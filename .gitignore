@@ -1,0 +1,5 @@
+state.json
+originals/
+__pycache__/
+*.log
+.DS_Store
