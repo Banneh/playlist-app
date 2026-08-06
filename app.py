@@ -331,9 +331,13 @@ def build_view():
     dev = STATE.get("device") or "xdj-700"
     if dev not in DEVICES:
         dev = "xdj-700"
+    bdir = os.path.join(ROOT, "originals", lib["id"])
     base = {"libraries": libraries_meta(), "active": lib["id"],
             "device": dev,
-            "devices": [{"id": k, "label": v["label"]} for k, v in DEVICES.items()]}
+            "devices": [{"id": k, "label": v["label"]} for k, v in DEVICES.items()],
+            "backups": len([f for f in os.listdir(bdir)
+                            if os.path.isfile(os.path.join(bdir, f))])
+                       if os.path.isdir(bdir) else 0}
     pl = lib.get("playlist")
     if not pl:
         return {**base, "ready": False}
@@ -490,6 +494,25 @@ def convert_all():
     view["convert_report"] = {"done": done, "errors": errors, "backup_dir": backup_dir}
     return view
 
+def restore_all():
+    """Copy backed-up originals back into the library folder (backups are kept)."""
+    lib = active_lib()
+    bdir = os.path.join(ROOT, "originals", lib["id"])
+    done, errors = 0, []
+    if os.path.isdir(bdir):
+        for f in sorted(os.listdir(bdir)):
+            src = os.path.join(bdir, f)
+            if not os.path.isfile(src):
+                continue
+            try:
+                shutil.copy2(src, os.path.join(lib["dir"], f))
+                done += 1
+            except Exception as e:
+                errors.append(f"{f}: {e}")
+    view = build_view()
+    view["restore_report"] = {"done": done, "errors": errors}
+    return view
+
 def library_op(data):
     op = data.get("op")
     libs = STATE["libraries"]
@@ -561,6 +584,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(tag_all())
             elif self.path == "/api/convert":
                 self._json(convert_all())
+            elif self.path == "/api/restore":
+                self._json(restore_all())
             elif self.path == "/api/library":
                 self._json(library_op(data))
             elif self.path == "/api/device":

@@ -53,6 +53,18 @@
   .tabs button { border: 0; border-radius: 0; background: transparent; padding: 9px 16px; color: var(--dim); }
   .tabs button.on { background: var(--panel2); color: var(--text); font-weight: 600; }
 
+  .bar.tools {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 8px 14px; gap: 18px; margin-bottom: 16px;
+  }
+  .bar.tools .grp { display: flex; align-items: center; gap: 8px; }
+  .bar.tools .lbl {
+    font-size: 10.5px; color: var(--dim); text-transform: uppercase;
+    letter-spacing: .1em; margin-right: 2px;
+  }
+  .bar.tools button { padding: 7px 13px; font-size: 13.5px; }
+  .bar.tools select { padding: 7px 8px; font-size: 13.5px; }
+
   .progress { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden; margin-bottom: 18px; }
   .progress i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); transition: width .5s; }
 
@@ -130,15 +142,22 @@
   <div class="bar">
     <button class="primary" id="btn-refresh">⟳ Fetch playlist</button>
     <button id="btn-rescan">📁 Rescan folder</button>
-    <button id="btn-tag" style="display:none">🏷 Write tags</button>
-    <select id="device" title="Target player"></select>
-    <button id="btn-convert">🎛 Convert</button>
     <input type="search" id="q" placeholder="Search artist or title…">
     <div class="tabs">
       <button data-tab="missing" class="on">Missing</button>
       <button data-tab="have">Have</button>
       <button data-tab="all">All</button>
     </div>
+  </div>
+  <div class="bar tools">
+    <span class="grp"><span class="lbl">Tags</span>
+      <button id="btn-tag">🏷 Write tags</button>
+    </span>
+    <span class="grp"><span class="lbl">Player</span>
+      <select id="device" title="Target player"></select>
+      <button id="btn-convert">🎛 Convert</button>
+      <button id="btn-restore" title="Copy the untouched originals back into the folder (backups are kept)">⏮ Restore originals</button>
+    </span>
   </div>
 
   <div class="progress"><i id="pbar" style="width:0%"></i></div>
@@ -205,10 +224,14 @@ function render() {
     `<option value="${d.id}" ${d.id === DATA.device ? 'selected' : ''}>${esc(d.label)}</option>`).join('');
   $('#pllink').style.visibility = DATA.playlist_url ? 'visible' : 'hidden';
   $('#pllink').href = DATA.playlist_url || '#';
+  const rb = $('#btn-restore');
+  rb.disabled = !DATA.backups;
+  rb.textContent = `⏮ Restore originals (${DATA.backups || 0})`;
   if (!DATA.ready) {
     ['#s-have', '#s-miss', '#s-local'].forEach(s => $(s).textContent = '–');
     $('#pbar').style.width = '0%';
-    $('#btn-tag').style.display = 'none';
+    const tb0 = $('#btn-tag');
+    tb0.disabled = true; tb0.textContent = '🏷 Write tags (0)';
     const cb0 = $('#btn-convert');
     cb0.disabled = true; cb0.textContent = '🎛 Convert (0)';
     $('#list').innerHTML = '<div class="empty">No playlist data yet — hit <b>⟳ Fetch playlist</b>.</div>';
@@ -219,7 +242,7 @@ function render() {
   $('#s-miss').textContent = DATA.missing;
   $('#s-local').textContent = DATA.local_count;
   const tb = $('#btn-tag');
-  tb.style.display = DATA.untagged > 0 ? '' : 'none';
+  tb.disabled = !DATA.untagged;
   tb.textContent = `🏷 Write tags (${DATA.untagged})`;
   $('#pbar').style.width = (100 * DATA.have / (DATA.have + DATA.missing || 1)) + '%';
 
@@ -347,6 +370,21 @@ $('#btn-convert').onclick = async () => {
       : `Converted ${r.done} file(s) — originals in playlist-app/originals`);
   } catch (e) { toast('Error: ' + e.message); }
   render();  // repaints the button with the fresh count
+};
+$('#btn-restore').onclick = async () => {
+  if (!confirm(`Copy ${DATA.backups} original file(s) back into the music folder?\n` +
+               `This overwrites the converted versions (you can convert again anytime).\n` +
+               `The backups themselves are kept.`)) return;
+  const b = $('#btn-restore');
+  b.disabled = true; b.innerHTML = '<span class="spin">⟳</span> Restoring…';
+  try {
+    DATA = await api('/api/restore', {});
+    const r = DATA.restore_report || {};
+    toast(r.errors && r.errors.length
+      ? `Restored ${r.done}, ${r.errors.length} failed: ${r.errors[0]}`
+      : `Restored ${r.done} original file(s)`);
+  } catch (e) { toast('Error: ' + e.message); }
+  render();
 };
 $('#lib').onchange = async e => {
   DATA = await api('/api/library', { op: 'select', id: e.target.value });
