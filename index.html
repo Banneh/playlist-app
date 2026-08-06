@@ -234,7 +234,9 @@ function render() {
     tb0.disabled = true; tb0.textContent = '🏷 Write tags (0)';
     const cb0 = $('#btn-convert');
     cb0.disabled = true; cb0.textContent = '🎛 Convert (0)';
-    $('#list').innerHTML = '<div class="empty">No playlist data yet — hit <b>⟳ Fetch playlist</b>.</div>';
+    $('#list').innerHTML = (DATA.libraries || []).length
+      ? '<div class="empty">No playlist data yet — hit <b>⟳ Fetch playlist</b>.</div>'
+      : '<div class="empty">Welcome to DJ HQ 🎧<br><br>Click <b>＋</b> in the header to link a music folder<br>to a public SoundCloud playlist.</div>';
     $('#extras').innerHTML = '';
     return;
   }
@@ -391,7 +393,7 @@ $('#lib').onchange = async e => {
   EDIT_ID = null; render();
 };
 $('#btn-addlib').onclick = async () => {
-  const dir = prompt('Full path to the music folder:\n(e.g. /Users/janbany/Desktop/Techno)');
+  const dir = prompt('Full path to the music folder:\n(e.g. ~/Music/Techno)');
   if (!dir) return;
   const url = prompt('SoundCloud playlist URL for this folder:');
   if (!url) return;
@@ -414,7 +416,10 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   try {
     DATA = await api('/api/state');
     render();
-    if (!DATA.ready) { DATA = await api('/api/refresh', {}); render(); }
+    if (!DATA.ready && (DATA.libraries || []).length) {
+      DATA = await api('/api/refresh', {});
+      render();
+    }
   } catch (e) { toast('Error: ' + e.message); }
 })();
 </script>

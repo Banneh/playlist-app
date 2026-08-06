@@ -9,10 +9,8 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from difflib import SequenceMatcher
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_DIR = os.path.dirname(ROOT)
-DEFAULT_URL = "https://soundcloud.com/jan-bany/sets/trance"
 STATE_PATH = os.path.join(ROOT, "state.json")
-PORT = 8765
+PORT = int(os.environ.get("DJHQ_PORT", "8765"))
 AUDIO_EXT = ('.wav', '.mp3', '.aiff', '.aif', '.flac', '.m4a', '.ogg')
 UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"}
@@ -28,53 +26,24 @@ DEVICES = {
 
 # ---------------- state ----------------
 
-def migrate(st):
-    """Old single-library state -> multi-library layout."""
-    if "libraries" in st:
-        return st
-    pl = st.get("playlist")
-    lib = {"id": "lib1", "dir": DEFAULT_DIR,
-           "url": (pl or {}).get("url") or DEFAULT_URL, "playlist": pl}
-    dc = {(k if os.path.isabs(k) else os.path.join(DEFAULT_DIR, k)): v
-          for k, v in st.get("dur_cache", {}).items()}
-    edits = {}
-    for k, v in st.get("edits", {}).items():
-        if k.startswith("x:") and not os.path.isabs(k[2:]):
-            edits["x:" + os.path.join(DEFAULT_DIR, k[2:])] = v
-        else:
-            edits[k] = v
-    ob = os.path.join(ROOT, "originals")
-    nb = os.path.join(ob, "lib1")
-    if os.path.isdir(ob):
-        os.makedirs(nb, exist_ok=True)
-        for f in os.listdir(ob):
-            p = os.path.join(ob, f)
-            if os.path.isfile(p):
-                shutil.move(p, os.path.join(nb, f))
-    return {"libraries": [lib], "active": "lib1", "dur_cache": dc,
-            "overrides": st.get("overrides", {}), "edits": edits,
-            "client_id": st.get("client_id"),
-            "device": st.get("device", "xdj-700")}
-
 def load_state():
     try:
         with open(STATE_PATH) as f:
-            return migrate(json.load(f))
+            return json.load(f)
     except Exception:
-        return {"libraries": [{"id": "lib1", "dir": DEFAULT_DIR,
-                               "url": DEFAULT_URL, "playlist": None}],
-                "active": "lib1", "dur_cache": {}, "overrides": {}, "edits": {},
-                "client_id": None, "device": "xdj-700"}
+        return {"libraries": [], "active": None, "dur_cache": {}, "overrides": {},
+                "edits": {}, "client_id": None, "device": "xdj-700"}
 
 def save_state(st):
     with open(STATE_PATH, "w") as f:
         json.dump(st, f, ensure_ascii=False)
 
 STATE = load_state()
-save_state(STATE)
 
 def active_lib():
     libs = STATE["libraries"]
+    if not libs:
+        return None
     return next((l for l in libs if l["id"] == STATE.get("active")), libs[0])
 
 def lib_name(lib):
@@ -331,13 +300,15 @@ def build_view():
     dev = STATE.get("device") or "xdj-700"
     if dev not in DEVICES:
         dev = "xdj-700"
-    bdir = os.path.join(ROOT, "originals", lib["id"])
-    base = {"libraries": libraries_meta(), "active": lib["id"],
+    bdir = os.path.join(ROOT, "originals", lib["id"]) if lib else ""
+    base = {"libraries": libraries_meta(), "active": lib["id"] if lib else None,
             "device": dev,
             "devices": [{"id": k, "label": v["label"]} for k, v in DEVICES.items()],
             "backups": len([f for f in os.listdir(bdir)
                             if os.path.isfile(os.path.join(bdir, f))])
-                       if os.path.isdir(bdir) else 0}
+                       if bdir and os.path.isdir(bdir) else 0}
+    if not lib:
+        return {**base, "ready": False}
     pl = lib.get("playlist")
     if not pl:
         return {**base, "ready": False}
@@ -406,9 +377,15 @@ def build_view():
 
 # ---------------- actions ----------------
 
+def require_lib():
+    lib = active_lib()
+    if not lib:
+        raise RuntimeError("add a library first (＋ button in the header)")
+    return lib
+
 def tag_all():
     """Write metadata to every file (matched + extras) whose tags don't match yet."""
-    lib = active_lib()
+    lib = require_lib()
     view = build_view()
     genre = view.get("genre", "Trance")
     done, errors = 0, []
@@ -429,7 +406,7 @@ def tag_all():
 def convert_all():
     """Convert every incompatible local PCM file in place (same path & duration ->
     rekordbox keeps hot cues / grid / analysis). Originals backed up first."""
-    lib = active_lib()
+    lib = require_lib()
     dev_key = STATE.get("device") or "xdj-700"
     dev = DEVICES.get(dev_key, DEVICES["xdj-700"])
     backup_dir = os.path.join(ROOT, "originals", lib["id"])
@@ -496,7 +473,7 @@ def convert_all():
 
 def restore_all():
     """Copy backed-up originals back into the library folder (backups are kept)."""
-    lib = active_lib()
+    lib = require_lib()
     bdir = os.path.join(ROOT, "originals", lib["id"])
     done, errors = 0, []
     if os.path.isdir(bdir):
@@ -576,7 +553,10 @@ class Handler(BaseHTTPRequestHandler):
             n = int(self.headers.get("Content-Length", 0))
             data = json.loads(self.rfile.read(n) or b"{}")
             if self.path == "/api/refresh":
-                fetch_playlist(active_lib())
+                lib = active_lib()
+                if not lib:
+                    raise RuntimeError("add a library first (＋ button in the header)")
+                fetch_playlist(lib)
                 self._json(build_view())
             elif self.path == "/api/rescan":
                 self._json(build_view())
@@ -604,7 +584,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(build_view())
             elif self.path == "/api/edit":
                 if data.get("file"):
-                    key = "x:" + os.path.join(active_lib()["dir"], data["file"])
+                    key = "x:" + os.path.join(require_lib()["dir"], data["file"])
                 else:
                     key = str(data.get("id"))
                 a = (data.get("artist") or "").strip()
