@@ -256,8 +256,6 @@ function render() {
       <span class="pill ${t.have ? 'have' : 'miss'} ${t.override ? 'manual' : ''}"
             title="Click to toggle manually" onclick="toggle(${t.id}, ${t.have}, ${t.auto})">
         ${t.have ? 'HAVE' : 'MISSING'}</span>
-      ${!t.have ? `<a class="open" href="${scSearch(t.artist + ' ' + t.title)}" target="_blank"
-        rel="noopener" title="Search SoundCloud for this track">🔍</a>` : ''}
       <a class="open" href="${esc(t.url)}" target="_blank" rel="noopener">Open ↗</a>
     </div>`).join('')
     : '<div class="empty">Nothing here 🎉</div>';
