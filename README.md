@@ -1,6 +1,6 @@
 # DJ HQ 🎧
 
-A tiny local web app for DJs who collect tracks from SoundCloud playlists and play
+A desktop app for DJs who collect tracks from SoundCloud playlists and play
 them through rekordbox on Pioneer gear. It answers three questions that normally
 cost you an evening:
 
@@ -8,7 +8,7 @@ cost you an evening:
 2. **Why does rekordbox show blank artist/title for my WAVs?**
 3. **Why won't my XDJ/CDJ play this file?**
 
-<!-- TODO: add screenshot/GIF here before publishing -->
+![DJ HQ](docs/screenshot.png)
 
 ## What it does
 
@@ -27,6 +27,59 @@ cost you an evening:
 - **Multiple libraries** — each links one folder to one playlist; switch in the
   header.
 
+## Install
+
+### Download (recommended)
+
+Grab the latest build from the
+[Releases page](https://github.com/Banneh/playlist-app/releases):
+
+| Platform | File |
+| --- | --- |
+| macOS (Apple Silicon) | `DJ HQ-<version>-arm64.dmg` |
+| Windows | `DJ HQ Setup <version>.exe` |
+| Linux | `DJ HQ-<version>.AppImage` |
+
+ffmpeg is bundled — there is nothing else to install.
+
+The builds are **unsigned** (no paid developer certificates), so the OS will
+warn on first launch:
+
+- **macOS**: right-click the app → *Open* → *Open*. If macOS says the app is
+  "damaged", clear the quarantine flag instead:
+  `xattr -cr "/Applications/DJ HQ.app"`
+- **Windows**: SmartScreen → *More info* → *Run anyway*.
+
+On an Intel Mac, run from source instead (below).
+
+### Run from source
+
+Requires [Node.js](https://nodejs.org) 20+.
+
+```
+git clone https://github.com/Banneh/playlist-app.git
+cd playlist-app
+npm install
+npm start
+```
+
+### Headless mode
+
+The same UI served to your browser, no Electron window:
+
+```
+npm run headless        # then open http://localhost:8765
+```
+
+Port and data location can be overridden with `DJHQ_PORT` and `DJHQ_DATA_DIR`.
+
+### Where your data lives
+
+The packaged app keeps its state (libraries, playlist snapshots, manual edits)
+in the OS user-data folder — `~/Library/Application Support/DJ HQ` on macOS.
+Running from source keeps `state.json` in the project folder. Conversion
+backups are stored next to the state in `originals/<library>/`.
+
 ## Safety
 
 This app rewrites files inside your music library, so it is paranoid about it:
@@ -40,20 +93,6 @@ This app rewrites files inside your music library, so it is paranoid about it:
   skipped with a warning instead of silently breaking your rekordbox references.
 
 Still: it's your library — keep your own backups too.
-
-## Install & run
-
-Requirements: Python 3.9+, [ffmpeg](https://ffmpeg.org) (`ffmpeg` + `ffprobe` on
-PATH), and mutagen.
-
-```
-pip install mutagen
-python3 app.py          # then open http://localhost:8765
-```
-
-Port can be overridden with `DJHQ_PORT=9000 python3 app.py`.
-Developed and tested on macOS; nothing in it is Mac-specific, but Windows/Linux
-are untested — reports welcome.
 
 ## A note on SoundCloud
 
@@ -74,6 +113,20 @@ button, nothing more.
   re-read files on its own: select the tracks → right-click → *Reload Tag*.
 - **A match is wrong** — click the HAVE/MISSING pill to override it, and ✎ to
   fix artist/title before tagging.
+- **"Couldn't load the library: operation not permitted" (macOS)** — give the
+  app access to your music folder in System Settings → Privacy & Security →
+  Files and Folders.
+
+## Development
+
+```
+npm run build       # compile TypeScript to dist/
+npm start           # build + open the Electron app
+npm run dist        # build installers locally into release/
+```
+
+Releases are built by GitHub Actions: pushing a `v*` tag builds macOS, Windows
+and Linux installers and publishes them to the Releases page.
 
 ## Out of scope (for now)
 
