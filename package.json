@@ -6,6 +6,10 @@
   "main": "dist/main.js",
   "license": "MIT",
   "author": "Jan Bany",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Banneh/playlist-app.git"
+  },
   "scripts": {
     "build": "tsc",
     "start": "npm run build && electron .",
