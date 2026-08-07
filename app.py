@@ -295,18 +295,37 @@ def libraries_meta():
     return [{"id": l["id"], "name": lib_name(l), "dir": l["dir"]}
             for l in STATE["libraries"]]
 
+def restorable_count(lib):
+    """Backups that differ (size/mtime) from the current library copy —
+    i.e. files a restore would actually change."""
+    if not lib:
+        return 0
+    bdir = os.path.join(ROOT, "originals", lib["id"])
+    if not os.path.isdir(bdir):
+        return 0
+    n = 0
+    for f in os.listdir(bdir):
+        src = os.path.join(bdir, f)
+        if not os.path.isfile(src):
+            continue
+        dst = os.path.join(lib["dir"], f)
+        try:
+            b, c = os.stat(src), os.stat(dst)
+            if b.st_size != c.st_size or abs(b.st_mtime - c.st_mtime) > 1:
+                n += 1
+        except FileNotFoundError:
+            n += 1
+    return n
+
 def build_view():
     lib = active_lib()
     dev = STATE.get("device") or "xdj-700"
     if dev not in DEVICES:
         dev = "xdj-700"
-    bdir = os.path.join(ROOT, "originals", lib["id"]) if lib else ""
     base = {"libraries": libraries_meta(), "active": lib["id"] if lib else None,
             "device": dev,
             "devices": [{"id": k, "label": v["label"]} for k, v in DEVICES.items()],
-            "backups": len([f for f in os.listdir(bdir)
-                            if os.path.isfile(os.path.join(bdir, f))])
-                       if bdir and os.path.isdir(bdir) else 0}
+            "backups": restorable_count(lib)}
     if not lib:
         return {**base, "ready": False}
     pl = lib.get("playlist")
