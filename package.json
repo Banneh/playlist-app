@@ -14,6 +14,9 @@
   },
   "build": {
     "appId": "com.djhq.app",
+    "directories": {
+      "output": "release"
+    },
     "productName": "DJ HQ",
     "files": [
       "dist/**",
@@ -45,6 +48,7 @@
   "devDependencies": {
     "@types/node": "^26.1.2",
     "electron": "^43.3.0",
+    "electron-builder": "^26.15.3",
     "typescript": "^7.0.2"
   },
   "dependencies": {
