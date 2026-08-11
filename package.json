@@ -1,7 +1,7 @@
 {
   "name": "dj-hq",
   "productName": "DJ HQ",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local playlist reconciliation, rekordbox tagging and player-compat conversion for DJs",
   "main": "dist/main.js",
   "license": "MIT",
@@ -18,6 +18,12 @@
   },
   "build": {
     "appId": "com.djhq.app",
+    "publish": {
+      "provider": "github",
+      "owner": "Banneh",
+      "repo": "playlist-app",
+      "releaseType": "release"
+    },
     "directories": {
       "output": "release"
     },
