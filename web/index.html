@@ -203,7 +203,7 @@
   /* ---- list ---- */
   .list { display: flex; flex-direction: column; gap: 6px; }
   .row {
-    display: flex; align-items: center; gap: 14px; background: var(--panel);
+    display: flex; align-items: center; gap: 10px; background: var(--panel);
     border: 1px solid var(--line); border-radius: var(--r-box); padding: 10px 14px; transition: .15s;
   }
   .row:hover { border-color: var(--line-strong); }
@@ -231,9 +231,29 @@
   .iconbtn.save { color: var(--green); }
   .iconbtn.danger { background: transparent; color: var(--dim); font-weight: 400; }
   .iconbtn.danger:hover { border-color: var(--accent2); color: var(--accent2); }
-  .dur { color: var(--dim); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .dur { color: var(--dim); font-size: 13px; font-variant-numeric: tabular-nums; width: 44px; text-align: right; flex-shrink: 0; }
+
+  /* Fixed columns: every control has a slot that stays put whether or not it is
+     filled, so status, Buy, Free DL and Open line up down the whole list. */
+  .acts { display: flex; gap: 6px; flex: 0 0 auto; }
+  .iconbtn.sq { width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .iconbtn.wide { width: 100%; height: 34px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; }
+  .slot { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; min-height: 34px; }
+  .slot.sq { width: 34px; }
+  .slot.status { width: 96px; }
+  .slot.buy { width: 86px; }
+  .slot.free { width: 100px; }
+  .slot.main { width: 176px; }
+  .slot > a.open { flex: 1 1 auto; width: auto; }
+  .dialog a.open { flex: 0 0 auto; width: auto; }
+  .slot.buy:empty::before, .slot.free:empty::before { content: "–"; color: var(--faint); opacity: .45; }
+  @media (max-width: 900px) {
+    .slot.status, .slot.buy, .slot.free, .slot.main { width: auto; }
+    .slot:empty { display: none; }
+  }
   .pill {
-    font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 4px 10px;
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 4px 10px; min-width: 84px;
+    text-align: center; box-sizing: border-box;
     border-radius: 999px; flex-shrink: 0; cursor: pointer; user-select: none; border: 1px solid transparent;
   }
   .pill.have { background: rgba(52,211,153,.13); color: var(--green); }
@@ -254,7 +274,8 @@
   .pill:hover { filter: brightness(1.25); }
   a.open {
     color: var(--accent); text-decoration: none; font-weight: 600; font-size: 13px;
-    padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; flex-shrink: 0; transition: .15s;
+    height: 34px; padding: 0 12px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--line); border-radius: 8px; flex: 0 0 84px; width: 84px; white-space: nowrap; transition: .15s;
   }
   a.open:hover { border-color: var(--accent); background: rgba(124,92,255,.1); }
   a.open.free { color: var(--green); }
@@ -603,6 +624,13 @@ function openAssign(id) {
 
 /* ---- playlist track row ---- */
 
+function linkBtn(t, kind) {
+  const l = (t.links || []).find(x => x.kind === kind);
+  return l ? `<a class="open ${l.kind}" href="${esc(l.url)}" target="_blank" rel="noopener" title="${
+    esc(l.title ? l.title + ' · ' : '')}${esc(l.host)}${l.fmt ? ' · ' + esc(l.fmt) : ''}">${
+    l.kind === 'free' ? '⬇' : '🛒'} ${esc(l.label)}</a>` : '';
+}
+
 function trackRow(t) {
   return t.id === EDIT_ID ? `
     <div class="row">
@@ -613,9 +641,11 @@ function trackRow(t) {
         <input id="e-title" value="${esc(t.title)}" placeholder="Title"
                onkeydown="if(event.key==='Enter')saveEdit(${t.id})">
       </div>
-      <button class="iconbtn save" onclick="saveEdit(${t.id})" title="Save">✓ Save</button>
-      ${t.edited ? `<button class="iconbtn danger" onclick="resetEdit(${t.id})" title="Back to SoundCloud values">↺</button>` : ''}
-      <button class="iconbtn" onclick="EDIT_ID=null;render()" title="Cancel">✕</button>
+      <div class="acts">
+        <button class="iconbtn save" onclick="saveEdit(${t.id})" title="Save">✓ Save</button>
+        <div class="slot sq">${t.edited ? `<button class="iconbtn sq danger" onclick="resetEdit(${t.id})" title="Back to SoundCloud values">↺</button>` : ''}</div>
+        <button class="iconbtn sq" onclick="EDIT_ID=null;render()" title="Cancel">✕</button>
+      </div>
     </div>` : `
     <div class="row ${t.have ? 'have' : ''}${t.na ? ' na' : ''}">
       <span class="num">${t.n}</span>
@@ -635,15 +665,16 @@ function trackRow(t) {
           title="Click to match a file">📌 manually set to “no file”</div>` : ''}
       </div>
       <span class="dur">${t.dur}</span>
-      <button class="iconbtn" onclick="openAssign(${t.id})" title="Match to a local file…">⇄</button>
-      <button class="iconbtn" onclick="EDIT_ID=${t.id};render();$('#e-artist').focus()" title="Edit artist / title">✎</button>
-      <span class="pill ${t.na ? 'na' : t.have ? 'have' : 'miss'} ${t.override || t.na ? 'manual' : ''}"
+      <div class="acts">
+        <button class="iconbtn sq" onclick="openAssign(${t.id})" title="Match to a local file…">⇄</button>
+        <button class="iconbtn sq" onclick="EDIT_ID=${t.id};render();$('#e-artist').focus()" title="Edit artist / title">✎</button>
+      </div>
+      <div class="slot status"><span class="pill ${t.na ? 'na' : t.have ? 'have' : 'miss'} ${t.override || t.na ? 'manual' : ''}"
             title="${t.na ? 'Not available now — click to put it back in Missing' : t.have ? 'Click to mark as MISSING'
-                     : 'Click: mark as HAVE · again: not available now · again: back to automatic'}" onclick="toggle(${t.id})">
-        ${t.na ? 'N/A' : t.have ? 'HAVE' : 'MISSING'}</span>
-      ${(t.links || []).map(l => `<a class="open ${l.kind}" href="${esc(l.url)}" target="_blank" rel="noopener"
-          title="${esc(l.title ? l.title + ' · ' : '')}${esc(l.host)}${l.fmt ? ' · ' + esc(l.fmt) : ''}">${
-          l.kind === 'free' ? '⬇' : '🛒'} ${esc(l.label)}</a>`).join('')}
+                     : 'Click: mark as HAVE · click again: not available now · again: back to automatic'}" onclick="toggle(${t.id})">${
+        t.na ? 'N/A' : t.have ? 'HAVE' : 'MISSING'}</span></div>
+      <div class="slot buy">${linkBtn(t, 'buy')}</div>
+      <div class="slot free">${linkBtn(t, 'free')}</div>
       <a class="open" href="${esc(t.url)}" target="_blank" rel="noopener">Open ↗</a>
     </div>`;
 }
@@ -688,8 +719,8 @@ function inboxRow(it) {
         ${it.action === 'upgrade' ? `<div class="f warn">⬆ replaces ${esc(it.cur_file)} — the old file is kept in the backup folder</div>` : ''}
       </div>
       <span class="dur">${it.dur}</span>
-      <button class="iconbtn save" onclick="inboxMove(${i})" title="Move this file into the music folder and match it to the track">
-        ${it.action === 'upgrade' ? '⬆ Upgrade' : '📥 Move into library'}</button>
+      <div class="slot main"><button class="iconbtn save wide" onclick="inboxMove(${i})" title="Move this file into the music folder and match it to the track">${
+        it.action === 'upgrade' ? '⬆ Upgrade' : '📥 Move into library'}</button></div>
     </div>`;
 }
 
@@ -745,9 +776,11 @@ function extraRow(f, i) {
         <input id="e-title" value="${esc(f.title)}" placeholder="Title"
                onkeydown="if(event.key==='Enter')saveExtra(${i})">
       </div>
-      <button class="iconbtn save" onclick="saveExtra(${i})">✓ Save</button>
-      ${f.edited ? `<button class="iconbtn danger" onclick="resetExtra(${i})" title="Back to filename values">↺</button>` : ''}
-      <button class="iconbtn" onclick="EDIT_ID=null;render()">✕</button>
+      <div class="acts">
+        <button class="iconbtn save" onclick="saveExtra(${i})">✓ Save</button>
+        <div class="slot sq">${f.edited ? `<button class="iconbtn sq danger" onclick="resetExtra(${i})" title="Back to filename values">↺</button>` : ''}</div>
+        <button class="iconbtn sq" onclick="EDIT_ID=null;render()">✕</button>
+      </div>
     </div>`;
   const fd = f.found;
   return `
@@ -761,11 +794,13 @@ function extraRow(f, i) {
         ${fd ? `<div class="f link" onclick="openFind(${i})" title="Click to pick a different track">☁ ${esc(fd.user)} – ${esc(fd.title)} · ${esc(fd.dur)}</div>` : ''}
       </div>
       <span class="dur">${f.dur}</span>
-      <button class="iconbtn" onclick="EDIT_ID='x${i}';render();$('#e-artist').focus()" title="Edit artist / title">✎</button>
-      ${fd ? `<button class="iconbtn" onclick="clearFound(${i})" title="Forget this match">✕</button>
-          <a class="open" href="${esc(fd.url)}" target="_blank" rel="noopener"
+      <div class="acts">
+        <button class="iconbtn sq" onclick="EDIT_ID='x${i}';render();$('#e-artist').focus()" title="Edit artist / title">✎</button>
+        <div class="slot sq">${fd ? `<button class="iconbtn sq" onclick="clearFound(${i})" title="Forget this match">✕</button>` : ''}</div>
+      </div>
+      <div class="slot main">${fd ? `<a class="open" href="${esc(fd.url)}" target="_blank" rel="noopener"
              title="Open the track on SoundCloud and add it to the playlist there">Add to playlist ↗</a>`
-        : `<button class="iconbtn" onclick="openFind(${i})" title="Search SoundCloud for this file">🔍 Find on SoundCloud</button>`}
+        : `<button class="iconbtn wide" onclick="openFind(${i})" title="Search SoundCloud for this file">🔍 Find on SoundCloud</button>`}</div>
     </div>`;
 }
 
