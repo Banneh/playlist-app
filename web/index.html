@@ -164,7 +164,8 @@
                     box-shadow: 0 1px 4px rgba(0,0,0,.35); }
   .tabs .count { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
   .tabs button.on .count { color: var(--dim); }
-  .tabs button[data-tab=new] .count:not(:empty):not(.zero) { color: var(--accent); font-weight: 700; }
+  .tabs button[data-tab=new] .count:not(:empty):not(.zero),
+  .tabs button[data-tab=inbox] .count:not(:empty):not(.zero) { color: var(--accent); font-weight: 700; }
   .meta .new {
     display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .08em; color: var(--accent);
     background: rgba(124,92,255,.15); padding: 2px 6px; border-radius: 999px; margin-left: 6px; vertical-align: middle;
@@ -358,6 +359,7 @@
       <button data-tab="all">All <span class="count" id="c-all"></span></button>
       <button data-tab="new" title="Tracks added to the playlist since you last marked all as seen">New <span class="count" id="c-new"></span></button>
       <button data-tab="extras" title="Local files that aren't in the playlist">Not in playlist <span class="count" id="c-extras"></span></button>
+      <button data-tab="inbox" title="Fresh downloads that match a track in this playlist">Downloads <span class="count" id="c-inbox"></span></button>
     </div>
     <span class="vr"></span>
     <button id="btn-rescan" title="Re-check the music folder for files"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Rescan</button>
@@ -381,6 +383,7 @@
 <script>
 let DATA = null, TAB = 'missing', Q = '', EDIT_ID = null;
 let MFILTER = 'all', HFILTER = 'all', LAST_ROWS = [];   // sub-filters of the Missing / Have tabs
+let INBOX = null;   // last /api/inbox result
 
 const $ = s => document.querySelector(s);
 const esc = s => (s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -452,6 +455,7 @@ async function refreshPlaylist({ manual = false } = {}) {
     const fresh = await api('/api/refresh', {});
     DATA = fresh; LAST_OK = Date.now();
     if (manual || !busy()) render();   // don't yank an edit form or dialog from under the user
+    loadInbox();                        // new downloads may have landed meanwhile
     setUpd('Playlist checked ' + fmtTime(LAST_OK));
     let diff = '';
     if (before && fresh.ready) {
@@ -641,6 +645,79 @@ function trackRow(t) {
     </div>`;
 }
 
+/* ---- downloads inbox ---- */
+
+async function loadInbox() {
+  try { INBOX = await api('/api/inbox', {}); }
+  catch (e) { INBOX = { error: e.message, items: [], others: 0, already: 0 }; }
+  render();
+}
+
+function inboxHtml(q) {
+  if (!INBOX) return '<div class="empty"><span class="spin"></span> Scanning the downloads folder…</div>';
+  const dir = esc((INBOX.dir || '').replace(/^\/Users\/[^/]+/, '~'));
+  if (INBOX.error) return `<div class="empty">Couldn’t scan ${dir}:<br><b>${esc(INBOX.error)}</b></div>`;
+  if (INBOX.exists === false) return `<div class="empty">No downloads folder at ${dir}</div>`;
+  const items = INBOX.items.filter(it => !q || (it.artist + ' ' + it.title + ' ' + it.name).toLowerCase().includes(q));
+  const rest = [INBOX.already ? `${INBOX.already} already in the library` : '',
+                INBOX.others ? `${INBOX.others} other audio file${INBOX.others === 1 ? '' : 's'} there match nothing` : ''].filter(Boolean).join(' · ');
+  const bar = `<div class="newbar">
+      <span>${INBOX.items.length ? `${INBOX.items.length} download${INBOX.items.length === 1 ? '' : 's'} in ${dir} match${INBOX.items.length === 1 ? 'es' : ''} a track in this playlist.`
+                                   : `Nothing in ${dir} matches a track in this playlist.`}${rest ? ' ' + rest + '.' : ''}</span>
+      <span style="display:flex;gap:8px">
+        <button class="iconbtn" onclick="loadInbox()" title="Scan the downloads folder again">↻ Rescan</button>
+        ${INBOX.items.length > 1 ? `<button class="iconbtn save" onclick="inboxMoveAll()">📥 Move all (${INBOX.items.length})</button>` : ''}
+      </span></div>`;
+  return bar + (items.length ? items.map(inboxRow).join('')
+    : INBOX.items.length ? '<div class="empty">No downloads match the search</div>' : '');
+}
+
+function inboxRow(it) {
+  const i = INBOX.items.indexOf(it);
+  const dd = it.dur_diff === 0 ? 'same length' : (it.dur_diff > 0 ? '+' : '') + it.dur_diff + ' s';
+  return `
+    <div class="row">
+      <span class="num">${it.n}</span>
+      <div class="meta">
+        <div class="t">${esc(it.title)}</div>
+        <div class="a">${esc(it.artist)}</div>
+        <div class="f">📥 ${esc(it.name)} · ${esc(it.dur)} (${dd}) · ${Math.round(it.score * 100)}% match${it.lossy ? ' · MP3' : ''}</div>
+        ${it.action === 'upgrade' ? `<div class="f warn">⬆ replaces ${esc(it.cur_file)} — the old file is kept in the backup folder</div>` : ''}
+      </div>
+      <span class="dur">${it.dur}</span>
+      <button class="iconbtn save" onclick="inboxMove(${i})" title="Move this file into the music folder and match it to the track">
+        ${it.action === 'upgrade' ? '⬆ Upgrade' : '📥 Move into library'}</button>
+    </div>`;
+}
+
+async function inboxMove(i) {
+  const it = INBOX.items[i];
+  if (!it) return;
+  try {
+    DATA = await api('/api/inbox-move', { file: it.name, id: it.id });
+    toast(`${it.action === 'upgrade' ? 'Upgraded' : 'Moved'}: ${it.name}`);
+  } catch (e) { toast('Error: ' + e.message, true); }
+  await loadInbox();
+}
+
+async function inboxMoveAll() {
+  const ups = INBOX.items.filter(it => it.action === 'upgrade').length;
+  const ok = await uiConfirm({
+    title: `Move ${INBOX.items.length} file(s) into the music folder?`,
+    body: `Each file is moved out of the downloads folder and matched to its track.${
+      ups ? `\n\n${ups} of them replace an MP3 you already have; the replaced files are kept in the backup folder.` : ''}`,
+    ok: 'Move all',
+  });
+  if (!ok) return;
+  try {
+    DATA = await api('/api/inbox-move-all', {});
+    const r = DATA.inbox_report || {};
+    toast(r.errors && r.errors.length ? `Moved ${r.done}, ${r.errors.length} failed: ${r.errors[0]}` : `Moved ${r.done} file(s)`,
+          !!(r.errors && r.errors.length));
+  } catch (e) { toast('Error: ' + e.message, true); }
+  await loadInbox();
+}
+
 /* ---- local files not in the playlist ---- */
 
 function extrasHtml(q) {
@@ -805,7 +882,7 @@ function render() {
   rb.innerHTML = btnLabel(I.restore, 'Restore originals', DATA.backups);
   if (!DATA.ready) {
     ['#s-have', '#s-miss', '#s-local'].forEach(s => $(s).textContent = '–');
-    ['#c-missing', '#c-have', '#c-all', '#c-new', '#c-extras'].forEach(s => $(s).textContent = '');
+    ['#c-missing', '#c-have', '#c-all', '#c-new', '#c-extras', '#c-inbox'].forEach(s => $(s).textContent = '');
     $('#pbar').style.width = '0%';
     $('#pct').textContent = '';
     const tb0 = $('#btn-tag');
@@ -825,6 +902,8 @@ function render() {
   $('#c-all').textContent = DATA.tracks.length;
   $('#c-new').textContent = DATA.new_count;
   $('#c-extras').textContent = DATA.extras.length;
+  $('#c-inbox').textContent = INBOX ? INBOX.items.length : '';
+  $('#c-inbox').classList.toggle('zero', !INBOX || !INBOX.items.length);
   $('#c-new').classList.toggle('zero', !DATA.new_count);
   const tb = $('#btn-tag');
   tb.disabled = !DATA.untagged;
@@ -839,7 +918,7 @@ function render() {
   const q = Q.toLowerCase();
   const matchesQ = t => !q || (t.artist + ' ' + t.title + ' ' + t.user).toLowerCase().includes(q);
   const inTab = t => TAB === 'all' || (TAB === 'new' ? t.is_new : TAB === 'have' ? t.have : !t.have && !t.na);
-  let rows = TAB === 'extras' ? [] : DATA.tracks.filter(t => inTab(t) && matchesQ(t));
+  let rows = TAB === 'extras' || TAB === 'inbox' ? [] : DATA.tracks.filter(t => inTab(t) && matchesQ(t));
   let chips = '', tail = '';
   const hasFree = t => t.links.some(l => l.kind === 'free'), hasBuy = t => t.links.some(l => l.kind === 'buy');
   if (TAB === 'missing') {
@@ -869,6 +948,7 @@ function render() {
   $('#list').innerHTML = chips + newBar + (rows.length ? rows.map(trackRow).join('')
     : `<div class="empty">${emptyMsg}</div>`) + tail;
   if (TAB === 'extras') $('#list').innerHTML = extrasHtml(q);
+  if (TAB === 'inbox') $('#list').innerHTML = inboxHtml(q);
 
 
   const cb = $('#btn-convert');
@@ -1020,6 +1100,7 @@ $('#btn-dellib').onclick = async () => {
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on'));
   b.classList.add('on'); TAB = b.dataset.tab; render();
+  if (TAB === 'inbox') loadInbox();
 });
 
 (async () => {

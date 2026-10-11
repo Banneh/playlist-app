@@ -43,6 +43,12 @@ cost you an evening:
   leaves the Missing list and comes back by itself when a download or shop
   link appears for it. The Have tab flags MP3s whose shop link sells a
   lossless file (*⬆ lossless available*).
+- **Downloads** — fresh files in your Downloads folder are matched against the
+  playlist the same way the library is. A download for a missing track gets a
+  *Move into library* button; a lossless download for a track you only have as
+  MP3 gets *Upgrade* (the MP3 is kept in the backup folder). Files move as
+  they are, no renaming, and are pinned to their track. Set `inbox_dir` in
+  state.json to watch a different folder.
 - **Not in playlist** — local files that match nothing in the playlist get
   their own tab. *Find on SoundCloud* searches for the track (by name and
   duration), you add it to the playlist on SoundCloud with one click, and once

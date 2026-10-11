@@ -87,6 +87,8 @@ export interface AppState {
   found: Record<string, Found>;
   /** "not available now": track id -> the links it had when marked; cleared when they change */
   na: Record<string, { sig: string; at: number }>;
+  /** folder watched for fresh downloads; default ~/Downloads */
+  inbox_dir?: string;
   client_id: string | null;
   device: string;
 }
@@ -258,8 +260,10 @@ async function refreshCache(p: string): Promise<void> {
   STATE.dur_cache[p] = [st.size, Math.floor(st.mtimeMs / 1000), pr.dur, pr.fmt, pr.tags];
 }
 
-async function scanLocal(lib: Library): Promise<LocalFile[]> {
-  const d = lib.dir;
+const scanLocal = (lib: Library) => scanFolder(lib.dir);
+
+/** Audio files directly inside a folder, probed once and cached by size+mtime. */
+async function scanFolder(d: string): Promise<LocalFile[]> {
   const cache = STATE.dur_cache;
   const files: LocalFile[] = [];
   const seen = new Set<string>();
@@ -278,7 +282,7 @@ async function scanLocal(lib: Library): Promise<LocalFile[]> {
     }
   }
   for (const k of Object.keys(cache))
-    if (k.startsWith(d + path.sep) && !seen.has(k)) delete cache[k];
+    if (path.dirname(k) === d && !seen.has(k)) delete cache[k];
   saveState();
   return files;
 }
@@ -994,6 +998,101 @@ export async function findAll(): Promise<any> {
   saveState();
   view = await buildView();
   view.find_report = { found, in_playlist, unsure, none, errors };
+  return view;
+}
+
+// ---------------- downloads inbox ----------------
+
+const inboxDir = () => STATE.inbox_dir || path.join(os.homedir(), "Downloads");
+
+function bestTrack(f: LocalFile, tracks: PlTrack[]): [PlTrack | null, number] {
+  let best: PlTrack | null = null, bestS = 0;
+  for (const t of tracks) {
+    let s = Math.max(sim(f.name, t.title), sim(f.name, `${t.user} ${t.title}`));
+    const dd = Math.abs(f.dur - t.dur);
+    s += dd < 3 ? 0.15 : dd < 10 ? 0.07 : 0;
+    if (s > bestS) { best = t; bestS = s; }
+  }
+  return [best, Math.round(bestS * 100) / 100];
+}
+
+/** Fresh downloads that belong to this playlist: each audio file in the inbox
+ *  folder matched against the tracks like the library matcher does. */
+export async function inboxView(): Promise<any> {
+  const lib = requireLib();
+  const dir = inboxDir();
+  const base = { dir, exists: fs.existsSync(dir), items: [] as any[], others: 0, already: 0 };
+  if (!base.exists || !lib.playlist) return base;
+  const view = await buildView();
+  const rows = new Map<number, any>(view.tracks.map((r: any) => [r.id, r]));
+  const libNames = new Set((await scanLocal(lib)).map((f) => f.name));
+  for (const f of await scanFolder(dir)) {
+    if (libNames.has(f.name)) { base.already++; continue; } // copied in already
+    const [t, score] = bestTrack(f, lib.playlist.tracks);
+    const row = t && rows.get(t.id);
+    if (!t || !row || score < 0.6) { base.others++; continue; }
+    const lossy = LOSSY.test(f.fmt[0]);
+    let action: "move" | "upgrade" | null = null;
+    if (!row.have) action = "move";
+    else if (row.lossy && !lossy) action = "upgrade";
+    if (!action) { base.already++; continue; } // we already hold an equal or better file
+    base.items.push({ name: f.name, dur: fmtDur(Math.round(f.dur)), dur_diff: Math.round(f.dur - t.dur), lossy,
+                      id: t.id, n: row.n, artist: row.artist, title: row.title, score: Math.min(1, score),
+                      action, cur_file: row.file });
+  }
+  return base;
+}
+
+function moveFile(src: string, dst: string): void {
+  try { fs.renameSync(src, dst); }
+  catch (e: any) {
+    if (e.code !== "EXDEV") throw e;
+    fs.copyFileSync(src, dst); // other volume: copy, then remove the original
+    fs.unlinkSync(src);
+  }
+}
+
+/** Move one inbox file into the library and pin it to its track. When the
+ *  track already has a (lossy) file, that file goes to originals/<lib>/replaced/. */
+export async function inboxMove(data: any): Promise<any> {
+  const lib = requireLib();
+  const name = path.basename(String(data.file || ""));
+  const src = path.join(inboxDir(), name);
+  if (!name || !fs.existsSync(src)) throw new Error(`${name}: no longer in the downloads folder`);
+  const dst = path.join(lib.dir, name);
+  if (fs.existsSync(dst)) throw new Error(`${name}: a file with this name is already in the library`);
+  const tid = String(data.id);
+  if (!lib.playlist?.tracks.some((t) => String(t.id) === tid)) throw new Error("track is not in the playlist");
+  const row = (await buildView()).tracks.find((r: any) => String(r.id) === tid);
+  if (row?.have && row.file) {
+    const rdir = path.join(backupDir(lib), "replaced");
+    fs.mkdirSync(rdir, { recursive: true });
+    const old = path.join(lib.dir, row.file);
+    let keep = path.join(rdir, row.file);
+    for (let i = 2; fs.existsSync(keep); i++) keep = path.join(rdir, row.file.replace(/(\.[^.]+)$/, ` (${i})$1`));
+    moveFile(old, keep);
+    delete STATE.dur_cache[old];
+  }
+  moveFile(src, dst);
+  delete STATE.dur_cache[src];
+  for (const a of Object.keys(STATE.assigned)) if (STATE.assigned[a] === name) delete STATE.assigned[a];
+  STATE.assigned[tid] = name;
+  delete STATE.overrides[tid];
+  delete STATE.na[tid];
+  saveState();
+  return buildView();
+}
+
+export async function inboxMoveAll(): Promise<any> {
+  const items = (await inboxView()).items;
+  let done = 0;
+  const errors: string[] = [];
+  for (const it of items) {
+    try { await inboxMove({ file: it.name, id: it.id }); done++; }
+    catch (e: any) { errors.push(e.message); }
+  }
+  const view = await buildView();
+  view.inbox_report = { done, errors };
   return view;
 }
 

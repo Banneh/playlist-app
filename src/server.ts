@@ -63,6 +63,9 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/find":     return route(() => core.findTrack(data));
           case "/api/found":    return route(() => core.setFound(data));
           case "/api/find-all": return route(() => core.findAll());
+          case "/api/inbox":          return route(() => core.inboxView());
+          case "/api/inbox-move":     return route(() => core.inboxMove(data));
+          case "/api/inbox-move-all": return route(() => core.inboxMoveAll());
           case "/api/pick-folder":
             if (!opts.pickFolder) return json({ path: null, unsupported: true });
             return void opts.pickFolder()
