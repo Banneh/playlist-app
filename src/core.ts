@@ -62,9 +62,15 @@ export interface PlTrack {
   sc_dl?: boolean;
   /** candidate links found in the description: [url, its line, the line above] */
   desc_links?: [string, string, string][];
+  /** ms when this app first saw the track in the playlist; 0 = predates tracking */
+  added?: number;
 }
 export interface Playlist { title: string; url: string; tracks: PlTrack[]; }
-export interface Library { id: string; dir: string; url: string; playlist: Playlist | null; }
+export interface Library {
+  id: string; dir: string; url: string; playlist: Playlist | null;
+  /** tracks added after this (ms) are NEW; set by "Mark all as seen" */
+  seen_mark?: number;
+}
 
 // dur_cache entry: [size, mtime, duration, [codec, sr, bits], [artist, title, genre]]
 type CacheEntry = [number, number, number, [string, number, number], [string, string, string]];
@@ -168,6 +174,11 @@ export async function fetchPlaylist(lib: Library): Promise<void> {
       } else throw e;
     }
   }
+  // first-seen time per track: kept across fetches; tracks already in the
+  // snapshot (or in a library's very first fetch) are not "new"
+  const prevAdded = new Map<number, number>();
+  for (const p of lib.playlist?.tracks || []) prevAdded.set(p.id, p.added || 0);
+  const now = Date.now();
   const out: PlTrack[] = [];
   for (const tid of ids) {
     const t = tracks[tid];
@@ -184,6 +195,7 @@ export async function fetchPlaylist(lib: Library): Promise<void> {
       buy_title: t.purchase_title || null,
       sc_dl: !!(t.downloadable && t.has_downloads_left),
       desc_links: extractLinks(t.description || ""),
+      added: !lib.playlist ? 0 : prevAdded.has(tid) ? prevAdded.get(tid)! : now,
     });
   }
   lib.playlist = { title: pl.title || "Playlist", url: lib.url, tracks: out };
@@ -580,6 +592,7 @@ export async function buildView(): Promise<any> {
              have, auto: !!m, file: m ? m[0] : null,
              score: m && m[1] >= 0 ? Math.min(1, m[1]) : null,
              manual_match: manual.has(t.id), links: trackLinks(t),
+             added: t.added || 0, is_new: (t.added || 0) > (lib.seen_mark || 0),
              tagged, incompat, override: o || null, edited: !!ed };
   });
   const extras = files.filter((f) => !fileHit.has(f.name)).map((f) => {
@@ -597,6 +610,8 @@ export async function buildView(): Promise<any> {
     local_files: files.map((f) => ({ name: f.name, dur: fmtDur(Math.round(f.dur)) })),
     have: rows.filter((r) => r.have).length,
     missing: rows.filter((r) => !r.have).length,
+    new_count: rows.filter((r) => r.is_new).length,
+    seen_mark: lib.seen_mark || 0,
     untagged: rows.filter((r) => r.tagged === false).length
             + extras.filter((e) => e.tagged === false).length,
     incompatible: files.filter((f) => compatReason(f.fmt, dev)).length,
@@ -770,6 +785,12 @@ export async function setAssign(data: any): Promise<any> {
     STATE.assigned[tid] = file;
     delete STATE.overrides[tid]; // explicit assignment supersedes a have/missing override
   }
+  saveState();
+  return buildView();
+}
+
+export async function markSeen(): Promise<any> {
+  requireLib().seen_mark = Date.now();
   saveState();
   return buildView();
 }

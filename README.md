@@ -16,7 +16,9 @@ cost you an evening:
   fuzzy-matches it against a local folder (filename + duration), giving you a
   Have / Missing view with direct links to every missing track. The playlist
   is re-checked on launch and every 15 minutes while the window is visible,
-  and you're told when tracks were added or removed. Where the
+  and you're told when tracks were added or removed. Added tracks are flagged
+  **NEW** and collected in a *New* tab until you press *Mark all as seen*.
+  Where the
   uploader set a purchase link, the row shows a **Free DL** or **Buy** button
   going straight to the gate or shop (Hypeddit, Bandcamp, Beatport, …). The
   track description is scanned too, so a "FREE DL: https://…" line or a

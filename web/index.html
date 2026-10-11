@@ -164,6 +164,16 @@
                     box-shadow: 0 1px 4px rgba(0,0,0,.35); }
   .tabs .count { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
   .tabs button.on .count { color: var(--dim); }
+  .tabs button[data-tab=new] .count:not(:empty):not(.zero) { color: var(--accent); font-weight: 700; }
+  .meta .new {
+    display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .08em; color: var(--accent);
+    background: rgba(124,92,255,.15); padding: 2px 6px; border-radius: 999px; margin-left: 6px; vertical-align: middle;
+  }
+  .newbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    color: var(--dim); font-size: 13px; padding: 8px 14px; margin-bottom: 4px;
+    background: rgba(124,92,255,.08); border: 1px solid rgba(124,92,255,.25); border-radius: var(--r-box);
+  }
 
   .vr { width: 1px; height: 22px; background: var(--line-strong); margin: 0 4px; }
   .spacer { flex: 1; }
@@ -334,6 +344,7 @@
       <button data-tab="missing" class="on">Missing <span class="count" id="c-missing"></span></button>
       <button data-tab="have">Have <span class="count" id="c-have"></span></button>
       <button data-tab="all">All <span class="count" id="c-all"></span></button>
+      <button data-tab="new" title="Tracks added to the playlist since you last marked all as seen">New <span class="count" id="c-new"></span></button>
     </div>
     <span class="vr"></span>
     <button id="btn-rescan" title="Re-check the music folder for files"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Rescan</button>
@@ -395,6 +406,12 @@ async function api(path, body) {
 const AUTO_REFRESH_MS = 15 * 60 * 1000;
 let LAST_OK = 0, RETRY = null;
 const fmtTime = ms => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const fmtDate = ms => new Date(ms).toLocaleDateString([], { day: 'numeric', month: 'short' });
+
+async function markSeen() {
+  try { DATA = await api('/api/seen', {}); render(); toast('Marked all as seen'); }
+  catch (e) { toast('Error: ' + e.message, true); }
+}
 const busy = () => INFLIGHT > 0 || EDIT_ID !== null || !!$('.overlay');
 
 function setUpd(text, isErr) {
@@ -422,7 +439,7 @@ async function refreshPlaylist({ manual = false } = {}) {
       const now = new Set(fresh.tracks.map(t => t.id));
       const added = fresh.tracks.filter(t => !before.has(t.id)).length;
       const removed = [...before].filter(id => !now.has(id)).length;
-      if (added || removed) diff = `${added} added, ${removed} removed`;
+      if (added || removed) diff = `${added} new, ${removed} removed`;
     }
     if (manual) toast('Playlist fetched from SoundCloud' + (diff ? ' · ' + diff : ''));
     else if (diff) toast('Playlist updated: ' + diff);
@@ -626,6 +643,8 @@ function render() {
   $('#c-missing').textContent = DATA.missing;
   $('#c-have').textContent = DATA.have;
   $('#c-all').textContent = DATA.have + DATA.missing;
+  $('#c-new').textContent = DATA.new_count;
+  $('#c-new').classList.toggle('zero', !DATA.new_count);
   const tb = $('#btn-tag');
   tb.disabled = !DATA.untagged;
   tb.innerHTML = btnLabel(I.tag, 'Write tags', DATA.untagged);
@@ -638,10 +657,16 @@ function render() {
 
   const q = Q.toLowerCase();
   const rows = DATA.tracks.filter(t =>
-    (TAB === 'all' || (TAB === 'have') === t.have) &&
+    (TAB === 'all' || (TAB === 'new' ? t.is_new : (TAB === 'have') === t.have)) &&
     (!q || (t.artist + ' ' + t.title + ' ' + t.user).toLowerCase().includes(q)));
 
-  $('#list').innerHTML = rows.length ? rows.map(t => t.id === EDIT_ID ? `
+  const newBar = TAB === 'new' && DATA.new_count ? `<div class="newbar">
+      <span>${DATA.new_count} track${DATA.new_count === 1 ? '' : 's'} added to the playlist since ${
+        DATA.seen_mark ? 'you last marked all as seen (' + fmtDate(DATA.seen_mark) + ')' : 'tracking began'}</span>
+      <button class="iconbtn save" onclick="markSeen()">✓ Mark all as seen</button></div>` : '';
+  const emptyMsg = TAB === 'new'
+    ? 'Nothing new. Tracks added to the playlist from now on show up here.' : 'Nothing here 🎉';
+  $('#list').innerHTML = newBar + (rows.length ? rows.map(t => t.id === EDIT_ID ? `
     <div class="row">
       <span class="num">${t.n}</span>
       <img src="${esc(t.art)}" loading="lazy" onerror="this.style.visibility='hidden'">
@@ -658,7 +683,8 @@ function render() {
       <span class="num">${t.n}</span>
       <img src="${esc(t.art)}" loading="lazy" onerror="this.style.visibility='hidden'">
       <div class="meta">
-        <div class="t">${esc(t.title)}${t.edited ? '<span class="ed" title="Edited manually">✎ edited</span>' : ''}</div>
+        <div class="t">${esc(t.title)}${t.is_new ? `<span class="new" title="Added to the playlist ${fmtDate(t.added)}">NEW</span>` : ''}${
+          t.edited ? '<span class="ed" title="Edited manually">✎ edited</span>' : ''}</div>
         <div class="a">${esc(t.artist)}${t.user && t.user !== t.artist ? ' · via ' + esc(t.user) : ''}</div>
         ${t.file ? `<div class="f link${t.tagged === false || t.incompat ? ' warn' : ''}"
           onclick="openAssign(${t.id})" title="Click to match a different file">📄 ${esc(t.file)}${
@@ -679,7 +705,7 @@ function render() {
           l.kind === 'free' ? '⬇' : '🛒'} ${esc(l.label)}</a>`).join('')}
       <a class="open" href="${esc(t.url)}" target="_blank" rel="noopener">Open ↗</a>
     </div>`).join('')
-    : '<div class="empty">Nothing here 🎉</div>';
+    : `<div class="empty">${emptyMsg}</div>`);
 
   $('#extras').innerHTML = DATA.extras.length
     ? '<div class="section">Local files not in playlist (' + DATA.extras.length + ')</div><div class="list">'
