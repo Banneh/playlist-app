@@ -17,7 +17,9 @@ cost you an evening:
   Have / Missing view with direct links to every missing track. The playlist
   is re-checked on launch and every 15 minutes while the window is visible,
   and you're told when tracks were added or removed. Added tracks are flagged
-  **NEW** and collected in a *New* tab until you press *Mark all as seen*.
+  **NEW**, files that arrive in the folder **NEW FILE**, and both are collected
+  in a *New* tab until you press *Mark all as seen* — a to-do list of what
+  still needs tagging, converting and importing.
   Where the
   uploader set a purchase link, the row shows a **Free DL** or **Buy** button
   going straight to the gate or shop (Hypeddit, Bandcamp, Beatport, …). The

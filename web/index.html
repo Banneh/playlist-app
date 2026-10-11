@@ -170,6 +170,7 @@
     display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .08em; color: var(--accent);
     background: rgba(124,92,255,.15); padding: 2px 6px; border-radius: 999px; margin-left: 6px; vertical-align: middle;
   }
+  .meta .new.file { color: var(--green); background: rgba(52,211,153,.15); }
   .newbar {
     display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
     color: var(--dim); font-size: 13px; padding: 8px 14px; margin-bottom: 4px;
@@ -358,7 +359,7 @@
       <button data-tab="missing" class="on">Missing <span class="count" id="c-missing"></span></button>
       <button data-tab="have">Have <span class="count" id="c-have"></span></button>
       <button data-tab="all">All <span class="count" id="c-all"></span></button>
-      <button data-tab="new" title="Tracks added to the playlist since you last marked all as seen">New <span class="count" id="c-new"></span></button>
+      <button data-tab="new" title="Tracks added to the playlist and files that arrived in the folder since you last marked all as seen">New <span class="count" id="c-new"></span></button>
       <button data-tab="extras" title="Local files that aren't in the playlist">Not in playlist <span class="count" id="c-extras"></span></button>
       <button data-tab="inbox" title="Fresh downloads that match a track in this playlist">Downloads <span class="count" id="c-inbox"></span></button>
     </div>
@@ -621,6 +622,7 @@ function trackRow(t) {
       <img src="${esc(t.art)}" loading="lazy" onerror="this.style.visibility='hidden'">
       <div class="meta">
         <div class="t">${esc(t.title)}${t.is_new ? `<span class="new" title="Added to the playlist ${fmtDate(t.added)}">NEW</span>` : ''}${
+          t.is_new_file ? `<span class="new file" title="File arrived ${fmtDate(t.acquired)}">NEW FILE</span>` : ''}${
           t.edited ? '<span class="ed" title="Edited manually">✎ edited</span>' : ''}</div>
         <div class="a">${esc(t.artist)}${t.user && t.user !== t.artist ? ' · via ' + esc(t.user) : ''}</div>
         ${t.file ? `<div class="f link${t.tagged === false || t.incompat ? ' warn' : ''}"
@@ -918,7 +920,7 @@ function render() {
 
   const q = Q.toLowerCase();
   const matchesQ = t => !q || (t.artist + ' ' + t.title + ' ' + t.user).toLowerCase().includes(q);
-  const inTab = t => TAB === 'all' || (TAB === 'new' ? t.is_new : TAB === 'have' ? t.have : !t.have && !t.na);
+  const inTab = t => TAB === 'all' || (TAB === 'new' ? t.is_new || t.is_new_file : TAB === 'have' ? t.have : !t.have && !t.na);
   let rows = TAB === 'extras' || TAB === 'inbox' ? [] : DATA.tracks.filter(t => inTab(t) && matchesQ(t));
   let chips = '', tail = '';
   const hasFree = t => t.links.some(l => l.kind === 'free'), hasBuy = t => t.links.some(l => l.kind === 'buy');
@@ -940,12 +942,14 @@ function render() {
   }
   LAST_ROWS = rows;
 
+  const newWhat = [DATA.new_tracks ? `${DATA.new_tracks} track${DATA.new_tracks === 1 ? '' : 's'} added to the playlist` : '',
+                   DATA.new_files ? `${DATA.new_files} file${DATA.new_files === 1 ? '' : 's'} arrived in the folder` : ''].filter(Boolean).join(' and ');
   const newBar = TAB === 'new' && DATA.new_count ? `<div class="newbar">
-      <span>${DATA.new_count} track${DATA.new_count === 1 ? '' : 's'} added to the playlist since ${
+      <span>${newWhat} since ${
         DATA.seen_mark ? 'you last marked all as seen (' + fmtDate(DATA.seen_mark) + ')' : 'tracking began'}</span>
       <button class="iconbtn save" onclick="markSeen()">✓ Mark all as seen</button></div>` : '';
   const emptyMsg = TAB === 'new'
-    ? 'Nothing new. Tracks added to the playlist from now on show up here.' : 'Nothing here 🎉';
+    ? 'Nothing new. Tracks added to the playlist and files that arrive in the folder show up here.' : 'Nothing here 🎉';
   $('#list').innerHTML = chips + newBar + (rows.length ? rows.map(trackRow).join('')
     : `<div class="empty">${emptyMsg}</div>`) + tail;
   if (TAB === 'extras') $('#list').innerHTML = extrasHtml(q);

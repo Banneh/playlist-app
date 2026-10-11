@@ -70,6 +70,8 @@ export interface Library {
   id: string; dir: string; url: string; playlist: Playlist | null;
   /** tracks added after this (ms) are NEW; set by "Mark all as seen" */
   seen_mark?: number;
+  /** file-arrival tracking has been initialised for this library (files present then aren't "new") */
+  acq_init?: boolean;
 }
 
 // dur_cache entry: [size, mtime, duration, [codec, sr, bits], [artist, title, genre]]
@@ -89,6 +91,8 @@ export interface AppState {
   na: Record<string, { sig: string; at: number }>;
   /** folder watched for fresh downloads; default ~/Downloads */
   inbox_dir?: string;
+  /** "<lib id>:<track id>" -> ms when a file for the track first turned up (0 = predates tracking) */
+  acquired: Record<string, number>;
   client_id: string | null;
   device: string;
 }
@@ -114,10 +118,11 @@ function loadState(): AppState {
     st.assigned = st.assigned || {}; // older state files predate manual matching
     st.found = st.found || {};
     st.na = st.na || {};
+    st.acquired = st.acquired || {};
     return st;
   } catch {
     return { libraries: [], active: null, dur_cache: {}, overrides: {},
-             edits: {}, assigned: {}, found: {}, na: {}, client_id: null, device: "xdj-700" };
+             edits: {}, assigned: {}, found: {}, na: {}, acquired: {}, client_id: null, device: "xdj-700" };
   }
 }
 export function saveState(): void {
@@ -645,6 +650,7 @@ export async function buildView(libArg?: Library): Promise<any> {
     if (fname) matched.set(tid, [fname, -1]);
   const reavailable: string[] = [];
   let naDirty = false;
+  const now = Date.now();
   const rows = pl.tracks.map((t, i) => {
     let [a, ti] = artistTitle(t);
     const ed = STATE.edits[String(t.id)];
@@ -671,14 +677,22 @@ export async function buildView(libArg?: Library): Promise<any> {
       lossy = LOSSY.test(f.fmt[0]);
     }
     const upgrade = have && lossy && links.some((l) => l.kind === "buy" && !!l.fmt && l.fmt !== "MP3");
+    // when did a file for this track first turn up? (NEW FILE until marked seen)
+    const ak = `${lib.id}:${t.id}`;
+    if (m) {
+      if (!(ak in STATE.acquired)) { STATE.acquired[ak] = lib.acq_init ? now : 0; naDirty = true; }
+    } else if (ak in STATE.acquired) { delete STATE.acquired[ak]; naDirty = true; }
+    const acquired = m ? STATE.acquired[ak] : 0;
     return { n: i + 1, id: t.id, artist: a, title: ti, user: t.user,
              dur: fmtDur(t.dur), url: t.url, art: t.art,
              have, na, auto: !!m, file: m ? m[0] : null,
              score: m && m[1] >= 0 ? Math.min(1, m[1]) : null,
              manual_match: manual.has(t.id), links, lossy, upgrade,
              added: t.added || 0, is_new: (t.added || 0) > (lib.seen_mark || 0),
+             acquired, is_new_file: acquired > (lib.seen_mark || 0),
              tagged, incompat, override: o || null, edited: !!ed };
   });
+  if (!lib.acq_init) { lib.acq_init = true; naDirty = true; } // first pass stamped existing files with 0
   if (naDirty) saveState();
   const extras = files.filter((f) => !fileHit.has(f.name)).map((f) => {
     const [xa, xt] = extraArtistTitle(f);
@@ -697,7 +711,9 @@ export async function buildView(libArg?: Library): Promise<any> {
     na_count: rows.filter((r) => r.na).length,
     upgrades: rows.filter((r) => r.upgrade).length,
     reavailable,
-    new_count: rows.filter((r) => r.is_new).length,
+    new_count: rows.filter((r) => r.is_new || r.is_new_file).length,
+    new_tracks: rows.filter((r) => r.is_new).length,
+    new_files: rows.filter((r) => r.is_new_file).length,
     seen_mark: lib.seen_mark || 0,
     untagged: rows.filter((r) => r.tagged === false).length
             + extras.filter((e) => e.tagged === false).length,
