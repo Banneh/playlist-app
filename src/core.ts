@@ -68,6 +68,8 @@ export interface AppState {
   dur_cache: Record<string, any[]>;
   overrides: Record<string, string>;
   edits: Record<string, { artist: string; title: string }>;
+  /** manual file assignment: track id -> file name ("" = forced no file) */
+  assigned: Record<string, string>;
   client_id: string | null;
   device: string;
 }
@@ -87,10 +89,12 @@ const statePath = () => path.join(DATA_DIR, "state.json");
 
 function loadState(): AppState {
   try {
-    return JSON.parse(fs.readFileSync(statePath(), "utf8"));
+    const st = JSON.parse(fs.readFileSync(statePath(), "utf8"));
+    st.assigned = st.assigned || {}; // older state files predate manual matching
+    return st;
   } catch {
     return { libraries: [], active: null, dur_cache: {}, overrides: {},
-             edits: {}, client_id: null, device: "xdj-700" };
+             edits: {}, assigned: {}, client_id: null, device: "xdj-700" };
   }
 }
 export function saveState(): void {
@@ -420,11 +424,31 @@ export async function buildView(): Promise<any> {
   const files = await scanLocal(lib);
   const pl = lib.playlist;
   const genre = pl.title || "Trance";
-  const matched = new Map<number, [string, number]>();
+  const fmap = new Map(files.map((f) => [f.name, f]));
+  // manual assignments win over auto-matching; drop entries whose file vanished
+  const trackIds = new Set(pl.tracks.map((t) => t.id));
+  let assignedDirty = false;
+  for (const k of Object.keys(STATE.assigned)) {
+    const fname = STATE.assigned[k];
+    if (!trackIds.has(Number(k)) || (fname !== "" && !fmap.has(fname))) {
+      delete STATE.assigned[k];
+      assignedDirty = true;
+    }
+  }
+  if (assignedDirty) saveState();
+  const manual = new Map<number, string>(); // track id -> file name ("" = no file)
+  const manualFiles = new Set<string>();
+  for (const [k, fname] of Object.entries(STATE.assigned)) {
+    manual.set(Number(k), fname);
+    if (fname) manualFiles.add(fname);
+  }
+  const matched = new Map<number, [string, number]>(); // score -1 = manual
   const fileHit = new Set<string>();
   for (const f of files) {
+    if (manualFiles.has(f.name)) { fileHit.add(f.name); continue; }
     let best: PlTrack | null = null, bestS = 0;
     for (const t of pl.tracks) {
+      if (manual.has(t.id)) continue; // manually decided, don't steal / re-fill
       let s = Math.max(sim(f.name, t.title), sim(f.name, `${t.user} ${t.title}`));
       const dd = Math.abs(f.dur - t.dur);
       s += dd < 3 ? 0.15 : dd < 10 ? 0.07 : 0;
@@ -436,7 +460,8 @@ export async function buildView(): Promise<any> {
       fileHit.add(f.name);
     }
   }
-  const fmap = new Map(files.map((f) => [f.name, f]));
+  for (const [tid, fname] of manual)
+    if (fname) matched.set(tid, [fname, -1]);
   const rows = pl.tracks.map((t, i) => {
     let [a, ti] = artistTitle(t);
     const ed = STATE.edits[String(t.id)];
@@ -454,6 +479,8 @@ export async function buildView(): Promise<any> {
     return { n: i + 1, id: t.id, artist: a, title: ti, user: t.user,
              dur: fmtDur(t.dur), url: t.url, art: t.art,
              have, auto: !!m, file: m ? m[0] : null,
+             score: m && m[1] >= 0 ? Math.min(1, m[1]) : null,
+             manual_match: manual.has(t.id),
              tagged, incompat, override: o || null, edited: !!ed };
   });
   const extras = files.filter((f) => !fileHit.has(f.name)).map((f) => {
@@ -468,6 +495,7 @@ export async function buildView(): Promise<any> {
   return {
     ...base, ready: true, playlist: pl.title, playlist_url: pl.url,
     genre, tracks: rows, extras,
+    local_files: files.map((f) => ({ name: f.name, dur: fmtDur(Math.round(f.dur)) })),
     have: rows.filter((r) => r.have).length,
     missing: rows.filter((r) => !r.have).length,
     untagged: rows.filter((r) => r.tagged === false).length
@@ -626,6 +654,23 @@ export async function setOverride(data: any): Promise<any> {
   const tid = String(data.id), status = data.status;
   if (status === "have" || status === "missing") STATE.overrides[tid] = status;
   else delete STATE.overrides[tid];
+  saveState();
+  return buildView();
+}
+
+export async function setAssign(data: any): Promise<any> {
+  // file: name = pin this file to the track, "" = force no file, null = back to auto
+  const tid = String(data.id);
+  const file = data.file;
+  if (file === null || file === undefined) {
+    delete STATE.assigned[tid];
+  } else {
+    if (file) // a file belongs to at most one track
+      for (const k of Object.keys(STATE.assigned))
+        if (k !== tid && STATE.assigned[k] === file) delete STATE.assigned[k];
+    STATE.assigned[tid] = file;
+    delete STATE.overrides[tid]; // explicit assignment supersedes a have/missing override
+  }
   saveState();
   return buildView();
 }

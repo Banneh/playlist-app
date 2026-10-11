@@ -271,6 +271,23 @@
   }
   .dialog input:focus { border-color: var(--accent); }
   .dialog .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+  /* ---- file-picker (match a track to a local file) ---- */
+  .meta .f.link { cursor: pointer; }
+  .meta .f.link:hover { text-decoration: underline; }
+  .filelist {
+    display: flex; flex-direction: column; gap: 4px;
+    max-height: min(320px, 45vh); overflow-y: auto; margin-top: 12px;
+  }
+  .fileopt {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+    width: 100%; text-align: left; padding: 8px 11px; white-space: normal;
+  }
+  .fileopt .fn { font-size: 13px; font-weight: 500; word-break: break-all; }
+  .fileopt .fi { font-size: 11.5px; color: var(--dim); }
+  .fileopt.cur { border-color: var(--accent); }
+  .fileopt.cur .fi { color: var(--accent); }
+  .fileopt.taken .fi { color: var(--amber); }
 </style>
 </head>
 <body>
@@ -431,6 +448,64 @@ function uiAddLibrary() {
   });
 }
 
+/* ---- manual file matching ---- */
+
+async function applyAssign(id, file, msg) {
+  try {
+    DATA = await api('/api/assign', { id, file });
+    render(); toast(msg);
+  } catch (e) { toast('Error: ' + e.message, true); }
+}
+
+function openAssign(id) {
+  const t = DATA.tracks.find(x => x.id === id);
+  if (!t) return;
+  const fileTo = {};   // file name -> track currently holding it
+  DATA.tracks.forEach(x => { if (x.file) fileTo[x.file] = x; });
+  modal((dlg, done) => {
+    dlg.innerHTML = `<h3>Match “${esc(t.artist ? t.artist + ' – ' : '')}${esc(t.title)}”</h3>
+      <p>Playlist duration ${esc(t.dur)}. Pick the local file for this track — a file taken from another track frees that track to auto-match again.</p>
+      <div class="field"><input id="af-q" placeholder="Filter files…" spellcheck="false"></div>
+      <div class="filelist" id="af-list"></div>
+      <div class="actions">
+        ${t.manual_match ? '<button data-a="auto" title="Forget the manual choice and auto-match again">Use auto-match</button>' : ''}
+        ${t.file || t.manual_match ? '<button data-a="none" title="Mark this track as having no local file">No file</button>' : ''}
+        <button data-a="cancel">Cancel</button>
+      </div>`;
+    const list = dlg.querySelector('#af-list');
+    const paint = q => {
+      q = (q || '').toLowerCase();
+      list.innerHTML = (DATA.local_files || [])
+        .filter(f => !q || f.name.toLowerCase().includes(q))
+        .map(f => {
+          const cur = t.file === f.name;
+          const other = !cur && fileTo[f.name];
+          return `<button class="fileopt${cur ? ' cur' : other ? ' taken' : ''}" data-f="${esc(f.name)}">
+            <span class="fn">${esc(f.name)}</span>
+            <span class="fi">${esc(f.dur)}${cur ? ' · current match' :
+              other ? ` · matched to #${other.n} ${esc(other.title)}` : ' · unmatched'}</span>
+          </button>`;
+        }).join('') || '<div class="empty" style="padding:24px 0">No files match the filter</div>';
+      list.querySelectorAll('.fileopt').forEach(b =>
+        b.onclick = () => done({ file: b.dataset.f }));
+    };
+    paint('');
+    const q = dlg.querySelector('#af-q');
+    q.oninput = e => paint(e.target.value);
+    q.focus();
+    const auto = dlg.querySelector('[data-a=auto]');
+    if (auto) auto.onclick = () => done({ auto: true });
+    const none = dlg.querySelector('[data-a=none]');
+    if (none) none.onclick = () => done({ none: true });
+    dlg.querySelector('[data-a=cancel]').onclick = () => done(null);
+  }).then(r => {
+    if (!r) return;
+    if (r.auto) return applyAssign(id, null, 'Back to auto-matching');
+    if (r.none) return applyAssign(id, '', 'Marked as having no local file');
+    applyAssign(id, r.file, 'File matched to this track');
+  });
+}
+
 /* ---- inline edit ---- */
 
 async function saveEdit(id) {
@@ -532,11 +607,16 @@ function render() {
       <div class="meta">
         <div class="t">${esc(t.title)}${t.edited ? '<span class="ed" title="Edited manually">✎ edited</span>' : ''}</div>
         <div class="a">${esc(t.artist)}${t.user && t.user !== t.artist ? ' · via ' + esc(t.user) : ''}</div>
-        ${t.file ? `<div class="f${t.tagged === false || t.incompat ? ' warn' : ''}">📄 ${esc(t.file)}${
+        ${t.file ? `<div class="f link${t.tagged === false || t.incompat ? ' warn' : ''}"
+          onclick="openAssign(${t.id})" title="Click to match a different file">📄 ${esc(t.file)}${
+          t.manual_match ? ' · 📌 manual' : t.score !== null ? ` · ${Math.round(t.score * 100)}% match` : ''}${
           t.tagged === true ? ' · ✓ tagged' : t.tagged === false ? ' · ⚠ needs tags' : ''}${
-          t.incompat ? ' · 🎛 ' + esc(t.incompat) : ''}</div>` : ''}
+          t.incompat ? ' · 🎛 ' + esc(t.incompat) : ''}</div>`
+        : t.manual_match ? `<div class="f warn link" onclick="openAssign(${t.id})"
+          title="Click to match a file">📌 manually set to “no file”</div>` : ''}
       </div>
       <span class="dur">${t.dur}</span>
+      <button class="iconbtn" onclick="openAssign(${t.id})" title="Match to a local file…">⇄</button>
       <button class="iconbtn" onclick="EDIT_ID=${t.id};render();$('#e-artist').focus()" title="Edit artist / title">✎</button>
       <span class="pill ${t.have ? 'have' : 'miss'} ${t.override ? 'manual' : ''}"
             title="Click to toggle manually" onclick="toggle(${t.id}, ${t.have}, ${t.auto})">
