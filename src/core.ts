@@ -60,6 +60,8 @@ export interface PlTrack {
   buy_url?: string | null; buy_title?: string | null;
   /** official SoundCloud download button is available and has downloads left */
   sc_dl?: boolean;
+  /** candidate links found in the description: [url, its line, the line above] */
+  desc_links?: [string, string, string][];
 }
 export interface Playlist { title: string; url: string; tracks: PlTrack[]; }
 export interface Library { id: string; dir: string; url: string; playlist: Playlist | null; }
@@ -181,6 +183,7 @@ export async function fetchPlaylist(lib: Library): Promise<void> {
       buy_url: t.purchase_url || null,
       buy_title: t.purchase_title || null,
       sc_dl: !!(t.downloadable && t.has_downloads_left),
+      desc_links: extractLinks(t.description || ""),
     });
   }
   lib.playlist = { title: pl.title || "Playlist", url: lib.url, tracks: out };
@@ -332,27 +335,89 @@ const looseEq = (a: string, b: string) => norm(a) === norm(b);
 
 // ---------------- purchase / free-download links ----------------
 
-/** Download-gate services: a link there is a free download whatever it's called. */
-const FREE_GATES = /(^|\.)(hypeddit\.com|droploud\.com|downloadgater\.com|gaterush\.me|gatekit\.pro|toneden\.io)$/i;
+/** Download gates and file hosts: a link there is a free download whatever it's called. */
+const FREE_HOSTS = /(^|\.)(hypeddit\.com|droploud\.com|downloadgater\.com|gaterush\.me|gatekit\.pro|toneden\.io|drive\.google\.com|dropbox\.com|wetransfer\.com|we\.tl|mega\.nz|mediafire\.com|1drv\.ms)$/i;
+/** Shops, and smart links that fan out to shops/streaming. */
+const SHOP_HOSTS = /(^|\.)(bandcamp\.com|beatport\.com|junodownload\.com|traxsource\.com|lnk\.to|ffm\.to|fanlink\.to|bfan\.link|hyperfollow\.com|push\.fm|smarturl\.it|lnk\.site|ditto\.fm|orcd\.co|found\.ee|li\.sten\.to|songwhip\.com|song\.link|album\.link|linkfire\.com|lnkfi\.re)$/i;
+/** Socials, streaming, profile hubs: never where you get the file. */
+const NOISE_HOSTS = /(^|\.)(instagram\.com|facebook\.com|fb\.com|twitter\.com|x\.com|tiktok\.com|youtube\.com|youtu\.be|spotify\.com|apple\.com|deezer\.com|tidal\.com|soundcloud\.com|snd\.sc|linktr\.ee|linksr\.io|lnk\.bio|beacons\.ai|ra\.co|discord\.gg|discord\.com|t\.me|telegram\.me|patreon\.com|mixcloud\.com|twitch\.tv|threads\.net|managerone\.io|amazon\.com|shazam\.com)$/i;
+const FREE_WORDS = /\bfree\b|\bdl\b|download|gratis/i;
+const BUY_WORDS = /\bbuy|purchase|pre-?order|out now|available|support|shop|stream/i;
+
+function hostOf(url: string): string {
+  try { return new URL(url).hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; }
+}
+
+/** Candidate "get the track here" links in a description: [url, its line, the
+ *  line before it]. Socials/streaming are dropped; scheme-less URLs only count
+ *  for known hosts (descriptions are full of "www.instagram.com/..."). */
+export function extractLinks(desc: string): [string, string, string][] {
+  const out: [string, string, string][] = [];
+  let prev = "";
+  for (const raw of (desc || "").split(/\r?\n/)) {
+    const line = raw.replace(/\s+/g, " ").trim();
+    if (!line) continue;
+    const re = /(https?:\/\/)?(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)+)(\/[^\s<>"'\)\]]*)?/gi;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(line))) {
+      let url = m[0].replace(/[.,;:!?]+$/, "");
+      const host = m[2].toLowerCase();
+      if (NOISE_HOSTS.test(host)) continue;
+      if (!m[1]) {
+        if (!FREE_HOSTS.test(host) && !SHOP_HOSTS.test(host)) continue;
+        url = "https://" + url;
+      }
+      if (!out.some((o) => o[0] === url)) out.push([url, line, prev]);
+      if (out.length >= 6) return out;
+    }
+    prev = line;
+  }
+  return out;
+}
+
+function wordKind(s: string): "free" | "buy" | null {
+  const f = FREE_WORDS.test(s), b = BUY_WORDS.test(s);
+  if (f && b) return /\bfree\b/i.test(s) ? "free" : "buy"; // "free dl" beats "support"; "stream/download" is a shop
+  return f ? "free" : b ? "buy" : null;
+}
+
+/** Host is decisive for gates/file hosts; otherwise the words on the link's own
+ *  line, then the line above ("FREE DOWNLOAD:\nhttps://..."), then shop hosts. */
+function classify(host: string, line: string, prev: string): "free" | "buy" | null {
+  if (FREE_HOSTS.test(host)) return "free";
+  return wordKind(line) || wordKind(prev) || (SHOP_HOSTS.test(host) ? "buy" : null);
+}
 
 export interface BuyLink { url: string; kind: "free" | "buy"; label: string; title: string; host: string; }
 
-/** Where to get the track: the uploader's purchase link (classified as a free
- *  download or a shop by its title/host), else SoundCloud's own download button. */
-export function buyLink(t: PlTrack): BuyLink | null {
-  const title = (t.buy_title || "").trim();
+/** Where to get the track, at most one free and one buy link: the uploader's
+ *  purchase button first, then links found in the description, then
+ *  SoundCloud's own download button. Free links sort first. */
+export function trackLinks(t: PlTrack): BuyLink[] {
+  const out: BuyLink[] = [];
+  const add = (url: string, kind: "free" | "buy", title: string, host: string) => {
+    if (out.some((o) => o.url === url || o.kind === kind)) return;
+    out.push({ url, kind, label: kind === "free" ? "Free DL" : "Buy", title, host });
+  };
   if (t.buy_url && /^https?:\/\//i.test(t.buy_url)) {
-    let host = "";
-    try { host = new URL(t.buy_url).hostname.replace(/^www\./, ""); } catch { /* fall through */ }
+    const host = hostOf(t.buy_url);
     if (host) {
-      const free = /free|\bdl\b|download|gratis/i.test(title) || FREE_GATES.test(host);
-      return { url: t.buy_url, kind: free ? "free" : "buy",
-               label: free ? "Free DL" : "Buy", title, host };
+      const title = (t.buy_title || "").trim();
+      add(t.buy_url, FREE_WORDS.test(title) || FREE_HOSTS.test(host) ? "free" : "buy", title, host);
     }
   }
-  if (t.sc_dl && t.url)
-    return { url: t.url, kind: "free", label: "Free DL", title: "Download on SoundCloud", host: "soundcloud.com" };
-  return null;
+  for (const [url, line, prev] of t.desc_links || []) {
+    const host = hostOf(url);
+    const kind = host ? classify(host, line, prev) : null;
+    if (!kind) continue;
+    // tooltip: the words around the link; never a bare URL (e.g. the Instagram line above it)
+    const words = (s: string) => s.replace(/(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?/gi, "")
+      .replace(/^[\s\-:>⬇→\[\]()]+|[\s\-:>⬇→\[\]()]+$/g, "").trim();
+    const ctx = words(line) || words(prev);
+    add(url, kind, ctx.slice(0, 80), host);
+  }
+  if (t.sc_dl && t.url) add(t.url, "free", "Download on SoundCloud", "soundcloud.com");
+  return out.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "free" ? -1 : 1));
 }
 
 function isTagged(f: LocalFile, artist: string, title: string, genre: string): boolean {
@@ -514,7 +579,7 @@ export async function buildView(): Promise<any> {
              dur: fmtDur(t.dur), url: t.url, art: t.art,
              have, auto: !!m, file: m ? m[0] : null,
              score: m && m[1] >= 0 ? Math.min(1, m[1]) : null,
-             manual_match: manual.has(t.id), buy: buyLink(t),
+             manual_match: manual.has(t.id), links: trackLinks(t),
              tagged, incompat, override: o || null, edited: !!ed };
   });
   const extras = files.filter((f) => !fileHit.has(f.name)).map((f) => {

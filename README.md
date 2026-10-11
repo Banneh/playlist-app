@@ -18,7 +18,10 @@ cost you an evening:
   is re-checked on launch and every 15 minutes while the window is visible,
   and you're told when tracks were added or removed. Where the
   uploader set a purchase link, the row shows a **Free DL** or **Buy** button
-  going straight to the gate or shop (Hypeddit, Bandcamp, Beatport, …).
+  going straight to the gate or shop (Hypeddit, Bandcamp, Beatport, …). The
+  track description is scanned too, so a "FREE DL: https://…" line or a
+  Google Drive share in the text gets a button as well (socials and streaming
+  links are ignored).
 - **Tag** — writes rekordbox-compatible metadata to matched files: ID3v2.3 with
   UTF-16 frames *plus* a RIFF `INFO` chunk for WAVs (rekordbox is picky — plain
   UTF-8 ID3v2.3 tags are silently ignored). Genre is taken from the playlist name.
@@ -117,8 +120,8 @@ the window is visible, and when you click *Fetch playlist* — nothing else.
   re-read files on its own: select the tracks → right-click → *Reload Tag*.
 - **A match is wrong** — click the HAVE/MISSING pill to override it, and ✎ to
   fix artist/title before tagging.
-- **No Free DL / Buy buttons** — the uploader set no purchase link on that
-  track, so only *Open* is shown. (After updating from an older version the
+- **No Free DL / Buy buttons** — the uploader set no purchase link and wrote
+  none in the description, so only *Open* is shown. (After updating from an older version the
   buttons appear once the launch refresh has run.)
 - **"Couldn't load the library: operation not permitted" (macOS)** — give the
   app access to your music folder in System Settings → Privacy & Security →

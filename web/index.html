@@ -674,9 +674,9 @@ function render() {
       <span class="pill ${t.have ? 'have' : 'miss'} ${t.override ? 'manual' : ''}"
             title="Click to toggle manually" onclick="toggle(${t.id}, ${t.have}, ${t.auto})">
         ${t.have ? 'HAVE' : 'MISSING'}</span>
-      ${t.buy ? `<a class="open ${t.buy.kind}" href="${esc(t.buy.url)}" target="_blank" rel="noopener"
-          title="${esc(t.buy.title ? t.buy.title + ' · ' : '')}${esc(t.buy.host)}">${
-          t.buy.kind === 'free' ? '⬇' : '🛒'} ${esc(t.buy.label)}</a>` : ''}
+      ${(t.links || []).map(l => `<a class="open ${l.kind}" href="${esc(l.url)}" target="_blank" rel="noopener"
+          title="${esc(l.title ? l.title + ' · ' : '')}${esc(l.host)}">${
+          l.kind === 'free' ? '⬇' : '🛒'} ${esc(l.label)}</a>`).join('')}
       <a class="open" href="${esc(t.url)}" target="_blank" rel="noopener">Open ↗</a>
     </div>`).join('')
     : '<div class="empty">Nothing here 🎉</div>';
