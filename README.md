@@ -14,7 +14,9 @@ cost you an evening:
 
 - **Reconcile** — fetches the live state of a public SoundCloud playlist and
   fuzzy-matches it against a local folder (filename + duration), giving you a
-  Have / Missing view with direct links to every missing track.
+  Have / Missing view with direct links to every missing track. Where the
+  uploader set a purchase link, the row shows a **Free DL** or **Buy** button
+  going straight to the gate or shop (Hypeddit, Bandcamp, Beatport, …).
 - **Tag** — writes rekordbox-compatible metadata to matched files: ID3v2.3 with
   UTF-16 frames *plus* a RIFF `INFO` chunk for WAVs (rekordbox is picky — plain
   UTF-8 ID3v2.3 tags are silently ignored). Genre is taken from the playlist name.
@@ -113,6 +115,9 @@ button, nothing more.
   re-read files on its own: select the tracks → right-click → *Reload Tag*.
 - **A match is wrong** — click the HAVE/MISSING pill to override it, and ✎ to
   fix artist/title before tagging.
+- **No Free DL / Buy buttons** — they come from the playlist data; hit *Fetch
+  playlist* once after updating. Tracks whose uploader set no link show only
+  *Open*.
 - **"Couldn't load the library: operation not permitted" (macOS)** — give the
   app access to your music folder in System Settings → Privacy & Security →
   Files and Folders.

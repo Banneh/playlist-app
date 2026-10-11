@@ -55,6 +55,11 @@ function run(cmd: string, args: string[], timeoutMs: number): Promise<{ code: nu
 export interface PlTrack {
   id: number; title: string; user: string; pub_artist: string | null;
   dur: number; url: string; art: string;
+  /** SoundCloud "Buy"/"Free DL" link set by the uploader; undefined on snapshots
+   *  fetched by older versions, null when the track has none */
+  buy_url?: string | null; buy_title?: string | null;
+  /** official SoundCloud download button is available and has downloads left */
+  sc_dl?: boolean;
 }
 export interface Playlist { title: string; url: string; tracks: PlTrack[]; }
 export interface Library { id: string; dir: string; url: string; playlist: Playlist | null; }
@@ -173,6 +178,9 @@ export async function fetchPlaylist(lib: Library): Promise<void> {
       dur: Math.floor((t.full_duration || t.duration || 0) / 1000),
       url: t.permalink_url || "",
       art: t.artwork_url || t.user?.avatar_url || "",
+      buy_url: t.purchase_url || null,
+      buy_title: t.purchase_title || null,
+      sc_dl: !!(t.downloadable && t.has_downloads_left),
     });
   }
   lib.playlist = { title: pl.title || "Playlist", url: lib.url, tracks: out };
@@ -320,6 +328,31 @@ function artistTitle(t: PlTrack): [string, string] {
 }
 
 const looseEq = (a: string, b: string) => norm(a) === norm(b);
+
+// ---------------- purchase / free-download links ----------------
+
+/** Download-gate services: a link there is a free download whatever it's called. */
+const FREE_GATES = /(^|\.)(hypeddit\.com|droploud\.com|downloadgater\.com|gaterush\.me|gatekit\.pro|toneden\.io)$/i;
+
+export interface BuyLink { url: string; kind: "free" | "buy"; label: string; title: string; host: string; }
+
+/** Where to get the track: the uploader's purchase link (classified as a free
+ *  download or a shop by its title/host), else SoundCloud's own download button. */
+export function buyLink(t: PlTrack): BuyLink | null {
+  const title = (t.buy_title || "").trim();
+  if (t.buy_url && /^https?:\/\//i.test(t.buy_url)) {
+    let host = "";
+    try { host = new URL(t.buy_url).hostname.replace(/^www\./, ""); } catch { /* fall through */ }
+    if (host) {
+      const free = /free|\bdl\b|download|gratis/i.test(title) || FREE_GATES.test(host);
+      return { url: t.buy_url, kind: free ? "free" : "buy",
+               label: free ? "Free DL" : "Buy", title, host };
+    }
+  }
+  if (t.sc_dl && t.url)
+    return { url: t.url, kind: "free", label: "Free DL", title: "Download on SoundCloud", host: "soundcloud.com" };
+  return null;
+}
 
 function isTagged(f: LocalFile, artist: string, title: string, genre: string): boolean {
   return looseEq(f.tags[0], artist) && looseEq(f.tags[1], title) && looseEq(f.tags[2], genre);
@@ -480,7 +513,7 @@ export async function buildView(): Promise<any> {
              dur: fmtDur(t.dur), url: t.url, art: t.art,
              have, auto: !!m, file: m ? m[0] : null,
              score: m && m[1] >= 0 ? Math.min(1, m[1]) : null,
-             manual_match: manual.has(t.id),
+             manual_match: manual.has(t.id), buy: buyLink(t),
              tagged, incompat, override: o || null, edited: !!ed };
   });
   const extras = files.filter((f) => !fileHit.has(f.name)).map((f) => {
@@ -495,6 +528,7 @@ export async function buildView(): Promise<any> {
   return {
     ...base, ready: true, playlist: pl.title, playlist_url: pl.url,
     genre, tracks: rows, extras,
+    links_stale: pl.tracks.length > 0 && pl.tracks.every((t) => t.buy_url === undefined),
     local_files: files.map((f) => ({ name: f.name, dur: fmtDur(Math.round(f.dur)) })),
     have: rows.filter((r) => r.have).length,
     missing: rows.filter((r) => !r.have).length,

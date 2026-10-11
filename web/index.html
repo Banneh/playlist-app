@@ -231,6 +231,10 @@
     padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; flex-shrink: 0; transition: .15s;
   }
   a.open:hover { border-color: var(--accent); background: rgba(124,92,255,.1); }
+  a.open.free { color: var(--green); }
+  a.open.free:hover { border-color: var(--green); background: rgba(52,211,153,.1); }
+  a.open.buy { color: var(--amber); }
+  a.open.buy:hover { border-color: var(--amber); background: rgba(251,191,36,.1); }
 
   .section { margin: 26px 0 10px; color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; }
   .empty { text-align: center; color: var(--dim); padding: 60px 0; }
@@ -621,6 +625,9 @@ function render() {
       <span class="pill ${t.have ? 'have' : 'miss'} ${t.override ? 'manual' : ''}"
             title="Click to toggle manually" onclick="toggle(${t.id}, ${t.have}, ${t.auto})">
         ${t.have ? 'HAVE' : 'MISSING'}</span>
+      ${t.buy ? `<a class="open ${t.buy.kind}" href="${esc(t.buy.url)}" target="_blank" rel="noopener"
+          title="${esc(t.buy.title ? t.buy.title + ' · ' : '')}${esc(t.buy.host)}">${
+          t.buy.kind === 'free' ? '⬇' : '🛒'} ${esc(t.buy.label)}</a>` : ''}
       <a class="open" href="${esc(t.url)}" target="_blank" rel="noopener">Open ↗</a>
     </div>`).join('')
     : '<div class="empty">Nothing here 🎉</div>';
@@ -788,6 +795,10 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
     if (!DATA.ready && (DATA.libraries || []).length) {
       DATA = await api('/api/refresh', {});
       render();
+    } else if (DATA.ready && DATA.links_stale) {
+      // playlist was saved by a version without purchase links: refetch once
+      try { DATA = await api('/api/refresh', {}); render(); toast('Purchase links loaded from SoundCloud'); }
+      catch (e) { toast('Could not fetch purchase links: ' + e.message, true); }
     }
   } catch (e) {
     toast('Error: ' + e.message, true);
