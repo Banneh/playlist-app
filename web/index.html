@@ -407,6 +407,7 @@ const AUTO_REFRESH_MS = 15 * 60 * 1000;
 let LAST_OK = 0, RETRY = null;
 const fmtTime = ms => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const fmtDate = ms => new Date(ms).toLocaleDateString([], { day: 'numeric', month: 'short' });
+const fmtSecs = s => Math.floor(s / 60) + ':' + String(Math.round(s) % 60).padStart(2, '0');
 
 async function markSeen() {
   try { DATA = await api('/api/seen', {}); render(); toast('Marked all as seen'); }
@@ -624,6 +625,14 @@ function extraRow(f, i) {
     </div>`;
 }
 
+function candidateHtml(c, k) {
+  return `<button class="fileopt${c.in_playlist ? ' taken' : k === 0 ? ' cur' : ''}" data-k="${k}">
+      <span class="fn">${esc(c.user)} – ${esc(c.title)}</span>
+      <span class="fi">${fmtSecs(c.dur)} (${c.dur_diff === 0 ? 'same length' : (c.dur_diff > 0 ? '+' : '') + c.dur_diff + ' s'}) · ${
+        Math.round(c.score * 100)}% match${c.in_playlist ? ' · already in playlist as #' + c.in_playlist : ''}</span>
+    </button>`;
+}
+
 function openFind(i) {
   const f = DATA.extras[i];
   if (!f) return;
@@ -643,12 +652,7 @@ function openFind(i) {
       list.innerHTML = '<div class="empty" style="padding:24px 0"><span class="spin"></span> Searching SoundCloud…</div>';
       try {
         const r = await api('/api/find', { file: f.name, q: qin.value });
-        list.innerHTML = r.candidates.length ? r.candidates.map((c, k) => `
-          <button class="fileopt${c.in_playlist ? ' taken' : k === 0 ? ' cur' : ''}" data-k="${k}">
-            <span class="fn">${esc(c.user)} – ${esc(c.title)}</span>
-            <span class="fi">${esc(c.dur)} (${c.dur_diff === 0 ? 'same length' : (c.dur_diff > 0 ? '+' : '') + c.dur_diff + ' s'}) · ${
-              Math.round(c.score * 100)}% match${c.in_playlist ? ' · already in playlist as #' + c.in_playlist : ''}</span>
-          </button>`).join('')
+        list.innerHTML = r.candidates.length ? r.candidates.map(candidateHtml).join('')
           : '<div class="empty" style="padding:24px 0">No results — try shorter search text</div>';
         list.querySelectorAll('.fileopt').forEach(b => b.onclick = () => done(r.candidates[+b.dataset.k]));
       } catch (e) { list.innerHTML = `<div class="empty" style="padding:24px 0">Search failed: ${esc(e.message)}</div>`; }
