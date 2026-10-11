@@ -23,6 +23,7 @@ app.whenReady().then(async () => {
       });
       return r.canceled ? null : r.filePaths[0];
     },
+    reveal: (p) => shell.showItemInFolder(p),
   });
   const port = (server.address() as any).port;
 

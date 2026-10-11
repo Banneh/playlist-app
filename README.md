@@ -54,6 +54,12 @@ cost you an evening:
   duration), you add it to the playlist on SoundCloud with one click, and once
   it shows up there the file is matched to it automatically. *Find all* fills
   in the sure matches for you and leaves doubtful ones for a manual pick.
+- **Export to rekordbox** — ⋯ menu → *Export rekordbox XML…* writes the matched
+  files of every library as rekordbox playlists, in SoundCloud order, to one
+  file in the app's data folder. Point rekordbox at it once (Preferences →
+  Advanced → Database → rekordbox xml) and import the playlist from the
+  *rekordbox xml* node in the tree; tracks already in your collection keep
+  their cues. Export again whenever the playlist changes — same path.
 - **Multiple libraries** — each links one folder to one playlist; switch in the
   header.
 

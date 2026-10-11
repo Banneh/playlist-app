@@ -332,6 +332,7 @@
     <div class="menu-wrap">
       <button class="ghost-icon" id="btn-menu" title="More options"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
       <div class="menu" id="libmenu">
+        <button class="menu-item" id="btn-xml" title="Write the matched files of every library as rekordbox playlists"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Export rekordbox XML…</button>
         <button class="menu-item danger" id="btn-dellib"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Remove this library…</button>
       </div>
     </div>
@@ -1085,6 +1086,28 @@ document.addEventListener('click', e => {
   if (!libMenu.contains(e.target)) libMenu.classList.remove('show');
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') libMenu.classList.remove('show'); });
+$('#btn-xml').onclick = async () => {
+  libMenu.classList.remove('show');
+  try {
+    const r = await api('/api/export-xml', {});
+    const lines = r.playlists.map(p => `<b>${esc(p.playlist)}</b>: ${p.tracks} track${p.tracks === 1 ? '' : 's'}`).join('<br>');
+    await modal((dlg, done) => {
+      dlg.innerHTML = `<h3>rekordbox XML written</h3>
+        <p>${lines || 'No libraries with a playlist yet.'}</p>
+        <div class="field"><label>File</label><input value="${esc(r.path)}" readonly onclick="this.select()" spellcheck="false"></div>
+        <p>In rekordbox: Preferences → Advanced → Database → <i>rekordbox xml</i> → Browse to this file.
+           A <i>rekordbox xml</i> item then appears in the tree; right-click the playlist there → Import Playlist.
+           Tracks already in your collection keep their cues and grids. Export again any time — the path stays the same.</p>
+        <div class="actions">
+          ${DATA.can_reveal ? '<button data-a="reveal">Show in folder</button>' : ''}
+          <button class="primary" data-a="ok">Done</button>
+        </div>`;
+      const rv = dlg.querySelector('[data-a=reveal]');
+      if (rv) rv.onclick = () => api('/api/reveal', { path: r.path }).catch(e => toast('Error: ' + e.message, true));
+      dlg.querySelector('[data-a=ok]').onclick = () => done(true);
+    });
+  } catch (e) { toast('Error: ' + e.message, true); }
+};
 $('#btn-dellib').onclick = async () => {
   libMenu.classList.remove('show');
   const name = $('#lib').selectedOptions[0] ? $('#lib').selectedOptions[0].text : 'this library';

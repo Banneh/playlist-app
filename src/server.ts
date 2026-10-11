@@ -9,10 +9,12 @@ export interface ServerOpts {
   dataDir: string;
   port: number;
   pickFolder?: () => Promise<string | null>;
+  /** show a file in the OS file manager (Electron only) */
+  reveal?: (p: string) => void;
 }
 
 export function startServer(opts: ServerOpts): Promise<http.Server> {
-  core.init(opts.dataDir, !!opts.pickFolder);
+  core.init(opts.dataDir, !!opts.pickFolder, !!opts.reveal);
 
   // file-mutating actions run one at a time
   let queue: Promise<any> = Promise.resolve();
@@ -66,6 +68,14 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/inbox":          return route(() => core.inboxView());
           case "/api/inbox-move":     return route(() => core.inboxMove(data));
           case "/api/inbox-move-all": return route(() => core.inboxMoveAll());
+          case "/api/export-xml":     return route(() => core.exportRekordboxXml());
+          case "/api/reveal": {
+            if (!opts.reveal) return json({ unsupported: true });
+            const p = path.resolve(String(data.path || ""));
+            if (p !== core.rekordboxXmlPath()) return json({ error: "can only reveal the exported file" }, 400);
+            opts.reveal(p);
+            return json({ ok: true });
+          }
           case "/api/pick-folder":
             if (!opts.pickFolder) return json({ path: null, unsupported: true });
             return void opts.pickFolder()

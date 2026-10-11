@@ -95,11 +95,13 @@ export interface AppState {
 
 let DATA_DIR = "";
 let CAN_PICK = false;
+let CAN_REVEAL = false;
 export let STATE: AppState;
 
-export function init(dataDir: string, canPick: boolean): void {
+export function init(dataDir: string, canPick: boolean, canReveal = false): void {
   DATA_DIR = dataDir;
   CAN_PICK = canPick;
+  CAN_REVEAL = canReveal;
   fs.mkdirSync(DATA_DIR, { recursive: true });
   STATE = loadState();
 }
@@ -568,8 +570,8 @@ function restorableCount(lib: Library | null): number {
 
 const fmtDur = (d: number) => `${Math.floor(d / 60)}:${String(d % 60).padStart(2, "0")}`;
 
-export async function buildView(): Promise<any> {
-  const lib = activeLib();
+export async function buildView(libArg?: Library): Promise<any> {
+  const lib = libArg || activeLib();
   let dev = STATE.device || "xdj-700";
   if (!DEVICES[dev]) dev = "xdj-700";
   const base: any = {
@@ -580,6 +582,7 @@ export async function buildView(): Promise<any> {
     backups: restorableCount(lib),
     backup_dir: lib ? backupDir(lib) : null,
     can_pick: CAN_PICK,
+    can_reveal: CAN_REVEAL,
   };
   if (!lib || !lib.playlist) return { ...base, ready: false };
   const files = await scanLocal(lib);
@@ -999,6 +1002,59 @@ export async function findAll(): Promise<any> {
   view = await buildView();
   view.find_report = { found, in_playlist, unsure, none, errors };
   return view;
+}
+
+// ---------------- rekordbox xml ----------------
+
+const APP_VERSION: string = tryRequire("../package.json")?.version || "0";
+const KIND: Record<string, string> = { ".wav": "WAV File", ".mp3": "MP3 File", ".aiff": "AIFF File",
+  ".aif": "AIFF File", ".flac": "FLAC File", ".m4a": "M4A File", ".ogg": "OGG File" };
+const xmlAttr = (s: any) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+/** rekordbox wants file://localhost/<percent-encoded absolute path>, drive letter unencoded on Windows */
+const rbLocation = (p: string) => "file://localhost" + (p.startsWith("/") ? "" : "/")
+  + p.split(path.sep).map((s) => encodeURIComponent(s).replace(/%3A/gi, ":")).join("/");
+
+export const rekordboxXmlPath = () => path.join(DATA_DIR, "rekordbox.xml");
+
+/** Write every library's matched files as a rekordbox playlist, in playlist
+ *  order, to one fixed file (point rekordbox at it once; re-export any time). */
+export async function exportRekordboxXml(): Promise<any> {
+  let id = 0;
+  const coll: string[] = [], lists: string[] = [];
+  const playlists: { playlist: string; tracks: number }[] = [];
+  for (const lib of STATE.libraries) {
+    if (!lib.playlist) continue;
+    const view = await buildView(lib);
+    const files = new Map((await scanLocal(lib)).map((f) => [f.name, f]));
+    const keys: number[] = [];
+    for (const r of view.tracks) {
+      const f = r.have && r.file ? files.get(r.file) : undefined;
+      if (!f) continue;
+      id++;
+      coll.push(`  <TRACK TrackID="${id}" Name="${xmlAttr(r.title)}" Artist="${xmlAttr(r.artist)}" Genre="${xmlAttr(view.genre)}"`
+        + ` Kind="${xmlAttr(KIND[path.extname(f.name).toLowerCase()] || "Audio File")}" TotalTime="${Math.round(f.dur)}"`
+        + ` Location="${xmlAttr(rbLocation(f.path))}"/>`);
+      keys.push(id);
+    }
+    lists.push(`    <NODE Name="${xmlAttr(lib.playlist.title)}" Type="1" KeyType="0" Entries="${keys.length}">\n`
+      + keys.map((k) => `      <TRACK Key="${k}"/>`).join("\n") + (keys.length ? "\n" : "") + "    </NODE>");
+    playlists.push({ playlist: lib.playlist.title, tracks: keys.length });
+  }
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<DJ_PLAYLISTS Version="1.0.0">
+  <PRODUCT Name="DJ HQ" Version="${xmlAttr(APP_VERSION)}" Company="DJ HQ"/>
+  <COLLECTION Entries="${coll.length}">
+${coll.join("\n")}
+  </COLLECTION>
+  <PLAYLISTS>
+    <NODE Type="0" Name="ROOT" Count="${lists.length}">
+${lists.join("\n")}
+    </NODE>
+  </PLAYLISTS>
+</DJ_PLAYLISTS>
+`;
+  fs.writeFileSync(rekordboxXmlPath(), xml);
+  return { path: rekordboxXmlPath(), playlists, tracks: coll.length };
 }
 
 // ---------------- downloads inbox ----------------
