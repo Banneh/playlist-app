@@ -245,6 +245,7 @@ async function scanLocal(lib: Library): Promise<LocalFile[]> {
   if (fs.existsSync(d) && fs.statSync(d).isDirectory()) {
     for (const f of fs.readdirSync(d).sort()) {
       if (f.startsWith(".") || !AUDIO_EXT.includes(path.extname(f).toLowerCase())) continue;
+      if (/\.tmp\.[^.]+$/i.test(f)) continue; // in-flight rewrite by writeTags/convertAll
       const p = path.join(d, f);
       const st = fs.statSync(p);
       seen.add(p);
@@ -528,7 +529,6 @@ export async function buildView(): Promise<any> {
   return {
     ...base, ready: true, playlist: pl.title, playlist_url: pl.url,
     genre, tracks: rows, extras,
-    links_stale: pl.tracks.length > 0 && pl.tracks.every((t) => t.buy_url === undefined),
     local_files: files.map((f) => ({ name: f.name, dur: fmtDur(Math.round(f.dur)) })),
     have: rows.filter((r) => r.have).length,
     missing: rows.filter((r) => !r.have).length,

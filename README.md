@@ -14,7 +14,9 @@ cost you an evening:
 
 - **Reconcile** — fetches the live state of a public SoundCloud playlist and
   fuzzy-matches it against a local folder (filename + duration), giving you a
-  Have / Missing view with direct links to every missing track. Where the
+  Have / Missing view with direct links to every missing track. The playlist
+  is re-checked on launch and every 15 minutes while the window is visible,
+  and you're told when tracks were added or removed. Where the
   uploader set a purchase link, the row shows a **Free DL** or **Buy** button
   going straight to the gate or shop (Hypeddit, Bandcamp, Beatport, …).
 - **Tag** — writes rekordbox-compatible metadata to matched files: ID3v2.3 with
@@ -102,8 +104,8 @@ There is no API key to configure: the app reads the same public endpoints the
 SoundCloud web player uses, with a client id scraped from their public JS. This
 is the yt-dlp school of integration — it works today, it may break whenever
 SoundCloud changes their frontend, and it is not an official API. Only public
-playlists work. Be reasonable: the app fetches a playlist when you click a
-button, nothing more.
+playlists work. The app fetches the playlist on launch, every 15 minutes while
+the window is visible, and when you click *Fetch playlist* — nothing else.
 
 ## Troubleshooting
 
@@ -115,9 +117,9 @@ button, nothing more.
   re-read files on its own: select the tracks → right-click → *Reload Tag*.
 - **A match is wrong** — click the HAVE/MISSING pill to override it, and ✎ to
   fix artist/title before tagging.
-- **No Free DL / Buy buttons** — they come from the playlist data; hit *Fetch
-  playlist* once after updating. Tracks whose uploader set no link show only
-  *Open*.
+- **No Free DL / Buy buttons** — the uploader set no purchase link on that
+  track, so only *Open* is shown. (After updating from an older version the
+  buttons appear once the launch refresh has run.)
 - **"Couldn't load the library: operation not permitted" (macOS)** — give the
   app access to your music folder in System Settings → Privacy & Security →
   Files and Folders.

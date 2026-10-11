@@ -107,6 +107,8 @@
     background: linear-gradient(90deg, var(--accent), var(--green)); transition: width .5s;
   }
   .pct { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .upd { font-size: 11.5px; color: var(--faint); white-space: nowrap; cursor: default; }
+  .upd.err { color: var(--accent2); }
 
   /* ---- toolbar ---- */
   .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
@@ -320,6 +322,7 @@
   <div class="sync-strip" id="syncstrip">
     <div class="progress"><i id="pbar" style="width:0%"></i></div>
     <span class="pct" id="pct"></span>
+    <span class="upd" id="upd" title="The playlist is re-fetched on launch and every 15 minutes while the window is visible"></span>
   </div>
 
   <div class="toolbar">
@@ -374,13 +377,59 @@ function toast(msg, isErr) {
   t._h = setTimeout(() => t.classList.remove('show'), isErr ? 4000 : 2200);
 }
 
+let INFLIGHT = 0;
 async function api(path, body) {
-  const r = await fetch(path, body !== undefined
-    ? { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }
-    : {});
-  const j = await r.json();
-  if (j.error) throw new Error(j.error);
-  return j;
+  INFLIGHT++;
+  try {
+    const r = await fetch(path, body !== undefined
+      ? { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }
+      : {});
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    return j;
+  } finally { INFLIGHT--; }
+}
+
+/* ---- playlist refresh: on launch, every 15 min while visible, and on demand ---- */
+
+const AUTO_REFRESH_MS = 15 * 60 * 1000;
+let LAST_OK = 0, RETRY = null;
+const fmtTime = ms => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const busy = () => INFLIGHT > 0 || EDIT_ID !== null || !!$('.overlay');
+
+function setUpd(text, isErr) {
+  const u = $('#upd'); u.textContent = text; u.classList.toggle('err', !!isErr);
+}
+
+async function refreshPlaylist({ manual = false } = {}) {
+  if (!DATA || !(DATA.libraries || []).length) return;
+  if (!manual) {
+    // not now: user is mid-action, or the window isn't visible. Try again shortly.
+    if (document.hidden) return;
+    if (busy()) {
+      if (!RETRY) RETRY = setTimeout(() => { RETRY = null; refreshPlaylist(); }, 60 * 1000);
+      return;
+    }
+  }
+  const before = DATA.ready ? new Set(DATA.tracks.map(t => t.id)) : null;
+  try {
+    const fresh = await api('/api/refresh', {});
+    DATA = fresh; LAST_OK = Date.now();
+    if (manual || !busy()) render();   // don't yank an edit form or dialog from under the user
+    setUpd('Playlist checked ' + fmtTime(LAST_OK));
+    let diff = '';
+    if (before && fresh.ready) {
+      const now = new Set(fresh.tracks.map(t => t.id));
+      const added = fresh.tracks.filter(t => !before.has(t.id)).length;
+      const removed = [...before].filter(id => !now.has(id)).length;
+      if (added || removed) diff = `${added} added, ${removed} removed`;
+    }
+    if (manual) toast('Playlist fetched from SoundCloud' + (diff ? ' · ' + diff : ''));
+    else if (diff) toast('Playlist updated: ' + diff);
+  } catch (e) {
+    setUpd((LAST_OK ? 'Last checked ' + fmtTime(LAST_OK) + ' · ' : '') + 'update failed: ' + e.message, true);
+    if (manual) toast('Error: ' + e.message, true);
+  }
 }
 
 /* ---- modal dialogs ---- */
@@ -689,7 +738,13 @@ async function run(btn, path, msg) {
   render();  // after restoring the label, so render's fresh counts win
 }
 
-$('#btn-refresh').onclick = () => run('#btn-refresh', '/api/refresh', 'Playlist fetched from SoundCloud');
+$('#btn-refresh').onclick = async () => {
+  const b = $('#btn-refresh'), old = b.innerHTML;
+  b.disabled = true; b.innerHTML = '<span class="spin"></span>Working…';
+  await refreshPlaylist({ manual: true });
+  b.disabled = false; b.innerHTML = old;
+  render();
+};
 $('#btn-rescan').onclick = () => run('#btn-rescan', '/api/rescan', 'Folder rescanned');
 $('#btn-tag').onclick = async () => {
   const b = $('#btn-tag');
@@ -792,14 +847,11 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   try {
     DATA = await api('/api/state');
     render();
-    if (!DATA.ready && (DATA.libraries || []).length) {
-      DATA = await api('/api/refresh', {});
-      render();
-    } else if (DATA.ready && DATA.links_stale) {
-      // playlist was saved by a version without purchase links: refetch once
-      try { DATA = await api('/api/refresh', {}); render(); toast('Purchase links loaded from SoundCloud'); }
-      catch (e) { toast('Could not fetch purchase links: ' + e.message, true); }
-    }
+    await refreshPlaylist({ manual: !DATA.ready });  // first run with no snapshot: report errors loudly
+    setInterval(() => refreshPlaylist(), AUTO_REFRESH_MS);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && Date.now() - LAST_OK > AUTO_REFRESH_MS) refreshPlaylist();
+    });
   } catch (e) {
     toast('Error: ' + e.message, true);
     $('#list').innerHTML = `<div class="empty">Couldn’t load the library:<br><b>${esc(e.message)}</b><br><br>
