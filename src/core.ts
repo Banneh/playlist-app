@@ -85,6 +85,8 @@ export interface AppState {
   assigned: Record<string, string>;
   /** SoundCloud track picked for a local file that isn't in the playlist, keyed "x:" + path */
   found: Record<string, Found>;
+  /** "not available now": track id -> the links it had when marked; cleared when they change */
+  na: Record<string, { sig: string; at: number }>;
   client_id: string | null;
   device: string;
 }
@@ -107,10 +109,11 @@ function loadState(): AppState {
     const st = JSON.parse(fs.readFileSync(statePath(), "utf8"));
     st.assigned = st.assigned || {}; // older state files predate manual matching
     st.found = st.found || {};
+    st.na = st.na || {};
     return st;
   } catch {
     return { libraries: [], active: null, dur_cache: {}, overrides: {},
-             edits: {}, assigned: {}, found: {}, client_id: null, device: "xdj-700" };
+             edits: {}, assigned: {}, found: {}, na: {}, client_id: null, device: "xdj-700" };
   }
 }
 export function saveState(): void {
@@ -472,6 +475,9 @@ export function trackLinks(t: PlTrack): BuyLink[] {
   return out.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "buy" ? -1 : 1));
 }
 
+const linksSig = (ls: BuyLink[]) => ls.map((l) => l.url).sort().join("|");
+const LOSSY = /^(mp3|aac|vorbis|opus|wma)/;
+
 function isTagged(f: LocalFile, artist: string, title: string, genre: string): boolean {
   return looseEq(f.tags[0], artist) && looseEq(f.tags[1], title) && looseEq(f.tags[2], genre);
 }
@@ -630,6 +636,8 @@ export async function buildView(): Promise<any> {
   }
   for (const [tid, fname] of manual)
     if (fname) matched.set(tid, [fname, -1]);
+  const reavailable: string[] = [];
+  let naDirty = false;
   const rows = pl.tracks.map((t, i) => {
     let [a, ti] = artistTitle(t);
     const ed = STATE.edits[String(t.id)];
@@ -638,24 +646,37 @@ export async function buildView(): Promise<any> {
     let have = !!m;
     const o = STATE.overrides[String(t.id)];
     if (o === "have" || o === "missing") have = o === "have";
-    let tagged: boolean | null = null, incompat: string | null = null;
+    const links = trackLinks(t);
+    // "not available now" ends by itself when a file turns up or the links change
+    let na = false;
+    const naRec = STATE.na[String(t.id)];
+    if (naRec) {
+      if (have || naRec.sig !== linksSig(links)) {
+        delete STATE.na[String(t.id)]; naDirty = true;
+        if (!have) reavailable.push(`${a} – ${ti}`);
+      } else na = true;
+    }
+    let tagged: boolean | null = null, incompat: string | null = null, lossy = false;
     if (m) {
       const f = fmap.get(m[0])!;
       tagged = isTagged(f, a, ti, genre);
       incompat = compatReason(f.fmt, dev);
+      lossy = LOSSY.test(f.fmt[0]);
     }
+    const upgrade = have && lossy && links.some((l) => l.kind === "buy" && !!l.fmt && l.fmt !== "MP3");
     return { n: i + 1, id: t.id, artist: a, title: ti, user: t.user,
              dur: fmtDur(t.dur), url: t.url, art: t.art,
-             have, auto: !!m, file: m ? m[0] : null,
+             have, na, auto: !!m, file: m ? m[0] : null,
              score: m && m[1] >= 0 ? Math.min(1, m[1]) : null,
-             manual_match: manual.has(t.id), links: trackLinks(t),
+             manual_match: manual.has(t.id), links, lossy, upgrade,
              added: t.added || 0, is_new: (t.added || 0) > (lib.seen_mark || 0),
              tagged, incompat, override: o || null, edited: !!ed };
   });
+  if (naDirty) saveState();
   const extras = files.filter((f) => !fileHit.has(f.name)).map((f) => {
     const [xa, xt] = extraArtistTitle(f);
     const fnd = STATE.found["x:" + f.path];
-    return { name: f.name, incompat: compatReason(f.fmt, dev), dur: fmtDur(Math.round(f.dur)),
+    return { name: f.name, incompat: compatReason(f.fmt, dev), dur: fmtDur(Math.round(f.dur)), lossy: LOSSY.test(f.fmt[0]),
              artist: xa, title: xt, edited: !!STATE.edits["x:" + f.path],
              tagged: isTagged(f, xa, xt, genre),
              found: fnd ? { ...fnd, dur: fmtDur(fnd.dur) } : null };
@@ -665,7 +686,10 @@ export async function buildView(): Promise<any> {
     genre, tracks: rows, extras,
     local_files: files.map((f) => ({ name: f.name, dur: fmtDur(Math.round(f.dur)) })),
     have: rows.filter((r) => r.have).length,
-    missing: rows.filter((r) => !r.have).length,
+    missing: rows.filter((r) => !r.have && !r.na).length,
+    na_count: rows.filter((r) => r.na).length,
+    upgrades: rows.filter((r) => r.upgrade).length,
+    reavailable,
     new_count: rows.filter((r) => r.is_new).length,
     seen_mark: lib.seen_mark || 0,
     untagged: rows.filter((r) => r.tagged === false).length
@@ -822,8 +846,13 @@ export async function setDevice(device: string): Promise<any> {
 
 export async function setOverride(data: any): Promise<any> {
   const tid = String(data.id), status = data.status;
+  delete STATE.overrides[tid];
+  delete STATE.na[tid];
   if (status === "have" || status === "missing") STATE.overrides[tid] = status;
-  else delete STATE.overrides[tid];
+  else if (status === "na") { // hidden from Missing until its links change
+    const t = activeLib()?.playlist?.tracks.find((x) => String(x.id) === tid);
+    STATE.na[tid] = { sig: linksSig(t ? trackLinks(t) : []), at: Date.now() };
+  }
   saveState();
   return buildView();
 }
@@ -840,6 +869,7 @@ export async function setAssign(data: any): Promise<any> {
         if (k !== tid && STATE.assigned[k] === file) delete STATE.assigned[k];
     STATE.assigned[tid] = file;
     delete STATE.overrides[tid]; // explicit assignment supersedes a have/missing override
+    delete STATE.na[tid];
   }
   saveState();
   return buildView();

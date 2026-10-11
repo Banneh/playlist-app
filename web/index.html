@@ -237,6 +237,18 @@
   .pill.have { background: rgba(52,211,153,.13); color: var(--green); }
   .pill.miss { background: rgba(251,92,126,.13); color: var(--accent2); }
   .pill.manual { border-color: var(--amber); }
+  .pill.na { background: rgba(146,153,173,.13); color: var(--dim); }
+  .row.na { opacity: .55; }
+  .meta .up { color: var(--green); font-size: 11px; margin-left: 6px; }
+  .chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+  .chip {
+    background: transparent; border: 1px solid var(--line); border-radius: 999px;
+    padding: 3px 11px; font-size: 12px; color: var(--dim);
+  }
+  .chip:hover { color: var(--text); border-color: var(--line-strong); background: transparent; }
+  .chip.on { border-color: var(--accent); color: var(--text); background: rgba(124,92,255,.12); }
+  .chip .count { color: var(--faint); font-variant-numeric: tabular-nums; margin-left: 4px; }
+  .chips .spacer { flex: 1; }
   .pill:hover { filter: brightness(1.25); }
   a.open {
     color: var(--accent); text-decoration: none; font-weight: 600; font-size: 13px;
@@ -247,7 +259,6 @@
   a.open.free:hover { border-color: var(--green); background: rgba(52,211,153,.1); }
   a.open.buy { color: var(--amber); }
   a.open.buy:hover { border-color: var(--amber); background: rgba(251,191,36,.1); }
-  a.open small { font-size: 10px; font-weight: 700; opacity: .7; margin-left: 3px; letter-spacing: .04em; }
 
   .section { margin: 26px 0 10px; color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; }
   .empty { text-align: center; color: var(--dim); padding: 60px 0; }
@@ -369,6 +380,7 @@
 
 <script>
 let DATA = null, TAB = 'missing', Q = '', EDIT_ID = null;
+let MFILTER = 'all', HFILTER = 'all', LAST_ROWS = [];   // sub-filters of the Missing / Have tabs
 
 const $ = s => document.querySelector(s);
 const esc = s => (s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -398,6 +410,11 @@ async function api(path, body) {
       : {});
     const j = await r.json();
     if (j.error) throw new Error(j.error);
+    if (j.reavailable && j.reavailable.length) {
+      const names = j.reavailable;
+      setTimeout(() => toast('Back in Missing — a link appeared: ' + names.slice(0, 2).join(', ')
+        + (names.length > 2 ? ' and ' + (names.length - 2) + ' more' : '')), 2400);
+    }
     return j;
   } finally { INFLIGHT--; }
 }
@@ -576,6 +593,52 @@ function openAssign(id) {
     if (r.none) return applyAssign(id, '', 'Marked as having no local file');
     applyAssign(id, r.file, 'File matched to this track');
   });
+}
+
+/* ---- playlist track row ---- */
+
+function trackRow(t) {
+  return t.id === EDIT_ID ? `
+    <div class="row">
+      <span class="num">${t.n}</span>
+      <img src="${esc(t.art)}" loading="lazy" onerror="this.style.visibility='hidden'">
+      <div class="editform">
+        <input id="e-artist" value="${esc(t.artist)}" placeholder="Artist">
+        <input id="e-title" value="${esc(t.title)}" placeholder="Title"
+               onkeydown="if(event.key==='Enter')saveEdit(${t.id})">
+      </div>
+      <button class="iconbtn save" onclick="saveEdit(${t.id})" title="Save">✓ Save</button>
+      ${t.edited ? `<button class="iconbtn danger" onclick="resetEdit(${t.id})" title="Back to SoundCloud values">↺</button>` : ''}
+      <button class="iconbtn" onclick="EDIT_ID=null;render()" title="Cancel">✕</button>
+    </div>` : `
+    <div class="row ${t.have ? 'have' : ''}${t.na ? ' na' : ''}">
+      <span class="num">${t.n}</span>
+      <img src="${esc(t.art)}" loading="lazy" onerror="this.style.visibility='hidden'">
+      <div class="meta">
+        <div class="t">${esc(t.title)}${t.is_new ? `<span class="new" title="Added to the playlist ${fmtDate(t.added)}">NEW</span>` : ''}${
+          t.edited ? '<span class="ed" title="Edited manually">✎ edited</span>' : ''}</div>
+        <div class="a">${esc(t.artist)}${t.user && t.user !== t.artist ? ' · via ' + esc(t.user) : ''}</div>
+        ${t.file ? `<div class="f link${t.tagged === false || t.incompat ? ' warn' : ''}"
+          onclick="openAssign(${t.id})" title="Click to match a different file">📄 ${esc(t.file)}${
+          t.manual_match ? ' · 📌 manual' : t.score !== null ? ` · ${Math.round(t.score * 100)}% match` : ''}${
+          t.tagged === true ? ' · ✓ tagged' : t.tagged === false ? ' · ⚠ needs tags' : ''}${
+          t.incompat ? ' · 🎛 ' + esc(t.incompat) : ''}${t.lossy ? ' · MP3' : ''}${
+          t.upgrade ? '<span class="up" title="You have the MP3; the shop link sells a lossless file">⬆ lossless available</span>' : ''}</div>`
+        : t.manual_match ? `<div class="f warn link" onclick="openAssign(${t.id})"
+          title="Click to match a file">📌 manually set to “no file”</div>` : ''}
+      </div>
+      <span class="dur">${t.dur}</span>
+      <button class="iconbtn" onclick="openAssign(${t.id})" title="Match to a local file…">⇄</button>
+      <button class="iconbtn" onclick="EDIT_ID=${t.id};render();$('#e-artist').focus()" title="Edit artist / title">✎</button>
+      <span class="pill ${t.na ? 'na' : t.have ? 'have' : 'miss'} ${t.override || t.na ? 'manual' : ''}"
+            title="${t.na ? 'Not available now — click to put it back in Missing' : t.have ? 'Click to mark as MISSING'
+                     : 'Click: mark as HAVE · again: not available now · again: back to automatic'}" onclick="toggle(${t.id})">
+        ${t.na ? 'N/A' : t.have ? 'HAVE' : 'MISSING'}</span>
+      ${(t.links || []).map(l => `<a class="open ${l.kind}" href="${esc(l.url)}" target="_blank" rel="noopener"
+          title="${esc(l.title ? l.title + ' · ' : '')}${esc(l.host)}${l.fmt ? ' · ' + esc(l.fmt) : ''}">${
+          l.kind === 'free' ? '⬇' : '🛒'} ${esc(l.label)}</a>`).join('')}
+      <a class="open" href="${esc(t.url)}" target="_blank" rel="noopener">Open ↗</a>
+    </div>`;
 }
 
 /* ---- local files not in the playlist ---- */
@@ -759,7 +822,7 @@ function render() {
   $('#s-local').textContent = DATA.local_count;
   $('#c-missing').textContent = DATA.missing;
   $('#c-have').textContent = DATA.have;
-  $('#c-all').textContent = DATA.have + DATA.missing;
+  $('#c-all').textContent = DATA.tracks.length;
   $('#c-new').textContent = DATA.new_count;
   $('#c-extras').textContent = DATA.extras.length;
   $('#c-new').classList.toggle('zero', !DATA.new_count);
@@ -769,14 +832,33 @@ function render() {
   tb.title = DATA.untagged
     ? 'Write artist / title tags into the untagged files'
     : 'All local files are already tagged';
-  const pctVal = Math.round(100 * DATA.have / (DATA.have + DATA.missing || 1));
+  const pctVal = Math.round(100 * DATA.have / (DATA.tracks.length || 1));
   $('#pbar').style.width = pctVal + '%';
   $('#pct').textContent = pctVal + '% in library';
 
   const q = Q.toLowerCase();
-  const rows = TAB === 'extras' ? [] : DATA.tracks.filter(t =>
-    (TAB === 'all' || (TAB === 'new' ? t.is_new : (TAB === 'have') === t.have)) &&
-    (!q || (t.artist + ' ' + t.title + ' ' + t.user).toLowerCase().includes(q)));
+  const matchesQ = t => !q || (t.artist + ' ' + t.title + ' ' + t.user).toLowerCase().includes(q);
+  const inTab = t => TAB === 'all' || (TAB === 'new' ? t.is_new : TAB === 'have' ? t.have : !t.have && !t.na);
+  let rows = TAB === 'extras' ? [] : DATA.tracks.filter(t => inTab(t) && matchesQ(t));
+  let chips = '', tail = '';
+  const hasFree = t => t.links.some(l => l.kind === 'free'), hasBuy = t => t.links.some(l => l.kind === 'buy');
+  if (TAB === 'missing') {
+    const n = { all: rows.length, free: rows.filter(hasFree).length, buy: rows.filter(hasBuy).length,
+                none: rows.filter(t => !t.links.length).length };
+    rows = rows.filter(t => MFILTER === 'all' || (MFILTER === 'free' ? hasFree(t) : MFILTER === 'buy' ? hasBuy(t) : !t.links.length));
+    const withLink = rows.filter(t => t.links.length).length;
+    chips = chipsHtml('MFILTER', MFILTER, [['all', 'All', n.all], ['free', '⬇ Free DL', n.free], ['buy', '🛒 Buy', n.buy], ['none', 'No link', n.none]])
+      .replace('</div>', `<span class="spacer"></span><button class="chip" onclick="copyLinks()" ${withLink ? '' : 'disabled'}
+        title="Copy “Artist – Title ⇥ link” for every track shown, one per line (Buy first when there is one)">⧉ Copy ${withLink} link${withLink === 1 ? '' : 's'}</button></div>`);
+    const naRows = DATA.tracks.filter(t => t.na && matchesQ(t));
+    if (naRows.length) tail = `<div class="section">Not available now (${naRows.length}) · back in Missing automatically when a link appears</div>`
+      + naRows.map(trackRow).join('');
+  } else if (TAB === 'have') {
+    const n = rows.filter(t => t.upgrade).length;
+    rows = rows.filter(t => HFILTER === 'all' || t.upgrade);
+    chips = chipsHtml('HFILTER', HFILTER, [['all', 'All', DATA.have], ['upgrade', '⬆ Lossless available', n]]);
+  }
+  LAST_ROWS = rows;
 
   const newBar = TAB === 'new' && DATA.new_count ? `<div class="newbar">
       <span>${DATA.new_count} track${DATA.new_count === 1 ? '' : 's'} added to the playlist since ${
@@ -784,46 +866,8 @@ function render() {
       <button class="iconbtn save" onclick="markSeen()">✓ Mark all as seen</button></div>` : '';
   const emptyMsg = TAB === 'new'
     ? 'Nothing new. Tracks added to the playlist from now on show up here.' : 'Nothing here 🎉';
-  $('#list').innerHTML = newBar + (rows.length ? rows.map(t => t.id === EDIT_ID ? `
-    <div class="row">
-      <span class="num">${t.n}</span>
-      <img src="${esc(t.art)}" loading="lazy" onerror="this.style.visibility='hidden'">
-      <div class="editform">
-        <input id="e-artist" value="${esc(t.artist)}" placeholder="Artist">
-        <input id="e-title" value="${esc(t.title)}" placeholder="Title"
-               onkeydown="if(event.key==='Enter')saveEdit(${t.id})">
-      </div>
-      <button class="iconbtn save" onclick="saveEdit(${t.id})" title="Save">✓ Save</button>
-      ${t.edited ? `<button class="iconbtn danger" onclick="resetEdit(${t.id})" title="Back to SoundCloud values">↺</button>` : ''}
-      <button class="iconbtn" onclick="EDIT_ID=null;render()" title="Cancel">✕</button>
-    </div>` : `
-    <div class="row ${t.have ? 'have' : ''}">
-      <span class="num">${t.n}</span>
-      <img src="${esc(t.art)}" loading="lazy" onerror="this.style.visibility='hidden'">
-      <div class="meta">
-        <div class="t">${esc(t.title)}${t.is_new ? `<span class="new" title="Added to the playlist ${fmtDate(t.added)}">NEW</span>` : ''}${
-          t.edited ? '<span class="ed" title="Edited manually">✎ edited</span>' : ''}</div>
-        <div class="a">${esc(t.artist)}${t.user && t.user !== t.artist ? ' · via ' + esc(t.user) : ''}</div>
-        ${t.file ? `<div class="f link${t.tagged === false || t.incompat ? ' warn' : ''}"
-          onclick="openAssign(${t.id})" title="Click to match a different file">📄 ${esc(t.file)}${
-          t.manual_match ? ' · 📌 manual' : t.score !== null ? ` · ${Math.round(t.score * 100)}% match` : ''}${
-          t.tagged === true ? ' · ✓ tagged' : t.tagged === false ? ' · ⚠ needs tags' : ''}${
-          t.incompat ? ' · 🎛 ' + esc(t.incompat) : ''}</div>`
-        : t.manual_match ? `<div class="f warn link" onclick="openAssign(${t.id})"
-          title="Click to match a file">📌 manually set to “no file”</div>` : ''}
-      </div>
-      <span class="dur">${t.dur}</span>
-      <button class="iconbtn" onclick="openAssign(${t.id})" title="Match to a local file…">⇄</button>
-      <button class="iconbtn" onclick="EDIT_ID=${t.id};render();$('#e-artist').focus()" title="Edit artist / title">✎</button>
-      <span class="pill ${t.have ? 'have' : 'miss'} ${t.override ? 'manual' : ''}"
-            title="Click to toggle manually" onclick="toggle(${t.id}, ${t.have}, ${t.auto})">
-        ${t.have ? 'HAVE' : 'MISSING'}</span>
-      ${(t.links || []).map(l => `<a class="open ${l.kind}" href="${esc(l.url)}" target="_blank" rel="noopener"
-          title="${esc(l.title ? l.title + ' · ' : '')}${esc(l.host)}">${
-          l.kind === 'free' ? '⬇' : '🛒'} ${esc(l.label)}${l.fmt ? ` <small>${esc(l.fmt)}</small>` : ''}</a>`).join('')}
-      <a class="open" href="${esc(t.url)}" target="_blank" rel="noopener">Open ↗</a>
-    </div>`).join('')
-    : `<div class="empty">${emptyMsg}</div>`);
+  $('#list').innerHTML = chips + newBar + (rows.length ? rows.map(trackRow).join('')
+    : `<div class="empty">${emptyMsg}</div>`) + tail;
   if (TAB === 'extras') $('#list').innerHTML = extrasHtml(q);
 
 
@@ -837,13 +881,31 @@ function render() {
 
 /* ---- actions ---- */
 
-async function toggle(id, have, auto) {
-  // cycle: auto -> forced opposite -> back to auto
+async function toggle(id) {
+  // auto-have:    HAVE -> MISSING -> auto
+  // auto-missing: MISSING -> HAVE -> N/A (not available now) -> auto
   const t = DATA.tracks.find(x => x.id === id);
   let status = null;
-  if (!t.override) status = have ? 'missing' : 'have';
-  DATA = await api('/api/override', { id, status });
-  render();
+  if (t.na) status = null;
+  else if (!t.override) status = t.have ? 'missing' : 'have';
+  else if (t.override === 'have' && !t.auto) status = 'na';
+  try { DATA = await api('/api/override', { id, status }); render(); }
+  catch (e) { toast('Error: ' + e.message, true); }
+}
+
+function chipsHtml(varName, cur, items) {
+  return '<div class="chips">' + items.map(([k, label, n]) =>
+    `<button class="chip${cur === k ? ' on' : ''}" onclick="${varName}='${k}';render()">${label}<span class="count">${n}</span></button>`).join('') + '</div>';
+}
+
+function copyLinks() {
+  const rows = LAST_ROWS.filter(t => t.links.length);
+  const text = rows.map(t => `${t.artist} – ${t.title}\t${t.links[0].url}`).join('\n');
+  if (!text) return toast('No links to copy');
+  if (typeof navigator === 'undefined' || !navigator.clipboard) return toast('Clipboard not available here', true);
+  navigator.clipboard.writeText(text).then(
+    () => toast(`Copied ${rows.length} link${rows.length === 1 ? '' : 's'}`),
+    e => toast('Copy failed: ' + e.message, true));
 }
 
 async function run(btn, path, msg) {
