@@ -23,7 +23,10 @@ cost you an evening:
   going straight to the gate or shop (Hypeddit, Bandcamp, Beatport, …). The
   track description is scanned too, so a "FREE DL: https://…" line or a
   Google Drive share in the text gets a button as well (socials and streaming
-  links are ignored).
+  links are ignored). When a track has both, **Buy** comes first — shops sell
+  lossless files, free downloads are often MP3 — Bandcamp is preferred over
+  other shops, and a WAV / MP3 hint is shown when the link text or the shop
+  makes the format certain.
 - **Tag** — writes rekordbox-compatible metadata to matched files: ID3v2.3 with
   UTF-16 frames *plus* a RIFF `INFO` chunk for WAVs (rekordbox is picky — plain
   UTF-8 ID3v2.3 tags are silently ignored). Genre is taken from the playlist name.

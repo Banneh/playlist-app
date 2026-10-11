@@ -247,6 +247,7 @@
   a.open.free:hover { border-color: var(--green); background: rgba(52,211,153,.1); }
   a.open.buy { color: var(--amber); }
   a.open.buy:hover { border-color: var(--amber); background: rgba(251,191,36,.1); }
+  a.open small { font-size: 10px; font-weight: 700; opacity: .7; margin-left: 3px; letter-spacing: .04em; }
 
   .section { margin: 26px 0 10px; color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; }
   .empty { text-align: center; color: var(--dim); padding: 60px 0; }
@@ -819,7 +820,7 @@ function render() {
         ${t.have ? 'HAVE' : 'MISSING'}</span>
       ${(t.links || []).map(l => `<a class="open ${l.kind}" href="${esc(l.url)}" target="_blank" rel="noopener"
           title="${esc(l.title ? l.title + ' · ' : '')}${esc(l.host)}">${
-          l.kind === 'free' ? '⬇' : '🛒'} ${esc(l.label)}</a>`).join('')}
+          l.kind === 'free' ? '⬇' : '🛒'} ${esc(l.label)}${l.fmt ? ` <small>${esc(l.fmt)}</small>` : ''}</a>`).join('')}
       <a class="open" href="${esc(t.url)}" target="_blank" rel="noopener">Open ↗</a>
     </div>`).join('')
     : `<div class="empty">${emptyMsg}</div>`);

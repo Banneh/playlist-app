@@ -414,16 +414,42 @@ function classify(host: string, line: string, prev: string): "free" | "buy" | nu
   return wordKind(line) || wordKind(prev) || (SHOP_HOSTS.test(host) ? "buy" : null);
 }
 
-export interface BuyLink { url: string; kind: "free" | "buy"; label: string; title: string; host: string; }
+export interface BuyLink {
+  url: string; kind: "free" | "buy"; label: string; title: string; host: string;
+  /** format the link text or shop makes certain: "WAV", "AIFF", "FLAC", "lossless", "MP3" */
+  fmt: string | null;
+}
 
-/** Where to get the track, at most one free and one buy link: the uploader's
- *  purchase button first, then links found in the description, then
- *  SoundCloud's own download button. Free links sort first. */
+const FMT_WORDS: [RegExp, string][] = [
+  [/\bwavs?\b/i, "WAV"], [/\baiff?\b/i, "AIFF"], [/\bflac\b/i, "FLAC"],
+  [/lossless|hi-?res|24[ -]?bit/i, "lossless"], [/\bmp3s?\b|\b320\b/i, "MP3"],
+];
+const BANDCAMP = /(^|\.)bandcamp\.com$/i;
+function fmtHint(words: string, host: string): string | null {
+  for (const [re, label] of FMT_WORDS) if (re.test(words)) return label;
+  return BANDCAMP.test(host) ? "lossless" : null; // Bandcamp buyers pick WAV / FLAC / AIFF
+}
+
+/** Preference within a kind: Bandcamp over other shops over smart links; a
+ *  free download known to be lossless over unknown over known MP3. */
+function linkRank(l: BuyLink): number {
+  if (l.kind === "buy")
+    return BANDCAMP.test(l.host) ? 3 : /(^|\.)(beatport|junodownload|traxsource)\.com$/i.test(l.host) ? 2 : 1;
+  return l.fmt === "MP3" ? 0 : l.fmt ? 2 : 1;
+}
+
+/** Where to get the track, at most one buy and one free link: the uploader's
+ *  purchase button, links found in the description, then SoundCloud's own
+ *  download button; within a kind the better-ranked link wins. Buy sorts
+ *  first: shops sell lossless files, free downloads are often MP3. */
 export function trackLinks(t: PlTrack): BuyLink[] {
   const out: BuyLink[] = [];
   const add = (url: string, kind: "free" | "buy", title: string, host: string) => {
-    if (out.some((o) => o.url === url || o.kind === kind)) return;
-    out.push({ url, kind, label: kind === "free" ? "Free DL" : "Buy", title, host });
+    if (out.some((o) => o.url === url)) return;
+    const l: BuyLink = { url, kind, label: kind === "free" ? "Free DL" : "Buy", title, host, fmt: fmtHint(title, host) };
+    const i = out.findIndex((o) => o.kind === kind);
+    if (i < 0) out.push(l);
+    else if (linkRank(l) > linkRank(out[i])) out[i] = l;
   };
   if (t.buy_url && /^https?:\/\//i.test(t.buy_url)) {
     const host = hostOf(t.buy_url);
@@ -443,7 +469,7 @@ export function trackLinks(t: PlTrack): BuyLink[] {
     add(url, kind, ctx.slice(0, 80), host);
   }
   if (t.sc_dl && t.url) add(t.url, "free", "Download on SoundCloud", "soundcloud.com");
-  return out.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "free" ? -1 : 1));
+  return out.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "buy" ? -1 : 1));
 }
 
 function isTagged(f: LocalFile, artist: string, title: string, genre: string): boolean {
