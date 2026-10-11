@@ -1,5 +1,7 @@
-/** DJ HQ HTTP server — same API as the original Python app. Runs inside the
- *  Electron main process, or standalone: `node dist/server.js`. */
+/** DJ HQ HTTP server: serves web/index.html and the JSON API documented in
+ *  README.md ("HTTP API"). Runs inside the Electron main process, or
+ *  standalone: `node dist/server.js`. Mutating requests are queued so file
+ *  operations never overlap. */
 import * as fs from "fs";
 import * as http from "http";
 import * as path from "path";

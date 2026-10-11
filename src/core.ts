@@ -1,7 +1,9 @@
-/** DJ HQ core — TypeScript port of the Python app (playlist reconciliation,
- *  rekordbox tagging, player-compat conversion). All file rewrites go through
- *  ffmpeg with an audio-MD5 (tags) or duration (converts) verification, and
- *  converts back up the untouched original first. */
+/** DJ HQ core: state, SoundCloud (playlist fetch, track search), file scan +
+ *  fuzzy matching, where-to-get-it links, rekordbox tagging, player-compat
+ *  conversion, the Downloads inbox and the rekordbox XML export. All file
+ *  rewrites go through ffmpeg with an audio-MD5 (tags) or duration (converts)
+ *  verification, converts back up the untouched original first, and every
+ *  action returns the full view (buildView) the UI renders. */
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
