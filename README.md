@@ -33,6 +33,11 @@ cost you an evening:
   **in place**: same filename, same duration. Because rekordbox references tracks
   by path and stores cues by time, your hot cues, memory cues and beat grids
   survive without re-importing.
+- **Not in playlist** — local files that match nothing in the playlist get
+  their own tab. *Find on SoundCloud* searches for the track (by name and
+  duration), you add it to the playlist on SoundCloud with one click, and once
+  it shows up there the file is matched to it automatically. *Find all* fills
+  in the sure matches for you and leaves doubtful ones for a manual pick.
 - **Multiple libraries** — each links one folder to one playlist; switch in the
   header.
 

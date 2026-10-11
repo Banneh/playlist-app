@@ -345,6 +345,7 @@
       <button data-tab="have">Have <span class="count" id="c-have"></span></button>
       <button data-tab="all">All <span class="count" id="c-all"></span></button>
       <button data-tab="new" title="Tracks added to the playlist since you last marked all as seen">New <span class="count" id="c-new"></span></button>
+      <button data-tab="extras" title="Local files that aren't in the playlist">Not in playlist <span class="count" id="c-extras"></span></button>
     </div>
     <span class="vr"></span>
     <button id="btn-rescan" title="Re-check the music folder for files"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Rescan</button>
@@ -362,7 +363,6 @@
   </div>
 
   <div class="list" id="list"><div class="empty">Loading…</div></div>
-  <div id="extras"></div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -576,6 +576,119 @@ function openAssign(id) {
   });
 }
 
+/* ---- local files not in the playlist ---- */
+
+function extrasHtml(q) {
+  const xs = DATA.extras.map((f, i) => ({ f, i }))
+    .filter(({ f }) => !q || (f.artist + ' ' + f.title + ' ' + f.name).toLowerCase().includes(q));
+  const todo = DATA.extras.filter(f => !f.found).length;
+  const bar = DATA.extras.length ? `<div class="newbar">
+      <span>${DATA.extras.length} local file${DATA.extras.length === 1 ? ' isn’t' : 's aren’t'} in the playlist.
+        Find each on SoundCloud, then add it to the playlist there — once it shows up, the file is matched automatically.</span>
+      ${todo ? `<button class="iconbtn" id="btn-findall" onclick="findAll()" title="Search SoundCloud for every unmatched file; sure matches are filled in, the rest are left for you">🔍 Find all (${todo})</button>` : ''}
+    </div>` : '';
+  return bar + (xs.length ? xs.map(({ f, i }) => extraRow(f, i)).join('')
+    : `<div class="empty">${DATA.extras.length ? 'No files match the search' : 'Every local file is in the playlist 🎉'}</div>`);
+}
+
+function extraRow(f, i) {
+  if ('x' + i === EDIT_ID) return `
+    <div class="row">
+      <span class="num">·</span>
+      <div class="editform">
+        <input id="e-artist" value="${esc(f.artist)}" placeholder="Artist">
+        <input id="e-title" value="${esc(f.title)}" placeholder="Title"
+               onkeydown="if(event.key==='Enter')saveExtra(${i})">
+      </div>
+      <button class="iconbtn save" onclick="saveExtra(${i})">✓ Save</button>
+      ${f.edited ? `<button class="iconbtn danger" onclick="resetExtra(${i})" title="Back to filename values">↺</button>` : ''}
+      <button class="iconbtn" onclick="EDIT_ID=null;render()">✕</button>
+    </div>`;
+  const fd = f.found;
+  return `
+    <div class="row">
+      <span class="num">·</span>
+      <div class="meta">
+        <div class="t">${esc(f.title)}${f.edited ? '<span class="ed">✎ edited</span>' : ''}</div>
+        <div class="a">${esc(f.artist) || '<i>no artist — click ✎</i>'}</div>
+        <div class="f${f.tagged === false || f.incompat ? ' warn' : ''}">📄 ${esc(f.name)}${
+          f.tagged ? ' · ✓ tagged' : ' · ⚠ needs tags'}${f.incompat ? ' · 🎛 ' + esc(f.incompat) : ''}</div>
+        ${fd ? `<div class="f link" onclick="openFind(${i})" title="Click to pick a different track">☁ ${esc(fd.user)} – ${esc(fd.title)} · ${esc(fd.dur)}</div>` : ''}
+      </div>
+      <span class="dur">${f.dur}</span>
+      <button class="iconbtn" onclick="EDIT_ID='x${i}';render();$('#e-artist').focus()" title="Edit artist / title">✎</button>
+      ${fd ? `<button class="iconbtn" onclick="clearFound(${i})" title="Forget this match">✕</button>
+          <a class="open" href="${esc(fd.url)}" target="_blank" rel="noopener"
+             title="Open the track on SoundCloud and add it to the playlist there">Add to playlist ↗</a>`
+        : `<button class="iconbtn" onclick="openFind(${i})" title="Search SoundCloud for this file">🔍 Find on SoundCloud</button>`}
+    </div>`;
+}
+
+function openFind(i) {
+  const f = DATA.extras[i];
+  if (!f) return;
+  modal((dlg, done) => {
+    dlg.innerHTML = `<h3>Find “${esc(f.artist ? f.artist + ' – ' : '')}${esc(f.title)}” on SoundCloud</h3>
+      <p>File duration ${esc(f.dur)}. Pick the matching track; you then add it to the playlist on SoundCloud.</p>
+      <div class="field"><div class="fieldrow">
+        <input id="fq" value="${esc((f.artist + ' ' + f.title).trim())}" spellcheck="false" placeholder="Search text">
+        <button id="fgo">Search</button></div></div>
+      <div class="filelist" id="flist"></div>
+      <div class="actions">
+        <a class="open" href="${scSearch(f.artist + ' ' + f.title)}" target="_blank" rel="noopener">Search on soundcloud.com ↗</a>
+        <button data-a="cancel">Cancel</button>
+      </div>`;
+    const list = dlg.querySelector('#flist'), qin = dlg.querySelector('#fq');
+    const search = async () => {
+      list.innerHTML = '<div class="empty" style="padding:24px 0"><span class="spin"></span> Searching SoundCloud…</div>';
+      try {
+        const r = await api('/api/find', { file: f.name, q: qin.value });
+        list.innerHTML = r.candidates.length ? r.candidates.map((c, k) => `
+          <button class="fileopt${c.in_playlist ? ' taken' : k === 0 ? ' cur' : ''}" data-k="${k}">
+            <span class="fn">${esc(c.user)} – ${esc(c.title)}</span>
+            <span class="fi">${esc(c.dur)} (${c.dur_diff === 0 ? 'same length' : (c.dur_diff > 0 ? '+' : '') + c.dur_diff + ' s'}) · ${
+              Math.round(c.score * 100)}% match${c.in_playlist ? ' · already in playlist as #' + c.in_playlist : ''}</span>
+          </button>`).join('')
+          : '<div class="empty" style="padding:24px 0">No results — try shorter search text</div>';
+        list.querySelectorAll('.fileopt').forEach(b => b.onclick = () => done(r.candidates[+b.dataset.k]));
+      } catch (e) { list.innerHTML = `<div class="empty" style="padding:24px 0">Search failed: ${esc(e.message)}</div>`; }
+    };
+    dlg.querySelector('#fgo').onclick = search;
+    qin.onkeydown = e => { if (e.key === 'Enter') search(); };
+    dlg.querySelector('[data-a=cancel]').onclick = () => done(null);
+    search();
+  }).then(async c => {
+    if (!c) return;
+    try {
+      DATA = await api('/api/found', { file: f.name, track: c });
+      render();
+      toast(c.in_playlist ? 'File matched to playlist track #' + c.in_playlist
+                          : 'Track found — add it to the playlist on SoundCloud');
+    } catch (e) { toast('Error: ' + e.message, true); }
+  });
+}
+
+async function clearFound(i) {
+  try { DATA = await api('/api/found', { file: DATA.extras[i].name, track: null }); render(); }
+  catch (e) { toast('Error: ' + e.message, true); }
+}
+
+async function findAll() {
+  const b = $('#btn-findall');
+  if (b) { b.disabled = true; b.innerHTML = '<span class="spin"></span>Searching…'; }
+  try {
+    DATA = await api('/api/find-all', {});
+    const r = DATA.find_report || {};
+    const parts = [`Found ${r.found}`];
+    if (r.in_playlist) parts.push(`${r.in_playlist} already in the playlist (open Find to confirm)`);
+    if (r.unsure) parts.push(`${r.unsure} need a manual pick`);
+    if (r.none) parts.push(`${r.none} not on SoundCloud`);
+    if (r.errors && r.errors.length) parts.push(`${r.errors.length} failed: ${r.errors[0]}`);
+    toast(parts.join(' · '), !!(r.errors && r.errors.length));
+  } catch (e) { toast('Error: ' + e.message, true); }
+  render();
+}
+
 /* ---- inline edit ---- */
 
 async function saveEdit(id) {
@@ -624,7 +737,7 @@ function render() {
   rb.innerHTML = btnLabel(I.restore, 'Restore originals', DATA.backups);
   if (!DATA.ready) {
     ['#s-have', '#s-miss', '#s-local'].forEach(s => $(s).textContent = '–');
-    ['#c-missing', '#c-have', '#c-all'].forEach(s => $(s).textContent = '');
+    ['#c-missing', '#c-have', '#c-all', '#c-new', '#c-extras'].forEach(s => $(s).textContent = '');
     $('#pbar').style.width = '0%';
     $('#pct').textContent = '';
     const tb0 = $('#btn-tag');
@@ -634,7 +747,6 @@ function render() {
     $('#list').innerHTML = (DATA.libraries || []).length
       ? '<div class="empty">No playlist data yet — hit <b>Fetch playlist</b>.</div>'
       : '<div class="empty">Welcome to DJ HQ 🎧<br><br>Click <b>+ Add library</b> in the header to link a music folder<br>to a public SoundCloud playlist.</div>';
-    $('#extras').innerHTML = '';
     return;
   }
   $('#s-have').textContent = DATA.have;
@@ -644,6 +756,7 @@ function render() {
   $('#c-have').textContent = DATA.have;
   $('#c-all').textContent = DATA.have + DATA.missing;
   $('#c-new').textContent = DATA.new_count;
+  $('#c-extras').textContent = DATA.extras.length;
   $('#c-new').classList.toggle('zero', !DATA.new_count);
   const tb = $('#btn-tag');
   tb.disabled = !DATA.untagged;
@@ -656,7 +769,7 @@ function render() {
   $('#pct').textContent = pctVal + '% in library';
 
   const q = Q.toLowerCase();
-  const rows = DATA.tracks.filter(t =>
+  const rows = TAB === 'extras' ? [] : DATA.tracks.filter(t =>
     (TAB === 'all' || (TAB === 'new' ? t.is_new : (TAB === 'have') === t.have)) &&
     (!q || (t.artist + ' ' + t.title + ' ' + t.user).toLowerCase().includes(q)));
 
@@ -706,35 +819,8 @@ function render() {
       <a class="open" href="${esc(t.url)}" target="_blank" rel="noopener">Open ↗</a>
     </div>`).join('')
     : `<div class="empty">${emptyMsg}</div>`);
+  if (TAB === 'extras') $('#list').innerHTML = extrasHtml(q);
 
-  $('#extras').innerHTML = DATA.extras.length
-    ? '<div class="section">Local files not in playlist (' + DATA.extras.length + ')</div><div class="list">'
-      + DATA.extras.map((f, i) => 'x' + i === EDIT_ID ? `
-        <div class="row">
-          <span class="num">·</span>
-          <div class="editform">
-            <input id="e-artist" value="${esc(f.artist)}" placeholder="Artist">
-            <input id="e-title" value="${esc(f.title)}" placeholder="Title"
-                   onkeydown="if(event.key==='Enter')saveExtra(${i})">
-          </div>
-          <button class="iconbtn save" onclick="saveExtra(${i})">✓ Save</button>
-          ${f.edited ? `<button class="iconbtn danger" onclick="resetExtra(${i})" title="Back to filename values">↺</button>` : ''}
-          <button class="iconbtn" onclick="EDIT_ID=null;render()">✕</button>
-        </div>` : `
-        <div class="row">
-          <span class="num">·</span>
-          <div class="meta">
-            <div class="t">${esc(f.title)}${f.edited ? '<span class="ed">✎ edited</span>' : ''}</div>
-            <div class="a">${esc(f.artist) || '<i>no artist — click ✎</i>'}</div>
-            <div class="f${f.tagged === false || f.incompat ? ' warn' : ''}">📄 ${esc(f.name)}${
-              f.tagged ? ' · ✓ tagged' : ' · ⚠ needs tags'}${
-              f.incompat ? ' · 🎛 ' + esc(f.incompat) : ''}</div>
-          </div>
-          <button class="iconbtn" onclick="EDIT_ID='x${i}';render();$('#e-artist').focus()" title="Edit artist / title">✎</button>
-          <a class="open" href="${scSearch(f.artist + ' ' + f.title)}" target="_blank"
-             rel="noopener" title="Search SoundCloud">🔍</a>
-        </div>`).join('') + '</div>'
-    : '';
 
   const cb = $('#btn-convert');
   cb.disabled = !DATA.incompatible;

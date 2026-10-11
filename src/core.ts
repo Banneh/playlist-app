@@ -83,6 +83,8 @@ export interface AppState {
   edits: Record<string, { artist: string; title: string }>;
   /** manual file assignment: track id -> file name ("" = forced no file) */
   assigned: Record<string, string>;
+  /** SoundCloud track picked for a local file that isn't in the playlist, keyed "x:" + path */
+  found: Record<string, Found>;
   client_id: string | null;
   device: string;
 }
@@ -104,10 +106,11 @@ function loadState(): AppState {
   try {
     const st = JSON.parse(fs.readFileSync(statePath(), "utf8"));
     st.assigned = st.assigned || {}; // older state files predate manual matching
+    st.found = st.found || {};
     return st;
   } catch {
     return { libraries: [], active: null, dur_cache: {}, overrides: {},
-             edits: {}, assigned: {}, client_id: null, device: "xdj-700" };
+             edits: {}, assigned: {}, found: {}, client_id: null, device: "xdj-700" };
   }
 }
 export function saveState(): void {
@@ -345,6 +348,17 @@ function artistTitle(t: PlTrack): [string, string] {
 
 const looseEq = (a: string, b: string) => norm(a) === norm(b);
 
+/** Artist/title for a local file that isn't in the playlist: "Artist - Title.ext",
+ *  overridden by an inline edit. */
+function extraArtistTitle(f: LocalFile): [string, string] {
+  const stem = f.name.replace(/\.[^.]+$/, "");
+  const i = stem.indexOf(" - ");
+  let [a, t] = i >= 0 ? [stem.slice(0, i).trim(), stem.slice(i + 3).trim()] : ["", stem];
+  const ed = STATE.edits["x:" + f.path];
+  if (ed) { a = ed.artist || a; t = ed.title || t; }
+  return [a, t];
+}
+
 // ---------------- purchase / free-download links ----------------
 
 /** Download gates and file hosts: a link there is a free download whatever it's called. */
@@ -546,6 +560,23 @@ export async function buildView(): Promise<any> {
       assignedDirty = true;
     }
   }
+  // local files whose SoundCloud match has since been added to the playlist:
+  // pin the file to that track (unless the track already has a manual file)
+  const foundPrefix = "x:" + lib.dir + path.sep;
+  for (const k of Object.keys(STATE.found)) {
+    if (!k.startsWith(foundPrefix)) continue;
+    const fname = path.basename(k.slice(2));
+    if (!fmap.has(fname)) { delete STATE.found[k]; assignedDirty = true; continue; }
+    const tid = String(STATE.found[k].id);
+    if (!trackIds.has(Number(tid))) continue;
+    if (!STATE.assigned[tid] || !fmap.has(STATE.assigned[tid])) {
+      for (const a of Object.keys(STATE.assigned)) if (STATE.assigned[a] === fname) delete STATE.assigned[a];
+      STATE.assigned[tid] = fname;
+      delete STATE.overrides[tid];
+    }
+    delete STATE.found[k];
+    assignedDirty = true;
+  }
   if (assignedDirty) saveState();
   const manual = new Map<number, string>(); // track id -> file name ("" = no file)
   const manualFiles = new Set<string>();
@@ -596,13 +627,12 @@ export async function buildView(): Promise<any> {
              tagged, incompat, override: o || null, edited: !!ed };
   });
   const extras = files.filter((f) => !fileHit.has(f.name)).map((f) => {
-    const stem = f.name.replace(/\.[^.]+$/, "");
-    const i = stem.indexOf(" - ");
-    let [xa, xt] = i >= 0 ? [stem.slice(0, i).trim(), stem.slice(i + 3).trim()] : ["", stem];
-    const ed = STATE.edits["x:" + f.path];
-    if (ed) { xa = ed.artist || xa; xt = ed.title || xt; }
-    return { name: f.name, incompat: compatReason(f.fmt, dev),
-             artist: xa, title: xt, edited: !!ed, tagged: isTagged(f, xa, xt, genre) };
+    const [xa, xt] = extraArtistTitle(f);
+    const fnd = STATE.found["x:" + f.path];
+    return { name: f.name, incompat: compatReason(f.fmt, dev), dur: fmtDur(Math.round(f.dur)),
+             artist: xa, title: xt, edited: !!STATE.edits["x:" + f.path],
+             tagged: isTagged(f, xa, xt, genre),
+             found: fnd ? { ...fnd, dur: fmtDur(fnd.dur) } : null };
   });
   return {
     ...base, ready: true, playlist: pl.title, playlist_url: pl.url,
@@ -787,6 +817,128 @@ export async function setAssign(data: any): Promise<any> {
   }
   saveState();
   return buildView();
+}
+
+// ---------------- soundcloud search (local files not in the playlist) ----------------
+
+export interface Found { id: number; url: string; title: string; user: string; dur: number; }
+interface Candidate extends Found { score: number; name: number; dur_diff: number; in_playlist: number | null; }
+
+/** api-v2 GET with the scraped client_id; rescrapes it once on 401/403. */
+async function scApi(lib: Library, pathAndQuery: string): Promise<any> {
+  for (let attempt = 0; ; attempt++) {
+    if (!STATE.client_id) { STATE.client_id = await scrapeClientId(await httpGet(lib.url)); saveState(); }
+    try {
+      return JSON.parse(await httpGet(`https://api-v2.soundcloud.com/${pathAndQuery}&client_id=${STATE.client_id}`));
+    } catch (e: any) {
+      if ((e.status === 401 || e.status === 403) && attempt === 0) { STATE.client_id = null; continue; }
+      throw e;
+    }
+  }
+}
+
+function extraQuery(f: LocalFile): string {
+  const [a, t] = extraArtistTitle(f);
+  return cleanTitle(`${a} ${t}`).replace(/_+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** Search SoundCloud for a local file; candidates scored like the playlist
+ *  matcher (name similarity + duration closeness), best first. Bracketed text
+ *  such as "(Extended Mix)" makes SoundCloud's search return junk or nothing,
+ *  so the bracket-free query goes first and the full one is merged in. */
+async function searchCandidates(lib: Library, f: LocalFile, q: string): Promise<Candidate[]> {
+  const bare = q.replace(/\s*[\(\[][^\)\]]*[\)\]]/g, " ").replace(/\s+/g, " ").trim();
+  const queries = bare && bare !== q ? [bare, q] : [q];
+  const inPl = new Map<number, number>();
+  (lib.playlist?.tracks || []).forEach((t, i) => inPl.set(t.id, i + 1));
+  const stem = f.name.replace(/\.[^.]+$/, "");
+  const [a, t] = extraArtistTitle(f);
+  const mine = [stem, `${a} ${t}`];
+  const seen = new Set<number>();
+  const out: Candidate[] = [];
+  for (const qq of queries) {
+    const r = await scApi(lib, `search/tracks?q=${encodeURIComponent(qq)}&limit=10`);
+    for (const c of r.collection || []) {
+      if (c.kind !== "track" || !c.permalink_url || seen.has(c.id)) continue;
+      seen.add(c.id);
+      const dur = Math.round((c.full_duration || c.duration || 0) / 1000);
+      const user = c.user?.username || "";
+      const title = c.title || "";
+      let name = 0;
+      for (const m of mine) name = Math.max(name, sim(m, title), sim(m, `${user} ${title}`));
+      const dd = Math.abs(f.dur - dur);
+      const score = name + (dd < 3 ? 0.15 : dd < 10 ? 0.07 : 0);
+      out.push({ id: c.id, url: c.permalink_url, title, user, dur,
+                 score: Math.round(Math.min(1, score) * 100) / 100, name: Math.round(name * 100) / 100,
+                 dur_diff: Math.round(dur - f.dur), in_playlist: inPl.get(c.id) || null });
+    }
+  }
+  return out.sort((a, b) => b.score - a.score).slice(0, 6);
+}
+
+/** Accept without asking when either: close name AND same length with a clear
+ *  gap to the runner-up (remix vs original normalise to the same words); or an
+ *  essentially exact name with a big gap, whatever the length — that's the
+ *  radio edit of your extended file, and for "add it to the playlist" it's
+ *  the right track. */
+function confident(c: Candidate[]): boolean {
+  if (!c.length || c[0].in_playlist) return false;
+  const gap = c.length === 1 ? 1 : c[0].score - c[1].score;
+  return (c[0].score >= 0.75 && Math.abs(c[0].dur_diff) <= 3 && gap >= 0.08)
+      || (c[0].name >= 0.9 && gap >= 0.2); // other artists' same-titled songs score ~0.73
+}
+
+export async function findTrack(data: any): Promise<any> {
+  const lib = requireLib();
+  const f = (await scanLocal(lib)).find((x) => x.name === data.file);
+  if (!f) throw new Error("file not found in the library folder");
+  const q = String(data.q || "").trim() || extraQuery(f);
+  return { q, candidates: await searchCandidates(lib, f, q) };
+}
+
+/** Remember the SoundCloud track picked for a file (null = forget). If the track
+ *  is already in the playlist this is really a manual match, so pin it instead. */
+export async function setFound(data: any): Promise<any> {
+  const lib = requireLib();
+  const key = "x:" + path.join(lib.dir, data.file);
+  const t = data.track;
+  if (!t) { delete STATE.found[key]; saveState(); return buildView(); }
+  delete STATE.found[key];
+  if ((lib.playlist?.tracks || []).some((p) => p.id === t.id))
+    return setAssign({ id: t.id, file: data.file });
+  STATE.found[key] = { id: Number(t.id), url: String(t.url), title: String(t.title || ""),
+                       user: String(t.user || ""), dur: Number(t.dur) || 0 };
+  saveState();
+  return buildView();
+}
+
+export async function findAll(): Promise<any> {
+  const lib = requireLib();
+  let view = await buildView();
+  const fmap = new Map((await scanLocal(lib)).map((f) => [f.name, f]));
+  let found = 0, in_playlist = 0, unsure = 0, none = 0;
+  const errors: string[] = [];
+  for (const e of view.extras || []) {
+    if (e.found) continue;
+    const f = fmap.get(e.name);
+    if (!f) continue;
+    try {
+      const c = await searchCandidates(lib, f, extraQuery(f));
+      if (confident(c)) {
+        const { id, url, title, user, dur } = c[0];
+        STATE.found["x:" + f.path] = { id, url, title, user, dur };
+        found++;
+      } else if (!c.length || c[0].score < 0.5) none++; // nothing plausible
+      else if (c[0].in_playlist && Math.abs(c[0].dur_diff) <= 3) in_playlist++; // matcher missed it; user confirms
+      else unsure++;
+    } catch (err: any) {
+      errors.push(`${f.name}: ${err.message}`);
+    }
+  }
+  saveState();
+  view = await buildView();
+  view.find_report = { found, in_playlist, unsure, none, errors };
+  return view;
 }
 
 export async function markSeen(): Promise<any> {

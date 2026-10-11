@@ -60,6 +60,9 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/edit":     return route(() => core.setEdit(data));
           case "/api/assign":   return route(() => core.setAssign(data));
           case "/api/seen":     return route(() => core.markSeen());
+          case "/api/find":     return route(() => core.findTrack(data));
+          case "/api/found":    return route(() => core.setFound(data));
+          case "/api/find-all": return route(() => core.findAll());
           case "/api/pick-folder":
             if (!opts.pickFolder) return json({ path: null, unsupported: true });
             return void opts.pickFolder()
