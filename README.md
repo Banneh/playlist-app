@@ -10,103 +10,138 @@ cost you an evening:
 3. **Why does rekordbox show blank artist/title for my WAVs?**
 4. **Why won't my XDJ/CDJ play this file?**
 
-![DJ HQ](docs/screenshot.png)
+![The Missing tab: every track you don't have yet, with a button to the place you get it](docs/screenshot.png)
 
 ## How it works
 
 A *library* is one music folder linked to one public SoundCloud playlist. The
 app fetches the playlist, scans the folder, and matches files to tracks by
-filename similarity and duration. Everything else builds on that match.
+filename similarity and duration. Everything else builds on that match. The
+playlist is re-fetched on launch, every 15 minutes while the window is
+visible, and whenever you click **Fetch playlist**.
 
-### The tabs
+## The tabs
 
-- **Missing** — tracks with no file. Every row links to where you can get the
-  track (see *Getting the missing tracks*). Chips narrow the list to tracks
-  with a free download, a shop link, or no link at all, and **Copy links** puts
-  one `Artist – Title ⇥ link` line per shown track on the clipboard. Tracks you
-  marked *not available now* sit dimmed at the bottom.
-- **Have** — tracks with a file, showing the file name, how sure the match is,
-  whether the file is tagged, and whether your player can play it. The
-  **Lossless available** chip lists MP3s whose shop link sells a lossless file.
-- **All** — both.
-- **New** — what changed since you last pressed **Mark all as seen**: tracks
-  added to the playlist (purple **NEW**) and files that arrived in the folder
-  (green **NEW FILE**). It doubles as the to-do list of what still needs
-  tagging, converting and importing.
-- **Not in playlist** — files in your folder that match nothing in the
-  playlist. **Find on SoundCloud** searches for the track by name and duration
-  and shows candidates with their length difference; pick one and
-  **Add to playlist ↗** opens it on SoundCloud where you add it. Once it shows
-  up in the playlist, the file is matched to it automatically. **Find all**
-  accepts the sure matches for you and leaves doubtful ones for a manual pick.
-  A candidate that is *already* in the playlist is simply pinned to the file.
-- **Downloads** — fresh audio files in your Downloads folder matched against
-  the playlist. A download for a missing track gets **Move into library**; a
-  lossless download for a track you only have as MP3 gets **Upgrade** (the old
-  MP3 is kept under `originals/<library>/replaced/`). Files move as they are,
-  no renaming, and are pinned to their track. Set `inbox_dir` in `state.json`
-  to watch a different folder.
+### Missing — get the tracks you don't have
 
-### Getting the missing tracks
+The screenshot above. Every row has a button to the best place to get the
+file: **Buy** (a shop — Bandcamp, Beatport, …) and **Free DL** (a download
+gate such as Hypeddit, a Drive or Dropbox share, or SoundCloud's own download
+button). The links come from the uploader's purchase link *and* from the track
+description. Buy comes first when both exist: shops sell lossless files, free
+downloads are often MP3. Hover a button for the link's own wording, its host,
+and the format when it is certain.
 
-Each track row shows the best places to get the file:
+1. Narrow the list with the chips: **Free DL**, **Buy**, or **No link**.
+2. Click **Buy** or **Free DL**. The track page itself is behind **Open**.
+3. Working through a batch? **Copy links** puts one `Artist – Title ⇥ link`
+   line per shown track on the clipboard.
+4. Can't get a track today? Click its **MISSING** pill twice (MISSING → HAVE →
+   **N/A**). It moves to a dimmed section at the bottom and comes back by
+   itself, with a notice, the moment a download or shop link appears for it.
+5. When the download lands in your Downloads folder, the **Downloads** tab
+   takes it from there (below).
 
-- **Buy** and **Free DL** buttons come from the uploader's purchase link on
-  SoundCloud, from links written in the track description (`FREE DL:
-  https://…`, a Google Drive share, a Bandcamp page — socials and streaming
-  links are ignored), and from SoundCloud's own download button when it still
-  has downloads left.
-- When a track has both, **Buy** comes first: shops sell lossless files, free
-  downloads are often MP3. Bandcamp is preferred over other shops. Hover a
-  button to see the link's own wording, its host, and the format when the text
-  or the shop makes it certain.
-- **Not available now** — click the MISSING pill twice (MISSING → HAVE → N/A)
-  for a track you can't get today. It leaves the Missing list and comes back by
-  itself, with a notice, the moment a download or shop link appears for it.
+### Have — what's on disk
 
-### Fixing a match
+![The Have tab: the matched file, how sure the match is, tag status and player compatibility](docs/tab-have.png)
 
-- **⇄** opens a file picker for the track: pin any file in the folder to it,
-  force *no file*, or go back to automatic. A file taken from another track
-  frees that track to auto-match again.
+Each row shows the matched file, how sure the match is, whether the file is
+tagged, and whether the selected player can play it. The **Lossless
+available** chip lists MP3s whose shop link sells a lossless file.
+
+<p align="center"><img src="docs/dialog-match.png" width="430" alt="The file picker: pin any file in the folder to a track, or force no file"></p>
+
+- **⇄** opens the file picker: pin any file in the folder to the track, force
+  *no file*, or go back to automatic. A file taken from another track frees
+  that track to auto-match again.
 - The **HAVE / MISSING** pill overrides the status by hand.
-- **✎** edits artist and title (used for tags and the rekordbox export).
+- **✎** edits artist and title — used for the tags and the rekordbox export.
 
-### Keeping up
+### New — what changed since you last looked
 
-The playlist is re-fetched on launch, every 15 minutes while the window is
-visible, and when you click **Fetch playlist**. A small "Playlist checked
-12:05" label shows the last successful check and turns red with the reason if
-one fails. When the track set changed you get a toast ("2 new, 1 removed") and
-the additions land in the *New* tab.
+![The New tab: tracks added to the playlist and files that arrived in the folder](docs/tab-new.png)
 
-### Preparing for the player
+Two kinds of change collect here until you press **Mark all as seen**: tracks
+added to the playlist (purple **NEW**) and files that arrived in the folder
+(green **NEW FILE**). It doubles as the to-do list of what still needs
+tagging, converting and importing into rekordbox. When a refresh finds changes
+you also get a toast ("2 new, 1 removed").
+
+### Not in playlist — files the playlist doesn't know about
+
+![The Not in playlist tab: local files that match nothing, with Find on SoundCloud](docs/tab-not-in-playlist.png)
+
+Files in your folder that match nothing in the playlist. The goal is to get
+them *into* the playlist so it stays the single source of truth.
+
+<p align="center"><img src="docs/dialog-find.png" width="430" alt="Find on SoundCloud: candidates with their length difference and match score"></p>
+
+1. **Find all** searches SoundCloud for every file and accepts the sure
+   matches (same name and a clear gap to the runner-up).
+2. For the rest, **Find on SoundCloud** shows candidates with their length
+   difference and a match score; edit the search text if nothing fits.
+3. Pick one. **Add to playlist ↗** opens the track on SoundCloud, where you add
+   it to the playlist yourself — the app never writes to SoundCloud.
+4. Once the next refresh sees the track in the playlist, the file is pinned to
+   it automatically and leaves this tab.
+
+A candidate that is *already* in the playlist is simply pinned to the file:
+that's a match the fuzzy matcher missed.
+
+### Downloads — bring new files in
+
+![The Downloads tab: fresh downloads matched to tracks, with Move into library and Upgrade](docs/tab-downloads.png)
+
+Audio files in your Downloads folder, matched against the playlist the same
+way the library is.
+
+- **Move into library** — the file belongs to a missing track. It is moved as
+  it is (no renaming) and pinned to the track.
+- **Upgrade** — a lossless download for a track you only have as MP3. The MP3
+  goes to `originals/<library>/replaced/`, the new file takes its place.
+- **Move all** does both in one go, after a confirm that says how many are
+  upgrades.
+
+Zips and unfinished downloads are ignored. Files already in the library by
+name, and matches you hold an equal or better file for, are counted but not
+listed. Set `inbox_dir` in `state.json` to watch a different folder.
+
+## Preparing for the player
+
+The *Prepare for player* bar sits under the tabs. Pick your player first; the
+counts update to match its limits.
 
 - **Write tags** — writes rekordbox-compatible metadata to matched files:
   ID3v2.3 with UTF-16 frames *plus* a RIFF `INFO` chunk for WAVs (rekordbox is
   picky — plain UTF-8 ID3v2.3 tags are silently ignored). Genre is the playlist
   name; artist/title come from the playlist or your inline edits.
-- **Convert** — checks each file against the selected player's real limits
-  (the XDJ-700 only plays 16-bit WAV at 44.1/48 kHz; NXS2 and CDJ-3000 take
-  24-bit, 96 kHz and FLAC) and converts incompatible files **in place**: same
-  filename, same duration. rekordbox references tracks by path and stores cues
-  by time, so hot cues, memory cues and beat grids survive.
+- **Convert** — checks each file against the player's real limits (the XDJ-700
+  only plays 16-bit WAV at 44.1/48 kHz; NXS2 and CDJ-3000 take 24-bit, 96 kHz
+  and FLAC) and converts incompatible files **in place**: same filename, same
+  duration. rekordbox references tracks by path and stores cues by time, so hot
+  cues, memory cues and beat grids survive.
 - **Restore originals** — copies the untouched originals back.
 
-### Into rekordbox
+## Into rekordbox
 
-**⋯ → Export rekordbox XML…** writes the matched files of every library as
-rekordbox playlists, in SoundCloud order, to one file in the app's data folder.
-Point rekordbox at it once (Preferences → Advanced → Database → *rekordbox
-xml* → Browse) and import the playlist from the *rekordbox xml* node in the
-tree. Tracks already in your collection keep their cues and grids. Export again
-whenever the playlist changes — the path stays the same, rekordbox just
-re-reads it.
+<p align="center"><img src="docs/dialog-export.png" width="430" alt="Export rekordbox XML: the file path and the steps to import it"></p>
 
-### Multiple libraries
+1. **⋯ → Export rekordbox XML…** writes the matched files of every library as
+   rekordbox playlists, in SoundCloud order, to one file in the app's data
+   folder.
+2. In rekordbox, once: Preferences → Advanced → Database → *rekordbox xml* →
+   Browse to that file.
+3. A *rekordbox xml* item appears in the tree. Right-click the playlist there →
+   **Import Playlist**. Tracks already in your collection keep their cues and
+   grids.
+4. Export again whenever the playlist changes — the path stays the same, so
+   rekordbox just re-reads it.
+
+## Multiple libraries
 
 Each library links one folder to one playlist; switch in the header. Manual
-matches, edits and the *New* watermark are kept per library.
+matches, edits, N/A marks and the *New* watermark are kept per library.
 
 ## Install
 
@@ -143,6 +178,14 @@ cd playlist-app
 npm install
 npm start
 ```
+
+### First run
+
+1. **+ Add library**: choose your music folder and paste the URL of a public
+   SoundCloud playlist.
+2. The playlist is fetched and the folder scanned. The header shows how much of
+   the playlist you already have.
+3. Pick your player in the *Prepare for player* bar.
 
 ### Headless mode
 
