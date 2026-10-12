@@ -393,15 +393,71 @@ async function rescanFolder() {
 }
 function libraryMenu(anchor) {
   showMenu(anchor, [
+    { label: APP.version ? 'DJ HQ ' + APP.version : 'DJ HQ', header: true },
     { label: 'Open playlist on SoundCloud', icon: 'external', disabled: !DATA.playlist_url, onclick: () => window.open(DATA.playlist_url, '_blank', 'noopener') },
     { label: 'Rescan music folder', icon: 'folder', onclick: rescanFolder },
     { label: 'Export rekordbox XML…', icon: 'upload', onclick: () => typeof exportXml === 'function' ? exportXml() : go('prepare') },
     '-',
     { label: 'Show me around', icon: 'sparkles', hint: 'A one-minute tour of the app', onclick: () => typeof startTour === 'function' && startTour() },
+    { label: 'Check for updates…', icon: 'refresh', hint: APP.version ? 'This is DJ HQ ' + APP.version : '', onclick: () => checkForUpdates({ manual: true }) },
     '-',
     { label: 'Add another library…', icon: 'plus', onclick: () => typeof uiAddLibrary === 'function' && uiAddLibrary() },
     { label: 'Remove this library…', icon: 'trash', danger: true, onclick: removeLibrary },
   ]);
+}
+
+/* ---------- updates: a daily look at the latest GitHub release ---------- */
+let APP = { version: '', platform: '', arch: '', packaged: false };
+let UPDATE = null;   // { version, url, page, asset } once a newer release is known
+const UPD_KEY = 'djhq-update-dismissed';
+const RELEASES_API = 'https://api.github.com/repos/Banneh/playlist-app/releases/latest';
+function verNewer(a, b) {
+  const x = String(a).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+  const y = String(b).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) { if ((x[i] || 0) > (y[i] || 0)) return true; if ((x[i] || 0) < (y[i] || 0)) return false; }
+  return false;
+}
+function assetPattern() {
+  if (APP.platform === 'darwin') return new RegExp('-mac-' + (APP.arch === 'arm64' ? 'arm64' : 'x64') + '\\.dmg$');
+  if (APP.platform === 'win32') return /Setup.*\.exe$/;
+  if (APP.platform === 'linux') return /\.AppImage$/;
+  return null;
+}
+async function checkForUpdates({ manual = false } = {}) {
+  try {
+    const r = await fetch(RELEASES_API, { headers: { Accept: 'application/vnd.github+json' } });
+    if (!r.ok) throw new Error('GitHub answered ' + r.status);
+    const rel = await r.json();
+    const latest = String(rel.tag_name || '').replace(/^v/, '');
+    if (!latest) throw new Error('no release found');
+    if (!APP.version || !verNewer(latest, APP.version)) {
+      UPDATE = null; renderUpdate();
+      if (manual) toast(`You’re up to date — DJ HQ ${APP.version || latest}`);
+      return;
+    }
+    const want = assetPattern();
+    const asset = want && (rel.assets || []).find(a => want.test(a.name));
+    UPDATE = { version: latest, url: asset ? asset.browser_download_url : rel.html_url, page: rel.html_url, asset: asset ? asset.name : '' };
+    renderUpdate(manual);
+    if (manual) toast(`DJ HQ ${latest} is available`);
+  } catch (e) {
+    if (manual) toast('Couldn’t check for updates: ' + e.message, true);
+  }
+}
+function renderUpdate(force) {
+  const box = $('#sb-update'); if (!box) return;
+  let dismissed = ''; try { dismissed = localStorage.getItem(UPD_KEY) || ''; } catch {}
+  if (!UPDATE || (!force && dismissed === UPDATE.version)) { box.hidden = true; return; }
+  const direct = APP.packaged && UPDATE.asset;
+  box.hidden = false;
+  box.innerHTML = `<div class="row1">${icon('sparkles')}<b>DJ HQ ${esc(UPDATE.version)} is out</b>
+      <button class="btn btn-ghost btn-sm btn-icon" title="Not now" onclick="dismissUpdate()">${icon('x')}</button></div>
+    <div class="sub">${direct ? 'Download it and install it over this version. Your library and settings stay.' : 'See what changed and grab the new version on GitHub.'}</div>
+    <a class="btn btn-primary btn-sm btn-block" href="${esc(UPDATE.url)}" target="_blank" rel="noopener" title="${esc(UPDATE.asset || UPDATE.page)}">${icon('download')}${direct ? 'Download ' + esc(UPDATE.version) : 'Open release page'}</a>`;
+}
+function dismissUpdate() {
+  if (UPDATE) { try { localStorage.setItem(UPD_KEY, UPDATE.version); } catch {} }
+  const box = $('#sb-update'); if (box) box.hidden = true;
 }
 
 /* ---------- global actions: refresh button, search, keyboard ---------- */
@@ -436,11 +492,14 @@ async function boot() {
       e.preventDefault(); const q = $('#q'); if (!q.hidden) q.focus();
     }
   });
+  try { APP = await (await fetch('/api/app')).json(); } catch {}
   try {
     DATA = await api('/api/state');
     render();
     if (typeof loadInbox === 'function' && (DATA.libraries || []).length) loadInbox();
     if (typeof maybeStartTour === 'function') setTimeout(maybeStartTour, 600);
+    setTimeout(() => checkForUpdates(), 4000);
+    setInterval(() => checkForUpdates(), 24 * 60 * 60 * 1000);
     await refreshPlaylist({ manual: !DATA.ready });   // first run with no snapshot: report errors loudly
     setInterval(() => refreshPlaylist(), AUTO_REFRESH_MS);
     document.addEventListener('visibilitychange', () => {

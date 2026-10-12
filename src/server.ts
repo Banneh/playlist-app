@@ -13,6 +13,8 @@ export interface ServerOpts {
   pickFolder?: () => Promise<string | null>;
   /** show a file in the OS file manager (Electron only) */
   reveal?: (p: string) => void;
+  /** true inside the packaged desktop app (enables the download link in update notices) */
+  packaged?: boolean;
 }
 
 export function startServer(opts: ServerOpts): Promise<http.Server> {
@@ -47,6 +49,11 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         return send(200, "text/html; charset=utf-8", fs.readFileSync(indexPath));
       if (req.url === "/api/state")
         return void core.buildView().then(json, (e) => json({ error: e.message }, 500));
+      if (req.url === "/api/app") {
+        let version = "";
+        try { version = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || ""; } catch {}
+        return json({ version, platform: process.platform, arch: process.arch, packaged: !!opts.packaged });
+      }
       // static UI assets (web/app.css, web/app.js, web/pages/*.js)
       const rel = decodeURIComponent((req.url || "/").split("?")[0]);
       const file = path.normalize(path.join(webDir, rel));

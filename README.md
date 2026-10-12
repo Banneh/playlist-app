@@ -16,6 +16,7 @@ you're done. Everything runs on your computer; nothing is uploaded anywhere.
 - [Install](#install)
   - [Download](#download)
   - [Opening the app for the first time](#opening-the-app-for-the-first-time)
+  - [Updating](#updating)
 - [Getting started](#getting-started)
 - [Using DJ HQ](#using-dj-hq)
   - [Missing: tracks you still need](#missing-tracks-you-still-need)
@@ -108,6 +109,13 @@ then click **Open** in the dialog. Once is enough.
 
 SmartScreen says it protected your PC. Click **More info**, then
 **Run anyway**.
+
+### Updating
+
+DJ HQ looks for a newer version on GitHub once a day. When there is one, a
+small notice appears at the bottom of the sidebar with a **Download** button
+for your computer. Install the new version over the old one; your library and
+settings stay where they are. **⋯ → Check for updates…** checks right away.
 
 ## Getting started
 
@@ -295,7 +303,7 @@ need tags or conversion before they're ready for the booth.
   in your folder; the counts next to each list are live.
 - The **⋯** button at the bottom of the sidebar opens the playlist on
   SoundCloud, rescans the music folder, exports the rekordbox XML, replays the
-  tour, and adds or removes libraries.
+  tour, checks for updates, and adds or removes libraries.
 
 ### More than one playlist
 
@@ -416,6 +424,7 @@ bodies are JSON.
 | Call | Body | Does |
 | --- | --- | --- |
 | `GET /api/state` | | current view |
+| `GET /api/app` | | app version, platform and whether it runs packaged (not a view) |
 | `POST /api/refresh` | | fetch the playlist, then the view |
 | `POST /api/rescan` | | rescan the folder |
 | `POST /api/library` | `{op: "add", dir, url}` · `{op: "select", id}` · `{op: "remove", id}` | manage libraries |

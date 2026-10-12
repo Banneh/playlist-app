@@ -497,8 +497,12 @@ function isTagged(f: LocalFile, artist: string, title: string, genre: string): b
 
 // ---------------- tagging & conversion ----------------
 
+/** MD5 of the stored audio packets (the compressed frames, or the PCM for WAV/AIFF).
+ *  Deliberately not the decoded audio: decoding depends on container details that a
+ *  rewrite legitimately normalises (a missing Xing header, a wrong ID3 size, junk
+ *  before the first frame), which made bit-identical rewrites look "changed". */
 async function audioMd5(p: string): Promise<string> {
-  const r = await run(FFMPEG, ["-v", "error", "-i", p, "-map", "0:a", "-f", "md5", "-"], 120000);
+  const r = await run(FFMPEG, ["-v", "error", "-i", p, "-map", "0:a", "-c", "copy", "-f", "md5", "-"], 120000);
   return r.stdout.trim();
 }
 
@@ -536,7 +540,7 @@ async function writeTags(p: string, artist: string, title: string, genre: string
   const r = await run(FFMPEG, args, 300000);
   try {
     if (r.code !== 0) throw new Error("ffmpeg: " + r.stderr.slice(0, 200));
-    if ((await audioMd5(tmp)) !== md5) throw new Error("audio changed during rewrite, aborted");
+    if ((await audioMd5(tmp)) !== md5) throw new Error("audio data would change, left untouched");
     if (ext === ".wav") appendId3ToWav(tmp, buildId3v23(artist, title, genre));
   } catch (e) {
     if (fs.existsSync(tmp)) fs.unlinkSync(tmp);

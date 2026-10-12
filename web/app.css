@@ -333,13 +333,19 @@ html.mac-inset .sb-brand * { -webkit-app-region: no-drag; }
 .sb-status.err { color: var(--red); } .sb-status.err .dot { background: var(--red); }
 .sb-status .trunc { flex: 1; }
 .sb-row { display: flex; align-items: center; gap: 6px; }
+.sb-update { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: var(--r-md); background: var(--accent-soft); border: 1px solid var(--accent-soft-2); font-size: 12px; }
+.sb-update .row1 { display: flex; align-items: center; gap: 7px; }
+.sb-update .row1 .ic { color: var(--accent-text); flex-shrink: 0; }
+.sb-update .row1 b { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-update .row1 .btn { width: 22px; height: 22px; }
+.sb-update .sub { color: var(--text-2); font-size: 11.5px; line-height: 1.4; }
 .sb-row .seg { margin-left: auto; }
 
 /* icon rail on narrow windows */
 @media (max-width: 1040px) {
   :root { --sb-w: 64px; }
   .sidebar { padding-left: 8px; padding-right: 8px; align-items: stretch; }
-  .sb-brand h1, .sb-brand .ver, .nav-sec, .nav-item .lbl, .lib-name, .lib-progress, .lib-foot, .sb-status, .sb-row .seg, .sb-row .lbl { display: none; }
+  .sb-brand h1, .sb-brand .ver, .nav-sec, .nav-item .lbl, .lib-name, .lib-progress, .lib-foot, .sb-status, .sb-row .seg, .sb-row .lbl, .sb-update { display: none; }
   .nav-item { justify-content: center; padding: 0; }
   .nav-item { position: relative; }
   /* counts become dots in the rail; the number lives in the tooltip */
