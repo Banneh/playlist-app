@@ -2,7 +2,7 @@
 
 **Your SoundCloud playlist, your music folder and your USB stick, finally telling the same story.**
 
-![DJ HQ showing the Missing list, with a download or shop link next to every track you still need](docs/screenshot.png)
+![DJ HQ showing the Missing list, with a download or shop link next to every track you still need](docs/screens/missing-light.png)
 
 You collect tracks in a SoundCloud playlist. The files live in a folder on your
 computer. rekordbox and the players at the club have strong opinions about those
@@ -43,7 +43,7 @@ On an Intel Mac, run it from source instead (see the end of this page).
 
 ## First run
 
-![The welcome screen asks for your music folder and a playlist link](docs/welcome.png)
+![The welcome screen asks for your music folder and a playlist link](docs/screens/welcome.png)
 
 1. Pick the folder where your tracks live.
 2. Paste the link to your SoundCloud playlist. It has to be public, that's all.
@@ -57,7 +57,7 @@ open, and whenever you press **Refresh**.
 Prefer it dark? The sun-and-moon button at the bottom of the sidebar switches
 between light, dark and "follow the system".
 
-![DJ HQ in dark mode](docs/dark-mode.png)
+![DJ HQ in dark mode](docs/screens/missing-dark.png)
 
 ## A tour
 
@@ -85,11 +85,11 @@ A few things that make a long list bearable:
 4. The **⋯** at the end of a row opens the track on SoundCloud, copies its
    links, matches a file by hand, or lets you fix the artist and title.
 
-<p align="center"><img src="docs/status-menu.png" width="420" alt="The status menu: Have, Missing, Not available on SoundCloud now, or back to automatic"></p>
+<p align="center"><img src="docs/screens/status-menu.png" width="420" alt="The status menu: Have, Missing, Not available on SoundCloud now, or back to automatic"></p>
 
 ### Have: what's already in your folder
 
-![The Have list shows the matched file under each track, with tags for anything it still needs](docs/tab-have.png)
+![The Have list shows the matched file under each track, with tags for anything it still needs](docs/screens/have.png)
 
 Each track shows the file it was matched to, plus a small tag when something
 needs attention: **Needs tags**, **Convert · 24-bit**, **MP3**, or
@@ -98,11 +98,11 @@ needs attention: **Needs tags**, **Convert · 24-bit**, **MP3**, or
 Wrong match? Click the file name (or **⋯ → Match to a local file…**) and pick
 the right one. Likely candidates are listed first.
 
-<p align="center"><img src="docs/dialog-match.png" width="480" alt="Match to a local file: the files in your folder, likely ones first"></p>
+<p align="center"><img src="docs/screens/match-dialog.png" width="480" alt="Match to a local file: the files in your folder, likely ones first"></p>
 
 ### New: what changed since you last looked
 
-![The New list: tracks added to the playlist and files that arrived in your folder](docs/tab-new.png)
+![The New list: tracks added to the playlist and files that arrived in your folder](docs/screens/new.png)
 
 Tracks added to the playlist and files that arrived in your folder collect here
 until you press **Mark all as seen**. Think of it as the to-do list for tagging
@@ -110,7 +110,7 @@ and importing.
 
 ### Downloads: from your Downloads folder into your library
 
-![The Downloads list: files that match a playlist track, each with a Move into library button](docs/tab-downloads.png)
+![The Downloads list: files that match a playlist track, each with a Move into library button](docs/screens/downloads.png)
 
 DJ HQ keeps an eye on your Downloads folder. When a file lands there that
 matches a track in the playlist, it shows up here with a **Move into library**
@@ -123,7 +123,7 @@ button instead. The old MP3 goes to the backup folder, not the bin.
 
 ### Not in playlist: files SoundCloud doesn't know about
 
-![The Not in playlist list, with Find on SoundCloud for each file](docs/tab-not-in-playlist.png)
+![The Not in playlist list, with Find on SoundCloud for each file](docs/screens/not-in-playlist.png)
 
 Tracks in your folder that match nothing in the playlist. The idea is to get
 them *into* the playlist, so the playlist stays the one list that's always
@@ -136,11 +136,11 @@ right.
    add it yourself. On the next refresh the file is matched automatically and
    leaves this list.
 
-<p align="center"><img src="docs/dialog-find.png" width="480" alt="Find on SoundCloud: candidates with their length and match"></p>
+<p align="center"><img src="docs/screens/find-dialog.png" width="480" alt="Find on SoundCloud: candidates with their length and match"></p>
 
 ### Prepare for player: tags, conversion and rekordbox
 
-![The Prepare for player page: target player, tags, compatibility, rekordbox export and the files that still need something](docs/tab-prepare.png)
+![The Prepare for player page: target player, tags, compatibility, rekordbox export and the files that still need something](docs/screens/prepare.png)
 
 Pick your player at the top. Everything below adapts to what it can play.
 
@@ -155,7 +155,7 @@ Pick your player at the top. Everything below adapts to what it can play.
   dialog walks you through the import; it's three clicks in rekordbox and only
   needs setting up once.
 
-<p align="center"><img src="docs/dialog-export.png" width="480" alt="The export dialog with the file path and the three rekordbox import steps"></p>
+<p align="center"><img src="docs/screens/export-dialog.png" width="480" alt="The export dialog with the file path and the three rekordbox import steps"></p>
 
 The list underneath shows exactly which files still need something before
 they're ready for the booth.
