@@ -14,7 +14,7 @@ function ppAttention() {
   const durs = new Map((DATA.local_files || []).map(f => [f.name, f.dur]));
   const rows = [];
   for (const t of DATA.tracks) if (t.file && (t.tagged === false || t.incompat))
-    rows.push({ name: t.file, title: t.title, artist: t.artist, tagged: t.tagged, incompat: t.incompat, lossy: t.lossy, dur: durs.get(t.file) || '' });
+    rows.push({ name: t.file, title: t.title, artist: t.artist, tagged: t.tagged, incompat: t.incompat, lossy: t.lossy, dur: durs.get(t.file) || '', art: t.art, url: t.url });
   for (const f of DATA.extras || []) if (f.tagged === false || f.incompat)
     rows.push({ name: f.name, title: '', artist: '', tagged: f.tagged, incompat: f.incompat, lossy: f.lossy, dur: f.dur || durs.get(f.name) || '' });
   return rows;
@@ -28,9 +28,9 @@ function ppIssueTags(r) {
 }
 function ppRow(r) {
   return `<div class="tr pp-tr">
-    <span class="pp-fico">${icon('music')}</span>
+    ${r.art ? artHtml({ art: r.art, url: r.url }) : `<span class="pp-fico">${icon('music')}</span>`}
     <div class="t-meta">
-      <div class="t-title"><span title="${esc(r.name)}">${esc(r.name)}</span></div>
+      <div class="t-title">${playBtn(joinPath(libDir(), r.name), r.title || r.name, r.artist || '')}<span title="${esc(r.name)}">${esc(r.name)}</span></div>
       <div class="t-sub">${r.title ? `${esc(r.artist ? r.artist + ' – ' : '')}${esc(r.title)}` : '<span class="via">Not in the playlist</span>'}</div>
     </div>
     <div class="pp-issues">${ppIssueTags(r)}</div>

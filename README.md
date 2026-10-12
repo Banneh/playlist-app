@@ -26,6 +26,7 @@ you're done. Everything runs on your computer; nothing is uploaded anywhere.
   - [Not in playlist: files SoundCloud doesn't know about](#not-in-playlist-files-soundcloud-doesnt-know-about)
   - [Prepare for player: tags, conversion and rekordbox](#prepare-for-player-tags-conversion-and-rekordbox)
   - [Appearance, search and the sidebar](#appearance-search-and-the-sidebar)
+  - [Settings](#settings)
   - [More than one playlist](#more-than-one-playlist)
 - [Tips and troubleshooting](#tips-and-troubleshooting)
 - [Your files and your data](#your-files-and-your-data)
@@ -54,12 +55,15 @@ builds on that:
 - **New** collects tracks added to the playlist and files that arrived in your
   folder since you last looked.
 - **Downloads** watches your Downloads folder and moves new files into your
-  library with one click, no renaming.
+  library with one click, no renaming. Bandcamp zips are looked inside, and
+  exact matches can move in on their own.
 - **Not in playlist** finds the SoundCloud track for files that aren't in the
   playlist yet, so you can add them there.
 - **Prepare for player** writes artist and title tags the way rekordbox reads
   them, converts files your Pioneer player can't play (in place, so your cues
   survive), and exports a rekordbox playlist.
+- Every file can be **previewed** in the app, and a library can follow your
+  SoundCloud **Likes** instead of a playlist.
 
 The playlist is checked again every 15 minutes while the window is open, and
 whenever you press **Refresh**. DJ HQ never writes to SoundCloud and never
@@ -124,7 +128,8 @@ settings stay where they are. **⋯ → Check for updates…** checks right away
 1. Click **Browse…** and pick the folder where your tracks live (or type the
    path).
 2. Paste the link to your SoundCloud playlist. It has to be public, that's
-   all.
+   all. If you collect by liking tracks instead, paste your Likes page
+   (`https://soundcloud.com/you/likes`); it works the same way.
 3. Click **Connect library**.
 
 DJ HQ fetches the playlist, scans the folder and matches files to tracks. That
@@ -132,10 +137,12 @@ takes a few seconds for a few hundred tracks. You land on the **Missing** list,
 and the sidebar shows how much of the playlist is already in your folder.
 
 The first time, DJ HQ offers a one-minute tour that points out what each list
-is for. Take it or click **Not now**; you can replay it any time from the **⋯**
-menu at the bottom of the sidebar (**Show me around**).
+is for. It runs on a few sample tracks, so you can take it before connecting
+anything (there's a button for it on the welcome screen) and nothing in your
+own library changes. Click **Not now** to skip it; **⋯ → Show me around**
+replays it any time.
 
-![The tour: a short card explains each part of the app while the rest is dimmed](docs/screens/tour.png)
+![The tour: a short card explains each part of the app on sample data while the rest is dimmed](docs/screens/tour.png)
 
 > [!NOTE]
 > Nothing is renamed, moved or rewritten at this point. DJ HQ only reads your
@@ -162,6 +169,16 @@ that isn't in your folder, with the quickest way to get it.
    up in your Downloads folder as usual.
 3. Switch to **Downloads** in the sidebar once a few files have landed, and
    move them into your library from there (see below).
+
+**Working through a long list**
+
+![Work through: one missing track at a time, with its link and a watch on the Downloads folder](docs/screens/work-through.png)
+
+**Work through** (top right) takes the list one track at a time: artwork, the
+links, and a watch on your Downloads folder. Open the link, grab the file in
+your browser, and when it lands DJ HQ offers **Move into library** and steps to
+the next track. Enter opens the link, the arrow keys step, N parks a track as
+not available, Esc closes.
 
 **Other things you can do here**
 
@@ -196,6 +213,12 @@ The **Needs attention** and **Lossless available** chips above the list show
 only those tracks. While any file still needs tags, a notice above the playlist
 lists how many and offers **Write tags** right there, so you don't have to go
 to Prepare for player for that.
+
+The small play button in front of a file name previews it right in the app; a
+player bar appears at the bottom with seek and volume. The same button sits in
+the match dialog, so you can check a shaky match by ear.
+
+![Previewing a file: the player bar at the bottom of the window](docs/screens/preview.png)
 
 **To fix a wrong match**
 
@@ -236,9 +259,16 @@ show up here.
 4. **Move all** does the whole list at once, after telling you how many files
    are upgrades.
 
-Zips and unfinished downloads are ignored; unzip, wait for the download to
-finish, then click **Rescan**. Files that are already in your library by name
-are counted but not listed.
+Bandcamp purchases arrive as zips; DJ HQ looks inside them, lists the tracks
+that belong to the playlist (tagged "from Album.zip") and unpacks only those,
+leaving the zip where it is. Unfinished downloads are ignored; let them finish,
+then click **Rescan**. Files that are already in your library by name are
+counted but not listed.
+
+With **Move exact matches automatically** turned on in Settings, a download
+whose name and length match a track exactly moves into the library on its own
+within a minute, and the app tells you. Fuzzy matches and upgrades always wait
+for your click.
 
 ### Not in playlist: files SoundCloud doesn't know about
 
@@ -291,7 +321,8 @@ values.
 <p align="center"><img src="docs/screens/export-dialog.png" width="480" alt="The export dialog with the file path and the three rekordbox import steps"></p>
 
 The **Files needing attention** list underneath shows exactly which files still
-need tags or conversion before they're ready for the booth.
+need tags or conversion before they're ready for the booth, each with its
+artwork and a play button.
 
 ### Appearance, search and the sidebar
 
@@ -302,10 +333,23 @@ need tags or conversion before they're ready for the booth.
 - The search box filters the current list by artist, title or file name. Press
   `/` to jump to it.
 - The library card at the top of the sidebar shows how many playlist tracks are
-  in your folder; the counts next to each list are live.
+  in your folder; the counts next to each list are live. **All tracks** is the
+  whole playlist, **Missing** and **Have** split it.
 - The **⋯** button at the bottom of the sidebar opens the playlist on
   SoundCloud, rescans the music folder, exports the rekordbox XML, replays the
-  tour, checks for updates, and adds or removes libraries.
+  tour, checks for updates, and adds or removes libraries. The gear next to it
+  opens Settings.
+
+### Settings
+
+![Settings: library, downloads folder, auto-move, refresh interval, appearance, backups](docs/screens/settings.png)
+
+The gear at the bottom of the sidebar. From top to bottom: the library (folder,
+playlist, remove), the Downloads folder DJ HQ watches and the switch for moving
+exact matches automatically, how often the playlist is checked, appearance,
+backups (how much space the originals of converted files and replaced MP3s
+take, with a **Clean up** button once you're sure you won't need them), and
+updates.
 
 ### More than one playlist
 
@@ -361,6 +405,7 @@ Windows. Running from source uses the project folder instead. In there:
 | `originals/<library>/` | originals backed up before a conversion |
 | `originals/<library>/replaced/` | MP3s replaced by a lossless download |
 | `rekordbox.xml` | the last rekordbox export |
+| `prefs.json` | appearance, "tour seen", dismissed update notices |
 
 **About SoundCloud.** There's no API key or login: the app reads the same
 public endpoints the SoundCloud web player uses. That works today and may break
@@ -412,7 +457,9 @@ npm run dist        # build installers locally into release/
 | `web/app.css` | design tokens and components for the light and dark themes |
 | `web/app.js` | the UI shell: sidebar, routing, menus, dialogs |
 | `web/pages/` | one file per page |
-| `web/tour.js` | the guided tour |
+| `web/tour.js` · `web/demo.js` | the guided tour and its sample data |
+| `web/player.js` | the preview player |
+| `src/zip.ts` | minimal zip reader for Bandcamp downloads |
 | `scripts/afterPack.js` | ad-hoc signs the macOS app after packaging |
 
 The UI is plain HTML, CSS and JavaScript with no build step. File-mutating
@@ -431,6 +478,9 @@ bodies are JSON.
 | `POST /api/rescan` | | rescan the folder |
 | `POST /api/library` | `{op: "add", dir, url}` · `{op: "select", id}` · `{op: "remove", id}` | manage libraries |
 | `POST /api/device` | `{device}` | target player (`xdj-700`, `nxs2`, `cdj-3000`) |
+| `POST /api/settings` | `{inbox_dir?, auto_move?, refresh_min?}` | downloads folder (`""` = default), auto-move, check interval in minutes |
+| `GET /api/file?path=` | | streams a local audio file for the preview (library and downloads folders only) |
+| `POST /api/clean-backups` | | deletes the active library's backups (adds `clean_report`) |
 | `POST /api/override` | `{id, status: "have" \| "missing" \| "na" \| null}` | status override / not available now |
 | `POST /api/assign` | `{id, file}` (`""` = no file, `null` = automatic) | pin a file to a track |
 | `POST /api/edit` | `{id, artist, title}` or `{file, artist, title}` | artist/title edit (track or local file) |
@@ -439,8 +489,8 @@ bodies are JSON.
 | `POST /api/find` | `{file, q?}` | SoundCloud candidates for a local file (not a view) |
 | `POST /api/found` | `{file, track \| null}` | remember / forget the picked track |
 | `POST /api/find-all` | | search every unresolved file, accept sure matches |
-| `POST /api/inbox` | | downloads that match the playlist (not a view) |
-| `POST /api/inbox-move` · `/api/inbox-move-all` | `{file, id}` · | move downloads into the library |
+| `POST /api/inbox` | | downloads that match the playlist, including tracks inside zips (not a view; carries `moved` when auto-move acted) |
+| `POST /api/inbox-move` · `/api/inbox-move-all` | `{file, id, zip?}` · | move downloads into the library (unpacks from a zip when `zip` is given) |
 | `POST /api/export-xml` | | write `rekordbox.xml` (returns path and counts) |
 | `POST /api/reveal` · `/api/pick-folder` | `{path}` · | Electron only |
 

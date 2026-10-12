@@ -4,12 +4,18 @@
 
 let IB_BUSY = false;   // a scan is running
 
-async function loadInbox() {
+async function loadInbox({ quiet = false } = {}) {
+  if (typeof TOUR !== 'undefined' && TOUR && TOUR.demo) return;   // the tour shows sample data
   IB_BUSY = true;
-  if (PAGE === 'inbox') render();          // show the spinner on Rescan while scanning
+  if (PAGE === 'inbox' && !quiet) render();   // show the spinner on Rescan while scanning
   try { INBOX = await api('/api/inbox', {}); }
   catch (e) { INBOX = { error: e.message, items: [], others: 0, already: 0 }; }
   IB_BUSY = false;
+  const moved = (INBOX && INBOX.moved) || [];
+  if (moved.length) {   // auto-move (Settings) put files into the library: counts changed
+    try { DATA = await api('/api/state'); } catch {}
+    toast(`Moved into your library: ${moved.slice(0, 2).join(', ')}${moved.length > 2 ? ' and ' + (moved.length - 2) + ' more' : ''}`);
+  }
   render();
 }
 
@@ -27,15 +33,17 @@ function ibRow(it) {
     pct >= 100 ? tag('Exact match', 'ok', 'check', 'The file name matches the playlist entry') : tag(pct + '% match', 'outline', '', 'How closely the file name matches the playlist entry'),
     tag(durDiff(it.dur_diff), it.dur_diff === 0 ? '' : Math.abs(it.dur_diff) > 10 ? 'warn' : '', '', 'Length compared to the SoundCloud track'),
     it.lossy ? tag('MP3', '', '', 'Lossy file') : '',
+    it.zip ? tag('from ' + it.zip, 'info', 'folder', 'Inside a zip in your Downloads folder; the track is unpacked into your library and the zip stays where it is') : '',
   ].filter(Boolean).join('');
   const up = it.action === 'upgrade';
   return `
     <div class="tr ib-row">
       <span class="num">${it.n}</span>
+      ${(() => { const t = DATA.tracks.find(x => x.id === it.id); return t ? artHtml(t) : '<span class="art none">' + icon('music') + '</span>'; })()}
       <div class="t-meta">
         <div class="t-title"><span title="${esc(it.title)}">${esc(it.title)}</span></div>
         <div class="t-sub">${esc(it.artist)}</div>
-        <div class="t-file">${icon('inbox')}<span class="fn" title="${esc(it.name)}">${esc(it.name)}</span><span class="tags">${tags}</span></div>
+        <div class="t-file">${(!it.zip && INBOX.dir ? playBtn(joinPath(INBOX.dir, it.name), it.title, it.artist) : '') || icon('inbox')}<span class="fn" title="${esc(it.name)}">${esc(it.name)}</span><span class="tags">${tags}</span></div>
         ${up ? `<div class="t-file ib-up">${icon('arrowUp')}<span class="fn" title="${esc(it.cur_file)}">Replaces ${esc(it.cur_file)}</span><span class="tags">${
           tag('Old file kept in the backup folder', 'warn', 'history', 'The MP3 you have now is moved to the backup folder, not deleted')}</span></div>` : ''}
       </div>
@@ -52,7 +60,7 @@ async function inboxMove(i, btn) {
   if (!it) return;
   if (btn) { btn.disabled = true; btn.innerHTML = spin(it.action === 'upgrade' ? 'Upgrading…' : 'Moving…'); }
   try {
-    DATA = await api('/api/inbox-move', { file: it.name, id: it.id });
+    DATA = await api('/api/inbox-move', { file: it.name, id: it.id, zip: it.zip || undefined });
     toast(`${it.action === 'upgrade' ? 'Upgraded' : 'Moved into your library'}: ${it.name}`);
   } catch (e) { toast('Couldn’t move the file: ' + e.message, true); }
   await loadInbox();
@@ -94,6 +102,7 @@ PAGES.inbox = {
     const parts = [n ? `${plural(n, 'file')} in ${dir} match${n === 1 ? 'es' : ''} a track in this playlist` : `Nothing in ${dir} matches a track in this playlist yet`];
     if (INBOX.already) parts.push(`${INBOX.already} already in your library`);
     if (INBOX.others) parts.push(`${plural(INBOX.others, 'other audio file')} match${INBOX.others === 1 ? 'es' : ''} nothing`);
+    if (INBOX.zip_errors && INBOX.zip_errors.length) parts.push(`<span title="${esc(INBOX.zip_errors.join('\n'))}">${plural(INBOX.zip_errors.length, 'zip')} couldn’t be read</span>`);
     return parts.join(' · ');
   },
   actions: () => {
@@ -102,7 +111,7 @@ PAGES.inbox = {
       n > 1 ? `<button class="btn btn-primary" id="ib-moveall" onclick="inboxMoveAll()" title="Move every matching file into your music folder">${icon('folderIn')}Move all (${n})</button>` : ''}`;
   },
   body: q => {
-    const head = `<div class="thead ib-row"><span class="num">#</span><span>Download</span><span class="r">Length</span><span></span></div>`;
+    const head = `<div class="thead ib-row"><span class="num">#</span><span></span><span>Download</span><span class="r">Length</span><span></span></div>`;
     const frame = inner => `<div class="table">${head}${inner}</div>`;
     if (!INBOX) return `<div class="table"><div class="empty"><span class="spin ib-spin"></span><p>Scanning ${esc(ibDir())}…</p></div></div>`;
     if (INBOX.error) return frame(emptyHtml({ ico: 'alert', title: 'Couldn’t scan the downloads folder', text: esc(INBOX.error),

@@ -56,6 +56,22 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
       if (req.url === "/api/state")
         return void core.buildView().then(json, (e) => json({ error: e.message }, 500));
       if (req.url === "/api/prefs") return json(readPrefs());
+      if ((req.url || "").startsWith("/api/file?")) {   // stream a local audio file for the in-app preview
+        const q = new URL(req.url || "", "http://x").searchParams;
+        const p = path.resolve(String(q.get("path") || ""));
+        const ok = core.allowedDirs().some((d) => p.startsWith(d + path.sep));
+        if (!ok || !fs.existsSync(p) || !fs.statSync(p).isFile()) return send(404, "text/plain", "not found");
+        const types: Record<string, string> = { ".mp3": "audio/mpeg", ".wav": "audio/wav", ".flac": "audio/flac", ".aiff": "audio/aiff", ".aif": "audio/aiff", ".m4a": "audio/mp4", ".ogg": "audio/ogg", ".opus": "audio/ogg" };
+        const type = types[path.extname(p).toLowerCase()] || "application/octet-stream";
+        const size = fs.statSync(p).size;
+        const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || ""));
+        let start = 0, end = size - 1;
+        if (range) { if (range[1]) start = Number(range[1]); if (range[2]) end = Number(range[2]); if (!range[1] && range[2]) { start = Math.max(0, size - Number(range[2])); end = size - 1; } }
+        if (start > end || end >= size) { res.writeHead(416, { "Content-Range": `bytes */${size}` }); return res.end(); }
+        res.writeHead(range ? 206 : 200, { "Content-Type": type, "Accept-Ranges": "bytes", "Content-Length": end - start + 1,
+          ...(range ? { "Content-Range": `bytes ${start}-${end}/${size}` } : {}) });
+        return void fs.createReadStream(p, { start, end }).pipe(res);
+      }
       if (req.url === "/api/app") {
         let version = "";
         try { version = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || ""; } catch {}
@@ -91,8 +107,10 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/tag":      return route(() => core.tagAll());
           case "/api/convert":  return route(() => core.convertAll());
           case "/api/restore":  return route(() => core.restoreAll());
+          case "/api/clean-backups": return route(() => core.cleanBackups());
           case "/api/library":  return route(() => core.libraryOp(data));
           case "/api/device":   return route(() => core.setDevice(data.device));
+          case "/api/settings": return route(() => core.setSettings(data));
           case "/api/override": return route(() => core.setOverride(data));
           case "/api/edit":     return route(() => core.setEdit(data));
           case "/api/assign":   return route(() => core.setAssign(data));

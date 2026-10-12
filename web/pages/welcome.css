@@ -37,3 +37,8 @@ html.mac-inset .wl-topbar { position: fixed; top: 0; left: 0; right: 0; height: 
 .wl-error .empty { padding: 20px 8px 10px; }
 .wl-errmsg { font-family: var(--mono); font-size: 12px; color: var(--text-2); word-break: break-word; }
 .wl-error .note { margin-top: 10px; }
+
+/* secondary action under the primary one */
+.wl-or { display: flex; align-items: center; gap: 10px; margin: 12px 0; color: var(--text-3); font-size: 12px; }
+.wl-or::before, .wl-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.wl-tour { height: 40px; }

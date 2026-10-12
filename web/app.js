@@ -24,7 +24,7 @@ let EDIT_ID = null;       // track id (or 'x<i>' for a local file) with the inli
 let INBOX = null;         // last /api/inbox result (pages/inbox.js)
 let INFLIGHT = 0;         // API calls in progress
 let LAST_OK = 0, LAST_ERR = '', RETRY = null;
-const AUTO_REFRESH_MS = 15 * 60 * 1000;
+const refreshMs = () => ((DATA && DATA.settings && DATA.settings.refresh_min) || 15) * 60 * 1000;   // Settings → refresh interval
 const PAGES = {};
 
 /* ---------- tiny helpers ---------- */
@@ -280,9 +280,9 @@ function setTheme(v) {
 /* ---------- navigation ---------- */
 const NAV = [
   { sec: 'Playlist' },
+  { id: 'all', label: 'All tracks', icon: 'listMusic', count: () => DATA.tracks.length },
   { id: 'missing', label: 'Missing', icon: 'download', count: () => DATA.missing, kind: () => DATA.missing ? '' : 'soft' },
   { id: 'have', label: 'Have', icon: 'checkCircle', count: () => DATA.have },
-  { id: 'all', label: 'All tracks', icon: 'listMusic', count: () => DATA.tracks.length },
   { sec: 'Library' },
   { id: 'new', label: 'New', icon: 'sparkles', count: () => DATA.new_count, kind: () => DATA.new_count ? 'accent' : '' },
   { id: 'inbox', label: 'Downloads', icon: 'inbox', count: () => INBOX ? INBOX.items.length : '', kind: () => INBOX && INBOX.items.length ? 'accent' : '', hideZero: true },
@@ -413,6 +413,7 @@ function libraryMenu(anchor) {
     '-',
     { label: 'Show me around', icon: 'sparkles', hint: 'A one-minute tour of the app', onclick: () => typeof startTour === 'function' && startTour() },
     { label: 'Check for updates…', icon: 'refresh', hint: APP.version ? 'This is DJ HQ ' + APP.version : '', onclick: () => checkForUpdates({ manual: true }) },
+    { label: 'Settings…', icon: 'settings', onclick: () => go('settings') },
     '-',
     { label: 'Add another library…', icon: 'plus', onclick: () => typeof uiAddLibrary === 'function' && uiAddLibrary() },
     { label: 'Remove this library…', icon: 'trash', danger: true, onclick: removeLibrary },
@@ -501,6 +502,7 @@ async function boot() {
   $('#btn-libmenu').onclick = e => { e.stopPropagation(); libraryMenu(e.currentTarget); };
   $('#btn-addlib').onclick = () => typeof uiAddLibrary === 'function' && uiAddLibrary();
   $('#btn-theme').onclick = e => { e.stopPropagation(); themeMenu(e.currentTarget); };
+  $('#btn-settings').onclick = () => go('settings');
   renderSidebarFoot();
   document.addEventListener('keydown', e => {
     if (e.key === '/' && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName) && !document.querySelector('.overlay')) {
@@ -516,9 +518,13 @@ async function boot() {
     setTimeout(() => checkForUpdates(), 4000);
     setInterval(() => checkForUpdates(), 24 * 60 * 60 * 1000);
     await refreshPlaylist({ manual: !DATA.ready });   // first run with no snapshot: report errors loudly
-    setInterval(() => refreshPlaylist(), AUTO_REFRESH_MS);
+    setInterval(() => { if (Date.now() - LAST_OK >= refreshMs()) refreshPlaylist(); }, 60 * 1000);
+    // auto-move: while it is on, look at the downloads folder every minute (the server moves exact matches)
+    setInterval(() => {
+      if (DATA && DATA.ready && DATA.settings && DATA.settings.auto_move && !busy() && typeof loadInbox === 'function') loadInbox({ quiet: true });
+    }, 60 * 1000);
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && Date.now() - LAST_OK > AUTO_REFRESH_MS) refreshPlaylist();
+      if (!document.hidden && Date.now() - LAST_OK > refreshMs()) refreshPlaylist();
     });
   } catch (e) {
     toast('Error: ' + e.message, true);

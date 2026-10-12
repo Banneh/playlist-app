@@ -11,7 +11,7 @@ function exFileLine(f) {
   if (f.tagged === false) tags.push(tag('Needs tags', 'warn', 'tag', 'Artist / title are not written into the file yet'));
   if (f.incompat) tags.push(tag('Convert · ' + f.incompat, 'warn', 'sliders', 'Not playable on the selected player as-is'));
   if (f.lossy) tags.push(tag('MP3', '', '', 'Lossy file'));
-  return `<div class="t-file"><span class="ic">${icon('music')}</span><span class="fn" title="${esc(f.name)}">${esc(f.name)}</span>${
+  return `<div class="t-file">${playBtn(joinPath(libDir(), f.name), f.title || f.name, f.artist || '') || `<span class="ic">${icon('music')}</span>`}<span class="fn" title="${esc(f.name)}">${esc(f.name)}</span>${
     tags.length ? `<span class="tags">${tags.join('')}</span>` : ''}</div>`;
 }
 function exFoundLine(f, i) {

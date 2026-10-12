@@ -22,7 +22,7 @@ function wlFieldsHtml(p, draft = {}) {
     <div class="field">
       <label for="${p}-url">SoundCloud playlist link</label>
       <input id="${p}-url" class="input" value="${esc(draft.url || '')}" placeholder="https://soundcloud.com/you/sets/your-playlist" spellcheck="false" autocomplete="off" autocapitalize="off">
-      <div class="hint">The playlist must be public.</div>
+      <div class="hint">A public playlist, or your Likes page: https://soundcloud.com/you/likes</div>
       <div class="wl-err" id="${p}-url-err" hidden></div>
     </div>`;
 }
@@ -95,6 +95,8 @@ PAGES.welcome = {
       <form class="card wl-form" id="wl-form" novalidate>
         ${wlFieldsHtml('wl', WL_DRAFT)}
         <button type="submit" class="btn btn-primary btn-lg btn-block wl-submit" id="wl-submit">${icon('link')}Connect library</button>
+        <div class="wl-or"><span>or</span></div>
+        <button type="button" class="btn btn-block wl-tour" onclick="startTour()">${icon('sparkles')}Take a one-minute tour first</button>
       </form>
       <div class="features">
         ${wlFeat('download', 'Find what’s missing', 'Missing tracks with their free download or shop links')}
@@ -102,6 +104,7 @@ PAGES.welcome = {
         ${wlFeat('upload', 'Into rekordbox', 'Exports a rekordbox playlist')}
       </div>
       <p class="wl-privacy">${icon('lock')}Everything stays on this computer. Nothing is uploaded.</p>
+
     </div>`,
 
   after: () => {

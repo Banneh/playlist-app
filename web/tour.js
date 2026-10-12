@@ -1,15 +1,18 @@
-/* Guided tour: a handful of coach marks over the live app.
-   First run (the first time the main window shows a library) opens an intro card with
-   "Not now" / "Show me around"; the sidebar's ⋯ menu replays it any time.
-   Globals used by app.js: TOUR (truthy while running, so auto-refresh waits),
-   startTour(), maybeStartTour(). */
+/* Guided tour: a handful of coach marks over the app, shown on sample data.
+   The first time the main window shows a library an intro card offers the tour or
+   "Not now"; the sidebar's ⋯ menu and the welcome screen replay it any time.
+   While the tour runs, DATA / INBOX are swapped for the sample objects in demo.js so
+   every step shows a populated screen (even with no library connected yet); the real
+   data comes back when the tour ends. No API call is made during the tour: the
+   overlay blocks clicks and go() only renders.
+   Globals used by app.js: TOUR (truthy while running, so auto-refresh waits; TOUR.demo
+   while the sample data is in place), startTour(), maybeStartTour(). */
 
 const TOUR_KEY = 'tourDone';
 let TOUR = null;
 
 /* Each step may switch pages first (page), then spotlights `target`; if that element
-   isn't there (an empty list, say) `fallback` is used, and with neither the card sits
-   in the middle of the window. */
+   isn't there `fallback` is used, and with neither the card sits in the middle. */
 const TOUR_STEPS = () => [
   { target: '.lib-card', place: 'right', title: 'Your library',
     text: 'One music folder linked to one SoundCloud playlist. The bar shows how much of the playlist is already in your folder. The + button at the bottom adds another library.' },
@@ -18,17 +21,19 @@ const TOUR_STEPS = () => [
   { page: 'missing', target: '#page-body .tr .pill', fallback: '.nav-item[data-page="missing"]', place: 'bottom', title: 'The status is your call',
     text: 'Click a status pill to mark a track as Have or Missing by hand, or park it as “not available on SoundCloud now”. It comes back on its own when a link appears.' },
   { page: 'have', target: '#page-body .tr .t-file', fallback: '.nav-item[data-page="have"]', place: 'bottom', title: 'Have: what’s in your folder',
-    text: 'The file behind each track, with a small tag when it still needs tags or a conversion. Click a file name to match a different one.' },
-  { page: 'inbox', target: '.nav-item[data-page="inbox"]', place: 'right', title: 'Downloads',
-    text: 'DJ HQ watches your Downloads folder. A download that matches a playlist track shows up here, one click away from your library. Nothing is renamed.' },
-  { page: 'extras', target: '.nav-item[data-page="extras"]', place: 'right', title: 'Not in playlist',
+    text: 'The file behind each track, with a small tag when it still needs tags, a conversion, or could be upgraded to lossless. Click a file name to match a different one.' },
+  { page: 'new', target: '#page-body .tr', fallback: '.nav-item[data-page="new"]', place: 'bottom', title: 'New: what changed',
+    text: 'Tracks added to the playlist and files that arrived in your folder collect here until you press Mark all as seen. Your to-do list for tagging and importing.' },
+  { page: 'inbox', target: '#page-body .tr .ib-act', fallback: '.nav-item[data-page="inbox"]', place: 'left', title: 'Downloads',
+    text: 'DJ HQ watches your Downloads folder. A download that matches a playlist track shows up here, one click away from your library. Nothing is renamed. A lossless file for a track you only have as MP3 offers an upgrade.' },
+  { page: 'extras', target: '#page-body .tr .cell .btn', fallback: '.nav-item[data-page="extras"]', place: 'left', title: 'Not in playlist',
     text: 'Files that aren’t in the playlist yet. Find each one on SoundCloud and add it to the playlist there; the file is matched automatically afterwards.' },
   { page: 'prepare', target: '#page-body .cards', fallback: '.nav-item[data-page="prepare"]', place: 'top', title: 'Prepare for player',
     text: 'Pick your player, write the tags rekordbox reads, convert the files it can’t play (your cues survive), and export a rekordbox playlist.' },
   { page: 'missing', target: '#btn-refresh', place: 'bottom', title: 'Always up to date',
     text: 'The playlist is checked every 15 minutes while the window is open. Refresh checks right now and rescans your folder too.' },
   { target: '#btn-libmenu', place: 'top', title: 'That’s the tour',
-    text: 'Light or dark mode lives next to this button. The ⋯ menu opens the playlist on SoundCloud, exports the rekordbox XML, and shows this tour again whenever you like.' },
+    text: 'Light or dark mode and Settings live next to this button. The ⋯ menu opens the playlist on SoundCloud, exports the rekordbox XML, and shows this tour again whenever you like.' },
 ];
 
 function maybeStartTour() {
@@ -43,7 +48,8 @@ function startTour({ intro = false } = {}) {
   root.className = 'tour';
   root.innerHTML = '<div class="tour-spot"></div><div class="tour-card"></div>';
   document.body.appendChild(root);
-  TOUR = { root, spot: root.querySelector('.tour-spot'), card: root.querySelector('.tour-card'), steps: TOUR_STEPS(), i: intro ? -1 : 0 };
+  TOUR = { root, spot: root.querySelector('.tour-spot'), card: root.querySelector('.tour-card'), steps: TOUR_STEPS(),
+           i: intro ? -1 : 0, demo: false, snap: null };
   TOUR.onKey = e => {
     if (e.key === 'Escape') { e.preventDefault(); endTour(); }
     else if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); tourNext(); }
@@ -55,6 +61,25 @@ function startTour({ intro = false } = {}) {
   tourShow();
 }
 
+/* Swap in the sample data (first real step) and put the real data back (end). */
+function tourEnterDemo() {
+  const t = TOUR; if (!t || t.demo) return;
+  t.snap = { DATA, INBOX, PAGE, Q, MFILTER, HFILTER };
+  t.demo = true;
+  DATA = demoView(); INBOX = demoInbox();
+  Q = ''; MFILTER = 'all'; HFILTER = 'all';
+  const q = document.querySelector('#q'); if (q) q.value = '';
+  PAGE = 'missing';
+  render();
+}
+function tourLeaveDemo(t) {
+  if (!t || !t.demo) return;
+  const s = t.snap; t.demo = false; t.snap = null;
+  DATA = s.DATA; INBOX = s.INBOX; PAGE = s.PAGE; Q = s.Q; MFILTER = s.MFILTER; HFILTER = s.HFILTER;
+  const q = document.querySelector('#q'); if (q) q.value = Q;
+  if (DATA) render();   // with no library the welcome screen comes back by itself
+}
+
 function endTour() {
   if (!TOUR) return;
   const t = TOUR; TOUR = null;
@@ -62,6 +87,7 @@ function endTour() {
   window.removeEventListener('resize', t.onResize);
   t.root.classList.add('out');
   setTimeout(() => t.root.remove(), 180);
+  tourLeaveDemo(t);
   setPref(TOUR_KEY, true);
 }
 function tourNext() {
@@ -77,17 +103,19 @@ function tourBack() {
 function tourShow() {
   const t = TOUR; if (!t) return;
   const n = t.steps.length;
-  if (t.i < 0) {   // intro card, no spotlight
+  if (t.i < 0) {   // intro card over whatever is on screen, no spotlight, no sample data yet
     t.spot.style.cssText = `left:${window.innerWidth / 2}px;top:${window.innerHeight / 2}px;width:0;height:0;border-radius:0`;
+    const hasLib = !!(DATA && (DATA.libraries || []).length);
     t.card.className = 'tour-card intro';
     t.card.innerHTML = `<span class="brand-mark">${icon('headphones')}</span>
       <h4>Welcome to DJ HQ</h4>
-      <p>Your library is connected. Want a one-minute tour of what each list does? You can replay it any time from the ⋯ menu in the sidebar.</p>
+      <p>${hasLib ? 'Your library is connected. ' : ''}Want a one-minute tour of what each list does? It walks through a few sample tracks, so nothing in your own library changes. You can replay it any time from the ⋯ menu in the sidebar.</p>
       <div class="tour-acts"><button class="btn" data-a="skip">Not now</button><button class="btn btn-primary" data-a="next">${icon('sparkles')}Show me around</button></div>`;
     wire(t.card);
     center(t.card);
     return;
   }
+  tourEnterDemo();
   const s = t.steps[t.i];
   if (s.page && PAGE !== s.page) go(s.page);
   let el = s.target ? document.querySelector(s.target) : null;

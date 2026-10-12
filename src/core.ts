@@ -9,6 +9,7 @@ import * as os from "os";
 import * as path from "path";
 import { execFile } from "child_process";
 import { buildId3v23, appendId3ToWav } from "./id3";
+import { listEntries, extractEntry, ZipEntry } from "./zip";
 
 const AUDIO_EXT = [".wav", ".mp3", ".aiff", ".aif", ".flac", ".m4a", ".ogg"];
 const UA =
@@ -93,6 +94,10 @@ export interface AppState {
   na: Record<string, { sig: string; at: number }>;
   /** folder watched for fresh downloads; default ~/Downloads */
   inbox_dir?: string;
+  /** user settings (see getSettings) */
+  settings?: { auto_move?: boolean; refresh_min?: number };
+  /** probe results for audio inside zips in the downloads folder: "<zip path>|<entry>|<size>" -> [dur, fmt, tags] */
+  zip_cache?: Record<string, [number, [string, number, number], [string, string, string]]>;
   /** "<lib id>:<track id>" -> ms when a file for the track first turned up (0 = predates tracking) */
   acquired: Record<string, number>;
   client_id: string | null;
@@ -121,6 +126,8 @@ function loadState(): AppState {
     st.found = st.found || {};
     st.na = st.na || {};
     st.acquired = st.acquired || {};
+    st.settings = st.settings || {};
+    st.zip_cache = st.zip_cache || {};
     return st;
   } catch {
     return { libraries: [], active: null, dur_cache: {}, overrides: {},
@@ -129,6 +136,51 @@ function loadState(): AppState {
 }
 export function saveState(): void {
   fs.writeFileSync(statePath(), JSON.stringify(STATE));
+}
+
+const REFRESH_CHOICES = [5, 15, 30, 60, 120];
+/** What the Settings page shows and edits. inbox_dir is kept top-level for older state files. */
+export function getSettings(): any {
+  const s = STATE.settings || (STATE.settings = {});
+  return {
+    inbox_dir: inboxDir(), inbox_default: path.join(os.homedir(), "Downloads"), inbox_custom: !!STATE.inbox_dir,
+    auto_move: !!s.auto_move, refresh_min: REFRESH_CHOICES.includes(s.refresh_min || 0) ? s.refresh_min : 15,
+    data_dir: DATA_DIR,
+  };
+}
+/** POST /api/settings {inbox_dir?: string|null ("" or null = back to ~/Downloads), auto_move?: boolean, refresh_min?: number} */
+export async function setSettings(data: any): Promise<any> {
+  const s = STATE.settings || (STATE.settings = {});
+  if ("inbox_dir" in data) {
+    const d = String(data.inbox_dir || "").trim();
+    if (!d) delete STATE.inbox_dir;
+    else {
+      if (!fs.existsSync(d) || !fs.statSync(d).isDirectory()) throw new Error("that folder doesn't exist");
+      STATE.inbox_dir = path.resolve(d);
+    }
+  }
+  if ("auto_move" in data) s.auto_move = !!data.auto_move;
+  if ("refresh_min" in data) {
+    const n = Number(data.refresh_min);
+    if (!REFRESH_CHOICES.includes(n)) throw new Error("refresh interval must be one of " + REFRESH_CHOICES.join(", ") + " minutes");
+    s.refresh_min = n;
+  }
+  saveState();
+  return buildView();
+}
+/** Folders the UI may stream audio from (preview): every library folder and the downloads folder. */
+export function allowedDirs(): string[] {
+  return [...STATE.libraries.map((l) => path.resolve(l.dir)), path.resolve(inboxDir())];
+}
+/** Total bytes under originals/<lib>/ (backups of converted files + replaced MP3s). */
+export function backupBytes(lib: Library | null): number {
+  if (!lib) return 0;
+  const walk = (d: string): number => {
+    let n = 0;
+    try { for (const e of fs.readdirSync(d, { withFileTypes: true })) n += e.isDirectory() ? walk(path.join(d, e.name)) : fs.statSync(path.join(d, e.name)).size; } catch {}
+    return n;
+  };
+  return walk(backupDir(lib));
 }
 
 export function activeLib(): Library | null {
@@ -167,30 +219,67 @@ async function scrapeClientId(html: string): Promise<string> {
   throw new Error("could not scrape a SoundCloud client_id");
 }
 
+/** "https://soundcloud.com/<user>/likes" -> "<user>", else null */
+export function likesUser(url: string): string | null {
+  const m = String(url || "").trim().match(/^https?:\/\/(?:www\.|m\.)?soundcloud\.com\/([^\/?#]+)\/likes\/?(?:[?#].*)?$/i);
+  return m ? m[1] : null;
+}
+
+/** api-v2 call that rescrapes the client_id once when it has gone stale. */
+async function withClientId<T>(html: string, fn: () => Promise<T>): Promise<T> {
+  if (!STATE.client_id) STATE.client_id = await scrapeClientId(html);
+  try { return await fn(); }
+  catch (e: any) {
+    if (e.status !== 401 && e.status !== 403) throw e;
+    STATE.client_id = await scrapeClientId(html);
+    return fn();
+  }
+}
+
+/** Track ids a user has liked, newest first (public likes only; capped at 1000). */
+async function fetchLikeIds(userId: number): Promise<number[]> {
+  const ids: number[] = [];
+  const seen = new Set<number>();
+  let next: string | null = `https://api-v2.soundcloud.com/users/${userId}/likes?client_id=${STATE.client_id}&limit=200&offset=0&linked_partitioning=1`;
+  while (next && ids.length < 1000) {
+    const j = JSON.parse(await httpGet(next));
+    for (const it of j.collection || []) {
+      const t = it.track;   // playlist likes have .playlist instead
+      if (t && typeof t.id === "number" && !seen.has(t.id)) { seen.add(t.id); ids.push(t.id); }
+    }
+    next = j.next_href ? (j.next_href.includes("client_id=") ? j.next_href : `${j.next_href}&client_id=${STATE.client_id}`) : null;
+  }
+  return ids.slice(0, 1000);
+}
+
 export async function fetchPlaylist(lib: Library): Promise<void> {
+  const likes = likesUser(lib.url);
   const html = await httpGet(lib.url);
   const m = html.match(/window\.__sc_hydration\s*=\s*(\[[\s\S]*?\]);<\/script>/);
-  if (!m) throw new Error("could not read playlist page (is the URL a public playlist?)");
-  const pl = JSON.parse(m[1]).find((i: any) => i.hydratable === "playlist")?.data;
-  if (!pl) throw new Error("no playlist found at this URL");
-  const ids: number[] = pl.tracks.map((t: any) => t.id);
-  if (!STATE.client_id) STATE.client_id = await scrapeClientId(html);
-  let tracks: Record<number, any> = {};
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      for (let i = 0; i < ids.length; i += 40) {
-        const batch = ids.slice(i, i + 40).join(",");
-        const url = `https://api-v2.soundcloud.com/tracks?ids=${batch}&client_id=${STATE.client_id}`;
-        for (const t of JSON.parse(await httpGet(url))) tracks[t.id] = t;
-      }
-      break;
-    } catch (e: any) {
-      if ((e.status === 401 || e.status === 403) && attempt === 0) {
-        STATE.client_id = await scrapeClientId(html); // stale client_id -> rescrape once
-        tracks = {};
-      } else throw e;
-    }
+  if (!m) throw new Error(likes ? "could not read the likes page (is the profile public?)" : "could not read playlist page (is the URL a public playlist?)");
+  const hyd = JSON.parse(m[1]);
+  let ids: number[], title: string;
+  if (likes) {
+    const user = hyd.find((i: any) => i.hydratable === "user")?.data;
+    if (!user || typeof user.id !== "number") throw new Error("no SoundCloud user found at this URL");
+    ids = await withClientId(html, () => fetchLikeIds(user.id));
+    if (!ids.length) throw new Error("no public likes found (are your likes public?)");
+    title = `${user.username || likes}'s likes`;
+  } else {
+    const pl = hyd.find((i: any) => i.hydratable === "playlist")?.data;
+    if (!pl) throw new Error("no playlist found at this URL");
+    ids = pl.tracks.map((t: any) => t.id);
+    title = pl.title || "Playlist";
   }
+  const tracks: Record<number, any> = await withClientId(html, async () => {
+    const got: Record<number, any> = {};
+    for (let i = 0; i < ids.length; i += 40) {
+      const batch = ids.slice(i, i + 40).join(",");
+      const url = `https://api-v2.soundcloud.com/tracks?ids=${batch}&client_id=${STATE.client_id}`;
+      for (const t of JSON.parse(await httpGet(url))) got[t.id] = t;
+    }
+    return got;
+  });
   // first-seen time per track: kept across fetches; tracks already in the
   // snapshot (or in a library's very first fetch) are not "new"
   const prevAdded = new Map<number, number>();
@@ -215,7 +304,7 @@ export async function fetchPlaylist(lib: Library): Promise<void> {
       added: !lib.playlist ? 0 : prevAdded.has(tid) ? prevAdded.get(tid)! : now,
     });
   }
-  lib.playlist = { title: pl.title || "Playlist", url: lib.url, tracks: out };
+  lib.playlist = { title, url: lib.url, tracks: out };
   saveState();
 }
 
@@ -594,6 +683,8 @@ export async function buildView(libArg?: Library): Promise<any> {
     backup_dir: lib ? backupDir(lib) : null,
     can_pick: CAN_PICK,
     can_reveal: CAN_REVEAL,
+    settings: getSettings(),
+    backup_bytes: backupBytes(lib),
   };
   if (!lib || !lib.playlist) return { ...base, ready: false };
   const files = await scanLocal(lib);
@@ -830,6 +921,24 @@ export async function restoreAll(): Promise<any> {
   return view;
 }
 
+/** Delete every backup of the active library (originals/<lib>/, including replaced/). */
+export async function cleanBackups(): Promise<any> {
+  const lib = requireLib();
+  const bdir = backupDir(lib);
+  let files = 0, freed = 0;
+  const walk = (d: string): void => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else { freed += fs.statSync(p).size; files++; }
+    }
+  };
+  if (fs.existsSync(bdir)) { walk(bdir); fs.rmSync(bdir, { recursive: true, force: true }); }
+  const view = await buildView();
+  view.clean_report = { freed_bytes: freed, files };
+  return view;
+}
+
 export async function libraryOp(data: any): Promise<any> {
   const op = data.op;
   const libs = STATE.libraries;
@@ -838,7 +947,7 @@ export async function libraryOp(data: any): Promise<any> {
     const url = (data.url || "").trim();
     if (!fs.existsSync(d) || !fs.statSync(d).isDirectory())
       throw new Error(`folder not found: ${d}`);
-    if (!url.startsWith("http")) throw new Error("please give a full SoundCloud playlist URL");
+    if (!url.startsWith("http")) throw new Error("please give a full SoundCloud playlist or likes URL");
     if (libs.some((l) => fs.realpathSync(l.dir) === fs.realpathSync(d)))
       throw new Error("this folder is already a library");
     const nid = "lib" + (Math.max(0, ...libs
@@ -1083,30 +1192,92 @@ ${lists.join("\n")}
 
 const inboxDir = () => STATE.inbox_dir || path.join(os.homedir(), "Downloads");
 
-function bestTrack(f: LocalFile, tracks: PlTrack[]): [PlTrack | null, number] {
+
+/** Audio inside the zip files of the downloads folder (album purchases): each
+ *  entry probed once by extracting it to <data>/tmp, cached by zip path + entry + size. */
+interface InboxFile extends LocalFile { zip?: string; matchNames: string[]; }
+
+const ZIP_SEP = "|";
+function zipEntryAudio(e: ZipEntry): boolean {
+  const base = path.posix.basename(e.name);
+  return !e.isDir && !e.name.startsWith("__MACOSX/") && !base.startsWith(".") && AUDIO_EXT.includes(path.extname(base).toLowerCase());
+}
+/** Names to match a zip entry under: without the track number, and for
+ *  "Artist - Album - 01 Title" also "Artist - Title" and "Title". */
+function zipMatchNames(base: string): string[] {
+  const stem = base.replace(/\.[^.]+$/, "");
+  const noNum = stem.replace(/^\s*\d{1,3}(?:\s*[-._)]\s*|\s+)(?=\S)/, "").trim() || stem;
+  const names = new Set<string>([noNum]);
+  const parts = noNum.split(/\s+-\s+/);
+  if (parts.length >= 3) { names.add(parts[0] + " - " + parts.slice(2).join(" - ")); names.add(parts.slice(2).join(" - ")); }
+  return [...names];
+}
+async function scanInboxZips(dir: string): Promise<{ files: InboxFile[]; errors: string[] }> {
+  const files: InboxFile[] = [], errors: string[] = [];
+  const cache = STATE.zip_cache || (STATE.zip_cache = {});
+  const live = new Set<string>();
+  const tmpDir = path.join(DATA_DIR, "tmp");
+  for (const f of fs.readdirSync(dir).sort()) {
+    if (f.startsWith(".") || path.extname(f).toLowerCase() !== ".zip") continue;
+    const zp = path.join(dir, f);
+    let entries: ZipEntry[];
+    try { entries = listEntries(zp).filter(zipEntryAudio); }
+    catch (e: any) { errors.push(`${f}: ${e.message}`); continue; }
+    for (const e of entries) {
+      const key = [zp, e.name, e.size].join(ZIP_SEP);
+      live.add(key);
+      if (!cache[key]) {
+        fs.mkdirSync(tmpDir, { recursive: true });
+        const tmp = path.join(tmpDir, `probe-${process.pid}-${Date.now()}${path.extname(e.name).toLowerCase()}`);
+        try {
+          extractEntry(zp, e, tmp);
+          const pr = await probe(tmp);
+          cache[key] = [pr.dur, pr.fmt, pr.tags];
+        } catch (err: any) { errors.push(`${f}: ${err.message}`); continue; }   // extractEntry names the entry itself
+        finally { try { fs.unlinkSync(tmp); } catch {} }
+      }
+      const [dur, fmt, tags] = cache[key];
+      const base = path.posix.basename(e.name);
+      files.push({ name: base, path: zp + ZIP_SEP + e.name, dur, fmt, tags, zip: f, matchNames: zipMatchNames(base) });
+    }
+  }
+  let changed = false;
+  for (const k of Object.keys(cache)) if (!live.has(k) && k.startsWith(dir + path.sep)) { delete cache[k]; changed = true; }
+  if (changed) saveState();
+  return { files, errors };
+}
+
+function bestTrackNames(names: string[], dur: number, tracks: PlTrack[]): [PlTrack | null, number] {
   let best: PlTrack | null = null, bestS = 0;
   for (const t of tracks) {
-    let s = Math.max(sim(f.name, t.title), sim(f.name, `${t.user} ${t.title}`));
-    const dd = Math.abs(f.dur - t.dur);
+    let s = 0;
+    for (const n of names) s = Math.max(s, sim(n, t.title), sim(n, `${t.user} ${t.title}`));
+    const dd = Math.abs(dur - t.dur);
     s += dd < 3 ? 0.15 : dd < 10 ? 0.07 : 0;
     if (s > bestS) { best = t; bestS = s; }
   }
   return [best, Math.round(bestS * 100) / 100];
 }
 
-/** Fresh downloads that belong to this playlist: each audio file in the inbox
- *  folder matched against the tracks like the library matcher does. */
+/** Fresh downloads that belong to this playlist: each audio file (and each audio
+ *  entry of a zip) in the downloads folder, matched against the tracks like the
+ *  library matcher does. With the auto-move setting on, exact matches of tracks
+ *  you don't have yet are moved straight away and listed in `moved`. */
 export async function inboxView(): Promise<any> {
   const lib = requireLib();
   const dir = inboxDir();
-  const base = { dir, exists: fs.existsSync(dir), items: [] as any[], others: 0, already: 0 };
+  const base = { dir, exists: fs.existsSync(dir), items: [] as any[], others: 0, already: 0,
+                 moved: [] as string[], move_errors: [] as string[], zip_errors: [] as string[] };
   if (!base.exists || !lib.playlist) return base;
   const view = await buildView();
   const rows = new Map<number, any>(view.tracks.map((r: any) => [r.id, r]));
   const libNames = new Set((await scanLocal(lib)).map((f) => f.name));
-  for (const f of await scanFolder(dir)) {
+  const plain: InboxFile[] = (await scanFolder(dir)).map((f) => ({ ...f, matchNames: [f.name] }));
+  const zips = await scanInboxZips(dir);
+  base.zip_errors = zips.errors;
+  for (const f of [...plain, ...zips.files]) {
     if (libNames.has(f.name)) { base.already++; continue; } // copied in already
-    const [t, score] = bestTrack(f, lib.playlist.tracks);
+    const [t, score] = bestTrackNames(f.matchNames, f.dur, lib.playlist.tracks);
     const row = t && rows.get(t.id);
     if (!t || !row || score < 0.6) { base.others++; continue; }
     const lossy = LOSSY.test(f.fmt[0]);
@@ -1114,9 +1285,21 @@ export async function inboxView(): Promise<any> {
     if (!row.have) action = "move";
     else if (row.lossy && !lossy) action = "upgrade";
     if (!action) { base.already++; continue; } // we already hold an equal or better file
-    base.items.push({ name: f.name, dur: fmtDur(Math.round(f.dur)), dur_diff: Math.round(f.dur - t.dur), lossy,
+    base.items.push({ name: f.name, zip: f.zip || null, dur: fmtDur(Math.round(f.dur)), dur_diff: Math.round(f.dur - t.dur), lossy,
                       id: t.id, n: row.n, artist: row.artist, title: row.title, score: Math.min(1, score),
                       action, cur_file: row.file });
+  }
+  // auto-move: exact matches (same name, same length) of tracks we don't have yet
+  if (STATE.settings?.auto_move && base.items.length && path.resolve(dir) !== path.resolve(lib.dir)) {
+    const movedTracks = new Set<number>();
+    const keep: any[] = [];
+    for (const it of base.items) {
+      const exact = it.action === "move" && it.score >= 0.999 && Math.abs(it.dur_diff) <= 2 && !movedTracks.has(it.id);
+      if (!exact) { keep.push(it); continue; }
+      try { await inboxMove({ file: it.name, id: it.id, zip: it.zip }); base.moved.push(it.name); movedTracks.add(it.id); }
+      catch (e: any) { base.move_errors.push(`${it.name}: ${e.message}`); keep.push(it); }
+    }
+    base.items = keep;
   }
   return base;
 }
@@ -1130,18 +1313,30 @@ function moveFile(src: string, dst: string): void {
   }
 }
 
-/** Move one inbox file into the library and pin it to its track. When the
- *  track already has a (lossy) file, that file goes to originals/<lib>/replaced/. */
+/** Move one inbox file (or one entry of a zip in the inbox) into the library and
+ *  pin it to its track. When the track already has a (lossy) file, that file goes
+ *  to originals/<lib>/replaced/. Zips stay where they are. */
 export async function inboxMove(data: any): Promise<any> {
   const lib = requireLib();
   const name = path.basename(String(data.file || ""));
-  const src = path.join(inboxDir(), name);
-  if (!name || !fs.existsSync(src)) throw new Error(`${name}: no longer in the downloads folder`);
+  const zip = data.zip ? path.basename(String(data.zip)) : "";
+  if (!name) throw new Error("no file given");
   const dst = path.join(lib.dir, name);
   if (fs.existsSync(dst)) throw new Error(`${name}: a file with this name is already in the library`);
   const tid = String(data.id);
   if (!lib.playlist?.tracks.some((t) => String(t.id) === tid)) throw new Error("track is not in the playlist");
+  const src = path.join(inboxDir(), zip || name);
+  if (!fs.existsSync(src)) throw new Error(`${zip || name}: no longer in the downloads folder`);
+  // stage the new file first (a failed extraction must not touch the library)
+  let staged: string | null = null;
+  if (zip) {
+    const entry = listEntries(src).filter(zipEntryAudio).find((e) => path.posix.basename(e.name) === name);
+    if (!entry) throw new Error(`${name}: not found inside ${zip}`);
+    staged = dst.replace(/(\.[^.]+)$/, ".tmp$1");   // the folder scan ignores *.tmp.<ext>
+    extractEntry(src, entry, staged);
+  }
   const row = (await buildView()).tracks.find((r: any) => String(r.id) === tid);
+  let kept: [string, string] | null = null;
   if (row?.have && row.file) {
     const rdir = path.join(backupDir(lib), "replaced");
     fs.mkdirSync(rdir, { recursive: true });
@@ -1149,10 +1344,17 @@ export async function inboxMove(data: any): Promise<any> {
     let keep = path.join(rdir, row.file);
     for (let i = 2; fs.existsSync(keep); i++) keep = path.join(rdir, row.file.replace(/(\.[^.]+)$/, ` (${i})$1`));
     moveFile(old, keep);
+    kept = [old, keep];
     delete STATE.dur_cache[old];
   }
-  moveFile(src, dst);
-  delete STATE.dur_cache[src];
+  try {
+    if (staged) fs.renameSync(staged, dst);
+    else { moveFile(src, dst); delete STATE.dur_cache[src]; }
+  } catch (e) {
+    if (kept) try { moveFile(kept[1], kept[0]); } catch {}   // put the replaced file back
+    if (staged) try { fs.unlinkSync(staged); } catch {}
+    throw e;
+  }
   for (const a of Object.keys(STATE.assigned)) if (STATE.assigned[a] === name) delete STATE.assigned[a];
   STATE.assigned[tid] = name;
   delete STATE.overrides[tid];
@@ -1162,11 +1364,11 @@ export async function inboxMove(data: any): Promise<any> {
 }
 
 export async function inboxMoveAll(): Promise<any> {
-  const items = (await inboxView()).items;
-  let done = 0;
-  const errors: string[] = [];
-  for (const it of items) {
-    try { await inboxMove({ file: it.name, id: it.id }); done++; }
+  const scan = await inboxView();
+  let done = scan.moved.length;   // auto-move may have handled some already
+  const errors: string[] = [...scan.move_errors];
+  for (const it of scan.items) {
+    try { await inboxMove({ file: it.name, id: it.id, zip: it.zip }); done++; }
     catch (e: any) { errors.push(e.message); }
   }
   const view = await buildView();

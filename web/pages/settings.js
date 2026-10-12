@@ -1,0 +1,142 @@
+/* Page: Settings — library, downloads folder + auto-move, refresh interval, appearance,
+   backups and about. Reads DATA.settings / DATA.backup_bytes, writes through POST /api/settings. */
+
+const ST_INTERVALS = [[5, 'Every 5 minutes'], [15, 'Every 15 minutes'], [30, 'Every 30 minutes'], [60, 'Every hour'], [120, 'Every 2 hours']];
+
+function stBytes(n) {
+  n = Number(n) || 0;
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(0) + ' KB';
+  if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(n < 10 * 1024 * 1024 ? 1 : 0) + ' MB';
+  return (n / 1024 / 1024 / 1024).toFixed(1) + ' GB';
+}
+
+/* one card: icon · heading · text · controls */
+function stCard(ico, color, title, text, controls) {
+  return `<div class="card st-card">
+    <div class="card-icon${color ? ' ' + color : ''}">${icon(ico)}</div>
+    <div class="st-body"><h3>${title}</h3>${text ? `<p>${text}</p>` : ''}${controls ? `<div class="st-controls">${controls}</div>` : ''}</div>
+  </div>`;
+}
+
+PAGES.settings = {
+  title: () => 'Settings',
+  sub: () => 'How DJ HQ works on this computer.',
+  search: false,
+  body: () => {
+    const S = DATA.settings || {};
+    const lib = (DATA.libraries || []).find(l => l.id === DATA.active) || {};
+    const libName = esc(lib.name || DATA.playlist || 'Library');
+    const isLikes = /\/likes\/?$/.test(DATA.playlist_url || '');
+
+    const library = stCard('folder', '', `Library <span class="st-name">${libName}</span>`,
+      'The music folder and the SoundCloud ' + (isLikes ? 'Likes page' : 'playlist') + ' this library keeps in sync.',
+      `<div class="st-path-row"><div class="path" title="${esc(lib.dir || '')}">${icon('folder')}<span>${esc(shortPath(lib.dir || ''))}</span></div></div>
+       ${DATA.playlist_url ? `<a class="btn btn-sm" href="${esc(DATA.playlist_url)}" target="_blank" rel="noopener">${icon('external')}${isLikes ? 'Open your Likes on SoundCloud' : 'Open playlist on SoundCloud'}</a>` : ''}
+       <button class="btn btn-sm" onclick="uiAddLibrary()">${icon('plus')}Add another library…</button>
+       <button class="btn btn-sm btn-danger" onclick="removeLibrary()">${icon('trash')}Remove this library…</button>`);
+
+    const inboxShown = esc(shortPath(S.inbox_dir || S.inbox_default || '~/Downloads'));
+    const downloads = stCard('inbox', 'blue', 'Downloads',
+      'DJ HQ watches this folder for fresh downloads that match a track in the playlist.',
+      `<div class="st-path-row">
+         <div class="path" title="${esc(S.inbox_dir || '')}">${icon('folder')}<span>${inboxShown}</span>${S.inbox_custom ? '' : tag('default', 'outline')}</div>
+         ${S.inbox_custom ? `<button class="btn btn-sm" onclick="stResetInbox()" title="Back to ${esc(shortPath(S.inbox_default || '~/Downloads'))}">${icon('undo')}Use the default folder</button>` : ''}
+       </div>
+       <div class="fieldrow st-inboxrow">
+         <input class="input" id="st-inbox" placeholder="Type another folder…" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')stSaveInbox()">
+         ${DATA.can_pick ? `<button class="btn" onclick="stBrowseInbox()">${icon('folder')}Browse…</button>` : ''}
+         <button class="btn" onclick="stSaveInbox()">${icon('check')}Save</button>
+       </div>
+       <label class="st-switch">
+         <input type="checkbox" id="st-auto" ${S.auto_move ? 'checked' : ''} onchange="stToggleAuto(this)">
+         <span class="st-track" aria-hidden="true"></span>
+         <span class="st-lbl"><b>Move exact matches into the library automatically</b>
+           <span>Only a file whose name matches a playlist track exactly and whose length matches is moved. Files you already have are never replaced. The Downloads page shows what moved.</span></span>
+       </label>`);
+
+    const refresh = stCard('refresh', '', 'Checking the playlist',
+      'How often DJ HQ looks at SoundCloud for changes while the window is open. Refresh in the top right checks right away.',
+      `<div class="select-wrap st-select"><select id="st-interval" aria-label="Refresh interval" onchange="stSetInterval(this.value)">${
+        ST_INTERVALS.map(([v, l]) => `<option value="${v}"${(S.refresh_min || 15) === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>`);
+
+    const appearance = stCard('sun', 'amber', 'Appearance', 'Light, dark, or whatever your computer is using.',
+      `<div class="seg" role="radiogroup" aria-label="Appearance">
+         <button class="${THEME === 'system' ? 'on' : ''}" onclick="stTheme('system')">${icon('monitor')}System</button>
+         <button class="${THEME === 'light' ? 'on' : ''}" onclick="stTheme('light')">${icon('sun')}Light</button>
+         <button class="${THEME === 'dark' ? 'on' : ''}" onclick="stTheme('dark')">${icon('moon')}Dark</button>
+       </div>`);
+
+    const bytes = DATA.backup_bytes || 0;
+    const backups = stCard('history', 'green', 'Backups',
+      'Before a file is converted, the untouched original is kept here, together with MP3s that a lossless download replaced. That is what Restore originals copies back.',
+      `<div class="st-size">${stBytes(bytes)}</div>
+       <button class="btn btn-sm" onclick="stCleanBackups()" ${bytes ? '' : 'disabled'} title="${bytes ? 'Delete every backup of this library' : 'There is nothing to clean up'}">${icon('trash')}Clean up backups…</button>`);
+
+    const about = stCard('info', '', `DJ HQ ${esc(APP.version || '')}`,
+      'Keeps your music folder in sync with a SoundCloud playlist and gets your tracks ready for rekordbox.',
+      `<button class="btn btn-sm" onclick="checkForUpdates({ manual: true })">${icon('refresh')}Check for updates</button>
+       <button class="btn btn-sm" onclick="startTour()">${icon('sparkles')}Show me around</button>
+       <div class="st-path-row st-wide"><span class="faint">Data folder</span><div class="path" title="${esc(S.data_dir || '')}">${icon('folder')}<span>${esc(shortPath(S.data_dir || ''))}</span></div></div>`);
+
+    return `<div class="st-list">${library}${downloads}${refresh}${appearance}${backups}${about}</div>`;
+  },
+};
+
+/* ---------- actions ---------- */
+async function stSave(patch, msg) {
+  try {
+    DATA = await api('/api/settings', patch);
+    render();
+    if (msg) toast(msg);
+    return true;
+  } catch (e) {
+    toast('Couldn’t save: ' + e.message, true);
+    render();
+    return false;
+  }
+}
+async function stSaveInbox() {
+  const el = $('#st-inbox');
+  const p = (el && el.value || '').trim();
+  if (!p) { if (el) el.focus(); return; }
+  await stSave({ inbox_dir: p }, 'Watching ' + shortPath(p) + ' for downloads');
+  if (typeof loadInbox === 'function') loadInbox({ quiet: true });
+}
+async function stBrowseInbox() {
+  try {
+    const r = await api('/api/pick-folder', {});
+    if (r.path) { await stSave({ inbox_dir: r.path }, 'Watching ' + shortPath(r.path) + ' for downloads'); if (typeof loadInbox === 'function') loadInbox({ quiet: true }); }
+  } catch (e) { toast('Couldn’t open the folder picker: ' + e.message, true); }
+}
+async function stResetInbox() {
+  await stSave({ inbox_dir: '' }, 'Back to the default Downloads folder');
+  if (typeof loadInbox === 'function') loadInbox({ quiet: true });
+}
+async function stToggleAuto(el) {
+  const on = !!el.checked;
+  const ok = await stSave({ auto_move: on }, on ? 'Exact matches will be moved in automatically' : 'Downloads wait for you again');
+  if (ok && on && typeof loadInbox === 'function') loadInbox({ quiet: true });
+}
+function stSetInterval(v) {
+  const n = Number(v);
+  const label = (ST_INTERVALS.find(([k]) => k === n) || [])[1] || '';
+  stSave({ refresh_min: n }, label ? 'Checking the playlist ' + label.replace(/^Every/, 'every') : 'Saved');
+}
+function stTheme(v) { setTheme(v); render(); }
+async function stCleanBackups() {
+  const bytes = DATA.backup_bytes || 0;
+  const ok = await uiConfirm({
+    title: 'Delete the backups?',
+    body: `<p>This frees <b>${esc(stBytes(bytes))}</b> by deleting the backed-up originals of converted files and the MP3s that lossless downloads replaced.</p>
+           <p>Afterwards <b>Restore originals</b> won’t be able to bring those files back. The files in your music folder are not touched.</p>`,
+    ok: 'Delete backups', danger: true, icon: 'trash',
+  });
+  if (!ok) return;
+  try {
+    DATA = await api('/api/clean-backups', {});
+    const r = DATA.clean_report || {};
+    render();
+    toast(`Freed ${stBytes(r.freed_bytes || bytes)}`);
+  } catch (e) { toast('Couldn’t clean up: ' + e.message, true); }
+}

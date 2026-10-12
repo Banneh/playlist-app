@@ -10,6 +10,9 @@
 <link rel="stylesheet" href="pages/inbox.css">
 <link rel="stylesheet" href="pages/prepare.css">
 <link rel="stylesheet" href="pages/welcome.css">
+<link rel="stylesheet" href="pages/settings.css">
+<link rel="stylesheet" href="pages/workthrough.css">
+<link rel="stylesheet" href="player.css">
 </head>
 <body>
 
@@ -44,6 +47,7 @@
         <button class="btn btn-ghost btn-sm" id="btn-addlib" title="Add a music folder + playlist"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg><span class="lbl">Add library</span></button>
         <button class="btn btn-ghost btn-sm btn-icon" id="btn-libmenu" title="Library options"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
         <span class="spacer"></span>
+        <button class="btn btn-ghost btn-sm btn-icon" id="btn-settings" title="Settings"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
         <button class="btn btn-ghost btn-sm btn-icon" id="btn-theme" title="Appearance"></button>
       </div>
     </div>
@@ -65,6 +69,7 @@
   </main>
 </div>
 
+<div class="player" id="player" hidden></div>
 <div class="toast" id="toast"></div>
 
 <script src="app.js"></script>
@@ -73,7 +78,11 @@
 <script src="pages/inbox.js"></script>
 <script src="pages/prepare.js"></script>
 <script src="pages/welcome.js"></script>
+<script src="demo.js"></script>
 <script src="tour.js"></script>
+<script src="pages/settings.js"></script>
+<script src="pages/workthrough.js"></script>
+<script src="player.js"></script>
 <script>boot();</script>
 </body>
 </html>
