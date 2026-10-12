@@ -1,7 +1,7 @@
 {
   "name": "dj-hq",
   "productName": "DJ HQ",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Local playlist reconciliation, rekordbox tagging and player-compat conversion for DJs",
   "main": "dist/main.js",
   "license": "MIT",
@@ -42,7 +42,9 @@
       "target": [
         "dmg"
       ],
-      "category": "public.app-category.music"
+      "category": "public.app-category.music",
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
+      "identity": null
     },
     "dmg": {
       "writeUpdateInfo": false
@@ -59,7 +61,8 @@
       "target": [
         "AppImage"
       ]
-    }
+    },
+    "afterPack": "scripts/afterPack.js"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",

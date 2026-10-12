@@ -1,102 +1,195 @@
 # DJ HQ
 
-**Your SoundCloud playlist, your music folder and your USB stick, finally telling the same story.**
+**Keep your music folder in sync with a SoundCloud playlist, and get your tracks ready for rekordbox and the club.**
 
-![DJ HQ showing the Missing list, with a download or shop link next to every track you still need](docs/screens/missing-light.png)
+![DJ HQ showing the Missing list: every track you still need, with its download or shop link](docs/screens/missing-light.png)
 
-You collect tracks in a SoundCloud playlist. The files live in a folder on your
-computer. rekordbox and the players at the club have strong opinions about those
-files. DJ HQ sits in the middle and keeps all three in step:
+DJ HQ is a free desktop app for DJs who collect music through SoundCloud
+playlists. It compares a playlist with the folder where your tracks live, shows
+you what's still missing and where to get it, tidies up the files you have so
+rekordbox and Pioneer players are happy, and hands you a rekordbox playlist when
+you're done. Everything runs on your computer; nothing is uploaded anywhere.
 
-- It shows you which tracks from the playlist you still don't have, with the
-  free download or the shop link right next to each one.
-- It notices when a download lands in your Downloads folder and moves it into
-  your music folder with one click.
-- It writes the artist and title into the files so rekordbox shows real names
-  instead of blanks, converts anything your player can't play, and hands you a
-  rekordbox playlist to import.
+## Contents
 
-Everything happens on your computer. Nothing is uploaded anywhere, and the app
-never touches your SoundCloud account.
+- [What DJ HQ does](#what-dj-hq-does)
+- [Install](#install)
+  - [Download](#download)
+  - [Opening the app for the first time](#opening-the-app-for-the-first-time)
+- [Getting started](#getting-started)
+- [Using DJ HQ](#using-dj-hq)
+  - [Missing: tracks you still need](#missing-tracks-you-still-need)
+  - [Have: tracks already in your folder](#have-tracks-already-in-your-folder)
+  - [New: what changed since you last looked](#new-what-changed-since-you-last-looked)
+  - [Downloads: moving new files into your library](#downloads-moving-new-files-into-your-library)
+  - [Not in playlist: files SoundCloud doesn't know about](#not-in-playlist-files-soundcloud-doesnt-know-about)
+  - [Prepare for player: tags, conversion and rekordbox](#prepare-for-player-tags-conversion-and-rekordbox)
+  - [Appearance, search and the sidebar](#appearance-search-and-the-sidebar)
+  - [More than one playlist](#more-than-one-playlist)
+- [Tips and troubleshooting](#tips-and-troubleshooting)
+- [Your files and your data](#your-files-and-your-data)
+- [Technical details](#technical-details)
+  - [Run from source](#run-from-source)
+  - [Headless mode](#headless-mode)
+  - [Project layout](#project-layout)
+  - [HTTP API](#http-api)
+  - [Releases](#releases)
+  - [Out of scope](#out-of-scope)
+- [License](#license)
 
-## Get it
+## What DJ HQ does
 
-Download the latest build from the
+A *library* in DJ HQ is one music folder linked to one public SoundCloud
+playlist. The app fetches the playlist, scans the folder and works out which
+file belongs to which track by comparing names and lengths. Everything else
+builds on that:
+
+- **Missing** lists every playlist track that isn't in your folder yet, with a
+  **Free DL** or **Buy** button that takes you straight to the download gate or
+  the shop. Links are found in the track's download button *and* in its
+  description.
+- **Have** shows the file behind each track you own, and flags anything that
+  still needs tags, conversion, or could be upgraded from MP3 to lossless.
+- **New** collects tracks added to the playlist and files that arrived in your
+  folder since you last looked.
+- **Downloads** watches your Downloads folder and moves new files into your
+  library with one click, no renaming.
+- **Not in playlist** finds the SoundCloud track for files that aren't in the
+  playlist yet, so you can add them there.
+- **Prepare for player** writes artist and title tags the way rekordbox reads
+  them, converts files your Pioneer player can't play (in place, so your cues
+  survive), and exports a rekordbox playlist.
+
+The playlist is checked again every 15 minutes while the window is open, and
+whenever you press **Refresh**. DJ HQ never writes to SoundCloud and never
+needs your SoundCloud login.
+
+## Install
+
+### Download
+
+Get the latest build from the
 [Releases page](https://github.com/Banneh/playlist-app/releases):
 
-| | |
+| Your computer | File to download |
 | --- | --- |
-| macOS (Apple Silicon) | `DJ HQ-<version>-arm64.dmg` |
-| Windows | `DJ HQ Setup <version>.exe` |
-| Linux | `DJ HQ-<version>.AppImage` |
+| Mac with Apple Silicon (M1 or later) | `DJ-HQ-<version>-mac-arm64.dmg` |
+| Mac with an Intel chip | `DJ-HQ-<version>-mac-x64.dmg` |
+| Windows | `DJ-HQ-Setup-<version>.exe` |
+| Linux | `DJ-HQ-<version>.AppImage` |
+
+> [!TIP]
+> Not sure which Mac you have? Click the Apple menu → **About This Mac**. If it
+> says *Chip: Apple M…* you want the Apple Silicon file; if it says
+> *Processor: Intel…* you want the Intel one.
 
 There's nothing else to install; ffmpeg comes bundled.
 
-The builds aren't signed (developer certificates cost money), so your computer
-will grumble the first time you open it:
+### Opening the app for the first time
 
-- **macOS:** right-click the app → *Open* → *Open*. If it claims the app is
-  "damaged", run `xattr -cr "/Applications/DJ HQ.app"` once in Terminal.
-- **Windows:** SmartScreen → *More info* → *Run anyway*.
+DJ HQ isn't signed with an Apple or Microsoft developer certificate (they cost
+money), so your computer asks you to vouch for it once. No Terminal needed.
 
-On an Intel Mac, run it from source instead (see the end of this page).
+**macOS 15 (Sequoia) or newer**
 
-## First run
+1. Open the DMG, drag **DJ HQ** into **Applications**, then double-click it.
+   macOS says it couldn't verify the app. Click **Done**.
+2. Open **System Settings → Privacy & Security** and scroll down to the
+   *Security* section. Next to "DJ HQ was blocked", click **Open Anyway**.
+3. Confirm with your password or Touch ID. From then on it opens like any
+   other app.
+
+**macOS 14 (Sonoma) or older**
+
+Right-click (or Control-click) **DJ HQ** in Applications, choose **Open**,
+then click **Open** in the dialog. Once is enough.
+
+**Windows**
+
+SmartScreen says it protected your PC. Click **More info**, then
+**Run anyway**.
+
+## Getting started
 
 ![The welcome screen asks for your music folder and a playlist link](docs/screens/welcome.png)
 
-1. Pick the folder where your tracks live.
-2. Paste the link to your SoundCloud playlist. It has to be public, that's all.
-3. Hit **Connect library**.
+1. Click **Browse…** and pick the folder where your tracks live (or type the
+   path).
+2. Paste the link to your SoundCloud playlist. It has to be public, that's
+   all.
+3. Click **Connect library**.
 
-DJ HQ fetches the playlist, scans the folder and works out which file belongs to
-which track, going by file names and track lengths. That takes a few seconds.
-From then on it checks the playlist again every 15 minutes while the window is
-open, and whenever you press **Refresh**.
+DJ HQ fetches the playlist, scans the folder and matches files to tracks. That
+takes a few seconds for a few hundred tracks. You land on the **Missing** list,
+and the sidebar shows how much of the playlist is already in your folder.
 
-Prefer it dark? The sun-and-moon button at the bottom of the sidebar switches
-between light, dark and "follow the system".
+> [!NOTE]
+> Nothing is renamed, moved or rewritten at this point. DJ HQ only reads your
+> folder until you ask it to write tags, convert a file or move a download.
 
-![DJ HQ in dark mode](docs/screens/missing-dark.png)
+## Using DJ HQ
 
-## A tour
+### Missing: tracks you still need
 
-### Missing: what you still need
-
-This is the list you'll live in. Every track from the playlist that isn't in your
-folder yet, with the quickest way to get it:
+This is the list you'll spend the most time in: every track from the playlist
+that isn't in your folder, with the quickest way to get it.
 
 - **Free DL** is a free download: a Hypeddit-style gate, a Drive or Dropbox
-  share, or SoundCloud's own download button. DJ HQ finds these through the
-  uploader's download link *and* by reading the track description.
+  share, or SoundCloud's own download button.
 - **Buy** is a shop: Bandcamp, Beatport, Juno, Traxsource and friends. When a
   track has both, Buy comes first, because shops sell lossless files and free
   downloads are often MP3s. Hover a button to see where it goes.
 
-A few things that make a long list bearable:
+**To work through the list**
 
-1. The chips at the top narrow the list to tracks with a free download, a shop
-   link, or no link at all.
-2. **Copy links** puts every track on screen on your clipboard as
-   "Artist – Title, link", one per line. Great for a shopping session.
-3. A track that isn't available right now? Click its status pill and choose
-   **Not available on SoundCloud now**. It moves to a quiet section at the
-   bottom and comes back on its own the moment a link appears.
-4. The **⋯** at the end of a row opens the track on SoundCloud, copies its
-   links, matches a file by hand, or lets you fix the artist and title.
+1. Use the chips above the list to narrow it down: tracks with a free download,
+   with a shop link, or with no link at all.
+2. Click **Free DL** or **Buy**. The link opens in your browser; the file ends
+   up in your Downloads folder as usual.
+3. Switch to **Downloads** in the sidebar once a few files have landed, and
+   move them into your library from there (see below).
+
+**Other things you can do here**
+
+- **Copy links** puts every track on screen on your clipboard as
+  "Artist – Title, link", one per line. Handy for a shopping session.
+- Click a track's status pill to change it by hand. **Not available on
+  SoundCloud now** parks a track in a quiet section at the bottom; it comes
+  back on its own the moment a link appears for it. **Back to automatic**
+  undoes any manual status.
+- The **⋯** at the end of a row opens the track on SoundCloud, copies its
+  links, matches a file by hand, or lets you fix the artist and title.
+- Click the artwork to open the track on SoundCloud.
 
 <p align="center"><img src="docs/screens/status-menu.png" width="420" alt="The status menu: Have, Missing, Not available on SoundCloud now, or back to automatic"></p>
 
-### Have: what's already in your folder
+### Have: tracks already in your folder
 
 ![The Have list shows the matched file under each track, with tags for anything it still needs](docs/screens/have.png)
 
 Each track shows the file it was matched to, plus a small tag when something
-needs attention: **Needs tags**, **Convert · 24-bit**, **MP3**, or
-**Lossless available** when the shop sells a better version of an MP3 you have.
+needs attention:
 
-Wrong match? Click the file name (or **⋯ → Match to a local file…**) and pick
-the right one. Likely candidates are listed first.
+| Tag | Meaning |
+| --- | --- |
+| **Needs tags** | Artist and title aren't written into the file yet. rekordbox would show it blank. |
+| **Convert · 24-bit** (or 88.2 kHz, …) | The selected player can't play this file as it is. |
+| **MP3** | A lossy file. |
+| **Lossless available** | You have the MP3, and the shop link sells a lossless version. |
+| **Matched by hand** | You picked this file yourself. |
+
+The **Needs attention** and **Lossless available** chips above the list show
+only those tracks.
+
+**To fix a wrong match**
+
+1. Click the file name under the track, or choose **⋯ → Match to a local
+   file…**.
+2. Pick the right file. Likely candidates are listed first; files already
+   matched to another track are marked, and picking one frees that track to
+   match again.
+3. Choose **No file** if the track isn't in your folder at all, or
+   **Auto-match** to let DJ HQ decide again.
 
 <p align="center"><img src="docs/screens/match-dialog.png" width="480" alt="Match to a local file: the files in your folder, likely ones first"></p>
 
@@ -104,22 +197,32 @@ the right one. Likely candidates are listed first.
 
 ![The New list: tracks added to the playlist and files that arrived in your folder](docs/screens/new.png)
 
-Tracks added to the playlist and files that arrived in your folder collect here
-until you press **Mark all as seen**. Think of it as the to-do list for tagging
-and importing.
+Tracks added to the playlist (**New**) and files that arrived in your folder
+(**New file**) collect here until you press **Mark all as seen**. Treat it as
+the to-do list for tagging, converting and importing into rekordbox. When a
+refresh finds changes, a short notice tells you how many tracks were added or
+removed.
 
-### Downloads: from your Downloads folder into your library
+### Downloads: moving new files into your library
 
 ![The Downloads list: files that match a playlist track, each with a Move into library button](docs/screens/downloads.png)
 
-DJ HQ keeps an eye on your Downloads folder. When a file lands there that
-matches a track in the playlist, it shows up here with a **Move into library**
-button. Nothing gets renamed; the file is moved as it is and linked to the
-track.
+DJ HQ keeps an eye on your Downloads folder. Audio files there are compared
+with the playlist the same way your library is, and the ones that match a track
+show up here.
 
-A lossless download for a track you only had as an MP3 gets an **Upgrade**
-button instead. The old MP3 goes to the backup folder, not the bin.
-**Move all** does the whole list at once.
+1. Check the row: it shows which track the file belongs to, whether the length
+   matches, and whether it's an MP3.
+2. Click **Move into library**. The file is moved as it is, no renaming, and
+   linked to the track. It disappears from Missing and appears in Have.
+3. For a lossless download of a track you only had as an MP3, the button reads
+   **Upgrade**. The old MP3 goes to the backup folder, not the bin.
+4. **Move all** does the whole list at once, after telling you how many files
+   are upgrades.
+
+Zips and unfinished downloads are ignored; unzip, wait for the download to
+finish, then click **Rescan**. Files that are already in your library by name
+are counted but not listed.
 
 ### Not in playlist: files SoundCloud doesn't know about
 
@@ -129,77 +232,82 @@ Tracks in your folder that match nothing in the playlist. The idea is to get
 them *into* the playlist, so the playlist stays the one list that's always
 right.
 
-1. **Find all** searches SoundCloud for every file and accepts the sure matches.
-2. For the rest, **Find on SoundCloud** shows the candidates with their length
-   and how well they match. Shorter search text often works better.
-3. Pick one, then **Add to playlist** opens the track on SoundCloud so you can
-   add it yourself. On the next refresh the file is matched automatically and
+1. Click **Find all** to search SoundCloud for every file at once. Sure matches
+   are accepted automatically; the rest are left for you.
+2. For those, click **Find on SoundCloud**. Candidates are listed with their
+   length and how well they match; a candidate already in the playlist is
+   marked, and picking it links the file to that track. If nothing fits, edit
+   the search text: shorter works better, so drop the remix part.
+3. Pick a candidate. The row now shows the found track and an **Add to
+   playlist** button, which opens it on SoundCloud so you can add it to the
+   playlist yourself.
+4. On the next refresh the file is matched to its track automatically and
    leaves this list.
 
 <p align="center"><img src="docs/screens/find-dialog.png" width="480" alt="Find on SoundCloud: candidates with their length and match"></p>
+
+If a file's artist or title is wrong (DJ HQ reads them from the file name),
+click **⋯ → Edit artist / title** first; the search and the tags use your
+values.
 
 ### Prepare for player: tags, conversion and rekordbox
 
 ![The Prepare for player page: target player, tags, compatibility, rekordbox export and the files that still need something](docs/screens/prepare.png)
 
-Pick your player at the top. Everything below adapts to what it can play.
-
-- **Write tags** writes the artist and title into the files, in the way
-  rekordbox actually reads them (it's picky about WAVs). The genre becomes the
-  playlist name.
-- **Convert** turns files your player can't play (24-bit, 88.2 kHz and the like)
-  into ones it can, in place: same file name, same length, so rekordbox keeps
-  your hot cues and beat grids. The originals are backed up first, and
-  **Restore originals** puts them back whenever you like.
-- **Export XML…** writes a rekordbox playlist with every matched file. The
-  dialog walks you through the import; it's three clicks in rekordbox and only
-  needs setting up once.
+1. **Pick your player** at the top. Everything below adapts to what it can
+   play: the XDJ-700 and XDJ-1000 only take 16-bit WAV at 44.1 or 48 kHz, while
+   the CDJ-2000NXS2, XDJ-XZ and CDJ-3000 also play 24-bit, 96 kHz and FLAC.
+2. **Write tags** writes the artist and title into every file that doesn't have
+   them, in the way rekordbox actually reads them (it's picky about WAVs). The
+   genre becomes the playlist name.
+3. **Convert** turns files your player can't play into ones it can, in place:
+   same file name, same length, so rekordbox keeps your hot cues and beat
+   grids. The originals are backed up first, and **Restore originals** puts
+   them back whenever you like.
+4. **Export XML…** writes a rekordbox playlist with every matched file and
+   shows you how to import it. In rekordbox: *Preferences → Advanced →
+   Database → rekordbox xml*, browse to the file once; a *rekordbox xml* item
+   then appears in the tree, and right-clicking the playlist there offers
+   **Import Playlist**. Tracks already in your collection keep their cues and
+   grids. Export again whenever the playlist changes; the file path stays the
+   same.
 
 <p align="center"><img src="docs/screens/export-dialog.png" width="480" alt="The export dialog with the file path and the three rekordbox import steps"></p>
 
-The list underneath shows exactly which files still need something before
-they're ready for the booth.
+The **Files needing attention** list underneath shows exactly which files still
+need tags or conversion before they're ready for the booth.
 
-### More than one playlist?
+### Appearance, search and the sidebar
 
-Add another library with the **+ Add library** button in the sidebar and switch
-between them from the library name at the top. Each library keeps its own
-matches, edits and "new" marks.
+![DJ HQ in dark mode](docs/screens/missing-dark.png)
 
-## Good to know
+- The sun-and-moon button at the bottom of the sidebar switches between light,
+  dark and "follow the system".
+- The search box filters the current list by artist, title or file name. Press
+  `/` to jump to it.
+- The library card at the top of the sidebar shows how many playlist tracks are
+  in your folder; the counts next to each list are live.
+- The **⋯** button at the bottom of the sidebar opens the playlist on
+  SoundCloud, rescans the music folder, exports the rekordbox XML, and adds or
+  removes libraries.
 
-**It's careful with your files.** Tag writes copy the audio bit for bit and
-verify it before replacing the file. Conversions back up the original first and
-verify the length afterwards; backups are never deleted. Moving a download is a
-real move, not a copy-and-forget. Keep your own backups anyway: it's your
-library.
+### More than one playlist
 
-**Where things live.** The packaged app keeps its data in the OS user-data
-folder (`~/Library/Application Support/DJ HQ` on macOS). Running from source
-uses the project folder. In there:
+Click **+ Add library** in the sidebar to link another folder to another
+playlist, and switch between libraries from the library name at the top. Each
+library keeps its own matches, edits and "new" marks.
 
-| | |
-| --- | --- |
-| `state.json` | libraries, playlist snapshots, manual matches, edits, "new" marks |
-| `originals/<library>/` | originals backed up before a conversion |
-| `originals/<library>/replaced/` | MP3s replaced by a lossless download |
-| `rekordbox.xml` | the last rekordbox export |
-
-**About SoundCloud.** There's no API key to set up: the app reads the same
-public endpoints the SoundCloud web player uses. That works today and may break
-whenever SoundCloud changes their site. Only public playlists work, and the app
-never writes to SoundCloud; adding a track to the playlist is something you do
-there, logged in as yourself.
-
-## When something looks off
+## Tips and troubleshooting
 
 - **A match is wrong.** Click the file name under the track and pick the right
-  file, or choose *No file*. The status pill lets you set have or missing by
+  file, or choose *No file*. The status pill lets you set Have or Missing by
   hand.
-- **No Free DL or Buy button.** The uploader set no purchase link and wrote
-  none in the description. The **⋯** menu still opens the track on SoundCloud.
+- **No Free DL or Buy button on a track.** The uploader set no purchase link
+  and wrote none in the description. The **⋯** menu still opens the track on
+  SoundCloud.
 - **Find on SoundCloud finds nothing.** Try shorter search text and drop the
-  remix part. Some edits simply aren't on SoundCloud.
+  remix part. Some edits simply aren't on SoundCloud; **⋯ → Search on
+  soundcloud.com** opens the site's own search.
 - **A download doesn't show up.** Zips and unfinished downloads are ignored:
   unzip, let it finish, then **Rescan**. A file whose name already exists in
   your folder counts as "already in your library".
@@ -214,8 +322,39 @@ there, logged in as yourself.
 - **"Couldn't load your library: operation not permitted" (macOS).** Give the
   app access to your music folder in System Settings → Privacy & Security →
   Files and Folders.
+- **macOS says the app is "damaged" and should go in the Bin.** That happens
+  when a download tool strips the app's signature. Download the DMG again with
+  Safari or Chrome. If it still says damaged, the one-time Terminal fix is
+  `xattr -cr "/Applications/DJ HQ.app"`.
 
-## For the curious
+## Your files and your data
+
+**DJ HQ is careful with your files.** Tag writes copy the audio bit for bit and
+verify it before replacing the file; on any doubt the original stays untouched.
+Conversions back up the original first and verify the length afterwards, and
+backups are never deleted. Moving a download is a real move, not a
+copy-and-forget. Keep your own backups anyway: it's your library.
+
+**Where things live.** The app keeps its data in the OS user-data folder,
+`~/Library/Application Support/DJ HQ` on macOS and `%APPDATA%\DJ HQ` on
+Windows. Running from source uses the project folder instead. In there:
+
+| | |
+| --- | --- |
+| `state.json` | libraries, playlist snapshots, manual matches, edits, "new" marks |
+| `originals/<library>/` | originals backed up before a conversion |
+| `originals/<library>/replaced/` | MP3s replaced by a lossless download |
+| `rekordbox.xml` | the last rekordbox export |
+
+**About SoundCloud.** There's no API key or login: the app reads the same
+public endpoints the SoundCloud web player uses. That works today and may break
+whenever SoundCloud changes their site. Only public playlists work, and the app
+never writes to SoundCloud; adding a track to the playlist is something you do
+there, logged in as yourself. The app fetches the playlist on launch, every
+15 minutes while the window is open, and when you press Refresh; a track search
+runs only when you use Find on SoundCloud or Find all.
+
+## Technical details
 
 ### Run from source
 
@@ -228,7 +367,7 @@ npm install
 npm start
 ```
 
-### Headless
+### Headless mode
 
 The same interface in your browser, without the Electron window:
 
@@ -239,7 +378,7 @@ npm run headless        # then open http://localhost:8765
 `DJHQ_PORT` and `DJHQ_DATA_DIR` override the port and the data folder.
 *Show in folder* and the native folder picker only exist in the desktop app.
 
-### Development
+### Project layout
 
 ```
 npm run build       # compile TypeScript to dist/
@@ -248,16 +387,19 @@ npm run headless    # build + serve the UI at http://localhost:8765
 npm run dist        # build installers locally into release/
 ```
 
-Where things are: `src/core.ts` (state, SoundCloud, matching, links, tagging,
-conversion, inbox, export), `src/server.ts` (HTTP API and static files),
-`src/main.ts` (Electron shell), `src/id3.ts` (ID3v2.3 / RIFF writer). The UI is
-plain HTML, CSS and JavaScript with no build step: `web/app.css` holds the
-design tokens and components for both themes, `web/app.js` the shell (sidebar,
-routing, menus, dialogs), and each page lives in `web/pages/`. File-mutating
-requests are queued and run one at a time.
+| Path | What it is |
+| --- | --- |
+| `src/core.ts` | state, SoundCloud access, matching, link classification, tagging, conversion, inbox, export |
+| `src/server.ts` | the HTTP API and the static UI files |
+| `src/main.ts` | the Electron shell |
+| `src/id3.ts` | ID3v2.3 / RIFF tag writer |
+| `web/app.css` | design tokens and components for the light and dark themes |
+| `web/app.js` | the UI shell: sidebar, routing, menus, dialogs |
+| `web/pages/` | one file per page |
+| `scripts/afterPack.js` | ad-hoc signs the macOS app after packaging |
 
-Releases are built by GitHub Actions: pushing a `v*` tag builds macOS, Windows
-and Linux installers and publishes them to the Releases page.
+The UI is plain HTML, CSS and JavaScript with no build step. File-mutating
+requests are queued and run one at a time.
 
 ### HTTP API
 
@@ -284,7 +426,14 @@ bodies are JSON.
 | `POST /api/export-xml` | | write `rekordbox.xml` (returns path and counts) |
 | `POST /api/reveal` · `/api/pick-folder` | `{path}` · | Electron only |
 
-## Out of scope (for now)
+### Releases
+
+Pushing a `v*` tag makes GitHub Actions build the installers on macOS (Apple
+Silicon and Intel), Windows and Linux and publish them to the Releases page.
+The macOS apps are ad-hoc signed; they aren't notarized, hence the one-time
+"Open Anyway" step above.
+
+### Out of scope
 
 Spotify and Apple Music playlists, private playlists (needs OAuth), writing to
 SoundCloud playlists, automated downloading through gates, and editing the
