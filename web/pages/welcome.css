@@ -1,0 +1,39 @@
+/* page-specific styles for pages/welcome.js (tokens and components come from app.css) */
+
+/* the welcome container must scroll on its own: body is overflow:hidden */
+.welcome { position: relative; height: 100vh; min-height: 0; align-items: flex-start; overflow-y: auto; }
+.welcome-box { margin: auto; padding: 28px 0; }
+html.mac-inset .wl-topbar { position: fixed; top: 0; left: 0; right: 0; height: 44px; -webkit-app-region: drag; z-index: 4; }
+.wl-theme { position: fixed; top: 14px; right: 16px; z-index: 5; -webkit-app-region: no-drag; }
+
+.welcome .welcome-mark { box-shadow: 0 10px 30px var(--accent-soft-2); }
+.welcome .lead { margin-bottom: 26px; }
+.welcome .card.wl-form { box-shadow: var(--shadow-2); }
+.wl-form .field + .field { margin-top: 16px; }
+.wl-form .fieldrow .btn { flex-shrink: 0; }
+.wl-submit { margin-top: 20px; }
+
+.wl-err { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--red); }
+.wl-err .ic { width: 13px; height: 13px; }
+.input.wl-invalid, .input.wl-invalid:focus { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
+
+.welcome .features { margin-top: 24px; gap: 14px; }
+.welcome .feat { gap: 4px; align-items: center; text-align: center; }
+.wl-feat-ico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--accent-soft); margin-bottom: 4px; }
+.wl-privacy { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 22px; font-size: 12px; color: var(--text-3); }
+.wl-privacy .ic { width: 13px; height: 13px; }
+
+/* "no playlist data yet" (inside the page body) */
+.wl-nodata { max-width: 620px; margin: 24px auto 0; }
+.wl-nodata .empty { padding: 36px 20px 20px; }
+.wl-nodata .empty p { max-width: 460px; }
+.wl-hints { display: flex; flex-direction: column; gap: 8px; margin: 10px auto 0; padding: 14px 16px; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--line); }
+.wl-hint { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; color: var(--text-2); }
+.wl-hint .ic { width: 15px; height: 15px; margin-top: 2px; color: var(--green); flex-shrink: 0; }
+.wl-hint b { color: var(--text); }
+.wl-path { font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+
+/* load error (inside the welcome container) */
+.wl-error .empty { padding: 20px 8px 10px; }
+.wl-errmsg { font-family: var(--mono); font-size: 12px; color: var(--text-2); word-break: break-word; }
+.wl-error .note { margin-top: 10px; }

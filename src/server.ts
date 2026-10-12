@@ -26,7 +26,13 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
     return r;
   }
 
-  const indexPath = path.join(__dirname, "..", "web", "index.html");
+  const webDir = path.join(__dirname, "..", "web");
+  const indexPath = path.join(webDir, "index.html");
+  const MIME: Record<string, string> = {
+    ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png",
+    ".woff2": "font/woff2", ".json": "application/json; charset=utf-8",
+  };
 
   const server = http.createServer((req, res) => {
     const send = (code: number, type: string, body: Buffer | string) => {
@@ -37,10 +43,18 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
       send(code, "application/json; charset=utf-8", JSON.stringify(obj));
 
     if (req.method === "GET") {
-      if (req.url === "/" || req.url === "/index.html")
+      if (req.url === "/" || req.url === "/index.html" || (req.url || "").startsWith("/?"))
         return send(200, "text/html; charset=utf-8", fs.readFileSync(indexPath));
       if (req.url === "/api/state")
         return void core.buildView().then(json, (e) => json({ error: e.message }, 500));
+      // static UI assets (web/app.css, web/app.js, web/pages/*.js)
+      const rel = decodeURIComponent((req.url || "/").split("?")[0]);
+      const file = path.normalize(path.join(webDir, rel));
+      const ext = path.extname(file).toLowerCase();
+      if (file.startsWith(webDir + path.sep) && MIME[ext] && fs.existsSync(file) && fs.statSync(file).isFile()) {
+        res.writeHead(200, { "Content-Type": MIME[ext], "Cache-Control": "no-cache" });
+        return res.end(fs.readFileSync(file));
+      }
       return send(404, "text/plain", "not found");
     }
 

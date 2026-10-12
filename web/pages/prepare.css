@@ -1,0 +1,34 @@
+/* page-specific styles for pages/prepare.js (tokens and components come from app.css) */
+
+/* target player card: icon · text · select, in one row */
+.pp-device { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.pp-device .pp-inline-icon { margin-bottom: 0; flex-shrink: 0; }
+.pp-device .pp-txt { flex: 1; min-width: 240px; }
+.pp-device .pp-txt p { margin-top: 3px; }
+.pp-device .pp-select { flex: 0 0 auto; min-width: 280px; }
+@media (max-width: 1000px) { .pp-device .pp-select { flex: 1 1 100%; } }
+
+/* the three action cards */
+.pp-cards .card { display: flex; flex-direction: column; min-height: 0; }
+.pp-cards .card p { flex: 1; }
+.pp-cards .card .card-acts { margin-top: 16px; }
+.pp-num { display: flex; align-items: center; min-height: 32px; margin: 6px 0 8px; }
+.pp-num .big { display: inline-flex; align-items: baseline; }
+
+/* files needing attention */
+.pp-table { margin-top: 0; }
+.pp-table .thead.pp-tr, .pp-table .tr.pp-tr { grid-template-columns: 40px minmax(0, 1fr) minmax(200px, auto) 48px; }
+.pp-fico {
+  width: 40px; height: 40px; border-radius: 7px; background: var(--surface-3); color: var(--text-3);
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.pp-issues { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-start; }
+@media (max-width: 980px) {
+  .pp-table .thead.pp-tr, .pp-table .tr.pp-tr { grid-template-columns: 40px minmax(0, 1fr) minmax(150px, auto) 48px; }
+}
+
+/* export dialog */
+.pp-steps-lead { margin-top: 14px; font-weight: 600; color: var(--text); }
+.dlg-body .path + .pp-steps-lead { margin-top: 14px; }
+.dlg-body .steps + p { margin-top: 12px; }
+

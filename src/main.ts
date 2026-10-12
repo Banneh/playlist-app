@@ -1,6 +1,6 @@
 /** DJ HQ — Electron entry point. Starts the local server on an ephemeral port
  *  and opens the UI in a window. External links open in the default browser. */
-import { app, BrowserWindow, dialog, shell } from "electron";
+import { app, BrowserWindow, dialog, nativeTheme, shell } from "electron";
 import * as path from "path";
 import { startServer } from "./server";
 
@@ -27,18 +27,22 @@ app.whenReady().then(async () => {
   });
   const port = (server.address() as any).port;
 
+  const mac = process.platform === "darwin";
   win = new BrowserWindow({
-    width: 1180,
-    height: 860,
-    minWidth: 760,
-    backgroundColor: "#0d0f14",
+    width: 1240,
+    height: 840,
+    minWidth: 900,
+    minHeight: 600,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#0f1116" : "#f4f5f7",
     title: "DJ HQ",
+    // macOS: the window chrome blends into the sidebar (traffic lights over it)
+    ...(mac ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 16, y: 18 } } : {}),
   });
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };
   });
-  win.loadURL(`http://127.0.0.1:${port}`);
+  win.loadURL(`http://127.0.0.1:${port}/${mac ? "?titlebar=inset" : ""}`);
   win.on("closed", () => { win = null; });
 });
 

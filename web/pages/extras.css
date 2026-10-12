@@ -1,0 +1,23 @@
+/* page-specific styles for pages/extras.js (tokens and components come from app.css) */
+
+/* row grid: (blank) · file · length · action · more */
+.thead.ex-head, .tr.ex-row { grid-template-columns: 30px minmax(0, 1fr) 48px 176px 30px; }
+.ex-row .cell .btn { width: 100%; }
+
+/* "No artist yet — add one" */
+.ex-noartist { display: inline-flex; align-items: center; gap: 5px; color: var(--text-3); cursor: pointer; }
+.ex-noartist .ic { width: 12px; height: 12px; }
+.ex-noartist:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+
+/* found-on-SoundCloud line */
+.ex-found .ic { color: var(--accent-text); }
+.ex-found .ex-dur { color: var(--text-3); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+/* find dialog */
+.ex-find .search { flex: 1; width: auto; }
+.ex-wait { padding: 28px 20px; flex-direction: row; gap: 8px; font-size: 13px; }
+
+@media (max-width: 980px) {
+  .thead.ex-head, .tr.ex-row { grid-template-columns: minmax(0, 1fr) 48px 176px 30px; }
+  .ex-head .num, .ex-row .num { display: none; }
+}
