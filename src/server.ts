@@ -28,6 +28,12 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
     return r;
   }
 
+  // UI preferences (theme, "tour seen", dismissed update) live next to state.json: the
+  // window's origin changes with the port, so browser storage would forget them.
+  const prefsPath = path.join(opts.dataDir, "prefs.json");
+  const readPrefs = (): Record<string, unknown> => {
+    try { return JSON.parse(fs.readFileSync(prefsPath, "utf8")); } catch { return {}; }
+  };
   const webDir = path.join(__dirname, "..", "web");
   const indexPath = path.join(webDir, "index.html");
   const MIME: Record<string, string> = {
@@ -49,6 +55,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         return send(200, "text/html; charset=utf-8", fs.readFileSync(indexPath));
       if (req.url === "/api/state")
         return void core.buildView().then(json, (e) => json({ error: e.message }, 500));
+      if (req.url === "/api/prefs") return json(readPrefs());
       if (req.url === "/api/app") {
         let version = "";
         try { version = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || ""; } catch {}
@@ -73,6 +80,11 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         try { data = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"); } catch {}
         const route = (fn: () => Promise<any>) =>
           enqueue(fn).then(json, (e) => json({ error: e.message }, 500));
+        if (req.url === "/api/prefs") {   // not queued: must not wait behind a long tag/convert run
+          const next = { ...readPrefs(), ...(data && typeof data === "object" ? data : {}) };
+          try { fs.writeFileSync(prefsPath, JSON.stringify(next, null, 2)); } catch (e: any) { return json({ error: e.message }, 500); }
+          return json(next);
+        }
         switch (req.url) {
           case "/api/refresh":  return route(() => core.refresh());
           case "/api/rescan":   return route(() => core.buildView());

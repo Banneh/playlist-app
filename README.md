@@ -193,7 +193,9 @@ needs attention:
 | **Matched by hand** | You picked this file yourself. |
 
 The **Needs attention** and **Lossless available** chips above the list show
-only those tracks.
+only those tracks. While any file still needs tags, a notice above the playlist
+lists how many and offers **Write tags** right there, so you don't have to go
+to Prepare for player for that.
 
 **To fix a wrong match**
 

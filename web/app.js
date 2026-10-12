@@ -250,10 +250,22 @@ function uiConfirm({ title, body, ok = 'OK', danger = false, icon: ico }) {
   }).then(v => !!v);
 }
 
+/* ---------- preferences ----------
+   Stored by the app (data folder / prefs.json), not by the browser: the window's origin
+   includes the port, which changes on every launch, so localStorage forgets everything. */
+let PREFS = {};
+async function loadPrefs() {
+  try { PREFS = (await (await fetch('/api/prefs')).json()) || {}; } catch { PREFS = {}; }
+}
+function setPref(key, value) {
+  PREFS[key] = value;
+  fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [key]: value }) }).catch(() => {});
+}
+
 /* ---------- theme ---------- */
 const THEME_KEY = 'djhq-theme';
 let THEME = 'system';
-try { THEME = localStorage.getItem(THEME_KEY) || 'system'; } catch {}
+try { THEME = localStorage.getItem(THEME_KEY) || 'system'; } catch {}   // instant, before prefs arrive
 function applyTheme() {
   const root = document.documentElement;
   if (THEME === 'light' || THEME === 'dark') root.setAttribute('data-theme', THEME);
@@ -261,6 +273,7 @@ function applyTheme() {
 }
 function setTheme(v) {
   THEME = v; try { localStorage.setItem(THEME_KEY, v); } catch {}
+  setPref('theme', v);
   applyTheme(); renderSidebarFoot();
 }
 
@@ -409,7 +422,7 @@ function libraryMenu(anchor) {
 /* ---------- updates: a daily look at the latest GitHub release ---------- */
 let APP = { version: '', platform: '', arch: '', packaged: false };
 let UPDATE = null;   // { version, url, page, asset } once a newer release is known
-const UPD_KEY = 'djhq-update-dismissed';
+const UPD_KEY = 'updateDismissed';
 const RELEASES_API = 'https://api.github.com/repos/Banneh/playlist-app/releases/latest';
 function verNewer(a, b) {
   const x = String(a).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
@@ -446,7 +459,7 @@ async function checkForUpdates({ manual = false } = {}) {
 }
 function renderUpdate(force) {
   const box = $('#sb-update'); if (!box) return;
-  let dismissed = ''; try { dismissed = localStorage.getItem(UPD_KEY) || ''; } catch {}
+  const dismissed = PREFS[UPD_KEY] || '';
   if (!UPDATE || (!force && dismissed === UPDATE.version)) { box.hidden = true; return; }
   const direct = APP.packaged && UPDATE.asset;
   box.hidden = false;
@@ -456,7 +469,7 @@ function renderUpdate(force) {
     <a class="btn btn-primary btn-sm btn-block" href="${esc(UPDATE.url)}" target="_blank" rel="noopener" title="${esc(UPDATE.asset || UPDATE.page)}">${icon('download')}${direct ? 'Download ' + esc(UPDATE.version) : 'Open release page'}</a>`;
 }
 function dismissUpdate() {
-  if (UPDATE) { try { localStorage.setItem(UPD_KEY, UPDATE.version); } catch {} }
+  if (UPDATE) setPref(UPD_KEY, UPDATE.version);
   const box = $('#sb-update'); if (box) box.hidden = true;
 }
 
@@ -476,6 +489,8 @@ function copyText(text, msg) {
 /* ---------- boot ---------- */
 async function boot() {
   applyTheme();
+  await loadPrefs();
+  if (PREFS.theme && PREFS.theme !== THEME) { THEME = PREFS.theme; try { localStorage.setItem(THEME_KEY, THEME); } catch {} applyTheme(); }
   if (/[?&]titlebar=inset/.test(location.search)) document.documentElement.classList.add('mac-inset');
   $('#q').oninput = e => { Q = e.target.value; render(); };
   $('#btn-refresh').onclick = manualRefresh;

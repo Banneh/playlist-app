@@ -180,6 +180,26 @@ function copyLinks() {
   copyText(rows.map(t => `${t.artist} – ${t.title}\t${t.links[0].url}`).join('\n'), `Copied ${plural(rows.length, 'link')}`);
 }
 
+/* ---------- "files still need tags" notice + one-click tagging from the playlist pages ---------- */
+function tagNote() {
+  const n = DATA.untagged || 0;
+  if (!n) return '';
+  return noteHtml(`<b>${plural(n, 'file')}</b> in your folder still ${n === 1 ? 'needs' : 'need'} artist and title tags. rekordbox shows ${n === 1 ? 'it' : 'them'} blank until then.`,
+    `<button class="btn btn-sm btn-primary" onclick="tagFromList(this)" title="Write artist / title into the untagged files">${icon('tag')}Write tags ${badge(n)}</button>
+     <button class="btn btn-sm btn-ghost" onclick="HFILTER='attention';go('have')" title="List the files that need attention">Show them</button>`,
+    'amber', 'tag');
+}
+async function tagFromList(btn) {
+  if (btn) { btn.disabled = true; btn.innerHTML = spin('Writing tags…'); }
+  try {
+    DATA = await api('/api/tag', {});
+    const r = DATA.tag_report || {}, errs = r.errors || [];
+    toast(errs.length ? `Tagged ${r.done || 0}, ${plural(errs.length, 'file')} failed: ${errs[0]}`
+                      : `Tagged ${plural(r.done || 0, 'file')} — rekordbox will show the right names`, !!errs.length);
+  } catch (e) { toast('Error: ' + e.message, true); }
+  render();
+}
+
 /* ---------- list helpers ---------- */
 const THEAD = `<div class="thead"><span class="num">#</span><span></span><span>Track</span><span class="r">Length</span><span>Status</span><span class="c">Get it</span><span></span></div>`;
 function trackTable(rows, emptyOpts) {
@@ -215,7 +235,7 @@ PAGES.missing = {
     const empty = q || MFILTER !== 'all'
       ? { ico: 'search', title: 'No tracks match', text: q ? 'Try a different search.' : 'Nothing in this filter.' }
       : { ico: 'checkCircle', kind: 'green', title: 'Nothing missing', text: 'Every track in the playlist is in your music folder.' };
-    return trackTable(rows, empty) + (na.length ? `
+    return tagNote() + trackTable(rows, empty) + (na.length ? `
       <div class="section">Not available right now ${badge(na.length)}<span class="hint">· back in Missing automatically when a link appears</span></div>
       <div class="table">${na.map(trackRow).join('')}</div>` : '');
   },
@@ -237,7 +257,7 @@ PAGES.have = {
     let rows = DATA.tracks.filter(t => t.have && matchesQ(t, q));
     rows = rows.filter(t => HFILTER === 'all' || (HFILTER === 'upgrade' ? t.upgrade : (t.tagged === false || t.incompat)));
     LAST_ROWS = rows;
-    return trackTable(rows, q || HFILTER !== 'all'
+    return tagNote() + trackTable(rows, q || HFILTER !== 'all'
       ? { ico: 'search', title: 'No tracks match', text: q ? 'Try a different search.' : 'Nothing in this filter.' }
       : { ico: 'folder', title: 'No matched files yet', text: 'Files in your music folder that match a playlist track show up here.' });
   },
@@ -249,7 +269,7 @@ PAGES.all = {
   body: q => {
     const rows = DATA.tracks.filter(t => matchesQ(t, q));
     LAST_ROWS = rows;
-    return trackTable(rows, { ico: 'search', title: 'No tracks match', text: 'Try a different search.' });
+    return tagNote() + trackTable(rows, { ico: 'search', title: 'No tracks match', text: 'Try a different search.' });
   },
 };
 

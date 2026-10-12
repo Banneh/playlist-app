@@ -4,7 +4,7 @@
    Globals used by app.js: TOUR (truthy while running, so auto-refresh waits),
    startTour(), maybeStartTour(). */
 
-const TOUR_KEY = 'djhq-tour-done';
+const TOUR_KEY = 'tourDone';
 let TOUR = null;
 
 /* Each step may switch pages first (page), then spotlights `target`; if that element
@@ -33,9 +33,7 @@ const TOUR_STEPS = () => [
 
 function maybeStartTour() {
   if (TOUR || !DATA || !DATA.ready || !(DATA.libraries || []).length) return;
-  let done = false;
-  try { done = !!localStorage.getItem(TOUR_KEY); } catch {}
-  if (!done) startTour({ intro: true });
+  if (!PREFS[TOUR_KEY]) startTour({ intro: true });
 }
 
 function startTour({ intro = false } = {}) {
@@ -64,7 +62,7 @@ function endTour() {
   window.removeEventListener('resize', t.onResize);
   t.root.classList.add('out');
   setTimeout(() => t.root.remove(), 180);
-  try { localStorage.setItem(TOUR_KEY, '1'); } catch {}
+  setPref(TOUR_KEY, true);
 }
 function tourNext() {
   if (!TOUR) return;
