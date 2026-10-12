@@ -130,7 +130,7 @@ async function api(path, body) {
     return j;
   } finally { INFLIGHT--; }
 }
-const busy = () => INFLIGHT > 0 || EDIT_ID !== null || !!document.querySelector('.overlay');
+const busy = () => INFLIGHT > 0 || EDIT_ID !== null || !!document.querySelector('.overlay') || (typeof TOUR !== 'undefined' && !!TOUR);
 
 /* ---------- playlist refresh: on launch, every 15 min while visible, on demand ---------- */
 function setStatus(text, isErr) {
@@ -365,6 +365,7 @@ async function addLibrary(dir, url) {
     DATA = await api('/api/library', { op: 'add', dir, url });
     LAST_OK = Date.now(); LAST_ERR = ''; PAGE = 'missing'; render();
     setStatus('Playlist checked ' + fmtTime(LAST_OK));
+    if (typeof maybeStartTour === 'function') setTimeout(maybeStartTour, 400);
     if (typeof loadInbox === 'function') loadInbox();
     toast('Library added');
     return true;
@@ -395,6 +396,8 @@ function libraryMenu(anchor) {
     { label: 'Open playlist on SoundCloud', icon: 'external', disabled: !DATA.playlist_url, onclick: () => window.open(DATA.playlist_url, '_blank', 'noopener') },
     { label: 'Rescan music folder', icon: 'folder', onclick: rescanFolder },
     { label: 'Export rekordbox XML…', icon: 'upload', onclick: () => typeof exportXml === 'function' ? exportXml() : go('prepare') },
+    '-',
+    { label: 'Show me around', icon: 'sparkles', hint: 'A one-minute tour of the app', onclick: () => typeof startTour === 'function' && startTour() },
     '-',
     { label: 'Add another library…', icon: 'plus', onclick: () => typeof uiAddLibrary === 'function' && uiAddLibrary() },
     { label: 'Remove this library…', icon: 'trash', danger: true, onclick: removeLibrary },
@@ -437,6 +440,7 @@ async function boot() {
     DATA = await api('/api/state');
     render();
     if (typeof loadInbox === 'function' && (DATA.libraries || []).length) loadInbox();
+    if (typeof maybeStartTour === 'function') setTimeout(maybeStartTour, 600);
     await refreshPlaylist({ manual: !DATA.ready });   // first run with no snapshot: report errors loudly
     setInterval(() => refreshPlaylist(), AUTO_REFRESH_MS);
     document.addEventListener('visibilitychange', () => {

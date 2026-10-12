@@ -556,3 +556,34 @@ html.mac-inset .page-head { padding-top: 30px; }
   .page-head { padding-left: 22px; padding-right: 22px; }
   .page-body { padding-left: 22px; padding-right: 22px; }
 }
+
+/* ---------- guided tour (web/tour.js) ---------- */
+.tour { position: fixed; inset: 0; z-index: 100; animation: tour-in .2s; }
+.tour.out { opacity: 0; transition: opacity .18s; }
+@keyframes tour-in { from { opacity: 0; } }
+.tour-spot {
+  position: absolute; border-radius: 12px; pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(10, 12, 18, .55), 0 0 0 2px var(--accent-soft-2);
+  transition: left .28s cubic-bezier(.4,0,.2,1), top .28s cubic-bezier(.4,0,.2,1), width .28s cubic-bezier(.4,0,.2,1), height .28s cubic-bezier(.4,0,.2,1);
+}
+:root[data-theme="dark"] .tour-spot, :root:not([data-theme="light"]) .tour-spot { box-shadow: 0 0 0 9999px rgba(0, 0, 0, .66), 0 0 0 2px var(--accent-soft-2); }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .tour-spot { box-shadow: 0 0 0 9999px rgba(10, 12, 18, .55), 0 0 0 2px var(--accent-soft-2); } }
+.tour-card {
+  position: absolute; width: 330px; max-width: calc(100vw - 32px); padding: 16px 18px 14px;
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow-3);
+  transition: left .28s cubic-bezier(.4,0,.2,1), top .28s cubic-bezier(.4,0,.2,1);
+}
+.tour-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.tour-step { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-text); }
+.tour-dots { display: flex; gap: 4px; }
+.tour-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--surface-3); }
+.tour-dots i.on { background: var(--accent); }
+.tour-card h4 { font-size: 15px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 5px; }
+.tour-card p { font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.tour-acts { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.tour-card.intro { width: 400px; text-align: center; padding: 28px 26px 24px; }
+.tour-card.intro .brand-mark { width: 48px; height: 48px; border-radius: 14px; margin: 0 auto 14px; }
+.tour-card.intro .brand-mark .ic { width: 24px; height: 24px; }
+.tour-card.intro h4 { font-size: 19px; }
+.tour-card.intro p { font-size: 13.5px; }
+.tour-card.intro .tour-acts { justify-content: center; margin-top: 18px; }

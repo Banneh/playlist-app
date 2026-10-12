@@ -123,6 +123,12 @@ DJ HQ fetches the playlist, scans the folder and matches files to tracks. That
 takes a few seconds for a few hundred tracks. You land on the **Missing** list,
 and the sidebar shows how much of the playlist is already in your folder.
 
+The first time, DJ HQ offers a one-minute tour that points out what each list
+is for. Take it or click **Not now**; you can replay it any time from the **⋯**
+menu at the bottom of the sidebar (**Show me around**).
+
+![The tour: a short card explains each part of the app while the rest is dimmed](docs/screens/tour.png)
+
 > [!NOTE]
 > Nothing is renamed, moved or rewritten at this point. DJ HQ only reads your
 > folder until you ask it to write tags, convert a file or move a download.
@@ -288,8 +294,8 @@ need tags or conversion before they're ready for the booth.
 - The library card at the top of the sidebar shows how many playlist tracks are
   in your folder; the counts next to each list are live.
 - The **⋯** button at the bottom of the sidebar opens the playlist on
-  SoundCloud, rescans the music folder, exports the rekordbox XML, and adds or
-  removes libraries.
+  SoundCloud, rescans the music folder, exports the rekordbox XML, replays the
+  tour, and adds or removes libraries.
 
 ### More than one playlist
 
@@ -396,6 +402,7 @@ npm run dist        # build installers locally into release/
 | `web/app.css` | design tokens and components for the light and dark themes |
 | `web/app.js` | the UI shell: sidebar, routing, menus, dialogs |
 | `web/pages/` | one file per page |
+| `web/tour.js` | the guided tour |
 | `scripts/afterPack.js` | ad-hoc signs the macOS app after packaging |
 
 The UI is plain HTML, CSS and JavaScript with no build step. File-mutating
