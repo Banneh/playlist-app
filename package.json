@@ -1,7 +1,7 @@
 {
   "name": "dj-hq",
   "productName": "DJ HQ",
-  "version": "1.4.0",
+  "version": "1.5.0-beta.1",
   "description": "Local playlist reconciliation, rekordbox tagging and player-compat conversion for DJs",
   "main": "dist/main.js",
   "license": "MIT",
