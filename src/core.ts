@@ -445,8 +445,8 @@ export async function scSetInPlaylist(token: string, url: string, add: boolean):
     const pl = await scResolve(lib.url);
     const ids: number[] = (pl.tracks || []).map((x: any) => Number(x.id)).filter((n: number) => n > 0);
     const next = add ? (ids.includes(tid) ? ids : [...ids, tid]) : ids.filter((n) => n !== tid);
-    if (next.length !== ids.length)
-      await scFetch("PUT", `playlists/${pl.id}`, token, { playlist: { tracks: next.map((id) => ({ id })) } });
+    if (next.length !== ids.length)   // the web player's own shape: plain ids, whole list
+      await scFetch("PUT", `playlists/${pl.id}`, token, { playlist: { tracks: next } });
     resolveCache.delete(lib.url.split(/[?#]/)[0].replace(/\/+$/, ""));
   }
   // patch the snapshot: likes list newest first, playlists in order of adding
