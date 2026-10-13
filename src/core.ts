@@ -93,6 +93,9 @@ export interface AppState {
   edits: Record<string, { artist: string; title: string }>;
   /** manual file assignment: track id -> file name ("" = forced no file) */
   assigned: Record<string, string>;
+  /** track ids whose assigned entry the user picked in the match dialog (the others come from
+   *  a download moved in or a found file): only these show "Matched by hand" */
+  by_hand: Record<string, true>;
   /** SoundCloud track picked for a local file that isn't in the playlist, keyed "x:" + path */
   found: Record<string, Found>;
   /** "not available now": track id -> the links it had when marked; cleared when they change */
@@ -128,6 +131,7 @@ function loadState(): AppState {
   try {
     const st = JSON.parse(fs.readFileSync(statePath(), "utf8"));
     st.assigned = st.assigned || {}; // older state files predate manual matching
+    st.by_hand = st.by_hand || {};
     st.found = st.found || {};
     st.na = st.na || {};
     st.acquired = st.acquired || {};
@@ -136,7 +140,7 @@ function loadState(): AppState {
     return st;
   } catch {
     return { libraries: [], active: null, dur_cache: {}, overrides: {},
-             edits: {}, assigned: {}, found: {}, na: {}, acquired: {}, client_id: null, device: "xdj-700" };
+             edits: {}, assigned: {}, by_hand: {}, found: {}, na: {}, acquired: {}, client_id: null, device: "xdj-700" };
   }
 }
 export function saveState(): void {
@@ -1081,10 +1085,11 @@ export async function buildView(libArg?: Library): Promise<any> {
   for (const k of Object.keys(STATE.assigned)) {
     const fname = STATE.assigned[k];
     if (!trackIds.has(Number(k)) || (fname !== "" && !fmap.has(fname))) {
-      delete STATE.assigned[k];
+      delete STATE.assigned[k]; delete STATE.by_hand[k];
       assignedDirty = true;
     }
   }
+  for (const k of Object.keys(STATE.by_hand)) if (!(k in STATE.assigned)) { delete STATE.by_hand[k]; assignedDirty = true; }
   // local files whose SoundCloud match has since been added to the playlist:
   // pin the file to that track (unless the track already has a manual file)
   const foundPrefixes = libDirs(lib).map((d) => "x:" + d + path.sep);
@@ -1096,7 +1101,7 @@ export async function buildView(libArg?: Library): Promise<any> {
     const tid = String(STATE.found[k].id);
     if (!trackIds.has(Number(tid))) continue;
     if (!STATE.assigned[tid] || !fmap.has(STATE.assigned[tid])) {
-      for (const a of Object.keys(STATE.assigned)) if (STATE.assigned[a] === fname) delete STATE.assigned[a];
+      for (const a of Object.keys(STATE.assigned)) if (STATE.assigned[a] === fname) { delete STATE.assigned[a]; delete STATE.by_hand[a]; }
       STATE.assigned[tid] = fname;
       delete STATE.overrides[tid];
     }
@@ -1169,7 +1174,7 @@ export async function buildView(libArg?: Library): Promise<any> {
              dur: fmtDur(t.dur), url: t.url, art: t.art,
              have, na, auto: !!m, file: m ? m[0] : null, path: m ? fmap.get(m[0])!.path : null,
              score: m && m[1] >= 0 ? Math.min(1, m[1]) : null,
-             manual_match: manual.has(t.id), links, lossy, upgrade,
+             pinned: manual.has(t.id), manual_match: manual.has(t.id) && !!STATE.by_hand[t.id], links, lossy, upgrade,
              added: t.added || 0, is_new: (t.added || 0) > (lib.seen_mark || 0),
              acquired, is_new_file: acquired > (lib.seen_mark || 0),
              tagged, incompat, override: o || null, edited: !!ed };
@@ -1425,12 +1430,13 @@ export async function setAssign(data: any): Promise<any> {
   const tid = String(data.id);
   const file = data.file;
   if (file === null || file === undefined) {
-    delete STATE.assigned[tid];
+    delete STATE.assigned[tid]; delete STATE.by_hand[tid];
   } else {
     if (file) // a file belongs to at most one track
       for (const k of Object.keys(STATE.assigned))
-        if (k !== tid && STATE.assigned[k] === file) delete STATE.assigned[k];
+        if (k !== tid && STATE.assigned[k] === file) { delete STATE.assigned[k]; delete STATE.by_hand[k]; }
     STATE.assigned[tid] = file;
+    STATE.by_hand[tid] = true;
     delete STATE.overrides[tid]; // explicit assignment supersedes a have/missing override
     delete STATE.na[tid];
   }
@@ -1781,8 +1787,9 @@ export async function inboxMove(data: any): Promise<any> {
     if (staged) try { fs.unlinkSync(staged); } catch {}
     throw e;
   }
-  for (const a of Object.keys(STATE.assigned)) if (STATE.assigned[a] === name) delete STATE.assigned[a];
-  STATE.assigned[tid] = name;
+  for (const a of Object.keys(STATE.assigned)) if (STATE.assigned[a] === name) { delete STATE.assigned[a]; delete STATE.by_hand[a]; }
+  STATE.assigned[tid] = name;   // pinned to the track, but not "by hand": the download is the file for it
+  delete STATE.by_hand[tid];
   delete STATE.overrides[tid];
   delete STATE.na[tid];
   saveState();
