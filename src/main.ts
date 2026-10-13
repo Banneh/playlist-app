@@ -32,10 +32,13 @@ function scEnsure(): WebContentsView {
   const v = new WebContentsView({ webPreferences: { partition: SC_PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true } });
   v.setBackgroundColor("#ffffff");
   const wc = v.webContents;
-  // links out of SoundCloud (shops, download gates) go to the default browser; sign-in popups may open
+  // sign-in buttons (Google, Apple, Facebook) open a popup window that must really open,
+  // in the same session; links out of SoundCloud (shops, download gates) go to the default browser
   wc.setWindowOpenHandler(({ url }) => {
-    if (inView(url) && !/^https?:\/\/(www\.|m\.)?soundcloud\.com\//.test(url)) return { action: "allow" };
-    if (inView(url)) wc.loadURL(url); else shell.openExternal(url);
+    if (!url || url === "about:blank" || inView(url))
+      return { action: "allow", overrideBrowserWindowOptions: { width: 520, height: 720, autoHideMenuBar: true, title: "Sign in",
+               webPreferences: { partition: SC_PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true } } };
+    shell.openExternal(url);
     return { action: "deny" };
   });
   wc.on("will-navigate", (e, url) => { if (!inView(url)) { e.preventDefault(); shell.openExternal(url); } });
