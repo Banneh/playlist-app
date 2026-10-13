@@ -14,7 +14,8 @@
     "build": "tsc",
     "start": "npm run build && electron .",
     "headless": "npm run build && node dist/server.js",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run build && electron-builder",
+    "screens": "npm run build && electron scripts/screenshots.js"
   },
   "build": {
     "appId": "com.djhq.app",

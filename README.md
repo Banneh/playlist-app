@@ -343,7 +343,7 @@ artwork and a play button.
 
 ### Settings
 
-![Settings: library, downloads folder, auto-move, refresh interval, appearance, backups](docs/screens/settings.png)
+![Settings: the library's folders, the downloads folder, auto-move, refresh interval, appearance, backups](docs/screens/settings.png)
 
 The gear at the bottom of the sidebar. From top to bottom: the library (its
 folders, playlist, remove), the Downloads folder DJ HQ watches and the switch
@@ -480,9 +480,15 @@ npm run dist        # build installers locally into release/
 | `web/player.js` | the preview player |
 | `src/zip.ts` | minimal zip reader for Bandcamp downloads |
 | `scripts/afterPack.js` | ad-hoc signs the macOS app after packaging |
+| `scripts/screenshots.js` | regenerates the README screenshots from sample data (`npm run screens`) |
 
 The UI is plain HTML, CSS and JavaScript with no build step. File-mutating
 requests are queued and run one at a time.
+
+The screenshots in this README come from `npm run screens`: it builds a
+throw-away home folder with a sample library (real audio files, made-up
+artists), runs the app against it and captures every screen, so nobody's
+actual collection ends up in the pictures.
 
 ### HTTP API
 
