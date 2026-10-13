@@ -2,6 +2,8 @@
 
 **Keep your music folder in sync with a SoundCloud playlist, and get your tracks ready for rekordbox and the club.**
 
+**[Download page →](https://banneh.github.io/dj-hq-site/)** picks the right installer for your computer and walks you through the first start.
+
 ![DJ HQ showing the Missing list: every track you still need, with its download or shop link](docs/screens/missing-light.png)
 
 DJ HQ is a free desktop app for DJs who collect music through SoundCloud
@@ -84,8 +86,9 @@ and needs no login.
 
 ### Download
 
-Get the latest build from the
-[Releases page](https://github.com/Banneh/playlist-app/releases):
+The easiest way is the [download page](https://banneh.github.io/dj-hq-site/):
+it detects your computer and offers the matching file. Or get the latest build
+from the [Releases page](https://github.com/Banneh/playlist-app/releases):
 
 | Your computer | File to download |
 | --- | --- |
