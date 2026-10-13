@@ -145,7 +145,7 @@ function openAssign(id) {
     sub: `<b>${esc(t.artist ? t.artist + ' – ' : '')}${esc(t.title)}</b> · ${esc(t.dur)} on SoundCloud. Likely files are listed first.`,
     body: `<div class="search" style="width:100%"><span>${icon('search')}</span><input id="af-q" type="search" placeholder="Filter files…" spellcheck="false"></div>
            <div class="optlist" id="af-list" style="margin-top:10px"></div>`,
-    foot: `${t.manual_match ? `<button class="btn btn-ghost" data-a="auto" title="Forget the manual choice and auto-match again">${icon('wand')}Auto-match</button>` : ''}
+    foot: `${t.pinned || t.manual_match ? `<button class="btn btn-ghost" data-a="auto" title="Forget the pinned choice and auto-match again">${icon('wand')}Auto-match</button>` : ''}
            ${t.file || t.manual_match ? `<button class="btn btn-ghost" data-a="none" title="Mark this track as having no local file">${icon('xCircle')}No file</button>` : ''}
            <span class="spacer"></span><button class="btn" data-close>Cancel</button>`,
     open(dlg, done) {
