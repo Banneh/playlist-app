@@ -60,7 +60,7 @@ PAGES.prepare = {
         <div class="card">
           <div class="card-icon">${icon('tag')}</div>
           <h3>Tags</h3>
-          <div class="pp-num">${n ? `<span class="big">${n}<small>${n === 1 ? 'file needs' : 'files need'} tags</small></span>` : tag('All files tagged', 'ok', 'check')}</div>
+          <div class="pp-num">${n ? `<button class="big link" onclick="HFILTER='tags';go('have')" title="Show these files on the Have page">${n}<small>${n === 1 ? 'file needs' : 'files need'} tags</small></button>` : tag('All files tagged', 'ok', 'check')}</div>
           <p>Artist and title are written into each file — that’s what rekordbox shows as the track names.</p>
           <div class="card-acts">
             <button class="btn ${n ? 'btn-primary' : ''}" id="pp-tag" onclick="ppTag()" ${n ? '' : 'disabled'} title="${n ? 'Write artist / title into the untagged files' : 'Every file is already tagged'}">${icon('tag')}Write tags${n ? ` ${badge(n)}` : ''}</button>
@@ -69,7 +69,7 @@ PAGES.prepare = {
         <div class="card">
           <div class="card-icon amber">${icon('sliders')}</div>
           <h3>Player compatibility</h3>
-          <div class="pp-num">${c ? `<span class="big">${c}<small>${c === 1 ? 'file' : 'files'} to convert</small></span>` : tag('Ready for this player', 'ok', 'check')}</div>
+          <div class="pp-num">${c ? `<button class="big link" onclick="HFILTER='convert';go('have')" title="Show these files on the Have page">${c}<small>${c === 1 ? 'file' : 'files'} to convert</small></button>` : tag('Ready for this player', 'ok', 'check')}</div>
           <p>${c ? `${c === 1 ? 'This file won’t' : 'These files won’t'} play on ${esc(dev.label)} as ${c === 1 ? 'it is' : 'they are'}. ` : ''}Converting keeps the same file name and length, so rekordbox keeps cues and beat grids. The originals are backed up first.</p>
           <div class="card-acts">
             <button class="btn ${c ? 'btn-primary' : ''}" id="pp-convert" onclick="ppConvert()" ${c ? '' : 'disabled'} title="${c ? 'Convert the incompatible files in place' : 'Every file is compatible with the selected player'}">${icon('sliders')}Convert${c ? ` ${badge(c)}` : ''}</button>

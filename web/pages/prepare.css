@@ -14,6 +14,10 @@
 .pp-cards .card .card-acts { margin-top: 16px; }
 .pp-num { display: flex; align-items: center; min-height: 32px; margin: 6px 0 8px; }
 .pp-num .big { display: inline-flex; align-items: baseline; }
+.pp-num button.big { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; border-radius: var(--r-sm); }
+.pp-num button.big:hover { color: var(--accent-text); }
+.pp-num button.big:hover small { text-decoration: underline; text-underline-offset: 3px; }
+.pp-num button.big:focus-visible { outline: none; box-shadow: var(--ring); }
 
 /* files needing attention */
 .pp-table { margin-top: 0; }
