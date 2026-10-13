@@ -174,6 +174,14 @@ function dcOpen(url, play) {
 }
 /** Settings → "Open SoundCloud links": on Discover (the default in the desktop app) or in the browser */
 const scInApp = () => !!APP.sc && !(DATA && DATA.settings && DATA.settings.sc_open === 'browser');
+/** the small button next to a title that does the opposite of the cover: open in the browser
+ *  when covers play on Discover, play on Discover when covers go to the browser (desktop app only) */
+function titleLink(url) {
+  if (!APP.sc) return '';
+  return scInApp()
+    ? `<button class="tl" onclick="window.open('${esc(url)}','_blank','noopener')" title="Open in your browser" aria-label="Open in your browser">${icon('external')}</button>`
+    : `<button class="tl" onclick="dcOpen('${esc(url)}', true)" title="Play on Discover" aria-label="Play on Discover">${icon('play')}</button>`;
+}
 /** open a SoundCloud link where the user wants them: Discover (playing the track when asked) or the browser */
 function scOpen(url, play) {
   if (scInApp()) return dcOpen(url, play);

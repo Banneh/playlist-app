@@ -44,7 +44,7 @@ function lkRow(t) {
       <span class="num">${t.n}</span>
       ${artHtml(t)}
       <div class="t-meta">
-        <div class="t-title"><span title="${esc(t.title)}">${esc(t.title)}</span>${inPl}</div>
+        <div class="t-title"><span title="${esc(t.title)}">${esc(t.title)}</span>${titleLink(t.url)}${inPl}</div>
         <div class="t-sub">${esc(t.artist)}${t.user && t.user !== t.artist ? ` <span class="via">· via ${esc(t.user)}</span>` : ''}</div>
         ${lkHaveLine(t)}
       </div>

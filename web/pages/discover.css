@@ -1,5 +1,11 @@
 /* page-specific styles for pages/discover.js (tokens and components come from app.css) */
 
+/* the hover button next to a track title (titleLink in discover.js) */
+.t-title .tl { flex-shrink: 0; width: 22px; height: 22px; padding: 0; border: 0; background: transparent; border-radius: 6px; display: grid; place-items: center; color: var(--text-3); opacity: 0; transition: opacity .12s, background .12s; }
+.t-title .tl .ic { width: 13px; height: 13px; }
+.tr:hover .t-title .tl, .t-title .tl:focus-visible { opacity: 1; }
+.t-title .tl:hover { background: var(--surface-3); color: var(--text); }
+
 /* the page fills the main area: bar on top, the native SoundCloud view over the frame */
 .page-body.dc-host { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 24px; }
 body.has-player .page-body.dc-host { padding-bottom: 92px; }

@@ -59,7 +59,7 @@ function trackRow(t) {
       <span class="num">${t.n}</span>
       ${artHtml(t)}
       <div class="t-meta">
-        <div class="t-title"><span title="${esc(t.title)}">${esc(t.title)}</span>${
+        <div class="t-title"><span title="${esc(t.title)}">${esc(t.title)}</span>${typeof titleLink === 'function' ? titleLink(t.url) : ''}${
           t.is_new ? tag('New', 'new', '', 'Added to the playlist ' + fmtDate(t.added)) : ''}${
           t.is_new_file ? tag('New file', 'newfile', '', 'File arrived ' + fmtDate(t.acquired)) : ''}${
           t.edited ? tag('Edited', 'outline', 'pencil', 'Artist / title edited by hand') : ''}</div>
