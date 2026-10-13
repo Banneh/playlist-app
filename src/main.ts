@@ -81,6 +81,26 @@ const sc: ScView = {
     const c = cookies.find((x) => x.value);
     return c ? c.value : null;
   },
+  async api(method, url, headers, body) {
+    const wc = scEnsure().webContents;
+    // the page must be a loaded soundcloud.com page (the user may add from Not in playlist before ever opening Discover)
+    const onSc = /^https:\/\/(www\.|m\.)?soundcloud\.com\//.test(wc.getURL());
+    if (!onSc || wc.isLoading()) {
+      await new Promise<void>((resolve) => {
+        const t = setTimeout(resolve, 20000);
+        wc.once("did-finish-load", () => { clearTimeout(t); resolve(); });
+        if (!onSc) wc.loadURL(SC_HOME);
+      });
+    }
+    const code = `(async () => {
+      try {
+        const r = await fetch(${JSON.stringify(url)}, { method: ${JSON.stringify(method)}, headers: ${JSON.stringify(headers)},
+          body: ${body === undefined ? "undefined" : JSON.stringify(body)}, credentials: "include" });
+        return { status: r.status, body: await r.text() };
+      } catch (e) { return { status: 0, body: String(e && e.message || e) }; }
+    })()`;
+    return wc.executeJavaScript(code, true);
+  },
   async signOut() {
     const ses = session.fromPartition(SC_PARTITION);
     await ses.clearStorageData();

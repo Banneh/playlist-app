@@ -324,6 +324,13 @@ export interface ScNow { url: string; id: number; title: string; user: string; d
 
 const SC_ORIGIN = { Origin: "https://soundcloud.com", Referer: "https://soundcloud.com/" };
 
+/** Signed-in calls go through the embedded SoundCloud page when one is available: SoundCloud's
+ *  bot protection (DataDome) only accepts writes that carry a real browser's fingerprint and
+ *  cookies. The transport runs fetch() inside that page and returns status + body text. */
+export type ScTransport = (method: string, url: string, headers: Record<string, string>, body?: string) => Promise<{ status: number; body: string }>;
+let scTransport: ScTransport | null = null;
+export function setScTransport(t: ScTransport | null): void { scTransport = t; }
+
 async function ensureClientId(): Promise<string> {
   if (!STATE.client_id) {
     const page = activeLib()?.url || "https://soundcloud.com/discover";
@@ -339,17 +346,28 @@ async function scFetch(method: string, pathAndQuery: string, token?: string | nu
   for (let attempt = 0; ; attempt++) {
     const cid = await ensureClientId();
     const sep = pathAndQuery.includes("?") ? "&" : "?";
-    const headers: Record<string, string> = { "User-Agent": UA, Accept: "application/json", ...SC_ORIGIN };
+    const url = `https://api-v2.soundcloud.com/${pathAndQuery}${sep}client_id=${cid}`;
+    const payload = body === undefined ? undefined : JSON.stringify(body);
+    const headers: Record<string, string> = { Accept: "application/json" };
     if (token) headers.Authorization = "OAuth " + token;
-    if (body !== undefined) headers["Content-Type"] = "application/json";
-    const r = await fetch(`https://api-v2.soundcloud.com/${pathAndQuery}${sep}client_id=${cid}`,
-      { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-    if (r.ok) { const txt = await r.text(); return txt ? JSON.parse(txt) : {}; }
-    if ((r.status === 401 || r.status === 403) && attempt === 0 && !token) { STATE.client_id = null; continue; }
-    if (r.status === 401) throw new Error("SoundCloud signed you out — sign in again on the Discover page");
-    if (r.status === 403) throw new Error("SoundCloud refused this (403)");
-    if (r.status === 404) throw new Error("SoundCloud could not find that");
-    throw new Error(`SoundCloud answered ${r.status}`);
+    if (payload !== undefined) headers["Content-Type"] = "application/json";
+    let status: number, txt: string;
+    if (token && scTransport) {
+      ({ status, body: txt } = await scTransport(method, url, headers, payload));
+      if (status === 0) throw new Error("SoundCloud page could not send the request: " + txt);
+    } else {
+      const r = await fetch(url, { method, headers: { ...headers, "User-Agent": UA, ...SC_ORIGIN }, body: payload });
+      status = r.status; txt = await r.text();
+    }
+    if (status >= 200 && status < 300) return txt ? JSON.parse(txt) : {};
+    if ((status === 401 || status === 403) && attempt === 0 && !token) { STATE.client_id = null; continue; }
+    const where = `${method} ${pathAndQuery.split("?")[0]}`;
+    const detail = txt.replace(/\s+/g, " ").trim().slice(0, 160);
+    console.error(`soundcloud ${status} on ${where}: ${txt.slice(0, 600)}`);
+    if (status === 401) throw new Error("SoundCloud signed you out — sign in again on the Discover page");
+    if (status === 403) throw new Error(`SoundCloud refused this (403 on ${where})${detail ? ": " + detail : ""}`);
+    if (status === 404) throw new Error(`SoundCloud could not find that (${where})`);
+    throw new Error(`SoundCloud answered ${status} on ${where}${detail ? ": " + detail : ""}`);
   }
 }
 

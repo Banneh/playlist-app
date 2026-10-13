@@ -35,10 +35,13 @@ export interface ScView {
   token(): Promise<string | null>;
   /** forget the SoundCloud session (cookies + storage) */
   signOut(): Promise<void>;
+  /** run an api-v2 request inside the SoundCloud page (see core.ScTransport) */
+  api: core.ScTransport;
 }
 
 export function startServer(opts: ServerOpts): Promise<http.Server> {
   core.init(opts.dataDir, !!opts.pickFolder, !!opts.reveal);
+  core.setScTransport(opts.sc ? opts.sc.api : null);
 
   // file-mutating actions run one at a time
   let queue: Promise<any> = Promise.resolve();
