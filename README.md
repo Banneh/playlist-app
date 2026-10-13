@@ -8,7 +8,9 @@ DJ HQ is a free desktop app for DJs who collect music through SoundCloud
 playlists. It compares a playlist with the folder where your tracks live, shows
 you what's still missing and where to get it, tidies up the files you have so
 rekordbox and Pioneer players are happy, and hands you a rekordbox playlist when
-you're done. Everything runs on your computer; nothing is uploaded anywhere.
+you're done. SoundCloud itself lives inside the app on the **Discover** page,
+so you can listen and add what you hear to the playlist with one click.
+Everything runs on your computer; nothing is uploaded anywhere.
 
 ## Contents
 
@@ -21,6 +23,8 @@ you're done. Everything runs on your computer; nothing is uploaded anywhere.
 - [Using DJ HQ](#using-dj-hq)
   - [Missing: tracks you still need](#missing-tracks-you-still-need)
   - [Have: tracks already in your folder](#have-tracks-already-in-your-folder)
+  - [Discover: SoundCloud inside the app](#discover-soundcloud-inside-the-app)
+  - [Your Likes](#your-likes)
   - [New: what changed since you last looked](#new-what-changed-since-you-last-looked)
   - [Downloads: moving new files into your library](#downloads-moving-new-files-into-your-library)
   - [Not in playlist: files SoundCloud doesn't know about](#not-in-playlist-files-soundcloud-doesnt-know-about)
@@ -63,12 +67,18 @@ Everything else builds on that:
 - **Prepare for player** writes artist and title tags the way rekordbox reads
   them, converts files your Pioneer player can't play (in place, so your cues
   survive), and exports a rekordbox playlist.
+- **Discover** is soundcloud.com inside the app: sign in there once, listen to
+  what it suggests, and add or like what you hear with one click. Clicking a
+  cover anywhere in DJ HQ plays the track there.
+- **Your Likes** checks every track you liked on SoundCloud against your
+  folders and shows what's still to get.
 - Every file can be **previewed** in the app, and a library can follow your
   SoundCloud **Likes** instead of a playlist.
 
 The playlist is checked again every 15 minutes while the window is open, and
-whenever you press **Refresh**. DJ HQ never writes to SoundCloud and never
-needs your SoundCloud login.
+whenever you press **Refresh**. DJ HQ writes to SoundCloud only when you ask it
+to on Discover, signed in there as yourself; everything else reads public pages
+and needs no login.
 
 ## Install
 
@@ -246,6 +256,51 @@ the match dialog, so you can check a shaky match by ear.
 
 <p align="center"><img src="docs/screens/match-dialog.png" width="480" alt="Match to a local file: the files in your folder, likely ones first"></p>
 
+### Discover: SoundCloud inside the app
+
+**Discover** is soundcloud.com inside DJ HQ. Sign in there once, the way you
+would in a browser (the session is SoundCloud's own and stays on this
+computer), listen to whatever it suggests, and add what you like to the
+playlist from the bar above the page, without a popup for every track.
+
+The bar shows the track SoundCloud's player is playing, with its cover, its
+length and whether it's in the playlist already:
+
+- **Add to playlist** puts it into the playlist on SoundCloud, so it lands in
+  Missing right away. For a library that follows your Likes, Add likes the
+  track instead.
+- The **heart** likes or unlikes it. With **Also like tracks you add to the
+  playlist** turned on in Settings, adding likes it as well, so your Likes keep
+  a record of everything you picked.
+- **Related tracks** opens what SoundCloud suggests after it. **Back**,
+  **Home** and **Playlist** step around the site.
+
+Discover is also where tracks play from the rest of the app. Click a track's
+cover on any list and it opens on Discover and starts playing; the **⋯** menu
+of a row offers **Play on Discover** and **Related tracks on Discover** as
+well. A small arrow that appears next to the title on hover opens the track in
+your browser instead. Prefer the browser for everything? Switch **Opening
+tracks** in Settings, and the arrow becomes a play button for Discover.
+
+While you're signed in, **Add to playlist** on Not in playlist is one click
+too, instead of a trip to the site. **Sign out…** in Settings forgets the
+session.
+
+Discover needs the desktop app. In a browser tab (headless mode) the page says
+so, and you use soundcloud.com next to DJ HQ instead.
+
+### Your Likes
+
+Every track the signed-in SoundCloud account has liked, checked against the
+files in all your libraries. **Still to get** lists the liked tracks that are
+in none of your folders, with the same Free DL and Buy links as Missing. **In
+your folders** are the ones you already have, through the playlist, a found
+file, or a file with the same name and length in any library. **Not in the
+playlist** are those missing from the active playlist, each with an **Add**
+button. The list is cached for a few minutes; **Refresh** reads it from
+SoundCloud again. A library that follows your Likes is this list by
+definition, so Add is hidden there.
+
 ### New: what changed since you last looked
 
 ![The New list: tracks added to the playlist and files that arrived in your folder](docs/screens/new.png)
@@ -364,7 +419,9 @@ artwork and a play button.
 ![Settings: the library's folders, the downloads folder, auto-move, refresh interval, appearance, backups](docs/screens/settings.png)
 
 The gear at the bottom of the sidebar. From top to bottom: the library (its
-folders, playlist, remove), the Downloads folder DJ HQ watches and the switch
+folders, playlist, remove), the SoundCloud account signed in on Discover (sign
+out, and the switch that likes every track you add), where tracks open
+(Discover or your browser), the Downloads folder DJ HQ watches and the switch
 for moving exact matches automatically, how often the playlist is checked,
 appearance, backups (how much space the originals of converted files and
 replaced MP3s take, with a **Clean up** button once you're sure you won't need
@@ -405,6 +462,9 @@ library keeps its own matches, edits and "new" marks.
 - **Find on SoundCloud finds nothing.** Try shorter search text and drop the
   remix part. Some edits simply aren't on SoundCloud; **⋯ → Search on
   soundcloud.com** opens the site's own search.
+- **Clicking a cover opens Discover but nothing plays.** SoundCloud asks for a
+  sign-in before it plays anything. Sign in once on the Discover page; the
+  session is kept.
 - **A download doesn't show up.** Zips and unfinished downloads are ignored:
   unzip, let it finish, then **Rescan**. A file whose name already exists in
   your folder counts as "already in your library".
@@ -443,14 +503,17 @@ Windows. Running from source uses the project folder instead. In there:
 | `originals/<library>/replaced/` | MP3s replaced by a lossless download |
 | `rekordbox.xml` | the last rekordbox export |
 | `prefs.json` | appearance, "tour seen", dismissed update notices |
+| `Partitions/` | the SoundCloud sign-in session behind Discover (Settings → Sign out clears it) |
 
-**About SoundCloud.** There's no API key or login: the app reads the same
-public endpoints the SoundCloud web player uses. That works today and may break
-whenever SoundCloud changes their site. Only public playlists work, and the app
-never writes to SoundCloud; adding a track to the playlist is something you do
-there, logged in as yourself. The app fetches the playlist on launch, every
-15 minutes while the window is open, and when you press Refresh; a track search
-runs only when you use Find on SoundCloud or Find all.
+**About SoundCloud.** There's no API key: the app reads the same public
+endpoints the SoundCloud web player uses. That works today and may break
+whenever SoundCloud changes their site. Only public playlists work. The app
+writes to SoundCloud only from Discover, where you are signed in as yourself,
+and only when you add, remove or like a track; DJ HQ never sees your password,
+since the sign-in happens on soundcloud.com inside the app. The playlist is
+fetched on launch, every 15 minutes while the window is open, and when you
+press Refresh; a track search runs only when you use Find on SoundCloud or
+Find all.
 
 ## Technical details
 
@@ -494,6 +557,7 @@ npm run dist        # build installers locally into release/
 | `web/app.css` | design tokens and components for the light and dark themes |
 | `web/app.js` | the UI shell: sidebar, routing, menus, dialogs |
 | `web/pages/` | one file per page |
+| `web/pages/discover.js` · `web/pages/likes.js` | the embedded SoundCloud page and Your Likes (desktop app only) |
 | `web/tour.js` · `web/demo.js` | the guided tour and its sample data |
 | `web/guide.js` | the Guide panel behind the ? button, one entry per page |
 | `web/pages/setup.js` | the "Before we start" screen shown once after the first library |
@@ -523,7 +587,7 @@ bodies are JSON.
 | `POST /api/rescan` | | rescan the library folders |
 | `POST /api/library` | `{op: "add", dir, url}` · `{op: "select", id}` · `{op: "remove", id}` · `{op: "add_folder", dir}` · `{op: "remove_folder", dir}` · `{op: "subfolders", on}` | manage libraries and their folders (the folder ops take an optional `id`, default: the active library) |
 | `POST /api/device` | `{device}` | target player (`xdj-700`, `nxs2`, `cdj-3000`) |
-| `POST /api/settings` | `{inbox_dir?, auto_move?, refresh_min?}` | downloads folder (`""` = default), auto-move, check interval in minutes |
+| `POST /api/settings` | `{inbox_dir?, auto_move?, refresh_min?, like_on_add?, sc_open?}` | downloads folder (`""` = default), auto-move, check interval in minutes, like-on-add, where SoundCloud links open (`"discover"` or `"browser"`) |
 | `GET /api/file?path=` | | streams a local audio file for the preview (library and downloads folders only) |
 | | | file keys (`file`, `name`) are relative to the library folder, `/`-separated; files of an extra folder carry its name in front |
 | `POST /api/clean-backups` | | deletes the active library's backups (adds `clean_report`) |
@@ -539,6 +603,11 @@ bodies are JSON.
 | `POST /api/inbox-move` · `/api/inbox-move-all` | `{file, id, zip?}` · | move downloads into the library (unpacks from a zip when `zip` is given) |
 | `POST /api/export-xml` | | write `rekordbox.xml` (returns path and counts) |
 | `POST /api/reveal` · `/api/pick-folder` | `{path}` · | Electron only |
+| `POST /api/sc/status` | | Discover: who is signed in and what the embedded player is playing (not a view; `available: false` headless) |
+| `POST /api/sc/add` · `/api/sc/remove` | `{url, like?}` | add a track to / remove it from the playlist on SoundCloud, signed in on Discover (adds `sc_result`) |
+| `POST /api/sc/like` | `{url, on}` | like / unlike a track (adds `sc_like`) |
+| `POST /api/sc/likes` | `{force?}` | the signed-in account's likes checked against all libraries (not a view) |
+| `POST /api/sc/show` · `/hide` · `/bounds` · `/nav` · `/signout` | | the embedded SoundCloud view (Electron only) |
 
 ### Releases
 

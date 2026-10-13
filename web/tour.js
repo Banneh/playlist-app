@@ -23,6 +23,8 @@ const TOUR_STEPS = () => [
     text: 'Click a status pill to mark a track as Have or Missing by hand, or park it as “not available on SoundCloud now”. It comes back on its own when a link appears.' },
   { page: 'have', target: '#page-body .tr .t-file', fallback: '.nav-item[data-page="have"]', place: 'bottom', title: 'Have: what’s in your folder',
     text: 'The file behind each track, with a small tag when it still needs tags, a conversion, or could be upgraded to lossless. Click a file name to match a different one.' },
+  ...(typeof APP !== 'undefined' && APP.sc ? [{ target: '.nav-item[data-page="discover"]', place: 'right', title: 'Discover: SoundCloud inside DJ HQ',
+    text: 'soundcloud.com, right here. Sign in once, listen to what it suggests, and the bar above the page adds or likes what you hear with one click. Clicking a cover on any list plays the track there.' }] : []),
   { page: 'new', target: '#page-body .tr', fallback: '.nav-item[data-page="new"]', place: 'bottom', title: 'New: what changed',
     text: 'Tracks added to the playlist and files that arrived in your folder collect here until you press Mark all as seen. Your to-do list for tagging and importing.' },
   { page: 'inbox', target: '#page-body .tr .ib-act', fallback: '.nav-item[data-page="inbox"]', place: 'left', title: 'Downloads',
