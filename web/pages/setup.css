@@ -1,0 +1,14 @@
+/* "Before we start" (pages/setup.js): lives in the welcome container, so it shares its layout */
+.welcome-box.su-box { width: min(600px, 100%); }
+.su-card { padding: 4px 22px; }
+.su-sec { display: flex; gap: 16px; padding: 18px 0; }
+.su-sec + .su-sec { border-top: 1px solid var(--line); }
+.su-sec .card-icon { margin: 0; flex-shrink: 0; }
+.su-main { flex: 1; min-width: 0; }
+.su-main h3 { font-size: 14.5px; font-weight: 650; letter-spacing: -.01em; }
+.su-main p { margin-top: 3px; font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.su-controls { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.su-controls .st-switch { margin-top: 2px; }
+.su-inboxrow { width: 100%; }
+.su-go { margin-top: 18px; }
+@media (max-width: 560px) { .su-sec { flex-direction: column; gap: 10px; } }

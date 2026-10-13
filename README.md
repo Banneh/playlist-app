@@ -134,8 +134,18 @@ settings stay where they are. **⋯ → Check for updates…** checks right away
 3. Click **Connect library**.
 
 DJ HQ fetches the playlist, scans the folder and matches files to tracks. That
-takes a few seconds for a few hundred tracks. You land on the **Missing** list,
-and the sidebar shows how much of the playlist is already in your folder.
+takes a few seconds for a few hundred tracks.
+
+![Before we start: the downloads folder, the target player, subfolders and appearance, asked once](docs/screens/setup.png)
+
+The first time, a **Before we start** screen asks for the basics: which folder
+your downloads land in and whether exact matches may be moved into the library
+on their own, which player you play on, whether the folders inside your music
+folder count too, and light or dark. Every one of them has a sensible default,
+so **Let's go** is a fine answer; all of it lives in Settings afterwards.
+
+You land on the **Missing** list, and the sidebar shows how much of the
+playlist is already in your folder.
 
 The first time, DJ HQ offers a one-minute tour that points out what each list
 is for. It runs on a few sample tracks, so you can take it before connecting
@@ -332,10 +342,15 @@ artwork and a play button.
 
 ![DJ HQ in dark mode](docs/screens/missing-dark.png)
 
+![The Guide: a panel on the right explains the Missing page in detail](docs/screens/guide.png)
+
 - The sun-and-moon button at the bottom of the sidebar switches between light,
   dark and "follow the system".
 - The search box filters the current list by artist, title or file name. Press
   `/` to jump to it.
+- The **?** button in the top right opens the Guide for the page you're on: what
+  every row, tag, button and chip means and what to do with it, in more detail
+  than the tour. Press `?` for the same thing.
 - The library card at the top of the sidebar shows how many playlist tracks are
   in your folder; the counts next to each list are live. **All tracks** is the
   whole playlist, **Missing** and **Have** split it.
@@ -480,6 +495,8 @@ npm run dist        # build installers locally into release/
 | `web/app.js` | the UI shell: sidebar, routing, menus, dialogs |
 | `web/pages/` | one file per page |
 | `web/tour.js` · `web/demo.js` | the guided tour and its sample data |
+| `web/guide.js` | the Guide panel behind the ? button, one entry per page |
+| `web/pages/setup.js` | the "Before we start" screen shown once after the first library |
 | `web/player.js` | the preview player |
 | `src/zip.ts` | minimal zip reader for Bandcamp downloads |
 | `scripts/afterPack.js` | ad-hoc signs the macOS app after packaging |
