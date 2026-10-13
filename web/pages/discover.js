@@ -5,7 +5,8 @@
    The web page itself is a native view that the Electron side lays over the #dc-frame
    placeholder: this file reports the placeholder's position (POST /api/sc/show|bounds|hide),
    polls POST /api/sc/status while the page is open and renders the bar from it.
-   Globals used elsewhere: SC (last status), scAddUrl(url), dcOpen(url), dcToast(). */
+   The heart next to Add likes the playing track (a Likes library's Add already is a like).
+   Globals used elsewhere: SC (last status), scAddUrl(url), dcOpen(url), dcToast(), dcLike(). */
 
 let SC = { available: false, signed_in: false, me: null, can: null, now: null, url: '' };
 const DC = { active: false, covered: false, timer: null, ro: null, html: '', msg: null, busy: false, pending: null };
@@ -54,10 +55,15 @@ function dcBarHtml() {
           n.in_playlist ? ` · ${tag('In ' + listName, 'ok', 'check')}` : ''}</div>
       </div>`;
     const related = `<button class="btn btn-sm" onclick="scPost('nav',{url:scRelated('${esc(n.url)}')})" title="Tracks SoundCloud suggests after this one">${icon('sparkles')}Related tracks</button>`;
+    // the heart: like / unlike the playing track (not for a Likes library, where Add is the like)
+    const heart = SC.signed_in && t && !likes
+      ? `<button class="btn btn-sm btn-icon dc-heart${n.liked ? ' on' : ''}" ${DC.busy ? 'disabled' : ''} onclick="dcLike('${esc(n.url)}',${n.liked ? 'false' : 'true'})" title="${n.liked ? 'Liked on SoundCloud · click to unlike' : n.liked === null ? 'Like on SoundCloud' : 'Like on SoundCloud'}" aria-label="${n.liked ? 'Unlike' : 'Like'}">${icon('heart')}</button>`
+      : '';
     if (!SC.signed_in) acts = `${related}${signin}`;
-    else if (SC.can && !SC.can.ok) acts = related;
-    else if (n.in_playlist) acts = `${related}<button class="btn btn-sm" ${DC.busy ? 'disabled' : ''} onclick="dcSet('${esc(n.url)}',false)" title="Remove from ${esc(listName)}">${icon('xCircle')}Remove</button>`;
-    else acts = `${related}<button class="btn btn-sm btn-primary" ${DC.busy || !t ? 'disabled' : ''} onclick="dcSet('${esc(n.url)}',true)" title="Add to ${esc(listName)} on SoundCloud">${icon('plus')}Add to ${likes ? 'Likes' : 'playlist'}</button>`;
+    else if (SC.can && !SC.can.ok) acts = `${related}${heart}`;
+    else if (n.in_playlist) acts = `${related}${heart}<button class="btn btn-sm" ${DC.busy ? 'disabled' : ''} onclick="dcSet('${esc(n.url)}',false)" title="Remove from ${esc(listName)}">${icon('xCircle')}Remove</button>`;
+    else acts = `${related}${heart}<button class="btn btn-sm btn-primary" ${DC.busy || !t ? 'disabled' : ''} onclick="dcSet('${esc(n.url)}',true)" title="Add to ${esc(listName)} on SoundCloud${
+      !likes && DATA.settings && DATA.settings.like_on_add ? ' (and like it — see Settings)' : ''}">${icon('plus')}Add to ${likes ? 'Likes' : 'playlist'}</button>`;
   }
   const note = SC.signed_in && SC.can && !SC.can.ok ? `<div class="dc-note">${icon('alert')}<span>${esc(SC.can.why || '')}</span></div>` : '';
   const msg = DC.msg ? `<div class="dc-msgline${DC.msg.err ? ' err' : ''}">${icon(DC.msg.err ? 'alert' : 'checkCircle')}<span>${esc(DC.msg.text)}</span></div>` : '';
@@ -118,13 +124,34 @@ async function dcSet(url, add) {
   try {
     DATA = await api('/api/sc/' + (add ? 'add' : 'remove'), { url });
     const r = DATA.sc_result || {};
-    if (SC.now && SC.now.url === url) SC.now.in_playlist = add;
+    if (SC.now && SC.now.url === url) { SC.now.in_playlist = add; if (r.liked) SC.now.liked = true; }
     DC.busy = false;
+    if (typeof LIKES !== 'undefined' && LIKES) LIKES = null;   // the Your Likes page reloads when shown
     renderSidebar();   // counts changed; the page itself stays put so the player keeps playing
-    dcToast((add ? 'Added ' : 'Removed ') + (r.title ? '“' + r.title + '”' : 'the track') + (add ? ' — it’s in Missing now' : ''));
+    const what = r.title ? '“' + r.title + '”' : 'the track';
+    if (add && r.like_error) dcToast('Added ' + what + ', but liking it failed: ' + r.like_error, true);
+    else dcToast((add ? 'Added ' : 'Removed ') + what + (add ? (r.liked ? ' and liked it' : '') + ' — it’s in Missing now' : ''));
   } catch (e) {
     DC.busy = false;
     dcToast('Couldn’t ' + (add ? 'add' : 'remove') + ' it: ' + e.message, true);
+  }
+  dcRenderBar();
+}
+/** like (true) or unlike (false) the track in the Discover bar */
+async function dcLike(url, on) {
+  if (DC.busy) return;
+  DC.busy = true; dcRenderBar();
+  try {
+    DATA = await api('/api/sc/like', { url, on });
+    const r = DATA.sc_like || {};
+    if (SC.now && SC.now.url === url) { SC.now.liked = on; if (r.id && SC.can && SC.can.likes) SC.now.in_playlist = on; }
+    if (typeof LIKES !== 'undefined' && LIKES) LIKES = null;
+    DC.busy = false;
+    renderSidebar();
+    dcToast((on ? 'Liked ' : 'Unliked ') + (r.title ? '“' + r.title + '”' : 'the track'));
+  } catch (e) {
+    DC.busy = false;
+    dcToast('Couldn’t ' + (on ? 'like' : 'unlike') + ' it: ' + e.message, true);
   }
   dcRenderBar();
 }

@@ -91,7 +91,14 @@ PAGES.settings = {
         : 'Sign in on the Discover page to add tracks straight from the SoundCloud player. The session stays on this computer only.',
       SC.signed_in && SC.me
         ? `<div class="st-account">${SC.me.avatar ? `<img class="st-avatar" src="${esc(SC.me.avatar)}" alt="">` : `<span class="st-avatar ph">${icon('cloud')}</span>`}<b>${esc(SC.me.username)}</b>${SC.can && !SC.can.ok ? tag('Can’t add here', 'warn', 'alert', SC.can.why || '') : tag('Connected', 'ok', 'check')}</div>
-           <button class="btn btn-sm" onclick="scSignOut()">${icon('cloudOff')}Sign out…</button>`
+           <button class="btn btn-sm" onclick="scSignOut()">${icon('cloudOff')}Sign out…</button>
+           <button class="btn btn-sm" onclick="go('likes')">${icon('heart')}Your Likes</button>
+           ${SC.can && SC.can.likes ? '' : `<label class="st-switch">
+             <input type="checkbox" id="st-likeadd" ${S.like_on_add ? 'checked' : ''} onchange="stToggleLikeOnAdd(this)">
+             <span class="st-track" aria-hidden="true"></span>
+             <span class="st-lbl"><b>Also like tracks you add to the playlist</b>
+               <span>Adding from the Discover bar (or Not in playlist) likes the track on SoundCloud as well, so your Likes keep a record of everything you picked.</span></span>
+           </label>`}`
         : `<button class="btn btn-sm btn-primary" onclick="dcOpen('https://soundcloud.com/signin')">${icon('cloud')}Sign in on Discover</button>`);
 
     const bytes = DATA.backup_bytes || 0;
@@ -176,6 +183,11 @@ async function stBrowseInbox() {
 async function stResetInbox() {
   await stSave({ inbox_dir: '' }, 'Back to the default Downloads folder');
   if (typeof loadInbox === 'function') loadInbox({ quiet: true });
+}
+async function stToggleLikeOnAdd(el) {
+  const on = !!el.checked;
+  const ok = await stSave({ like_on_add: on }, on ? 'Tracks you add are liked as well' : 'Adding no longer likes the track');
+  if (!ok) { el.checked = !on; render(); }
 }
 async function stToggleAuto(el) {
   const on = !!el.checked;

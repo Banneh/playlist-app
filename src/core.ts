@@ -100,7 +100,7 @@ export interface AppState {
   /** folder watched for fresh downloads; default ~/Downloads */
   inbox_dir?: string;
   /** user settings (see getSettings) */
-  settings?: { auto_move?: boolean; refresh_min?: number };
+  settings?: { auto_move?: boolean; refresh_min?: number; like_on_add?: boolean };
   /** probe results for audio inside zips in the downloads folder: "<zip path>|<entry>|<size>" -> [dur, fmt, tags] */
   zip_cache?: Record<string, [number, [string, number, number], [string, string, string]]>;
   /** "<lib id>:<track id>" -> ms when a file for the track first turned up (0 = predates tracking) */
@@ -150,10 +150,12 @@ export function getSettings(): any {
   return {
     inbox_dir: inboxDir(), inbox_default: path.join(os.homedir(), "Downloads"), inbox_custom: !!STATE.inbox_dir,
     auto_move: !!s.auto_move, refresh_min: REFRESH_CHOICES.includes(s.refresh_min || 0) ? s.refresh_min : 15,
+    like_on_add: !!s.like_on_add,
     data_dir: DATA_DIR,
   };
 }
-/** POST /api/settings {inbox_dir?: string|null ("" or null = back to ~/Downloads), auto_move?: boolean, refresh_min?: number} */
+/** POST /api/settings {inbox_dir?: string|null ("" or null = back to ~/Downloads), auto_move?: boolean, refresh_min?: number,
+ *  like_on_add?: boolean (Discover: also like a track when adding it to the playlist)} */
 export async function setSettings(data: any): Promise<any> {
   const s = STATE.settings || (STATE.settings = {});
   if ("inbox_dir" in data) {
@@ -165,6 +167,7 @@ export async function setSettings(data: any): Promise<any> {
     }
   }
   if ("auto_move" in data) s.auto_move = !!data.auto_move;
+  if ("like_on_add" in data) s.like_on_add = !!data.like_on_add;
   if ("refresh_min" in data) {
     const n = Number(data.refresh_min);
     if (!REFRESH_CHOICES.includes(n)) throw new Error("refresh interval must be one of " + REFRESH_CHOICES.join(", ") + " minutes");
@@ -465,7 +468,7 @@ export async function scCanWrite(token: string): Promise<{ ok: boolean; why?: st
 /** Add (or remove) a track to the active library's playlist or likes as the signed-in
  *  user, then patch the snapshot so the UI shows it right away; the next refresh
  *  reconciles with SoundCloud. */
-export async function scSetInPlaylist(token: string, url: string, add: boolean): Promise<any> {
+export async function scSetInPlaylist(token: string, url: string, add: boolean, alsoLike = false): Promise<any> {
   const lib = requireLib();
   if (!lib.playlist) throw new Error("fetch the playlist first");
   const can = await scCanWrite(token);
@@ -499,7 +502,139 @@ export async function scSetInPlaylist(token: string, url: string, add: boolean):
   saveState();
   const view = await buildView();
   view.sc_result = { id: tid, added: add, title: t.title || "", user: t.user?.username || "" };
+  if (add && alsoLike && !can.likes) {   // "also like what I add": a failure here must not undo the add
+    try { await setLiked(token, me, tid, true); view.sc_result.liked = true; }
+    catch (e: any) { view.sc_result.liked = false; view.sc_result.like_error = e.message; }
+  }
   return view;
+}
+
+// ---------------- likes (the Discover bar's heart, the Your Likes page) ----------------
+
+interface LikesSnap { userId: number; at: number; ids: number[]; tracks: PlTrack[] | null; }
+let likesSnap: LikesSnap | null = null;
+let likesLoading: Promise<LikesSnap> | null = null;
+const LIKES_TTL = 5 * 60 * 1000;
+
+/** The signed-in user's liked track ids, newest first, cached for a few minutes
+ *  (fetchLikeIds reads the public likes list, so this needs no token). */
+async function likedIds(me: ScUser, force = false): Promise<LikesSnap> {
+  if (!force && likesSnap && likesSnap.userId === me.id && Date.now() - likesSnap.at < LIKES_TTL) return likesSnap;
+  if (likesLoading) return likesLoading;
+  likesLoading = (async () => {
+    try {
+      await ensureClientId();
+      let ids: number[];
+      try { ids = await fetchLikeIds(me.id); }
+      catch (e: any) {
+        if (e.status !== 401 && e.status !== 403) throw e;
+        STATE.client_id = null; await ensureClientId();   // stale client id: scrape it again, once
+        ids = await fetchLikeIds(me.id);
+      }
+      likesSnap = { userId: me.id, at: Date.now(), ids, tracks: null };
+      return likesSnap;
+    } finally { likesLoading = null; }
+  })();
+  return likesLoading;
+}
+/** What the Discover bar may already know: the liked ids when they are fresh, else null
+ *  (and a refresh starts in the background, so the next poll has them). */
+export function likedIdsCached(me: ScUser): Set<number> | null {
+  const fresh = likesSnap && likesSnap.userId === me.id && Date.now() - likesSnap.at < LIKES_TTL;
+  if (!fresh) likedIds(me).catch(() => {});
+  return likesSnap && likesSnap.userId === me.id ? new Set(likesSnap.ids) : null;
+}
+/** The liked tracks as snapshot rows (fetched once per likes snapshot). */
+async function likedTracks(me: ScUser, force = false): Promise<PlTrack[]> {
+  const snap = await likedIds(me, force);
+  if (snap.tracks) return snap.tracks;
+  const got: Record<number, any> = {};
+  for (let i = 0; i < snap.ids.length; i += 40) {
+    const arr = await scFetch("GET", `tracks?ids=${snap.ids.slice(i, i + 40).join(",")}`);
+    for (const t of arr || []) got[t.id] = t;
+  }
+  snap.tracks = snap.ids.map((id) => got[id]).filter(Boolean).map((t) => trackFromApi(t, 0));
+  return snap.tracks;
+}
+
+async function setLiked(token: string, me: ScUser, tid: number, on: boolean): Promise<void> {
+  await scFetch(on ? "PUT" : "DELETE", `users/${me.id}/track_likes/${tid}`, token);
+  if (likesSnap && likesSnap.userId === me.id) {   // keep the cache in step
+    likesSnap.ids = likesSnap.ids.filter((x) => x !== tid);
+    if (on) likesSnap.ids.unshift(tid);
+    if (likesSnap.tracks) {
+      likesSnap.tracks = likesSnap.tracks.filter((x) => x.id !== tid);
+      if (on) { try { likesSnap.tracks.unshift(trackFromApi(await scFetch("GET", `tracks/${tid}`), 0)); } catch { likesSnap.tracks = null; } }
+    }
+  }
+}
+
+/** Like (or unlike) a track as the signed-in user. When the active library follows
+ *  this user's likes, that is the same as adding it there, so the snapshot is patched too. */
+export async function scSetLiked(token: string, url: string, on: boolean): Promise<any> {
+  const me = await scMe(token);
+  const lib = activeLib();
+  const mine = lib && likesUser(lib.url)?.toLowerCase() === me.permalink.toLowerCase();
+  if (mine && lib?.playlist) {
+    const view = await scSetInPlaylist(token, url, on);
+    view.sc_like = { id: view.sc_result.id, liked: on, title: view.sc_result.title };
+    return view;
+  }
+  const t = await scResolve(url);
+  if (!t || t.kind !== "track") throw new Error("that is not a SoundCloud track");
+  await setLiked(token, me, Number(t.id), on);
+  const view = await buildView();
+  view.sc_like = { id: Number(t.id), liked: on, title: t.title || "", user: t.user?.username || "" };
+  return view;
+}
+
+/** The Your Likes page: every track the signed-in user liked, with the file that
+ *  covers it in any library (matched through the playlist, a "found" file, or by
+ *  name and length like the Downloads inbox does) and the playlists it is in. */
+export async function scLikesCheck(token: string, force = false): Promise<any> {
+  const me = await scMe(token);
+  const tracks = await likedTracks(me, force);
+  const ids = new Set(tracks.map((t) => t.id));
+  type Have = { lib: string; file: string; path: string; lossy: boolean; score: number | null };
+  const have = new Map<number, Have>();
+  const inPl = new Map<number, string[]>();
+  const loose: { lib: Library; f: LocalFile }[] = [];   // files not matched to a playlist track
+  for (const lib of STATE.libraries) {
+    if (!lib.playlist) continue;
+    const view = await buildView(lib);
+    const files = new Map((await scanLocal(lib)).map((f) => [f.name, f]));
+    for (const r of view.tracks) {
+      if (!ids.has(r.id)) continue;
+      inPl.set(r.id, [...(inPl.get(r.id) || []), libName(lib)]);
+      if (r.have && r.file && !have.has(r.id)) have.set(r.id, { lib: libName(lib), file: r.file, path: r.path, lossy: !!r.lossy, score: null });
+    }
+    for (const e of view.extras) {
+      const f = files.get(e.name);
+      if (!f) continue;
+      if (e.found && ids.has(e.found.id) && !have.has(e.found.id))
+        have.set(e.found.id, { lib: libName(lib), file: f.name, path: f.path, lossy: LOSSY.test(f.fmt[0]), score: null });
+      else loose.push({ lib, f });
+    }
+  }
+  // name + length matching for the rest, with a cheap shared-word filter first
+  const toks = tracks.map((t) => new Set(norm(`${t.user} ${t.title}`).split(" ").filter(Boolean)));
+  for (const { lib, f } of loose) {
+    const ft = norm(f.base).split(" ").filter(Boolean);
+    const cands = tracks.filter((t, i) => !have.has(t.id) && ft.some((w) => toks[i].has(w)));
+    const [t, score] = bestTrackNames([f.base], f.dur, cands);
+    if (t && score >= 0.6) have.set(t.id, { lib: libName(lib), file: f.name, path: f.path, lossy: LOSSY.test(f.fmt[0]), score: Math.min(1, score) });
+  }
+  const active = activeLib();
+  const rows = tracks.map((t, i) => {
+    const [artist, title] = artistTitle(t);
+    return { n: i + 1, id: t.id, title, artist, user: t.user, dur: fmtDur(t.dur), url: t.url, art: t.art,
+             links: trackLinks(t), have: have.get(t.id) || null, in_playlist: inPl.get(t.id) || [],
+             in_active: !!active?.playlist?.tracks.some((x) => x.id === t.id) };
+  });
+  return { user: me, fetched_at: likesSnap?.at || Date.now(), total: rows.length,
+           have: rows.filter((r) => r.have).length, missing: rows.filter((r) => !r.have).length,
+           likes_lib: !!(active && likesUser(active.url)?.toLowerCase() === me.permalink.toLowerCase()),
+           tracks: rows };
 }
 
 // ---------------- local scan ----------------

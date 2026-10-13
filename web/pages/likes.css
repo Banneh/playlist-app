@@ -1,0 +1,11 @@
+/* page-specific styles for pages/likes.js (tokens and components come from app.css) */
+
+/* #, art, track, length, status, get, add */
+.thead.lk-tr, .tr.lk-tr { grid-template-columns: 30px 40px minmax(0, 1fr) 48px 84px 184px 72px; }
+.lk-add { display: flex; justify-content: flex-end; }
+.lk-tr .pill { cursor: default; }
+.lk-tr .pill .ic { display: none; }
+
+@media (max-width: 1040px) {
+  .thead.lk-tr, .tr.lk-tr { grid-template-columns: 40px minmax(0, 1fr) 48px 84px 92px 72px; }
+}

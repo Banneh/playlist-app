@@ -16,6 +16,12 @@ body.has-player .page-body.dc-host { padding-bottom: 92px; }
 .dc-sub .tag { margin-left: 2px; }
 .dc-acts { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
+/* the heart: like / unlike the playing track */
+.dc-heart.on { color: var(--red); border-color: var(--red-line); background: var(--red-soft); }
+.dc-heart.on .ic { fill: currentColor; }
+.dc-heart:hover .ic { transform: scale(1.1); }
+.dc-heart .ic { transition: transform .12s; }
+
 /* the little "playing" bars next to the title */
 .dc-eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; flex-shrink: 0; }
 .dc-eq i { width: 3px; height: 100%; border-radius: 1px; background: var(--accent); animation: dc-eq .9s ease-in-out infinite; transform-origin: bottom; }

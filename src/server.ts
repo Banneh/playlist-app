@@ -103,7 +103,8 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           }
           const t = nowCache.now;
           const inList = t ? (core.activeLib()?.playlist?.tracks || []).some((x) => x.id === t.id) : false;
-          now = { ...now, url, track: t, in_playlist: inList };
+          const likedSet = me && t ? core.likedIdsCached(me) : null;   // null until the likes list is known
+          now = { ...now, url, track: t, in_playlist: inList, liked: likedSet && t ? likedSet.has(t.id) : null };
         }
         return { available: true, url: sc.url(), signed_in: !!me, me, can, now };
       }
@@ -111,8 +112,20 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         return enqueue(async () => {   // the token is read right before the write, so a sign-out in the view is respected
           const token = await sc.token();
           if (!token) throw new Error("sign in to SoundCloud on the Discover page first");
-          return core.scSetInPlaylist(token, String(data.url || ""), action === "add");
+          const like = action === "add" && ("like" in data ? !!data.like : !!core.getSettings().like_on_add);
+          return core.scSetInPlaylist(token, String(data.url || ""), action === "add", like);
         });
+      case "like":   // {url, on}
+        return enqueue(async () => {
+          const token = await sc.token();
+          if (!token) throw new Error("sign in to SoundCloud on the Discover page first");
+          return core.scSetLiked(token, String(data.url || ""), !!data.on);
+        });
+      case "likes": {   // {force?}: the Your Likes page (not a view)
+        const token = await sc.token();
+        if (!token) return { signed_in: false };
+        return enqueue(() => core.scLikesCheck(token, !!data.force));
+      }
       default: throw new Error("unknown SoundCloud action");
     }
   }
