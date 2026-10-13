@@ -42,8 +42,17 @@ function scEnsure(): WebContentsView {
     return { action: "deny" };
   });
   wc.on("will-navigate", (e, url) => { if (!inView(url)) { e.preventDefault(); shell.openExternal(url); } });
+  wc.on("did-finish-load", () => { if (scView && scShown) scFit(scView, scView.getBounds().width); });
   scView = v;
   return v;
+}
+
+/** soundcloud.com lays itself out for a ~1200px desktop page and piles up below that;
+ *  in a narrower area the page is zoomed out so it keeps its real layout (like browser zoom) */
+const SC_LAYOUT_WIDTH = 1200;
+function scFit(v: WebContentsView, width: number) {
+  const z = Math.max(0.6, Math.min(1, width / SC_LAYOUT_WIDTH));
+  if (Math.abs(v.webContents.getZoomFactor() - z) > 0.01) v.webContents.setZoomFactor(z);
 }
 
 const sc: ScView = {
@@ -52,6 +61,7 @@ const sc: ScView = {
     const v = scEnsure();
     if (!scShown) { win.contentView.addChildView(v); scShown = true; }
     v.setBounds(rect);
+    scFit(v, rect.width);
     const cur = v.webContents.getURL();
     if (url) { if (cur !== url) v.webContents.loadURL(url); }
     else if (!cur) v.webContents.loadURL(SC_HOME);
@@ -59,7 +69,7 @@ const sc: ScView = {
   hide() {
     if (win && scView && scShown) { win.contentView.removeChildView(scView); scShown = false; }
   },
-  setBounds(rect: ScRect) { if (scView && scShown) scView.setBounds(rect); },
+  setBounds(rect: ScRect) { if (scView && scShown) { scView.setBounds(rect); scFit(scView, rect.width); } },
   navigate(url: string) { scEnsure().webContents.loadURL(url); },
   back() { const h = scView?.webContents.navigationHistory; if (h && h.canGoBack()) h.goBack(); },
   url() { return scView ? scView.webContents.getURL() : ""; },
