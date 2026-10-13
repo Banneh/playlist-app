@@ -47,7 +47,9 @@ function exRow(f, i) {
       </div>
       <span class="dur">${esc(f.dur)}</span>
       <div class="cell">${fd
-        ? `<a class="btn btn-sm btn-accent" href="${esc(fd.url)}" target="_blank" rel="noopener" title="Open the track on SoundCloud and add it to the playlist there — the file is matched automatically afterwards">${icon('external')}Add to playlist</a>`
+        ? (typeof scCan === 'function' && scCan()
+          ? `<button class="btn btn-sm btn-accent" onclick="scAddUrl('${esc(fd.url)}')" title="Add the track to the playlist on SoundCloud — the file is matched right away">${icon('plus')}Add to playlist</button>`
+          : `<a class="btn btn-sm btn-accent" href="${esc(fd.url)}" target="_blank" rel="noopener" title="Open the track on SoundCloud and add it to the playlist there — the file is matched automatically afterwards">${icon('external')}Add to playlist</a>`)
         : `<button class="btn btn-sm" onclick="openFind(${i})" title="Search SoundCloud for this file">${icon('search')}Find on SoundCloud</button>`}</div>
       <button class="btn btn-ghost btn-sm btn-icon more" onclick="exMenu(this, ${i})" title="More">${icon('more')}</button>
     </div>`;
@@ -63,6 +65,7 @@ function exMenu(anchor, i) {
     { label: f.found ? 'Pick a different track…' : 'Find on SoundCloud…', icon: 'search', onclick: () => openFind(i) },
   ];
   if (f.found) items.push('-',
+    ...(APP.sc ? [{ label: 'Listen on Discover', icon: 'cloud', onclick: () => dcOpen(f.found.url) }] : []),
     { label: 'Open on SoundCloud', icon: 'external', onclick: () => window.open(f.found.url, '_blank', 'noopener') },
     { label: 'Copy SoundCloud link', icon: 'copy', onclick: () => copyText(f.found.url, 'Link copied') },
     { label: 'Forget this match', icon: 'xCircle', onclick: () => clearFound(i) });

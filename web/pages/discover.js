@@ -1,0 +1,162 @@
+/* Page: Discover — soundcloud.com inside the app (desktop app only). You sign in there
+   as usual and listen to whatever SoundCloud suggests; the track its player is playing
+   shows up in the bar above the page with one Add to playlist button, so there is no
+   popup to open and close for every track.
+   The web page itself is a native view that the Electron side lays over the #dc-frame
+   placeholder: this file reports the placeholder's position (POST /api/sc/show|bounds|hide),
+   polls POST /api/sc/status while the page is open and renders the bar from it.
+   Globals used elsewhere: SC (last status), scAddUrl(url), dcOpen(url), dcToast(). */
+
+let SC = { available: false, signed_in: false, me: null, can: null, now: null, url: '' };
+const DC = { active: false, covered: false, timer: null, ro: null, html: '', msg: null, busy: false, pending: null };
+
+const scPost = (action, body) => fetch('/api/sc/' + action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(r => r.json());
+const scCan = () => !!(APP.sc && SC.signed_in && SC.can && SC.can.ok);
+const scRelated = url => String(url || '').replace(/[?#].*$/, '').replace(/\/+$/, '') + '/recommended';
+
+PAGES.discover = {
+  title: () => 'Discover',
+  sub: () => !APP.sc ? 'Listen on SoundCloud and add tracks to the playlist with one click.'
+    : SC.signed_in && SC.me ? `Signed in as <b>${esc(SC.me.username)}</b> · play anything below and add it from the bar.`
+    : 'SoundCloud, inside DJ HQ. Sign in below to add what you hear to the playlist.',
+  search: false,
+  body: () => !APP.sc
+    ? emptyHtml({ ico: 'cloud', title: 'Discover needs the desktop app',
+        text: 'The embedded SoundCloud player is part of the DJ HQ app for Mac, Windows and Linux. In a browser tab, open soundcloud.com next to DJ HQ instead.' })
+    : `<div class="dc-bar card" id="dc-bar">${dcBarHtml()}</div><div class="dc-frame" id="dc-frame"><span class="spin"></span></div>`,
+  after: () => { if (APP.sc) dcMount(); },
+  onHide: () => dcUnmount(),
+  onCover: on => { DC.covered = on; on ? dcHide() : dcShow(); },
+  toast: (msg, isErr) => dcToast(msg, isErr),
+};
+
+/* ---------- the bar ---------- */
+function dcBarHtml() {
+  const likes = SC.can ? SC.can.likes : /\/likes\/?$/.test(DATA.playlist_url || '');
+  const listName = likes ? 'your Likes' : 'the playlist';
+  const nav = `<div class="dc-nav">
+    <button class="btn btn-ghost btn-sm btn-icon" onclick="scPost('nav',{action:'back'})" title="Back">${icon('arrowLeft')}</button>
+    <button class="btn btn-ghost btn-sm" onclick="scPost('nav',{action:'home'})" title="SoundCloud home">${icon('cloud')}Home</button>
+    <button class="btn btn-ghost btn-sm" onclick="scPost('nav',{action:'playlist'})" title="Open ${esc(listName)} on SoundCloud">${icon('listMusic')}${likes ? 'Likes' : 'Playlist'}</button>
+  </div>`;
+  const n = SC.now, t = n && n.track;
+  const signin = `<button class="btn btn-sm btn-primary" onclick="dcOpen('https://soundcloud.com/signin')" title="Sign in to add tracks from here">${icon('cloud')}Sign in to add</button>`;
+  let now, acts = '';
+  if (!n) {
+    now = `<div class="dc-text"><div class="dc-title muted">Nothing playing yet</div><div class="dc-sub">Press play on any track below — it shows up here.</div></div>`;
+    if (!SC.signed_in) acts = signin;
+  } else {
+    const title = t ? t.title : n.title, user = t ? t.user : n.artist;
+    now = `<img class="dc-art" src="${esc(t && t.art ? t.art.replace('-large', '-t120x120') : '')}" alt="" onerror="this.style.visibility='hidden'">
+      <div class="dc-text">
+        <div class="dc-title"><span title="${esc(title)}">${esc(title)}</span>${n.playing ? '<span class="dc-eq" aria-hidden="true"><i></i><i></i><i></i></span>' : ''}</div>
+        <div class="dc-sub">${esc(user)}${t ? ' · ' + fmtSecs(t.dur) : ''}${
+          n.in_playlist ? ` · ${tag('In ' + listName, 'ok', 'check')}` : ''}</div>
+      </div>`;
+    const related = `<button class="btn btn-sm" onclick="scPost('nav',{url:scRelated('${esc(n.url)}')})" title="Tracks SoundCloud suggests after this one">${icon('sparkles')}Related tracks</button>`;
+    if (!SC.signed_in) acts = `${related}${signin}`;
+    else if (SC.can && !SC.can.ok) acts = related;
+    else if (n.in_playlist) acts = `${related}<button class="btn btn-sm" ${DC.busy ? 'disabled' : ''} onclick="dcSet('${esc(n.url)}',false)" title="Remove from ${esc(listName)}">${icon('xCircle')}Remove</button>`;
+    else acts = `${related}<button class="btn btn-sm btn-primary" ${DC.busy || !t ? 'disabled' : ''} onclick="dcSet('${esc(n.url)}',true)" title="Add to ${esc(listName)} on SoundCloud">${icon('plus')}Add to ${likes ? 'Likes' : 'playlist'}</button>`;
+  }
+  const note = SC.signed_in && SC.can && !SC.can.ok ? `<div class="dc-note">${icon('alert')}<span>${esc(SC.can.why || '')}</span></div>` : '';
+  const msg = DC.msg ? `<div class="dc-msgline${DC.msg.err ? ' err' : ''}">${icon(DC.msg.err ? 'alert' : 'checkCircle')}<span>${esc(DC.msg.text)}</span></div>` : '';
+  return `<div class="dc-row">${nav}<div class="dc-now">${now}</div><div class="dc-acts">${acts}</div></div>${note}${msg}`;
+}
+function dcRenderBar() {
+  const bar = $('#dc-bar'); if (!bar) return;
+  const html = dcBarHtml();
+  if (html === DC.html) return;   // nothing changed: keep hover / focus
+  DC.html = html; bar.innerHTML = html;
+}
+
+/* ---------- the native view ---------- */
+function dcRect() {
+  const f = $('#dc-frame'); if (!f) return null;
+  const r = f.getBoundingClientRect();
+  return { x: r.left, y: r.top, width: r.width, height: r.height };
+}
+function dcShow() {
+  if (!DC.active || DC.covered || (typeof TOUR !== 'undefined' && TOUR) || PAGE !== 'discover') return;
+  const r = dcRect(); if (!r || r.width < 50 || r.height < 50) return;
+  const url = DC.pending; DC.pending = null;   // a page another part of the app asked for (dcOpen)
+  scPost('show', url ? { ...r, url } : r).catch(() => {});
+}
+function dcHide() { scPost('hide').catch(() => {}); }
+function dcMount() {
+  const body = $('#page-body'); if (body) body.classList.add('dc-host');
+  DC.active = true; DC.html = '';
+  dcRenderBar();
+  if (DC.ro) DC.ro.disconnect();
+  const f = $('#dc-frame');
+  if (f && typeof ResizeObserver !== 'undefined') { DC.ro = new ResizeObserver(() => dcShow()); DC.ro.observe(f); }
+  if (!DC.timer) { DC.timer = setInterval(dcPoll, 1500); dcPoll(); }
+  dcShow();
+}
+function dcUnmount() {
+  DC.active = false;
+  if (DC.ro) { DC.ro.disconnect(); DC.ro = null; }
+  if (DC.timer) { clearInterval(DC.timer); DC.timer = null; }
+  const body = $('#page-body'); if (body) body.classList.remove('dc-host');
+  dcHide();
+}
+window.addEventListener('resize', () => dcShow());
+
+/* ---------- status + actions ---------- */
+async function dcPoll() {
+  if (!APP.sc) return;
+  try {
+    const s = await scPost('status');
+    if (s && s.available) SC = s;
+  } catch {}
+  if (DC.active) dcRenderBar();
+}
+/** add (true) or remove (false) a track by URL from the Discover bar */
+async function dcSet(url, add) {
+  if (DC.busy) return;
+  DC.busy = true; dcRenderBar();
+  try {
+    DATA = await api('/api/sc/' + (add ? 'add' : 'remove'), { url });
+    const r = DATA.sc_result || {};
+    if (SC.now && SC.now.url === url) SC.now.in_playlist = add;
+    DC.busy = false;
+    renderSidebar();   // counts changed; the page itself stays put so the player keeps playing
+    dcToast((add ? 'Added ' : 'Removed ') + (r.title ? '“' + r.title + '”' : 'the track') + (add ? ' — it’s in Missing now' : ''));
+  } catch (e) {
+    DC.busy = false;
+    dcToast('Couldn’t ' + (add ? 'add' : 'remove') + ' it: ' + e.message, true);
+  }
+  dcRenderBar();
+}
+/** one-click add from other pages (Not in playlist); falls back to opening SoundCloud */
+async function scAddUrl(url) {
+  if (!scCan()) return dcOpen(url);
+  try {
+    DATA = await api('/api/sc/add', { url });
+    const r = DATA.sc_result || {};
+    render();
+    toast('Added ' + (r.title ? '“' + r.title + '”' : 'the track') + ' to the playlist');
+  } catch (e) { toast('Couldn’t add it: ' + e.message, true); }
+}
+/** open a SoundCloud URL on the Discover page */
+function dcOpen(url) {
+  if (!APP.sc) return window.open(url, '_blank', 'noopener');
+  if (PAGE === 'discover' && DC.active) return void scPost('nav', { url }).catch(() => {});
+  DC.pending = url;   // the view is (re)attached by dcShow, which passes the page along
+  go('discover');
+}
+/** toasts can't be seen under the native view: the bar shows them instead */
+function dcToast(msg, isErr) {
+  if (PAGE !== 'discover' || !DC.active) return false;
+  DC.msg = { text: msg, err: !!isErr };
+  clearTimeout(DC.msgTimer);
+  DC.msgTimer = setTimeout(() => { DC.msg = null; dcRenderBar(); }, isErr ? 6000 : 3200);
+  dcRenderBar();
+  return true;
+}
+async function scSignOut() {
+  const ok = await uiConfirm({ title: 'Sign out of SoundCloud?', body: '<p>DJ HQ forgets the SoundCloud session it keeps for the Discover page. Your playlist and files are not touched.</p>', ok: 'Sign out', icon: 'cloudOff' });
+  if (!ok) return;
+  try { await scPost('signout'); SC = { ...SC, signed_in: false, me: null, can: null }; render(); toast('Signed out of SoundCloud'); }
+  catch (e) { toast('Couldn’t sign out: ' + e.message, true); }
+}

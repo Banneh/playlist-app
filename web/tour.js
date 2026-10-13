@@ -44,6 +44,7 @@ function maybeStartTour() {
 function startTour({ intro = false } = {}) {
   if (TOUR) endTour();
   closeMenu();
+  if (PAGE === 'discover') go('missing');   // the embedded SoundCloud view would cover the tour
   const root = document.createElement('div');
   root.className = 'tour';
   root.innerHTML = '<div class="tour-spot"></div><div class="tour-card"></div>';

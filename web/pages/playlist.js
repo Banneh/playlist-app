@@ -101,6 +101,7 @@ function rowMenu(anchor, id) {
     { label: 'Match to a local file…', icon: 'link', onclick: () => openAssign(id) },
     { label: 'Edit artist / title', icon: 'pencil', onclick: () => { EDIT_ID = id; render(); const a = $('#e-artist'); a && a.focus(); } },
     '-',
+    ...(APP.sc ? [{ label: 'Related tracks on Discover', icon: 'sparkles', hint: 'What SoundCloud suggests after this track, inside DJ HQ', onclick: () => dcOpen(scRelated(t.url)) }] : []),
     { label: 'Open on SoundCloud', icon: 'external', onclick: () => window.open(t.url, '_blank', 'noopener') },
     { label: 'Copy SoundCloud link', icon: 'copy', onclick: () => copyText(t.url, 'Link copied') },
   ];

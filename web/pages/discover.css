@@ -1,0 +1,38 @@
+/* page-specific styles for pages/discover.js (tokens and components come from app.css) */
+
+/* the page fills the main area: bar on top, the native SoundCloud view over the frame */
+.page-body.dc-host { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 24px; }
+body.has-player .page-body.dc-host { padding-bottom: 92px; }
+
+.dc-bar { padding: 10px 12px 10px 10px; margin-bottom: 12px; flex-shrink: 0; }
+.dc-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.dc-nav { display: flex; align-items: center; gap: 2px; flex-shrink: 0; padding-right: 10px; border-right: 1px solid var(--line); }
+.dc-now { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.dc-art { width: 38px; height: 38px; border-radius: 8px; object-fit: cover; background: var(--surface-3); flex-shrink: 0; }
+.dc-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dc-title { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; min-width: 0; }
+.dc-title > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dc-sub { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-sub .tag { margin-left: 2px; }
+.dc-acts { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* the little "playing" bars next to the title */
+.dc-eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; flex-shrink: 0; }
+.dc-eq i { width: 3px; height: 100%; border-radius: 1px; background: var(--accent); animation: dc-eq .9s ease-in-out infinite; transform-origin: bottom; }
+.dc-eq i:nth-child(2) { animation-delay: .25s; }
+.dc-eq i:nth-child(3) { animation-delay: .5s; }
+@keyframes dc-eq { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
+
+/* a reason the add button is missing, and feedback (toasts can't show over the view) */
+.dc-note, .dc-msgline { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 7px 10px; border-radius: var(--r-sm); font-size: 12.5px; }
+.dc-note { background: var(--amber-soft); color: var(--amber); }
+.dc-note .ic, .dc-msgline .ic { flex-shrink: 0; }
+.dc-msgline { background: var(--green-soft); color: var(--green); }
+.dc-msgline.err { background: var(--red-soft); color: var(--red); }
+
+/* placeholder under the native view (visible for a moment before it attaches) */
+.dc-frame { flex: 1; min-height: 200px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; color: var(--text-3); }
+
+@media (max-width: 1040px) {
+  .dc-nav .btn:not(.btn-icon) span, .dc-nav .btn:not(.btn-icon) { padding: 0 8px; }
+}

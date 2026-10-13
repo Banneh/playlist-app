@@ -10,6 +10,9 @@
        search:  'placeholder' | false,     // search box placeholder, or false to hide it
        after:   () => {},                  // optional, runs after body is in the DOM
        onShow:  () => {},                  // optional, runs when the page is navigated to
+       onHide:  () => {},                  // optional, runs when another page takes over
+       onCover: (on) => {},                // optional, a menu or dialog is open (true) / closed again
+       toast:   (msg, isErr) => bool,      // optional, show feedback itself (return true to swallow the toast)
      };
 
    Everything here is global on purpose: markup uses inline onclick handlers. */
@@ -69,6 +72,7 @@ const PATHS = {
   arrowUp: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
   arrowUpCircle: '<circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4"/><path d="M12 16V8"/>',
   arrowRight: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  arrowLeft: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
   sparkles: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
   inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
   listMusic: '<path d="M21 15V6"/><path d="M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path d="M12 12H3"/><path d="M16 6H3"/><path d="M12 18H3"/>',
@@ -106,6 +110,8 @@ const emptyHtml = ({ ico = 'music', kind = '', title = '', text = '', acts = '' 
 
 /* ---------- toast ---------- */
 function toast(msg, isErr) {
+  const pg = PAGES[PAGE];
+  if (pg && pg.toast && pg.toast(msg, isErr)) return;
   const t = $('#toast');
   t.innerHTML = `${icon(isErr ? 'alert' : 'checkCircle')}<span>${esc(msg)}</span>`;
   t.classList.toggle('err', !!isErr); t.classList.add('show');
@@ -174,9 +180,12 @@ async function refreshPlaylist({ manual = false } = {}) {
 /* ---------- popover menu ----------
    showMenu(anchorEl, [{ label, icon, onclick, danger, checked, disabled, hint }, '-', { label, header: true }]) */
 let MENU = null;
+/** pages with a native view over them (Discover) hide it while a menu or dialog is open */
+function coverNative(on) { const pg = PAGES[PAGE]; pg && pg.onCover && pg.onCover(on); }
 function closeMenu() {
   if (!MENU) return;
   const m = MENU; MENU = null;
+  coverNative(false);
   if (m._anchor) m._anchor.removeAttribute('aria-expanded');
   m.classList.remove('show');
   setTimeout(() => m.remove(), 120);
@@ -199,6 +208,7 @@ function showMenu(anchor, items, opts = {}) {
   m.style.left = x + 'px'; m.style.top = y + 'px';
   anchor.setAttribute('aria-expanded', 'true');
   MENU = m;
+  coverNative(true);
   requestAnimationFrame(() => m.classList.add('show'));
   return m;
 }
@@ -215,8 +225,10 @@ function modal(build, opts = {}) {
     const ov = document.createElement('div'); ov.className = 'overlay';
     const dlg = document.createElement('div'); dlg.className = 'dialog' + (opts.wide ? ' wide' : '');
     ov.appendChild(dlg); document.body.appendChild(ov);
+    coverNative(true);
     const done = v => {
       document.removeEventListener('keydown', onKey);
+      coverNative(false);
       ov.classList.remove('show');
       setTimeout(() => ov.remove(), 180);
       resolve(v);
@@ -283,6 +295,7 @@ const NAV = [
   { id: 'all', label: 'All tracks', icon: 'listMusic', count: () => DATA.tracks.length },
   { id: 'missing', label: 'Missing', icon: 'download', count: () => DATA.missing, kind: () => DATA.missing ? '' : 'soft' },
   { id: 'have', label: 'Have', icon: 'checkCircle', count: () => DATA.have },
+  { id: 'discover', label: 'Discover', icon: 'cloud', count: () => '', when: () => !!APP.sc },
   { sec: 'Library' },
   { id: 'new', label: 'New', icon: 'sparkles', count: () => DATA.new_count, kind: () => DATA.new_count ? 'accent' : '' },
   { id: 'inbox', label: 'Downloads', icon: 'inbox', count: () => INBOX ? INBOX.items.length : '', kind: () => INBOX && INBOX.items.length ? 'accent' : '', hideZero: true },
@@ -292,6 +305,7 @@ const NAV = [
 ];
 function go(page) {
   if (!PAGES[page]) return;
+  if (page !== PAGE && PAGES[PAGE] && PAGES[PAGE].onHide) PAGES[PAGE].onHide();
   PAGE = page; EDIT_ID = null; closeMenu();
   render();
   const p = PAGES[page];
@@ -306,7 +320,7 @@ function render() {
   const noLibs = !(DATA.libraries || []).length;
   document.body.classList.toggle('onboarding', noLibs);
   $('#app').hidden = noLibs; $('#welcome').hidden = !noLibs;
-  if (noLibs) { $('#welcome').innerHTML = PAGES.welcome.body(); PAGES.welcome.after && PAGES.welcome.after(); return; }
+  if (noLibs) { PAGES[PAGE] && PAGES[PAGE].onHide && PAGES[PAGE].onHide(); $('#welcome').innerHTML = PAGES.welcome.body(); PAGES.welcome.after && PAGES.welcome.after(); return; }
 
   renderSidebar();
   const page = PAGES[PAGE] || PAGES.missing;
@@ -319,6 +333,7 @@ function render() {
     $('#ph-title').innerHTML = `<h2>${esc(page.title())}</h2><div class="sub">${LAST_ERR ? 'Couldn’t fetch the playlist: <b>' + esc(LAST_ERR) + '</b>' : 'No playlist data yet'}</div>`;
     $('#ph-actions').innerHTML = ''; $('#ph-tools').hidden = true; $('#ph-tools').innerHTML = '';
     $('#page-body').innerHTML = PAGES.welcome.noData();
+    page.onHide && page.onHide();
     return;
   }
   $('#ph-title').innerHTML = `<h2>${esc(page.title())}</h2>${page.sub ? `<div class="sub">${page.sub()}</div>` : ''}`;
@@ -350,6 +365,7 @@ function renderSidebar() {
 
   $('#nav').innerHTML = NAV.map(it => {
     if (it.sec) return `<div class="nav-sec">${esc(it.sec)}</div>`;
+    if (it.when && !it.when()) return '';
     const c = DATA.ready ? it.count() : '';
     const show = c !== '' && c !== undefined && !(it.hideZero && !c);
     return `<button class="nav-item${PAGE === it.id ? ' on' : ''}" data-page="${it.id}" onclick="go('${it.id}')" title="${esc(it.label)}${show ? ' · ' + c : ''}">${icon(it.icon)}<span class="lbl">${esc(it.label)}</span>${
@@ -408,6 +424,7 @@ function libraryMenu(anchor) {
   showMenu(anchor, [
     { label: APP.version ? 'DJ HQ ' + APP.version : 'DJ HQ', header: true },
     { label: 'Open playlist on SoundCloud', icon: 'external', disabled: !DATA.playlist_url, onclick: () => window.open(DATA.playlist_url, '_blank', 'noopener') },
+    ...(APP.sc ? [{ label: 'Discover: listen and add', icon: 'cloud', onclick: () => go('discover') }] : []),
     { label: 'Rescan music folder', icon: 'folder', onclick: rescanFolder },
     { label: 'Export rekordbox XML…', icon: 'upload', onclick: () => typeof exportXml === 'function' ? exportXml() : go('prepare') },
     '-',
@@ -514,6 +531,7 @@ async function boot() {
     DATA = await api('/api/state');
     render();
     if (typeof loadInbox === 'function' && (DATA.libraries || []).length) loadInbox();
+    if (APP.sc && typeof dcPoll === 'function') dcPoll();
     if (typeof maybeStartTour === 'function') setTimeout(maybeStartTour, 600);
     setTimeout(() => checkForUpdates(), 4000);
     setInterval(() => checkForUpdates(), 24 * 60 * 60 * 1000);

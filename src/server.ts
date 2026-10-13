@@ -15,6 +15,26 @@ export interface ServerOpts {
   reveal?: (p: string) => void;
   /** true inside the packaged desktop app (enables the download link in update notices) */
   packaged?: boolean;
+  /** the embedded SoundCloud view behind the Discover page (Electron only) */
+  sc?: ScView;
+}
+
+export interface ScRect { x: number; y: number; width: number; height: number; }
+export interface ScView {
+  /** attach the view to the window at these window coordinates (loads SoundCloud the first time) */
+  show(rect: ScRect, url?: string): Promise<void>;
+  hide(): void;
+  setBounds(rect: ScRect): void;
+  navigate(url: string): void;
+  back(): void;
+  /** the track the SoundCloud player bar is showing, straight from the page */
+  nowPlaying(): Promise<{ url: string; title: string; artist: string; playing: boolean } | null>;
+  /** the page the view is on ("" before the first load) */
+  url(): string;
+  /** the session's oauth_token cookie, null when nobody is signed in */
+  token(): Promise<string | null>;
+  /** forget the SoundCloud session (cookies + storage) */
+  signOut(): Promise<void>;
 }
 
 export function startServer(opts: ServerOpts): Promise<http.Server> {
@@ -41,6 +61,58 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
     ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png",
     ".woff2": "font/woff2", ".json": "application/json; charset=utf-8",
   };
+
+  // Discover page: the embedded SoundCloud view and the signed-in user's actions.
+  // Status calls are not queued (they poll); add/remove touch state.json, so they are.
+  const rect = (d: any): ScRect => ({ x: Math.round(+d.x || 0), y: Math.round(+d.y || 0), width: Math.max(0, Math.round(+d.width || 0)), height: Math.max(0, Math.round(+d.height || 0)) });
+  let nowCache: { url: string; now: core.ScNow | null } = { url: "", now: null };
+  async function scRoute(action: string, data: any): Promise<any> {
+    const sc = opts.sc;
+    if (!sc) return { available: false };
+    switch (action) {
+      case "show":   await sc.show(rect(data), data.url ? String(data.url) : undefined); return { ok: true };
+      case "hide":   sc.hide(); return { ok: true };
+      case "bounds": sc.setBounds(rect(data)); return { ok: true };
+      case "nav": {
+        if (data.action === "back") sc.back();
+        else if (data.action === "signin") sc.navigate("https://soundcloud.com/signin");
+        else if (data.action === "home") sc.navigate("https://soundcloud.com/discover");
+        else if (data.action === "playlist") { const l = core.activeLib(); if (l) sc.navigate(l.url); }
+        else if (typeof data.url === "string" && /^https:\/\/(www\.|m\.)?soundcloud\.com\//.test(data.url)) sc.navigate(data.url);
+        return { ok: true };
+      }
+      case "signout": await sc.signOut(); return { ok: true };
+      case "status": {
+        const token = await sc.token();
+        let me: core.ScUser | null = null, can: { ok: boolean; why?: string; likes: boolean } | null = null;
+        if (token) {
+          try { me = await core.scMe(token); } catch { me = null; }   // a stale cookie: treat as signed out
+          if (me) { try { can = await core.scCanWrite(token); } catch (e: any) { can = { ok: false, why: e.message, likes: false }; } }
+        }
+        let now: any = null;
+        try { now = await sc.nowPlaying(); } catch {}
+        if (now && now.url) {
+          const url = now.url.split(/[?#]/)[0];
+          if (url !== nowCache.url) {
+            let r: core.ScNow | null = null;
+            try { r = await core.scNow(url); } catch {}
+            nowCache = { url, now: r };
+          }
+          const t = nowCache.now;
+          const inList = t ? (core.activeLib()?.playlist?.tracks || []).some((x) => x.id === t.id) : false;
+          now = { ...now, url, track: t, in_playlist: inList };
+        }
+        return { available: true, url: sc.url(), signed_in: !!me, me, can, now };
+      }
+      case "add": case "remove":
+        return enqueue(async () => {   // the token is read right before the write, so a sign-out in the view is respected
+          const token = await sc.token();
+          if (!token) throw new Error("sign in to SoundCloud on the Discover page first");
+          return core.scSetInPlaylist(token, String(data.url || ""), action === "add");
+        });
+      default: throw new Error("unknown SoundCloud action");
+    }
+  }
 
   const server = http.createServer((req, res) => {
     const send = (code: number, type: string, body: Buffer | string) => {
@@ -75,7 +147,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
       if (req.url === "/api/app") {
         let version = "";
         try { version = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || ""; } catch {}
-        return json({ version, platform: process.platform, arch: process.arch, packaged: !!opts.packaged });
+        return json({ version, platform: process.platform, arch: process.arch, packaged: !!opts.packaged, sc: !!opts.sc });
       }
       // static UI assets (web/app.css, web/app.js, web/pages/*.js)
       const rel = decodeURIComponent((req.url || "/").split("?")[0]);
@@ -101,6 +173,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           try { fs.writeFileSync(prefsPath, JSON.stringify(next, null, 2)); } catch (e: any) { return json({ error: e.message }, 500); }
           return json(next);
         }
+        if ((req.url || "").startsWith("/api/sc/")) return void scRoute(req.url!.slice(8), data).then(json, (e) => json({ error: e.message }, 500));
         switch (req.url) {
           case "/api/refresh":  return route(() => core.refresh());
           case "/api/rescan":   return route(() => core.buildView());

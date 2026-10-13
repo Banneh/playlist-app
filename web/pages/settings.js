@@ -67,6 +67,15 @@ PAGES.settings = {
          <button class="${THEME === 'dark' ? 'on' : ''}" onclick="stTheme('dark')">${icon('moon')}Dark</button>
        </div>`);
 
+    const account = !APP.sc ? '' : stCard('cloud', 'blue', 'SoundCloud account',
+      SC.signed_in && SC.me
+        ? 'The Discover page is signed in, so tracks can be added to ' + (SC.can && SC.can.likes ? 'your Likes' : 'the playlist') + ' with one click.'
+        : 'Sign in on the Discover page to add tracks straight from the SoundCloud player. The session stays on this computer only.',
+      SC.signed_in && SC.me
+        ? `<div class="st-account">${SC.me.avatar ? `<img class="st-avatar" src="${esc(SC.me.avatar)}" alt="">` : `<span class="st-avatar ph">${icon('cloud')}</span>`}<b>${esc(SC.me.username)}</b>${SC.can && !SC.can.ok ? tag('Can’t add here', 'warn', 'alert', SC.can.why || '') : tag('Connected', 'ok', 'check')}</div>
+           <button class="btn btn-sm" onclick="scSignOut()">${icon('cloudOff')}Sign out…</button>`
+        : `<button class="btn btn-sm btn-primary" onclick="dcOpen('https://soundcloud.com/signin')">${icon('cloud')}Sign in on Discover</button>`);
+
     const bytes = DATA.backup_bytes || 0;
     const backups = stCard('history', 'green', 'Backups',
       'Before a file is converted, the untouched original is kept here, together with MP3s that a lossless download replaced. That is what Restore originals copies back.',
@@ -79,7 +88,7 @@ PAGES.settings = {
        <button class="btn btn-sm" onclick="startTour()">${icon('sparkles')}Show me around</button>
        <div class="st-path-row st-wide"><span class="faint">Data folder</span><div class="path" title="${esc(S.data_dir || '')}">${icon('folder')}<span>${esc(shortPath(S.data_dir || ''))}</span></div></div>`);
 
-    return `<div class="st-list">${library}${downloads}${refresh}${appearance}${backups}${about}</div>`;
+    return `<div class="st-list">${library}${account}${downloads}${refresh}${appearance}${backups}${about}</div>`;
   },
 };
 

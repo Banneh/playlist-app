@@ -289,23 +289,160 @@ export async function fetchPlaylist(lib: Library): Promise<void> {
   for (const tid of ids) {
     const t = tracks[tid];
     if (!t) continue;
-    out.push({
-      id: tid,
-      title: t.title || "",
-      user: t.user?.username || "",
-      pub_artist: t.publisher_metadata?.artist || null,
-      dur: Math.floor((t.full_duration || t.duration || 0) / 1000),
-      url: t.permalink_url || "",
-      art: t.artwork_url || t.user?.avatar_url || "",
-      buy_url: t.purchase_url || null,
-      buy_title: t.purchase_title || null,
-      sc_dl: !!(t.downloadable && t.has_downloads_left),
-      desc_links: extractLinks(t.description || ""),
-      added: !lib.playlist ? 0 : prevAdded.has(tid) ? prevAdded.get(tid)! : now,
-    });
+    out.push(trackFromApi(t, !lib.playlist ? 0 : prevAdded.has(tid) ? prevAdded.get(tid)! : now));
   }
   lib.playlist = { title, url: lib.url, tracks: out };
   saveState();
+}
+
+/** One snapshot row from an api-v2 track object. */
+function trackFromApi(t: any, added: number): PlTrack {
+  return {
+    id: Number(t.id),
+    title: t.title || "",
+    user: t.user?.username || "",
+    pub_artist: t.publisher_metadata?.artist || null,
+    dur: Math.floor((t.full_duration || t.duration || 0) / 1000),
+    url: t.permalink_url || "",
+    art: t.artwork_url || t.user?.avatar_url || "",
+    buy_url: t.purchase_url || null,
+    buy_title: t.purchase_title || null,
+    sc_dl: !!(t.downloadable && t.has_downloads_left),
+    desc_links: extractLinks(t.description || ""),
+    added,
+  };
+}
+
+// ---------------- soundcloud account (the Discover page) ----------------
+// The desktop app shows soundcloud.com in an embedded view where the user signs in
+// normally; the session's oauth_token cookie is handed to these functions per call and
+// is never written to state.json. Writes go through the same api-v2 the web player uses.
+
+export interface ScUser { id: number; username: string; permalink: string; avatar: string; }
+/** a track the embedded player reports, resolved against SoundCloud */
+export interface ScNow { url: string; id: number; title: string; user: string; dur: number; art: string; }
+
+const SC_ORIGIN = { Origin: "https://soundcloud.com", Referer: "https://soundcloud.com/" };
+
+async function ensureClientId(): Promise<string> {
+  if (!STATE.client_id) {
+    const page = activeLib()?.url || "https://soundcloud.com/discover";
+    STATE.client_id = await scrapeClientId(await httpGet(page));
+    saveState();
+  }
+  return STATE.client_id;
+}
+
+/** api-v2 request, optionally as the signed-in user; rescrapes the client_id once when
+ *  SoundCloud rejects it (a 401 *with* a token means the session is gone, not the id). */
+async function scFetch(method: string, pathAndQuery: string, token?: string | null, body?: any): Promise<any> {
+  for (let attempt = 0; ; attempt++) {
+    const cid = await ensureClientId();
+    const sep = pathAndQuery.includes("?") ? "&" : "?";
+    const headers: Record<string, string> = { "User-Agent": UA, Accept: "application/json", ...SC_ORIGIN };
+    if (token) headers.Authorization = "OAuth " + token;
+    if (body !== undefined) headers["Content-Type"] = "application/json";
+    const r = await fetch(`https://api-v2.soundcloud.com/${pathAndQuery}${sep}client_id=${cid}`,
+      { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    if (r.ok) { const txt = await r.text(); return txt ? JSON.parse(txt) : {}; }
+    if ((r.status === 401 || r.status === 403) && attempt === 0 && !token) { STATE.client_id = null; continue; }
+    if (r.status === 401) throw new Error("SoundCloud signed you out — sign in again on the Discover page");
+    if (r.status === 403) throw new Error("SoundCloud refused this (403)");
+    if (r.status === 404) throw new Error("SoundCloud could not find that");
+    throw new Error(`SoundCloud answered ${r.status}`);
+  }
+}
+
+const meCache = new Map<string, ScUser>();
+/** The signed-in user behind a session token (cached per token). */
+export async function scMe(token: string): Promise<ScUser> {
+  const hit = meCache.get(token);
+  if (hit) return hit;
+  const u = await scFetch("GET", "me", token);
+  if (!u || typeof u.id !== "number") throw new Error("not signed in");
+  const me: ScUser = { id: u.id, username: u.username || u.permalink || "", permalink: u.permalink || "", avatar: u.avatar_url || "" };
+  meCache.clear(); meCache.set(token, me);
+  return me;
+}
+
+const resolveCache = new Map<string, any>();
+/** resolve a soundcloud.com URL to its api-v2 object (track / playlist / user); cached */
+async function scResolve(url: string): Promise<any> {
+  const key = url.split(/[?#]/)[0].replace(/\/+$/, "");
+  const hit = resolveCache.get(key);
+  if (hit) return hit;
+  const obj = await scFetch("GET", `resolve?url=${encodeURIComponent(key)}`);
+  if (resolveCache.size > 500) resolveCache.clear();
+  resolveCache.set(key, obj);
+  return obj;
+}
+
+/** What the Discover bar shows for the track the embedded player reports. */
+export async function scNow(url: string): Promise<ScNow | null> {
+  if (!/^https?:\/\/(www\.|m\.)?soundcloud\.com\/[^\/]+\/[^\/]+/.test(url)) return null;
+  const t = await scResolve(url);
+  if (!t || t.kind !== "track") return null;
+  return { url: t.permalink_url || url, id: t.id, title: t.title || "", user: t.user?.username || "",
+           dur: Math.floor((t.full_duration || t.duration || 0) / 1000), art: t.artwork_url || t.user?.avatar_url || "" };
+}
+
+/** Whether the signed-in user may add to the active library's playlist / likes:
+ *  { ok: true } or { ok: false, why }. */
+export async function scCanWrite(token: string): Promise<{ ok: boolean; why?: string; likes: boolean }> {
+  const lib = activeLib();
+  if (!lib) return { ok: false, why: "no library", likes: false };
+  const me = await scMe(token);
+  const likes = likesUser(lib.url);
+  if (likes) {
+    if (likes.toLowerCase() !== me.permalink.toLowerCase())
+      return { ok: false, likes: true, why: `This library follows ${likes}'s likes, but you are signed in as ${me.username}.` };
+    return { ok: true, likes: true };
+  }
+  const pl = await scResolve(lib.url);
+  if (!pl || pl.kind !== "playlist") return { ok: false, likes: false, why: "The library's playlist could not be found on SoundCloud." };
+  if (pl.user_id !== me.id)
+    return { ok: false, likes: false, why: `This playlist belongs to ${pl.user?.username || "someone else"}; you can only add to your own playlists.` };
+  return { ok: true, likes: false };
+}
+
+/** Add (or remove) a track to the active library's playlist or likes as the signed-in
+ *  user, then patch the snapshot so the UI shows it right away; the next refresh
+ *  reconciles with SoundCloud. */
+export async function scSetInPlaylist(token: string, url: string, add: boolean): Promise<any> {
+  const lib = requireLib();
+  if (!lib.playlist) throw new Error("fetch the playlist first");
+  const can = await scCanWrite(token);
+  if (!can.ok) throw new Error(can.why || "cannot write to this playlist");
+  const t = await scResolve(url);
+  if (!t || t.kind !== "track") throw new Error("that is not a SoundCloud track");
+  const tid = Number(t.id);
+  const me = await scMe(token);
+  const have = lib.playlist.tracks.some((x) => x.id === tid);
+  if (can.likes) {
+    if (add && !have) await scFetch("PUT", `users/${me.id}/track_likes/${tid}`, token);
+    if (!add && have) await scFetch("DELETE", `users/${me.id}/track_likes/${tid}`, token);
+  } else {
+    // the playlist update takes the whole track list: take SoundCloud's current one, not our snapshot
+    resolveCache.delete(lib.url.split(/[?#]/)[0].replace(/\/+$/, ""));
+    const pl = await scResolve(lib.url);
+    const ids: number[] = (pl.tracks || []).map((x: any) => Number(x.id)).filter((n: number) => n > 0);
+    const next = add ? (ids.includes(tid) ? ids : [...ids, tid]) : ids.filter((n) => n !== tid);
+    if (next.length !== ids.length)
+      await scFetch("PUT", `playlists/${pl.id}`, token, { playlist: { tracks: next.map((id) => ({ id })) } });
+    resolveCache.delete(lib.url.split(/[?#]/)[0].replace(/\/+$/, ""));
+  }
+  // patch the snapshot: likes list newest first, playlists in order of adding
+  lib.playlist.tracks = lib.playlist.tracks.filter((x) => x.id !== tid);
+  if (add) {
+    const row = trackFromApi(t, Date.now());
+    if (can.likes) lib.playlist.tracks.unshift(row); else lib.playlist.tracks.push(row);
+    // a local file previously "found" as this track is now a real match
+    for (const k of Object.keys(STATE.found)) if (STATE.found[k].id === tid) delete STATE.found[k];
+  }
+  saveState();
+  const view = await buildView();
+  view.sc_result = { id: tid, added: add, title: t.title || "", user: t.user?.username || "" };
+  return view;
 }
 
 // ---------------- local scan ----------------
