@@ -22,7 +22,7 @@ const DEMO_DEVICES = [
   { id: 'nxs2', label: 'CDJ-2000NXS2 / XDJ-XZ' },
   { id: 'cdj-3000', label: 'CDJ-3000' },
 ];
-const DEMO_LIB = { id: 'demo', name: 'Sample library', dir: '/Users/you/Music/Sample' };
+const DEMO_LIB = { id: 'demo', name: 'Sample library', dir: '/Users/you/Music/Sample', dirs: ['/Users/you/Music/Sample'], subfolders: false };
 const DEMO_HOME = '/Users/you';
 const DEMO_DATA_DIR = DEMO_HOME + '/Library/Application Support/DJ HQ';
 

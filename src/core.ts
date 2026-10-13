@@ -70,7 +70,12 @@ export interface PlTrack {
 }
 export interface Playlist { title: string; url: string; tracks: PlTrack[]; }
 export interface Library {
+  /** the main music folder: new downloads are moved here */
   id: string; dir: string; url: string; playlist: Playlist | null;
+  /** further folders that belong to this library (see libDirs) */
+  dirs?: string[];
+  /** also scan the folders inside each library folder (off by default) */
+  subfolders?: boolean;
   /** tracks added after this (ms) are NEW; set by "Mark all as seen" */
   seen_mark?: number;
   /** file-arrival tracking has been initialised for this library (files present then aren't "new") */
@@ -170,7 +175,7 @@ export async function setSettings(data: any): Promise<any> {
 }
 /** Folders the UI may stream audio from (preview): every library folder and the downloads folder. */
 export function allowedDirs(): string[] {
-  return [...STATE.libraries.map((l) => path.resolve(l.dir)), path.resolve(inboxDir())];
+  return [...STATE.libraries.flatMap((l) => libDirs(l).map((d) => path.resolve(d))), path.resolve(inboxDir())];
 }
 /** Total bytes under originals/<lib>/ (backups of converted files + replaced MP3s). */
 export function backupBytes(lib: Library | null): number {
@@ -191,6 +196,40 @@ export function activeLib(): Library | null {
 
 function libName(lib: Library): string {
   return lib.playlist?.title || path.basename(lib.dir.replace(/\/+$/, "")) || lib.id;
+}
+
+/** Every folder of a library: the main one first, then the extra ones in the order they were added. */
+export function libDirs(lib: Library): string[] {
+  return [lib.dir, ...(lib.dirs || [])];
+}
+/** The key an extra folder's files carry: "<folder name>/<relative path>" (the main
+ *  folder's files are keyed by their relative path alone, so old state stays valid).
+ *  An extra folder named like another one, or like a subfolder of the main folder
+ *  while subfolders are scanned, gets " (2)", " (3)" … so keys stay unambiguous. */
+function dirPrefixes(lib: Library): Map<string, string> {
+  const out = new Map<string, string>();
+  const used = new Set<string>();
+  if (lib.subfolders) {
+    try {
+      for (const e of fs.readdirSync(lib.dir, { withFileTypes: true }))
+        if (e.isDirectory() && !e.name.startsWith(".")) used.add(e.name);
+    } catch {}
+  }
+  libDirs(lib).forEach((d, i) => {
+    if (i === 0) { out.set(d, ""); return; }
+    const base = path.basename(d.replace(/[\/\\]+$/, "")) || "folder";
+    let name = base;
+    for (let n = 2; used.has(name); n++) name = `${base} (${n})`;
+    used.add(name);
+    out.set(d, name + "/");
+  });
+  return out;
+}
+/** Absolute path of a library file key (the inverse of the keys scanLocal hands out). */
+function libPath(lib: Library, key: string): string {
+  for (const [d, prefix] of dirPrefixes(lib))
+    if (prefix && key.startsWith(prefix)) return path.join(d, ...key.slice(prefix.length).split("/"));
+  return path.join(lib.dir, ...key.split("/"));
 }
 
 function requireLib(): Library {
@@ -505,7 +544,9 @@ export function compatReason(fmt: [string, number, number], devKey: string): str
   return (codec || "unknown").toUpperCase() + " unsupported";
 }
 
-interface LocalFile { name: string; path: string; dur: number; fmt: [string, number, number]; tags: [string, string, string]; }
+/** name: the key the UI and state use (relative to its library folder, "/"-separated,
+ *  prefixed with the folder name for extra folders); base: the file name alone. */
+interface LocalFile { name: string; base: string; path: string; dur: number; fmt: [string, number, number]; tags: [string, string, string]; }
 
 async function refreshCache(p: string): Promise<void> {
   const st = fs.statSync(p);
@@ -513,29 +554,53 @@ async function refreshCache(p: string): Promise<void> {
   STATE.dur_cache[p] = [st.size, Math.floor(st.mtimeMs / 1000), pr.dur, pr.fmt, pr.tags];
 }
 
-const scanLocal = (lib: Library) => scanFolder(lib.dir);
+/** Every audio file of a library: all its folders, with their subfolders when the
+ *  library asks for that. Keys (name) are unique across folders; a path that is
+ *  reachable twice (nested folders) is listed once. */
+async function scanLocal(lib: Library): Promise<LocalFile[]> {
+  const out: LocalFile[] = [];
+  const seenPath = new Set<string>(), seenKey = new Set<string>();
+  for (const [d, prefix] of dirPrefixes(lib)) {
+    for (const f of await scanFolder(d, !!lib.subfolders)) {
+      const key = prefix + f.name;
+      if (seenPath.has(f.path) || seenKey.has(key)) continue;
+      seenPath.add(f.path); seenKey.add(key);
+      out.push({ ...f, name: key });
+    }
+  }
+  return out;
+}
 
-/** Audio files directly inside a folder, probed once and cached by size+mtime. */
-async function scanFolder(d: string): Promise<LocalFile[]> {
+/** Audio files inside a folder (and, with `recursive`, its subfolders), probed once
+ *  and cached by size+mtime. Names are relative to the folder, "/"-separated. */
+async function scanFolder(d: string, recursive = false): Promise<LocalFile[]> {
   const cache = STATE.dur_cache;
   const files: LocalFile[] = [];
   const seen = new Set<string>();
-  if (fs.existsSync(d) && fs.statSync(d).isDirectory()) {
-    for (const f of fs.readdirSync(d).sort()) {
-      if (f.startsWith(".") || !AUDIO_EXT.includes(path.extname(f).toLowerCase())) continue;
+  const walk = async (dir: string, rel: string): Promise<void> => {
+    let entries: fs.Dirent[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    for (const e of entries) {
+      const f = e.name;
+      if (f.startsWith(".")) continue;
+      const p = path.join(dir, f);
+      if (e.isDirectory()) { if (recursive) await walk(p, rel + f + "/"); continue; }
+      if (!e.isFile() || !AUDIO_EXT.includes(path.extname(f).toLowerCase())) continue;
       if (/\.tmp\.[^.]+$/i.test(f)) continue; // in-flight rewrite by writeTags/convertAll
-      const p = path.join(d, f);
       const st = fs.statSync(p);
       seen.add(p);
       const c = cache[p] as CacheEntry | undefined;
       if (!c || c[0] !== st.size || c[1] !== Math.floor(st.mtimeMs / 1000) || c.length < 5)
         await refreshCache(p);
-      const e = cache[p] as CacheEntry;
-      files.push({ name: f, path: p, dur: e[2], fmt: e[3], tags: e[4] });
+      const en = cache[p] as CacheEntry;
+      files.push({ name: rel + f, base: f, path: p, dur: en[2], fmt: en[3], tags: en[4] });
     }
-  }
+  };
+  if (fs.existsSync(d) && fs.statSync(d).isDirectory()) await walk(d, "");
+  const under = (k: string) => recursive ? k.startsWith(d + path.sep) : path.dirname(k) === d;
   for (const k of Object.keys(cache))
-    if (path.dirname(k) === d && !seen.has(k)) delete cache[k];
+    if (under(k) && !seen.has(k)) delete cache[k];
   saveState();
   return files;
 }
@@ -611,7 +676,7 @@ const looseEq = (a: string, b: string) => norm(a) === norm(b);
 /** Artist/title for a local file that isn't in the playlist: "Artist - Title.ext",
  *  overridden by an inline edit. */
 function extraArtistTitle(f: LocalFile): [string, string] {
-  const stem = f.name.replace(/\.[^.]+$/, "");
+  const stem = f.base.replace(/\.[^.]+$/, "");
   const i = stem.indexOf(" - ");
   let [a, t] = i >= 0 ? [stem.slice(0, i).trim(), stem.slice(i + 3).trim()] : ["", stem];
   const ed = STATE.edits["x:" + f.path];
@@ -804,17 +869,42 @@ function copyPreservingTimes(src: string, dst: string): void {
 
 const backupDir = (lib: Library) => path.join(DATA_DIR, "originals", lib.id);
 
+/** Backed-up originals of a library: [key, backup path], key as scanLocal hands it
+ *  out (backups mirror the library's folder layout under originals/<lib>/; the
+ *  replaced/ folder holds MP3s that lossless downloads replaced and is not one). */
+function backupEntries(lib: Library): [string, string][] {
+  const bdir = backupDir(lib);
+  const out: [string, string][] = [];
+  const walk = (dir: string, rel: string): void => {
+    let entries: fs.Dirent[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
+      if (e.isDirectory()) { if (!(dir === bdir && e.name === "replaced")) walk(path.join(dir, e.name), rel + e.name + "/"); }
+      else if (e.isFile()) out.push([rel + e.name, path.join(dir, e.name)]);
+    }
+  };
+  walk(bdir, "");
+  return out;
+}
+
+/** Backups that could go back into the library: [key, backup path, library path];
+ *  a backup whose folder is gone (removed from the library, deleted) is left out. */
+function restorable(lib: Library): [string, string, string][] {
+  const out: [string, string, string][] = [];
+  for (const [key, src] of backupEntries(lib)) {
+    const dst = libPath(lib, key);
+    if (fs.existsSync(path.dirname(dst))) out.push([key, src, dst]);
+  }
+  return out;
+}
+
 function restorableCount(lib: Library | null): number {
   // backups that differ (size/mtime) from the current library copy
   if (!lib) return 0;
-  const bdir = backupDir(lib);
-  if (!fs.existsSync(bdir)) return 0;
   let n = 0;
-  for (const f of fs.readdirSync(bdir)) {
-    const src = path.join(bdir, f);
-    if (!fs.statSync(src).isFile()) continue;
+  for (const [, src, dst] of restorable(lib)) {
     try {
-      const b = fs.statSync(src), c = fs.statSync(path.join(lib.dir, f));
+      const b = fs.statSync(src), c = fs.statSync(dst);
       if (b.size !== c.size || Math.abs(b.mtimeMs - c.mtimeMs) > 1000) n++;
     } catch {
       n++;
@@ -830,7 +920,7 @@ export async function buildView(libArg?: Library): Promise<any> {
   let dev = STATE.device || "xdj-700";
   if (!DEVICES[dev]) dev = "xdj-700";
   const base: any = {
-    libraries: STATE.libraries.map((l) => ({ id: l.id, name: libName(l), dir: l.dir })),
+    libraries: STATE.libraries.map((l) => ({ id: l.id, name: libName(l), dir: l.dir, dirs: libDirs(l), subfolders: !!l.subfolders })),
     active: lib ? lib.id : null,
     device: dev,
     devices: Object.entries(DEVICES).map(([id, d]) => ({ id, label: d.label })),
@@ -846,6 +936,7 @@ export async function buildView(libArg?: Library): Promise<any> {
   const pl = lib.playlist;
   const genre = pl.title || "Trance";
   const fmap = new Map(files.map((f) => [f.name, f]));
+  const byPath = new Map(files.map((f) => [f.path, f]));
   // manual assignments win over auto-matching; drop entries whose file vanished
   const trackIds = new Set(pl.tracks.map((t) => t.id));
   let assignedDirty = false;
@@ -858,11 +949,12 @@ export async function buildView(libArg?: Library): Promise<any> {
   }
   // local files whose SoundCloud match has since been added to the playlist:
   // pin the file to that track (unless the track already has a manual file)
-  const foundPrefix = "x:" + lib.dir + path.sep;
+  const foundPrefixes = libDirs(lib).map((d) => "x:" + d + path.sep);
   for (const k of Object.keys(STATE.found)) {
-    if (!k.startsWith(foundPrefix)) continue;
-    const fname = path.basename(k.slice(2));
-    if (!fmap.has(fname)) { delete STATE.found[k]; assignedDirty = true; continue; }
+    if (!foundPrefixes.some((pre) => k.startsWith(pre))) continue;
+    const ff = byPath.get(k.slice(2));
+    if (!ff) { delete STATE.found[k]; assignedDirty = true; continue; }
+    const fname = ff.name;
     const tid = String(STATE.found[k].id);
     if (!trackIds.has(Number(tid))) continue;
     if (!STATE.assigned[tid] || !fmap.has(STATE.assigned[tid])) {
@@ -887,7 +979,7 @@ export async function buildView(libArg?: Library): Promise<any> {
     let best: PlTrack | null = null, bestS = 0;
     for (const t of pl.tracks) {
       if (manual.has(t.id)) continue; // manually decided, don't steal / re-fill
-      let s = Math.max(sim(f.name, t.title), sim(f.name, `${t.user} ${t.title}`));
+      let s = Math.max(sim(f.base, t.title), sim(f.base, `${t.user} ${t.title}`));
       const dd = Math.abs(f.dur - t.dur);
       s += dd < 3 ? 0.15 : dd < 10 ? 0.07 : 0;
       if (s > bestS) { best = t; bestS = s; }
@@ -937,7 +1029,7 @@ export async function buildView(libArg?: Library): Promise<any> {
     const acquired = m ? STATE.acquired[ak] : 0;
     return { n: i + 1, id: t.id, artist: a, title: ti, user: t.user,
              dur: fmtDur(t.dur), url: t.url, art: t.art,
-             have, na, auto: !!m, file: m ? m[0] : null,
+             have, na, auto: !!m, file: m ? m[0] : null, path: m ? fmap.get(m[0])!.path : null,
              score: m && m[1] >= 0 ? Math.min(1, m[1]) : null,
              manual_match: manual.has(t.id), links, lossy, upgrade,
              added: t.added || 0, is_new: (t.added || 0) > (lib.seen_mark || 0),
@@ -949,7 +1041,7 @@ export async function buildView(libArg?: Library): Promise<any> {
   const extras = files.filter((f) => !fileHit.has(f.name)).map((f) => {
     const [xa, xt] = extraArtistTitle(f);
     const fnd = STATE.found["x:" + f.path];
-    return { name: f.name, incompat: compatReason(f.fmt, dev), dur: fmtDur(Math.round(f.dur)), lossy: LOSSY.test(f.fmt[0]),
+    return { name: f.name, path: f.path, incompat: compatReason(f.fmt, dev), dur: fmtDur(Math.round(f.dur)), lossy: LOSSY.test(f.fmt[0]),
              artist: xa, title: xt, edited: !!STATE.edits["x:" + f.path],
              tagged: isTagged(f, xa, xt, genre),
              found: fnd ? { ...fnd, dur: fmtDur(fnd.dur) } : null };
@@ -957,7 +1049,7 @@ export async function buildView(libArg?: Library): Promise<any> {
   return {
     ...base, ready: true, playlist: pl.title, playlist_url: pl.url,
     genre, tracks: rows, extras,
-    local_files: files.map((f) => ({ name: f.name, dur: fmtDur(Math.round(f.dur)) })),
+    local_files: files.map((f) => ({ name: f.name, path: f.path, dur: fmtDur(Math.round(f.dur)) })),
     have: rows.filter((r) => r.have).length,
     missing: rows.filter((r) => !r.have && !r.na).length,
     na_count: rows.filter((r) => r.na).length,
@@ -989,7 +1081,7 @@ export async function tagAll(): Promise<any> {
     if (e.tagged === false) todo.push([e.name, e.artist, e.title]);
   for (const [fname, artist, title] of todo) {
     try {
-      await writeTags(path.join(lib.dir, fname), artist, title, genre);
+      await writeTags(libPath(lib, fname), artist, title, genre);
       done++;
     } catch (e: any) {
       errors.push(`${fname}: ${e.message}`);
@@ -1020,8 +1112,8 @@ export async function convertAll(): Promise<any> {
     }
     const tmp = f.path + ".tmp" + ext;
     try {
-      fs.mkdirSync(bdir, { recursive: true });
-      const bpath = path.join(bdir, f.name);
+      const bpath = path.join(bdir, ...f.name.split("/"));
+      fs.mkdirSync(path.dirname(bpath), { recursive: true });
       if (!fs.existsSync(bpath)) copyPreservingTimes(f.path, bpath);
       const [artist, title, genre] = f.tags;
       const newSr = dev.srs.includes(sr) ? sr : sr % 48000 === 0 ? 48000 : 44100;
@@ -1056,19 +1148,14 @@ export async function convertAll(): Promise<any> {
 export async function restoreAll(): Promise<any> {
   // Copy backed-up originals back into the library folder (backups are kept).
   const lib = requireLib();
-  const bdir = backupDir(lib);
   let done = 0;
   const errors: string[] = [];
-  if (fs.existsSync(bdir)) {
-    for (const f of fs.readdirSync(bdir).sort()) {
-      const src = path.join(bdir, f);
-      if (!fs.statSync(src).isFile()) continue;
-      try {
-        copyPreservingTimes(src, path.join(lib.dir, f));
-        done++;
-      } catch (e: any) {
-        errors.push(`${f}: ${e.message}`);
-      }
+  for (const [key, src, dst] of restorable(lib)) {
+    try {
+      copyPreservingTimes(src, dst);
+      done++;
+    } catch (e: any) {
+      errors.push(`${key}: ${e.message}`);
     }
   }
   const view = await buildView();
@@ -1094,16 +1181,37 @@ export async function cleanBackups(): Promise<any> {
   return view;
 }
 
+const sameDir = (a: string, b: string) => {
+  try { return fs.realpathSync(a) === fs.realpathSync(b); } catch { return path.resolve(a) === path.resolve(b); }
+};
+const insideDir = (inner: string, outer: string) => {
+  const rel = path.relative(path.resolve(outer), path.resolve(inner));
+  return !!rel && !rel.startsWith("..") && !path.isAbsolute(rel);
+};
+/** A folder given by the user (typed or picked): "~" expanded, must exist. */
+function userDir(raw: any): string {
+  const d = String(raw || "").trim().replace(/^~(?=$|\/)/, os.homedir());
+  if (!d) throw new Error("no folder given");
+  if (!fs.existsSync(d) || !fs.statSync(d).isDirectory()) throw new Error(`folder not found: ${d}`);
+  return path.resolve(d);
+}
+
+/** POST /api/library: {op: "add", dir, url} · {op: "select", id} · {op: "remove", id}
+ *  · {op: "add_folder", dir, id?} · {op: "remove_folder", dir, id?} · {op: "subfolders", on, id?}
+ *  (the folder ops act on the active library unless `id` says otherwise). */
 export async function libraryOp(data: any): Promise<any> {
   const op = data.op;
   const libs = STATE.libraries;
+  const target = (): Library => {
+    const lib = data.id ? libs.find((l) => l.id === data.id) : activeLib();
+    if (!lib) throw new Error("library not found");
+    return lib;
+  };
   if (op === "add") {
-    const d = (data.dir || "").trim().replace(/^~(?=$|\/)/, os.homedir());
+    const d = userDir(data.dir);
     const url = (data.url || "").trim();
-    if (!fs.existsSync(d) || !fs.statSync(d).isDirectory())
-      throw new Error(`folder not found: ${d}`);
     if (!url.startsWith("http")) throw new Error("please give a full SoundCloud playlist or likes URL");
-    if (libs.some((l) => fs.realpathSync(l.dir) === fs.realpathSync(d)))
+    if (libs.some((l) => libDirs(l).some((x) => sameDir(x, d))))
       throw new Error("this folder is already a library");
     const nid = "lib" + (Math.max(0, ...libs
       .filter((l) => /^lib\d+$/.test(l.id)).map((l) => parseInt(l.id.slice(3), 10))) + 1);
@@ -1117,6 +1225,30 @@ export async function libraryOp(data: any): Promise<any> {
     if (libs.length <= 1) throw new Error("cannot remove the last library");
     STATE.libraries = libs.filter((l) => l.id !== data.id);
     if (STATE.active === data.id) STATE.active = STATE.libraries[0].id;
+  } else if (op === "add_folder") {
+    const lib = target();
+    const d = userDir(data.dir);
+    for (const x of libDirs(lib)) {
+      if (sameDir(x, d)) throw new Error("this folder is already part of the library");
+      if (insideDir(d, x)) throw new Error(`${d} is inside ${x}, which is already part of the library — turn on "Include subfolders" instead`);
+      if (insideDir(x, d)) throw new Error(`${x} is inside ${d}; a library folder cannot contain another one`);
+    }
+    for (const other of libs)
+      if (other !== lib && libDirs(other).some((x) => sameDir(x, d)))
+        throw new Error(`this folder already belongs to the library “${libName(other)}”`);
+    lib.dirs = [...(lib.dirs || []), d];
+  } else if (op === "remove_folder") {
+    const lib = target();
+    const d = String(data.dir || "");
+    if (sameDir(lib.dir, d)) throw new Error("the main folder cannot be removed; remove the library instead");
+    const before = (lib.dirs || []).length;
+    lib.dirs = (lib.dirs || []).filter((x) => !sameDir(x, d));
+    if (lib.dirs.length === before) throw new Error("that folder is not part of the library");
+    if (!lib.dirs.length) delete lib.dirs;
+    for (const k of Object.keys(STATE.dur_cache)) if (k.startsWith(d + path.sep)) delete STATE.dur_cache[k];
+  } else if (op === "subfolders") {
+    const lib = target();
+    if (data.on) lib.subfolders = true; else delete lib.subfolders;
   } else {
     throw new Error("unknown library op");
   }
@@ -1200,7 +1332,7 @@ async function searchCandidates(lib: Library, f: LocalFile, q: string): Promise<
   const queries = bare && bare !== q ? [bare, q] : [q];
   const inPl = new Map<number, number>();
   (lib.playlist?.tracks || []).forEach((t, i) => inPl.set(t.id, i + 1));
-  const stem = f.name.replace(/\.[^.]+$/, "");
+  const stem = f.base.replace(/\.[^.]+$/, "");
   const [a, t] = extraArtistTitle(f);
   const mine = [stem, `${a} ${t}`];
   const seen = new Set<number>();
@@ -1249,7 +1381,7 @@ export async function findTrack(data: any): Promise<any> {
  *  is already in the playlist this is really a manual match, so pin it instead. */
 export async function setFound(data: any): Promise<any> {
   const lib = requireLib();
-  const key = "x:" + path.join(lib.dir, data.file);
+  const key = "x:" + libPath(lib, String(data.file || ""));
   const t = data.track;
   if (!t) { delete STATE.found[key]; saveState(); return buildView(); }
   delete STATE.found[key];
@@ -1393,7 +1525,7 @@ async function scanInboxZips(dir: string): Promise<{ files: InboxFile[]; errors:
       }
       const [dur, fmt, tags] = cache[key];
       const base = path.posix.basename(e.name);
-      files.push({ name: base, path: zp + ZIP_SEP + e.name, dur, fmt, tags, zip: f, matchNames: zipMatchNames(base) });
+      files.push({ name: base, base, path: zp + ZIP_SEP + e.name, dur, fmt, tags, zip: f, matchNames: zipMatchNames(base) });
     }
   }
   let changed = false;
@@ -1426,7 +1558,7 @@ export async function inboxView(): Promise<any> {
   if (!base.exists || !lib.playlist) return base;
   const view = await buildView();
   const rows = new Map<number, any>(view.tracks.map((r: any) => [r.id, r]));
-  const libNames = new Set((await scanLocal(lib)).map((f) => f.name));
+  const libNames = new Set((await scanLocal(lib)).map((f) => f.base));
   const plain: InboxFile[] = (await scanFolder(dir)).map((f) => ({ ...f, matchNames: [f.name] }));
   const zips = await scanInboxZips(dir);
   base.zip_errors = zips.errors;
@@ -1445,7 +1577,7 @@ export async function inboxView(): Promise<any> {
                       action, cur_file: row.file });
   }
   // auto-move: exact matches (same name, same length) of tracks we don't have yet
-  if (STATE.settings?.auto_move && base.items.length && path.resolve(dir) !== path.resolve(lib.dir)) {
+  if (STATE.settings?.auto_move && base.items.length && !libDirs(lib).some((d) => sameDir(d, dir))) {
     const movedTracks = new Set<number>();
     const keep: any[] = [];
     for (const it of base.items) {
@@ -1494,10 +1626,11 @@ export async function inboxMove(data: any): Promise<any> {
   let kept: [string, string] | null = null;
   if (row?.have && row.file) {
     const rdir = path.join(backupDir(lib), "replaced");
+    const old = libPath(lib, row.file);
+    const base = path.basename(old);
     fs.mkdirSync(rdir, { recursive: true });
-    const old = path.join(lib.dir, row.file);
-    let keep = path.join(rdir, row.file);
-    for (let i = 2; fs.existsSync(keep); i++) keep = path.join(rdir, row.file.replace(/(\.[^.]+)$/, ` (${i})$1`));
+    let keep = path.join(rdir, base);
+    for (let i = 2; fs.existsSync(keep); i++) keep = path.join(rdir, base.replace(/(\.[^.]+)$/, ` (${i})$1`));
     moveFile(old, keep);
     kept = [old, keep];
     delete STATE.dur_cache[old];
@@ -1538,7 +1671,7 @@ export async function markSeen(): Promise<any> {
 }
 
 export async function setEdit(data: any): Promise<any> {
-  const key = data.file ? "x:" + path.join(requireLib().dir, data.file) : String(data.id);
+  const key = data.file ? "x:" + libPath(requireLib(), String(data.file)) : String(data.id);
   const a = (data.artist || "").trim(), ti = (data.title || "").trim();
   if (a || ti) STATE.edits[key] = { artist: a, title: ti };
   else delete STATE.edits[key];

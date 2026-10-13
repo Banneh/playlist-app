@@ -61,7 +61,7 @@ function wtOpenLink() {
 async function wtNotAvailable() {
   const t = wtCurrent(); if (!t || WT.busy) return;
   WT.busy = true;
-  try { DATA = await api('/api/override', { id: t.id, status: 'na' }); toast('Parked as not available — it comes back when a link appears'); }
+  try { DATA = await api('/api/override', { id: t.id, status: 'na' }); toast('Parked as not available — it comes back when a link appears'); inboxChanged(); }
   catch (e) { toast('Error: ' + e.message, true); }
   WT.busy = false;
   WT.found = null; WT.opened = false;
