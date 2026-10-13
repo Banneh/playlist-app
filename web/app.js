@@ -89,6 +89,7 @@ const PATHS = {
   cloudOff: '<path d="m2 2 20 20"/><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/>',
   eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
   play: '<polygon points="6 3 20 12 6 21 6 3"/>',
   lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   wand: '<path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/>',
@@ -320,9 +321,12 @@ function render() {
   if (!DATA) return;
   closeMenu();
   const noLibs = !(DATA.libraries || []).length;
-  document.body.classList.toggle('onboarding', noLibs);
-  $('#app').hidden = noLibs; $('#welcome').hidden = !noLibs;
-  if (noLibs) { PAGES[PAGE] && PAGES[PAGE].onHide && PAGES[PAGE].onHide(); $('#welcome').innerHTML = PAGES.welcome.body(); PAGES.welcome.after && PAGES.welcome.after(); return; }
+  const setup = !noLibs && typeof SETUP !== 'undefined' && SETUP && !!PAGES.setup;   // "Before we start", right after the first library
+  document.body.classList.toggle('onboarding', noLibs || setup);
+  $('#app').hidden = noLibs || setup; $('#welcome').hidden = !(noLibs || setup);
+  if (noLibs || setup) PAGES[PAGE] && PAGES[PAGE].onHide && PAGES[PAGE].onHide();   // the Discover view must not stay over the screen
+  if (noLibs) { $('#welcome').innerHTML = PAGES.welcome.body(); PAGES.welcome.after && PAGES.welcome.after(); return; }
+  if (setup) { $('#welcome').innerHTML = PAGES.setup.body(); PAGES.setup.after && PAGES.setup.after(); return; }
 
   renderSidebar();
   const page = PAGES[PAGE] || PAGES.missing;
@@ -331,6 +335,8 @@ function render() {
   search.hidden = page.search === false || !DATA.ready;
   search.parentElement.hidden = search.hidden;   // the wrapper carries the icon and the "/" hint
   search.placeholder = typeof page.search === 'string' ? page.search : 'Search artist or title…';
+  const guideBtn = $('#btn-guide');
+  if (guideBtn) guideBtn.hidden = !DATA.ready || typeof GUIDES === 'undefined' || !GUIDES[PAGE];
   if (!DATA.ready) {   // library exists, playlist never fetched (or fetch failed on first run)
     $('#ph-title').innerHTML = `<h2>${esc(page.title())}</h2><div class="sub">${LAST_ERR ? 'Couldn’t fetch the playlist: <b>' + esc(LAST_ERR) + '</b>' : 'No playlist data yet'}</div>`;
     $('#ph-actions').innerHTML = ''; $('#ph-tools').hidden = true; $('#ph-tools').innerHTML = '';
@@ -395,11 +401,16 @@ async function addLibrary(dir, url) {
   toast('Adding library — fetching the playlist…');
   try {
     DATA = await api('/api/library', { op: 'add', dir, url });
-    LAST_OK = Date.now(); LAST_ERR = ''; PAGE = 'missing'; render();
+    LAST_OK = Date.now(); LAST_ERR = ''; PAGE = 'missing';
+    // the very first library: "Before we start" asks for the basics, then offers the tour
+    // (the pref survives a quit in between; an install that already had a library never sets it)
+    const first = (DATA.libraries || []).length === 1 && !PREFS.setupPending && !PREFS.setupDone && typeof SETUP !== 'undefined' && PAGES.setup;
+    if (first) { SETUP = true; setPref('setupPending', true); }
+    render();
     setStatus('Playlist checked ' + fmtTime(LAST_OK));
-    if (typeof maybeStartTour === 'function') setTimeout(maybeStartTour, 400);
+    if (!first && typeof maybeStartTour === 'function') setTimeout(maybeStartTour, 400);
     if (typeof loadInbox === 'function') loadInbox();
-    toast('Library added');
+    if (!first) toast('Library added');
     return true;
   } catch (e) {
     toast('Couldn’t add the library: ' + e.message, true);
@@ -528,6 +539,7 @@ async function boot() {
   $('#btn-addlib').onclick = () => typeof uiAddLibrary === 'function' && uiAddLibrary();
   $('#btn-theme').onclick = e => { e.stopPropagation(); themeMenu(e.currentTarget); };
   $('#btn-settings').onclick = () => go('settings');
+  $('#btn-guide').onclick = () => typeof openGuide === 'function' && openGuide();
   renderSidebarFoot();
   document.addEventListener('keydown', e => {
     if (e.key === '/' && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName) && !document.querySelector('.overlay')) {
@@ -537,6 +549,7 @@ async function boot() {
   try { APP = await (await fetch('/api/app')).json(); } catch {}
   try {
     DATA = await api('/api/state');
+    if (PREFS.setupPending && (DATA.libraries || []).length && typeof SETUP !== 'undefined') SETUP = true;   // quit in the middle of "Before we start"
     render();
     if (typeof loadInbox === 'function' && (DATA.libraries || []).length) loadInbox();
     if (APP.sc && typeof dcPoll === 'function') dcPoll();

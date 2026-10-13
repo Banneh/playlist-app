@@ -16,8 +16,9 @@ let TOUR = null;
 const TOUR_STEPS = () => [
   { target: '.lib-card', place: 'right', title: 'Your library',
     text: 'One music folder linked to one SoundCloud playlist. The bar shows how much of the playlist is already in your folder. The + button at the bottom adds another library.' },
-  { page: 'missing', target: '#page-body .tr .get', fallback: '.nav-item[data-page="missing"]', place: 'left', title: 'Missing: what you still need',
-    text: 'Every playlist track that isn’t in your folder yet. Free DL and Buy take you straight to the download gate or the shop. Shops come first, because they sell lossless files.' },
+  // a row that has both buttons, so "shops come first" can be seen
+  { page: 'missing', target: '#page-body .tr .get:has(.btn-amber):has(.btn-green)', fallback: '#page-body .tr .get', place: 'left', title: 'Missing: what you still need',
+    text: 'Every playlist track that isn’t in your folder yet. Free DL and Buy take you straight to the download gate or the shop. When a track has both, Buy comes first, because shops sell lossless files.' },
   { page: 'missing', target: '#page-body .tr .pill', fallback: '.nav-item[data-page="missing"]', place: 'bottom', title: 'The status is your call',
     text: 'Click a status pill to mark a track as Have or Missing by hand, or park it as “not available on SoundCloud now”. It comes back on its own when a link appears.' },
   { page: 'have', target: '#page-body .tr .t-file', fallback: '.nav-item[data-page="have"]', place: 'bottom', title: 'Have: what’s in your folder',
@@ -32,12 +33,14 @@ const TOUR_STEPS = () => [
     text: 'Pick your player, write the tags rekordbox reads, convert the files it can’t play (your cues survive), and export a rekordbox playlist.' },
   { page: 'missing', target: '#btn-refresh', place: 'bottom', title: 'Always up to date',
     text: 'The playlist is checked every 15 minutes while the window is open. Refresh checks right now and rescans your folder too.' },
+  { page: 'missing', target: '#btn-guide', fallback: '#btn-refresh', place: 'bottom', title: 'The Guide',
+    text: 'The ? button explains the page you are on in detail: every tag, button and chip, and what to do with it. Press ? on the keyboard for the same thing.' },
   { target: '#btn-libmenu', place: 'top', title: 'That’s the tour',
     text: 'Light or dark mode and Settings live next to this button. The ⋯ menu opens the playlist on SoundCloud, exports the rekordbox XML, and shows this tour again whenever you like.' },
 ];
 
 function maybeStartTour() {
-  if (TOUR || !DATA || !DATA.ready || !(DATA.libraries || []).length) return;
+  if (TOUR || !DATA || !DATA.ready || !(DATA.libraries || []).length || (typeof SETUP !== 'undefined' && SETUP)) return;
   if (!PREFS[TOUR_KEY]) startTour({ intro: true });
 }
 

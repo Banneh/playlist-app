@@ -190,6 +190,10 @@ app.whenReady().then(async () => {
   await js(`window.__data = DATA; DATA = { ...DATA, libraries: [], active: null, ready: false }; WL_DRAFT = { dir: '~/Music/Trance', url: 'https://soundcloud.com/you/sets/trance-selection' }; render();`);
   await shot("welcome");
   await js(`DATA = window.__data; render();`);
+  // "Before we start", the screen that follows the first library
+  await js(`SETUP = true; render();`);
+  await shot("setup");
+  await js(`SETUP = false; render();`);
 
   // the tour, on its own sample data, at the Missing step
   await js(`go('missing'); startTour(); tourNext();`);
@@ -199,6 +203,10 @@ app.whenReady().then(async () => {
 
   await js(`go('missing');`);
   await shot("missing-light");
+  await js(`openGuide();`);
+  await sleep(400);
+  await shot("guide");
+  await js(`closeGuide(true);`);
   await js(`const pill = document.querySelector('#page-body .tr .pill'); pill.click();`);
   await sleep(250);
   await shot("status-menu", await box(".menu", 130));

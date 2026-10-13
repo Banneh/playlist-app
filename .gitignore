@@ -1,4 +1,5 @@
 state.json
+prefs.json
 originals/
 __pycache__/
 *.log
