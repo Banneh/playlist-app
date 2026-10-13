@@ -345,8 +345,9 @@ function renderSidebar() {
   $('#lib-bar').style.width = pct + '%';
   $('#lib-pct').textContent = DATA.ready ? pct + '%' : '';
   const active = libs.find(l => l.id === DATA.active);
-  $('#lib-dir').textContent = active ? shortPath(active.dir) : '';
-  $('#lib-dir').title = active ? active.dir : '';
+  const dirs = active ? (active.dirs || [active.dir]) : [];
+  $('#lib-dir').textContent = active ? shortPath(active.dir) + (dirs.length > 1 ? ` + ${dirs.length - 1} more` : '') : '';
+  $('#lib-dir').title = dirs.join('\n') + (active && active.subfolders ? '\n(including subfolders)' : '');
 
   $('#nav').innerHTML = NAV.map(it => {
     if (it.sec) return `<div class="nav-sec">${esc(it.sec)}</div>`;
@@ -400,15 +401,20 @@ async function removeLibrary() {
   try { DATA = await api('/api/library', { op: 'remove', id: DATA.active }); render(); toast('Library removed'); }
   catch (e) { toast('Error: ' + e.message, true); }
 }
+/** The Downloads list depends on which tracks you have: after a match, a status change
+ *  or a found file, look at the downloads folder again (quietly, in the background). */
+function inboxChanged() {
+  if (INBOX && typeof loadInbox === 'function') loadInbox({ quiet: true });
+}
 async function rescanFolder() {
-  try { DATA = await api('/api/rescan', {}); render(); toast('Folder rescanned'); }
+  try { DATA = await api('/api/rescan', {}); render(); toast('Folders rescanned'); }
   catch (e) { toast('Error: ' + e.message, true); }
 }
 function libraryMenu(anchor) {
   showMenu(anchor, [
     { label: APP.version ? 'DJ HQ ' + APP.version : 'DJ HQ', header: true },
     { label: 'Open playlist on SoundCloud', icon: 'external', disabled: !DATA.playlist_url, onclick: () => window.open(DATA.playlist_url, '_blank', 'noopener') },
-    { label: 'Rescan music folder', icon: 'folder', onclick: rescanFolder },
+    { label: 'Rescan music folders', icon: 'folder', onclick: rescanFolder },
     { label: 'Export rekordbox XML…', icon: 'upload', onclick: () => typeof exportXml === 'function' ? exportXml() : go('prepare') },
     '-',
     { label: 'Show me around', icon: 'sparkles', hint: 'A one-minute tour of the app', onclick: () => typeof startTour === 'function' && startTour() },

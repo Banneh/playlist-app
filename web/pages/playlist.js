@@ -26,7 +26,7 @@ function fileLine(t) {
   if (t.incompat) tags.push(tag('Convert · ' + t.incompat, 'warn', 'sliders', 'Not playable on the selected player as-is'));
   if (t.lossy) tags.push(tag('MP3', '', '', 'Lossy file'));
   if (t.upgrade) tags.push(tag('Lossless available', 'accent', 'arrowUp', 'You have the MP3; the shop link sells a lossless file'));
-  return `<div class="t-file">${playBtn(joinPath(libDir(), t.file), t.title, t.artist) || `<span class="ic">${icon('music')}</span>`}<span class="fn link" onclick="openAssign(${t.id})" title="${esc(t.file)} — click to match a different file">${esc(t.file)}</span>${
+  return `<div class="t-file">${playBtn(filePath(t, t.file), t.title, t.artist) || `<span class="ic">${icon('music')}</span>`}<span class="fn link" onclick="openAssign(${t.id})" title="${esc(t.file)} — click to match a different file">${esc(t.file)}</span>${
     tags.length ? `<span class="tags">${tags.join('')}</span>` : ''}</div>`;
 }
 
@@ -92,7 +92,7 @@ function statusMenu(anchor, id) {
   ]);
 }
 async function applyStatus(id, status) {
-  try { DATA = await api('/api/override', { id, status }); render(); }
+  try { DATA = await api('/api/override', { id, status }); render(); inboxChanged(); }
   catch (e) { toast('Error: ' + e.message, true); }
 }
 function rowMenu(anchor, id) {
@@ -123,7 +123,7 @@ async function resetEdit(id) {
 
 /* ---------- match a track to a local file ---------- */
 async function applyAssign(id, file, msg) {
-  try { DATA = await api('/api/assign', { id, file }); render(); toast(msg); }
+  try { DATA = await api('/api/assign', { id, file }); render(); toast(msg); inboxChanged(); }
   catch (e) { toast('Error: ' + e.message, true); }
 }
 const normName = s => String(s || '').toLowerCase().replace(/\.[a-z0-9]+$/, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -154,7 +154,7 @@ function openAssign(id) {
         q = (q || '').toLowerCase();
         list.innerHTML = files.filter(f => !q || f.name.toLowerCase().includes(q)).map(f => {
           const cur = t.file === f.name, other = !cur && fileTo[f.name];
-          return `<button class="opt${cur ? ' cur' : other ? ' taken' : ''}" data-f="${esc(f.name)}">${playBtn(joinPath(libDir(), f.name), f.name, '').replace('play-btn', 'play-btn lead') || icon('music', 'lead')}
+          return `<button class="opt${cur ? ' cur' : other ? ' taken' : ''}" data-f="${esc(f.name)}">${playBtn(filePath(f, f.name), f.name, '').replace('play-btn', 'play-btn lead') || icon('music', 'lead')}
             <span class="opt-main"><span class="fn">${esc(f.name)}</span>
             <span class="fi">${cur ? tag('Current match', 'accent', 'check') : other ? tag(`Matched to #${other.n} ${other.title}`, 'warn', 'link') : tag('Unmatched', '')}</span></span>
             <span class="dur">${esc(f.dur)}</span></button>`;

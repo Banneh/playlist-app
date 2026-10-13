@@ -1,5 +1,6 @@
-/* Page: Settings — library, downloads folder + auto-move, refresh interval, appearance,
-   backups and about. Reads DATA.settings / DATA.backup_bytes, writes through POST /api/settings. */
+/* Page: Settings — library (its folders, subfolder scanning), downloads folder + auto-move,
+   refresh interval, appearance, backups and about. Reads DATA.settings / DATA.backup_bytes,
+   writes through POST /api/settings; folder changes go through POST /api/library. */
 
 const ST_INTERVALS = [[5, 'Every 5 minutes'], [15, 'Every 15 minutes'], [30, 'Every 30 minutes'], [60, 'Every hour'], [120, 'Every 2 hours']];
 
@@ -29,9 +30,26 @@ PAGES.settings = {
     const libName = esc(lib.name || DATA.playlist || 'Library');
     const isLikes = /\/likes\/?$/.test(DATA.playlist_url || '');
 
+    const dirs = lib.dirs || (lib.dir ? [lib.dir] : []);
+    const folderRows = dirs.map((d, i) => `<div class="st-path-row">
+         <div class="path" title="${esc(d)}">${icon('folder')}<span>${esc(shortPath(d))}</span>${i === 0 && dirs.length > 1 ? tag('main', 'outline', '', 'New downloads are moved into this folder') : ''}</div>
+         ${i > 0 ? `<button class="btn btn-sm" onclick="stRemoveFolder(${JSON.stringify(d).replace(/"/g, '&quot;')})" title="Stop scanning this folder (the files stay where they are)">${icon('x')}Remove</button>` : ''}
+       </div>`).join('');
     const library = stCard('folder', '', `Library <span class="st-name">${libName}</span>`,
-      'The music folder and the SoundCloud ' + (isLikes ? 'Likes page' : 'playlist') + ' this library keeps in sync.',
-      `<div class="st-path-row"><div class="path" title="${esc(lib.dir || '')}">${icon('folder')}<span>${esc(shortPath(lib.dir || ''))}</span></div></div>
+      'The music folder' + (dirs.length > 1 ? 's' : '') + ' and the SoundCloud ' + (isLikes ? 'Likes page' : 'playlist') + ' this library keeps in sync. '
+        + 'A library can span several folders; files in any of them count as yours. New downloads go into the main one.',
+      `${folderRows}
+       <div class="fieldrow st-inboxrow">
+         <input class="input" id="st-folder" placeholder="Add another folder to this library…" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')stAddFolder()">
+         ${DATA.can_pick ? `<button class="btn" onclick="stBrowseFolder()">${icon('folder')}Browse…</button>` : ''}
+         <button class="btn" onclick="stAddFolder()">${icon('plus')}Add folder</button>
+       </div>
+       <label class="st-switch">
+         <input type="checkbox" id="st-sub" ${lib.subfolders ? 'checked' : ''} onchange="stToggleSubfolders(this)">
+         <span class="st-track" aria-hidden="true"></span>
+         <span class="st-lbl"><b>Include subfolders</b>
+           <span>Also look inside the folders within each library folder. Off, only files directly in a library folder count. Files in subfolders show up as <i>subfolder/file</i>.</span></span>
+       </label>
        ${DATA.playlist_url ? `<a class="btn btn-sm" href="${esc(DATA.playlist_url)}" target="_blank" rel="noopener">${icon('external')}${isLikes ? 'Open your Likes on SoundCloud' : 'Open playlist on SoundCloud'}</a>` : ''}
        <button class="btn btn-sm" onclick="uiAddLibrary()">${icon('plus')}Add another library…</button>
        <button class="btn btn-sm btn-danger" onclick="removeLibrary()">${icon('trash')}Remove this library…</button>`);
@@ -84,6 +102,43 @@ PAGES.settings = {
 };
 
 /* ---------- actions ---------- */
+async function stLibrary(body, msg) {
+  try {
+    DATA = await api('/api/library', body);
+    render();
+    if (msg) toast(msg);
+    return true;
+  } catch (e) {
+    toast('Couldn’t change the library: ' + e.message, true);
+    return false;
+  }
+}
+async function stAddFolder() {
+  const el = $('#st-folder');
+  const p = (el && el.value || '').trim();
+  if (!p) { if (el) el.focus(); return; }
+  await stLibrary({ op: 'add_folder', dir: p }, 'Now also scanning ' + shortPath(p));
+}
+async function stBrowseFolder() {
+  try {
+    const r = await api('/api/pick-folder', {});
+    if (r.path) await stLibrary({ op: 'add_folder', dir: r.path }, 'Now also scanning ' + shortPath(r.path));
+  } catch (e) { toast('Couldn’t open the folder picker: ' + e.message, true); }
+}
+async function stRemoveFolder(dir) {
+  const ok = await uiConfirm({
+    title: `Remove ${esc(shortPath(dir))} from the library?`,
+    body: '<p>DJ HQ stops scanning this folder. The files in it stay exactly where they are; tracks matched to them show as missing again.</p>',
+    ok: 'Remove folder', danger: true, icon: 'x',
+  });
+  if (!ok) return;
+  await stLibrary({ op: 'remove_folder', dir }, 'Folder removed from the library');
+}
+async function stToggleSubfolders(el) {
+  const on = !!el.checked;
+  const ok = await stLibrary({ op: 'subfolders', on }, on ? 'Subfolders are scanned too' : 'Only the library folders themselves are scanned');
+  if (!ok) { el.checked = !on; render(); }
+}
 async function stSave(patch, msg) {
   try {
     DATA = await api('/api/settings', patch);

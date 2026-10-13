@@ -27,6 +27,7 @@ you're done. Everything runs on your computer; nothing is uploaded anywhere.
   - [Prepare for player: tags, conversion and rekordbox](#prepare-for-player-tags-conversion-and-rekordbox)
   - [Appearance, search and the sidebar](#appearance-search-and-the-sidebar)
   - [Settings](#settings)
+  - [More than one folder](#more-than-one-folder)
   - [More than one playlist](#more-than-one-playlist)
 - [Tips and troubleshooting](#tips-and-troubleshooting)
 - [Your files and your data](#your-files-and-your-data)
@@ -41,10 +42,10 @@ you're done. Everything runs on your computer; nothing is uploaded anywhere.
 
 ## What DJ HQ does
 
-A *library* in DJ HQ is one music folder linked to one public SoundCloud
-playlist. The app fetches the playlist, scans the folder and works out which
-file belongs to which track by comparing names and lengths. Everything else
-builds on that:
+A *library* in DJ HQ is a music folder (or several) linked to one public
+SoundCloud playlist. The app fetches the playlist, scans the folders and works
+out which file belongs to which track by comparing names and lengths.
+Everything else builds on that:
 
 - **Missing** lists every playlist track that isn't in your folder yet, with a
   **Free DL** or **Buy** button that takes you straight to the download gate or
@@ -344,12 +345,30 @@ artwork and a play button.
 
 ![Settings: library, downloads folder, auto-move, refresh interval, appearance, backups](docs/screens/settings.png)
 
-The gear at the bottom of the sidebar. From top to bottom: the library (folder,
-playlist, remove), the Downloads folder DJ HQ watches and the switch for moving
-exact matches automatically, how often the playlist is checked, appearance,
-backups (how much space the originals of converted files and replaced MP3s
-take, with a **Clean up** button once you're sure you won't need them), and
-updates.
+The gear at the bottom of the sidebar. From top to bottom: the library (its
+folders, playlist, remove), the Downloads folder DJ HQ watches and the switch
+for moving exact matches automatically, how often the playlist is checked,
+appearance, backups (how much space the originals of converted files and
+replaced MP3s take, with a **Clean up** button once you're sure you won't need
+them), and updates.
+
+### More than one folder
+
+A library starts with one folder, but your tracks for a playlist may be spread
+over several, or sorted into subfolders. Both work:
+
+- **Add folder** in the library card of Settings adds another folder to the
+  library. Files in any of its folders count as yours. The first folder stays
+  the *main* one: that is where downloads are moved into. A folder can be
+  removed from the library again; its files stay where they are.
+- **Include subfolders** also scans the folders inside each library folder.
+  It is off unless you turn it on, so a library never picks up more than you
+  asked for.
+
+Files outside the main folder are listed with their folder in front, for
+example `Deep/Artist – Title.wav` or `Vinyl rips/Artist – Title.wav`, so you
+can see where each one lives. Tags, conversion, backups and restore work on
+them like on any other file.
 
 ### More than one playlist
 
@@ -475,11 +494,12 @@ bodies are JSON.
 | `GET /api/state` | | current view |
 | `GET /api/app` | | app version, platform and whether it runs packaged (not a view) |
 | `POST /api/refresh` | | fetch the playlist, then the view |
-| `POST /api/rescan` | | rescan the folder |
-| `POST /api/library` | `{op: "add", dir, url}` · `{op: "select", id}` · `{op: "remove", id}` | manage libraries |
+| `POST /api/rescan` | | rescan the library folders |
+| `POST /api/library` | `{op: "add", dir, url}` · `{op: "select", id}` · `{op: "remove", id}` · `{op: "add_folder", dir}` · `{op: "remove_folder", dir}` · `{op: "subfolders", on}` | manage libraries and their folders (the folder ops take an optional `id`, default: the active library) |
 | `POST /api/device` | `{device}` | target player (`xdj-700`, `nxs2`, `cdj-3000`) |
 | `POST /api/settings` | `{inbox_dir?, auto_move?, refresh_min?}` | downloads folder (`""` = default), auto-move, check interval in minutes |
 | `GET /api/file?path=` | | streams a local audio file for the preview (library and downloads folders only) |
+| | | file keys (`file`, `name`) are relative to the library folder, `/`-separated; files of an extra folder carry its name in front |
 | `POST /api/clean-backups` | | deletes the active library's backups (adds `clean_report`) |
 | `POST /api/override` | `{id, status: "have" \| "missing" \| "na" \| null}` | status override / not available now |
 | `POST /api/assign` | `{id, file}` (`""` = no file, `null` = automatic) | pin a file to a track |

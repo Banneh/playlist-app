@@ -21,6 +21,9 @@ function libDir() {
   return l ? l.dir : '';
 }
 const joinPath = (dir, name) => dir ? dir.replace(/[\\/]+$/, '') + '/' + name : '';
+/** where a listed file lives: the server says (library files can sit in any of the
+ *  library's folders); rows without a path are joined onto the main folder */
+const filePath = (row, name) => (row && row.path) || joinPath(libDir(), name);
 const plIsPlaying = path => !!path && PLAYER.path === path && !!PLAYER.audio && !PLAYER.audio.paused;
 
 /** a small round preview button; a span, so it can sit inside a <button class="opt"> too */
