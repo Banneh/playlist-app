@@ -73,8 +73,9 @@ function trackRow(t) {
     </div>`;
 }
 function artHtml(t) {
-  return `<button class="art${t.art ? '' : ' none'}" onclick="window.open('${esc(t.url)}','_blank','noopener')" title="Open on SoundCloud">${
-    t.art ? `<img src="${esc(t.art)}" loading="lazy" alt="" onerror="this.parentNode.classList.add('none');this.remove()">` : icon('music')}<span class="ov">${icon('external')}</span></button>`;
+  const inApp = typeof scInApp === 'function' && scInApp();   // Discover: play it here; otherwise the browser
+  return `<button class="art${t.art ? '' : ' none'}" onclick="scOpen('${esc(t.url)}', true)" title="${inApp ? 'Play on Discover' : 'Open on SoundCloud'}">${
+    t.art ? `<img src="${esc(t.art)}" loading="lazy" alt="" onerror="this.parentNode.classList.add('none');this.remove()">` : icon('music')}<span class="ov">${icon(inApp ? 'play' : 'external')}</span></button>`;
 }
 
 /* ---------- row menus ---------- */
@@ -101,8 +102,9 @@ function rowMenu(anchor, id) {
     { label: 'Match to a local file…', icon: 'link', onclick: () => openAssign(id) },
     { label: 'Edit artist / title', icon: 'pencil', onclick: () => { EDIT_ID = id; render(); const a = $('#e-artist'); a && a.focus(); } },
     '-',
-    ...(APP.sc ? [{ label: 'Related tracks on Discover', icon: 'sparkles', hint: 'What SoundCloud suggests after this track, inside DJ HQ', onclick: () => dcOpen(scRelated(t.url)) }] : []),
-    { label: 'Open on SoundCloud', icon: 'external', onclick: () => window.open(t.url, '_blank', 'noopener') },
+    ...(APP.sc ? [{ label: 'Play on Discover', icon: 'play', hint: 'Hear the track inside DJ HQ', onclick: () => dcOpen(t.url, true) },
+                  { label: 'Related tracks on Discover', icon: 'sparkles', hint: 'What SoundCloud suggests after this track, inside DJ HQ', onclick: () => dcOpen(scRelated(t.url)) }] : []),
+    { label: APP.sc ? 'Open in your browser' : 'Open on SoundCloud', icon: 'external', onclick: () => window.open(t.url, '_blank', 'noopener') },
     { label: 'Copy SoundCloud link', icon: 'copy', onclick: () => copyText(t.url, 'Link copied') },
   ];
   for (const l of t.links || []) items.push({ label: `Copy ${l.label} link (${l.host})`, icon: 'copy', onclick: () => copyText(l.url, 'Link copied') });

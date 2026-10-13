@@ -50,7 +50,7 @@ PAGES.settings = {
          <span class="st-lbl"><b>Include subfolders</b>
            <span>Also look inside the folders within each library folder. Off, only files directly in a library folder count. Files in subfolders show up as <i>subfolder/file</i>.</span></span>
        </label>
-       ${DATA.playlist_url ? `<a class="btn btn-sm" href="${esc(DATA.playlist_url)}" target="_blank" rel="noopener">${icon('external')}${isLikes ? 'Open your Likes on SoundCloud' : 'Open playlist on SoundCloud'}</a>` : ''}
+       ${DATA.playlist_url ? `<button class="btn btn-sm" onclick="scOpen(DATA.playlist_url)">${icon(scInApp() ? 'cloud' : 'external')}${isLikes ? 'Open your Likes on SoundCloud' : 'Open playlist on SoundCloud'}</button>` : ''}
        <button class="btn btn-sm" onclick="uiAddLibrary()">${icon('plus')}Add another library…</button>
        <button class="btn btn-sm btn-danger" onclick="removeLibrary()">${icon('trash')}Remove this library…</button>`);
 
@@ -101,6 +101,13 @@ PAGES.settings = {
            </label>`}`
         : `<button class="btn btn-sm btn-primary" onclick="dcOpen('https://soundcloud.com/signin')">${icon('cloud')}Sign in on Discover</button>`);
 
+    const links = !APP.sc ? '' : stCard('play', '', 'Opening tracks',
+      'Where a track goes when you click its cover, Open playlist on SoundCloud, or a search: the Discover page inside DJ HQ, or your browser.',
+      `<div class="seg" role="radiogroup" aria-label="Open SoundCloud links">
+         <button class="${S.sc_open !== 'browser' ? 'on' : ''}" onclick="stScOpen('discover')">${icon('cloud')}On Discover</button>
+         <button class="${S.sc_open === 'browser' ? 'on' : ''}" onclick="stScOpen('browser')">${icon('external')}In your browser</button>
+       </div>`);
+
     const bytes = DATA.backup_bytes || 0;
     const backups = stCard('history', 'green', 'Backups',
       'Before a file is converted, the untouched original is kept here, together with MP3s that a lossless download replaced. That is what Restore originals copies back.',
@@ -113,7 +120,7 @@ PAGES.settings = {
        <button class="btn btn-sm" onclick="startTour()">${icon('sparkles')}Show me around</button>
        <div class="st-path-row st-wide"><span class="faint">Data folder</span><div class="path" title="${esc(S.data_dir || '')}">${icon('folder')}<span>${esc(shortPath(S.data_dir || ''))}</span></div></div>`);
 
-    return `<div class="st-list">${library}${account}${downloads}${refresh}${appearance}${backups}${about}</div>`;
+    return `<div class="st-list">${library}${account}${links}${downloads}${refresh}${appearance}${backups}${about}</div>`;
   },
 };
 
@@ -183,6 +190,9 @@ async function stBrowseInbox() {
 async function stResetInbox() {
   await stSave({ inbox_dir: '' }, 'Back to the default Downloads folder');
   if (typeof loadInbox === 'function') loadInbox({ quiet: true });
+}
+function stScOpen(v) {
+  stSave({ sc_open: v }, v === 'browser' ? 'SoundCloud links open in your browser' : 'SoundCloud links open on Discover');
 }
 async function stToggleLikeOnAdd(el) {
   const on = !!el.checked;

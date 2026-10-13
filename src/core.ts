@@ -100,7 +100,7 @@ export interface AppState {
   /** folder watched for fresh downloads; default ~/Downloads */
   inbox_dir?: string;
   /** user settings (see getSettings) */
-  settings?: { auto_move?: boolean; refresh_min?: number; like_on_add?: boolean };
+  settings?: { auto_move?: boolean; refresh_min?: number; like_on_add?: boolean; sc_open?: "discover" | "browser" };
   /** probe results for audio inside zips in the downloads folder: "<zip path>|<entry>|<size>" -> [dur, fmt, tags] */
   zip_cache?: Record<string, [number, [string, number, number], [string, string, string]]>;
   /** "<lib id>:<track id>" -> ms when a file for the track first turned up (0 = predates tracking) */
@@ -151,11 +151,13 @@ export function getSettings(): any {
     inbox_dir: inboxDir(), inbox_default: path.join(os.homedir(), "Downloads"), inbox_custom: !!STATE.inbox_dir,
     auto_move: !!s.auto_move, refresh_min: REFRESH_CHOICES.includes(s.refresh_min || 0) ? s.refresh_min : 15,
     like_on_add: !!s.like_on_add,
+    sc_open: s.sc_open === "browser" ? "browser" : "discover",
     data_dir: DATA_DIR,
   };
 }
 /** POST /api/settings {inbox_dir?: string|null ("" or null = back to ~/Downloads), auto_move?: boolean, refresh_min?: number,
- *  like_on_add?: boolean (Discover: also like a track when adding it to the playlist)} */
+ *  like_on_add?: boolean (Discover: also like a track when adding it to the playlist),
+ *  sc_open?: "discover" | "browser" (where SoundCloud links open; the desktop app defaults to Discover)} */
 export async function setSettings(data: any): Promise<any> {
   const s = STATE.settings || (STATE.settings = {});
   if ("inbox_dir" in data) {
@@ -168,6 +170,7 @@ export async function setSettings(data: any): Promise<any> {
   }
   if ("auto_move" in data) s.auto_move = !!data.auto_move;
   if ("like_on_add" in data) s.like_on_add = !!data.like_on_add;
+  if ("sc_open" in data) s.sc_open = data.sc_open === "browser" ? "browser" : "discover";
   if ("refresh_min" in data) {
     const n = Number(data.refresh_min);
     if (!REFRESH_CHOICES.includes(n)) throw new Error("refresh interval must be one of " + REFRESH_CHOICES.join(", ") + " minutes");

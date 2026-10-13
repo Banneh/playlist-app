@@ -442,7 +442,7 @@ async function rescanFolder() {
 function libraryMenu(anchor) {
   showMenu(anchor, [
     { label: APP.version ? 'DJ HQ ' + APP.version : 'DJ HQ', header: true },
-    { label: 'Open playlist on SoundCloud', icon: 'external', disabled: !DATA.playlist_url, onclick: () => window.open(DATA.playlist_url, '_blank', 'noopener') },
+    { label: 'Open playlist on SoundCloud', icon: typeof scInApp === 'function' && scInApp() ? 'cloud' : 'external', disabled: !DATA.playlist_url, onclick: () => scOpen(DATA.playlist_url) },
     ...(APP.sc ? [{ label: 'Discover: listen and add', icon: 'cloud', onclick: () => go('discover') }] : []),
     { label: 'Rescan music folders', icon: 'folder', onclick: rescanFolder },
     { label: 'Export rekordbox XML…', icon: 'upload', onclick: () => typeof exportXml === 'function' ? exportXml() : go('prepare') },

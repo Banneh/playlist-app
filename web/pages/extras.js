@@ -49,7 +49,7 @@ function exRow(f, i) {
       <div class="cell">${fd
         ? (typeof scCan === 'function' && scCan()
           ? `<button class="btn btn-sm btn-accent" onclick="scAddUrl('${esc(fd.url)}')" title="Add the track to the playlist on SoundCloud — the file is matched right away">${icon('plus')}Add to playlist</button>`
-          : `<a class="btn btn-sm btn-accent" href="${esc(fd.url)}" target="_blank" rel="noopener" title="Open the track on SoundCloud and add it to the playlist there — the file is matched automatically afterwards">${icon('external')}Add to playlist</a>`)
+          : `<button class="btn btn-sm btn-accent" onclick="scOpen('${esc(fd.url)}')" title="Open the track on SoundCloud and add it to the playlist there — the file is matched automatically afterwards">${icon('external')}Add to playlist</button>`)
         : `<button class="btn btn-sm" onclick="openFind(${i})" title="Search SoundCloud for this file">${icon('search')}Find on SoundCloud</button>`}</div>
       <button class="btn btn-ghost btn-sm btn-icon more" onclick="exMenu(this, ${i})" title="More">${icon('more')}</button>
     </div>`;
@@ -65,11 +65,11 @@ function exMenu(anchor, i) {
     { label: f.found ? 'Pick a different track…' : 'Find on SoundCloud…', icon: 'search', onclick: () => openFind(i) },
   ];
   if (f.found) items.push('-',
-    ...(APP.sc ? [{ label: 'Listen on Discover', icon: 'cloud', onclick: () => dcOpen(f.found.url) }] : []),
-    { label: 'Open on SoundCloud', icon: 'external', onclick: () => window.open(f.found.url, '_blank', 'noopener') },
+    ...(APP.sc ? [{ label: 'Play on Discover', icon: 'play', hint: 'Hear the track inside DJ HQ', onclick: () => dcOpen(f.found.url, true) }] : []),
+    { label: APP.sc ? 'Open in your browser' : 'Open on SoundCloud', icon: 'external', onclick: () => window.open(f.found.url, '_blank', 'noopener') },
     { label: 'Copy SoundCloud link', icon: 'copy', onclick: () => copyText(f.found.url, 'Link copied') },
     { label: 'Forget this match', icon: 'xCircle', onclick: () => clearFound(i) });
-  else items.push('-', { label: 'Search on soundcloud.com', icon: 'external', onclick: () => window.open(scSearch(f.artist + ' ' + f.title), '_blank', 'noopener') });
+  else items.push('-', { label: 'Search on soundcloud.com', icon: typeof scInApp === 'function' && scInApp() ? 'cloud' : 'external', onclick: () => scOpen(scSearch(f.artist + ' ' + f.title)) });
   showMenu(anchor, items, { align: 'right' });
 }
 

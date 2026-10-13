@@ -55,22 +55,44 @@ function scFit(v: WebContentsView, width: number) {
   if (Math.abs(v.webContents.getZoomFactor() - z) > 0.01) v.webContents.setZoomFactor(z);
 }
 
+/** press the big play button of the track page that is open (polls while the page hydrates);
+ *  a button already in its "pause" state means the track is playing, so it is left alone */
+const SC_PLAY_JS = `(() => new Promise((res) => {
+  const t0 = Date.now();
+  const tick = () => {
+    const b = [...document.querySelectorAll('button.sc-button-play.playButton, .soundTitle__playButtonHero button, .fullHero button.sc-button-play')]
+      .find((x) => !x.closest('.playControls') && !x.classList.contains('sc-button-disabled'));
+    if (b) { if (!b.classList.contains('sc-button-pause')) b.click(); return res(true); }
+    if (Date.now() - t0 > 8000) return res(false);
+    setTimeout(tick, 250);
+  };
+  tick();
+}))()`;
+/** open a page in the view and, when asked, start the track on it once it has loaded */
+function scGo(v: WebContentsView, url: string, play?: boolean) {
+  const wc = v.webContents;
+  const press = () => { wc.executeJavaScript(SC_PLAY_JS, true).catch(() => {}); };
+  if (wc.getURL() === url && !wc.isLoading()) { if (play) press(); return; }
+  if (play) wc.once("did-finish-load", press);
+  wc.loadURL(url);
+}
+
 const sc: ScView = {
-  async show(rect: ScRect, url?: string) {
+  async show(rect: ScRect, url?: string, play?: boolean) {
     if (!win) return;
     const v = scEnsure();
     if (!scShown) { win.contentView.addChildView(v); scShown = true; }
     v.setBounds(rect);
     scFit(v, rect.width);
     const cur = v.webContents.getURL();
-    if (url) { if (cur !== url) v.webContents.loadURL(url); }
+    if (url) scGo(v, url, play);
     else if (!cur) v.webContents.loadURL(SC_HOME);
   },
   hide() {
     if (win && scView && scShown) { win.contentView.removeChildView(scView); scShown = false; }
   },
   setBounds(rect: ScRect) { if (scView && scShown) { scView.setBounds(rect); scFit(scView, rect.width); } },
-  navigate(url: string) { scEnsure().webContents.loadURL(url); },
+  navigate(url: string, play?: boolean) { scGo(scEnsure(), url, play); },
   back() { const h = scView?.webContents.navigationHistory; if (h && h.canGoBack()) h.goBack(); },
   url() { return scView ? scView.webContents.getURL() : ""; },
   async nowPlaying() {

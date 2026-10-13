@@ -85,8 +85,8 @@ function dcRect() {
 function dcShow() {
   if (!DC.active || DC.covered || (typeof TOUR !== 'undefined' && TOUR) || PAGE !== 'discover') return;
   const r = dcRect(); if (!r || r.width < 50 || r.height < 50) return;
-  const url = DC.pending; DC.pending = null;   // a page another part of the app asked for (dcOpen)
-  scPost('show', url ? { ...r, url } : r).catch(() => {});
+  const p = DC.pending; DC.pending = null;   // a page another part of the app asked for (dcOpen)
+  scPost('show', p ? { ...r, url: p.url, play: p.play } : r).catch(() => {});
 }
 function dcHide() { scPost('hide').catch(() => {}); }
 function dcMount() {
@@ -165,12 +165,59 @@ async function scAddUrl(url) {
     toast('Added ' + (r.title ? '“' + r.title + '”' : 'the track') + ' to the playlist');
   } catch (e) { toast('Couldn’t add it: ' + e.message, true); }
 }
-/** open a SoundCloud URL on the Discover page */
-function dcOpen(url) {
+/** open a SoundCloud URL on the Discover page; with play, the track on it starts playing */
+function dcOpen(url, play) {
   if (!APP.sc) return window.open(url, '_blank', 'noopener');
-  if (PAGE === 'discover' && DC.active) return void scPost('nav', { url }).catch(() => {});
-  DC.pending = url;   // the view is (re)attached by dcShow, which passes the page along
+  if (PAGE === 'discover' && DC.active) return void scPost('nav', { url, play: !!play }).catch(() => {});
+  DC.pending = { url, play: !!play };   // the view is (re)attached by dcShow, which passes the page along
   go('discover');
+}
+/** Settings → "Open SoundCloud links": on Discover (the default in the desktop app) or in the browser */
+const scInApp = () => !!APP.sc && !(DATA && DATA.settings && DATA.settings.sc_open === 'browser');
+/** open a SoundCloud link where the user wants them: Discover (playing the track when asked) or the browser */
+function scOpen(url, play) {
+  if (scInApp()) return dcOpen(url, play);
+  window.open(url, '_blank', 'noopener');
+}
+
+/* ---------- the Guide: the two Discover pages, and what the artwork does here ---------- */
+if (typeof GUIDES !== 'undefined') {
+  GUIDES.discover = {
+    icon: 'cloud', title: 'Discover',
+    lead: 'soundcloud.com inside DJ HQ. Sign in there once, listen to whatever it suggests, and add what you like to the playlist from the bar above the page, without a popup for every track.',
+    sections: [
+      { h: 'The bar above the page', items: [
+        ['play', 'Now playing', 'Whatever SoundCloud’s player is playing shows up here with its cover, length and whether it is in the playlist already.'],
+        ['plus', 'Add to playlist', 'Puts the playing track into the playlist on SoundCloud, so it lands in Missing right away. For a Likes library this likes the track instead.'],
+        ['heart', 'The heart', 'Likes or unlikes the playing track on SoundCloud. With “Also like tracks you add” on in Settings, adding likes it as well.'],
+        ['sparkles', 'Related tracks', 'What SoundCloud suggests after this track. The same item sits in the ⋯ menu of every playlist row.'],
+        ['arrowLeft', 'Back · Home · Playlist', 'Steps back a page, goes to SoundCloud’s home, or opens your playlist (or Likes) on SoundCloud.'],
+      ] },
+      { h: 'Good to know', tips: [
+        'Clicking a cover anywhere in DJ HQ plays that track here. Prefer the browser? Switch <b>Opening tracks</b> in Settings.',
+        'The session is SoundCloud’s own, kept on this computer only. <b>Sign out</b> in Settings forgets it.',
+        'Toasts can’t be seen under the page, so feedback for Add and the heart shows in the bar instead.',
+      ] },
+    ],
+  };
+  GUIDES.likes = {
+    icon: 'heart', title: 'Your Likes',
+    lead: 'Every track the signed-in SoundCloud account has liked, checked against the files in all your libraries.',
+    sections: [
+      { h: 'The chips', items: [
+        ['download', 'Still to get', 'Liked tracks that are in none of your folders, with the same Free DL and Buy links as Missing.'],
+        ['checkCircle', 'In your folders', 'Liked tracks you already have: through the playlist, a found file, or a file with the same name and length in any library.'],
+        ['listMusic', 'Not in the playlist', 'Liked tracks that aren’t in the active playlist yet. <b>Add</b> puts one in with one click.'],
+      ] },
+      { h: 'Good to know', tips: [
+        'The likes list is cached for a few minutes; <b>Refresh</b> on the page reads it from SoundCloud again.',
+        'A Likes library (a playlist link that ends in /likes) is this list by definition, so Add is hidden there.',
+      ] },
+    ],
+  };
+  const art = ['music', 'Artwork', 'Click it to play the track on Discover, inside DJ HQ. <b>Opening tracks</b> in Settings switches that to your browser.'];
+  for (const k of ['all']) { const s = GUIDES[k] && GUIDES[k].sections[0]; if (s && s.items && s.items[0][1] === 'Artwork') s.items[0] = art; }
+  if (GUIDES.missing) GUIDES.missing.sections[2].tips[2] = 'Click a cover to hear the track on Discover first; a <b>Play on Discover</b> item sits in every row’s ⋯ menu as well.';
 }
 /** toasts can't be seen under the native view: the bar shows them instead */
 function dcToast(msg, isErr) {

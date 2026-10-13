@@ -21,11 +21,12 @@ export interface ServerOpts {
 
 export interface ScRect { x: number; y: number; width: number; height: number; }
 export interface ScView {
-  /** attach the view to the window at these window coordinates (loads SoundCloud the first time) */
-  show(rect: ScRect, url?: string): Promise<void>;
+  /** attach the view to the window at these window coordinates (loads SoundCloud the first time);
+   *  with a url that page is opened, and with play the track on it is started */
+  show(rect: ScRect, url?: string, play?: boolean): Promise<void>;
   hide(): void;
   setBounds(rect: ScRect): void;
-  navigate(url: string): void;
+  navigate(url: string, play?: boolean): void;
   back(): void;
   /** the track the SoundCloud player bar is showing, straight from the page */
   nowPlaying(): Promise<{ url: string; title: string; artist: string; playing: boolean } | null>;
@@ -73,7 +74,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
     const sc = opts.sc;
     if (!sc) return { available: false };
     switch (action) {
-      case "show":   await sc.show(rect(data), data.url ? String(data.url) : undefined); return { ok: true };
+      case "show":   await sc.show(rect(data), data.url ? String(data.url) : undefined, !!data.play); return { ok: true };
       case "hide":   sc.hide(); return { ok: true };
       case "bounds": sc.setBounds(rect(data)); return { ok: true };
       case "nav": {
@@ -81,7 +82,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         else if (data.action === "signin") sc.navigate("https://soundcloud.com/signin");
         else if (data.action === "home") sc.navigate("https://soundcloud.com/discover");
         else if (data.action === "playlist") { const l = core.activeLib(); if (l) sc.navigate(l.url); }
-        else if (typeof data.url === "string" && /^https:\/\/(www\.|m\.)?soundcloud\.com\//.test(data.url)) sc.navigate(data.url);
+        else if (typeof data.url === "string" && /^https:\/\/(www\.|m\.)?soundcloud\.com\//.test(data.url)) sc.navigate(data.url, !!data.play);
         return { ok: true };
       }
       case "signout": await sc.signOut(); return { ok: true };
