@@ -380,6 +380,8 @@ html.mac-inset .page-head { padding-top: 30px; }
 }
 .note .ic { color: var(--accent-text); flex-shrink: 0; }
 .note .txt { flex: 1; min-width: 200px; }
+/* one quiet line under a list: "2 more files … but aren't in the playlist" + a link button */
+.note-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 10px 2px 0; font-size: 12.5px; color: var(--text-2); }
 .note .txt b { font-weight: 600; }
 .note .acts { display: flex; gap: 8px; flex-wrap: wrap; }
 .note-green { background: var(--green-soft); border-color: var(--green-line); } .note-green .ic { color: var(--green); }

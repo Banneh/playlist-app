@@ -187,7 +187,7 @@ function tagNote() {
   if (!n) return '';
   return noteHtml(`<b>${plural(n, 'file')}</b> in your folder still ${n === 1 ? 'needs' : 'need'} artist and title tags. rekordbox shows ${n === 1 ? 'it' : 'them'} blank until then.`,
     `<button class="btn btn-sm btn-primary" onclick="tagFromList(this)" title="Write artist / title into the untagged files">${icon('tag')}Write tags ${badge(n)}</button>
-     <button class="btn btn-sm btn-ghost" onclick="HFILTER='attention';go('have')" title="List the files that need attention">Show them</button>`,
+     <button class="btn btn-sm btn-ghost" onclick="HFILTER='tags';go('have')" title="List the files that still need tags">Show them</button>`,
     'amber', 'tag');
 }
 async function tagFromList(btn) {
@@ -243,6 +243,10 @@ PAGES.missing = {
   },
 };
 
+/** the Have chips: all · lossless available · needs tags · needs convert ("attention" from older links = both) */
+const haveFilter = t => HFILTER === 'all' ? true : HFILTER === 'upgrade' ? !!t.upgrade : HFILTER === 'tags' ? t.tagged === false
+  : HFILTER === 'convert' ? !!t.incompat : (t.tagged === false || !!t.incompat);
+
 PAGES.have = {
   title: () => 'Have',
   sub: () => {
@@ -253,15 +257,24 @@ PAGES.have = {
   tools: () => {
     const rows = DATA.tracks.filter(t => t.have && matchesQ(t, Q.trim().toLowerCase()));
     return chipsHtml('HFILTER', HFILTER, [['all', 'All', rows.length], ['upgrade', 'Lossless available', rows.filter(t => t.upgrade).length, 'arrowUp'],
-      ['attention', 'Needs attention', rows.filter(t => t.tagged === false || t.incompat).length, 'alert']]);
+      ['tags', 'Needs tags', rows.filter(t => t.tagged === false).length, 'tag'],
+      ['convert', 'Needs convert', rows.filter(t => !!t.incompat).length, 'sliders']]);
   },
   body: q => {
     let rows = DATA.tracks.filter(t => t.have && matchesQ(t, q));
-    rows = rows.filter(t => HFILTER === 'all' || (HFILTER === 'upgrade' ? t.upgrade : (t.tagged === false || t.incompat)));
+    rows = rows.filter(t => haveFilter(t));
     LAST_ROWS = rows;
-    return tagNote() + trackTable(rows, q || HFILTER !== 'all'
-      ? { ico: 'search', title: 'No tracks match', text: q ? 'Try a different search.' : 'Nothing in this filter.' }
-      : { ico: 'folder', title: 'No matched files yet', text: 'Files in your music folder that match a playlist track show up here.' });
+    // files that need the same work but aren't in the playlist live on another page: say so
+    const strays = HFILTER === 'tags' ? (DATA.extras || []).filter(f => f.tagged === false).length
+                 : HFILTER === 'convert' ? (DATA.extras || []).filter(f => f.incompat).length : 0;
+    const strayLine = strays ? `<div class="note-line"><span>${plural(strays, 'more file')} ${strays === 1 ? 'needs' : 'need'} ${HFILTER === 'tags' ? 'tags' : 'converting'} but ${
+      strays === 1 ? 'isn’t' : 'aren’t'} in the playlist.</span><button class="btn btn-sm btn-ghost" onclick="go('extras')">${icon('folder')}Not in playlist</button></div>` : '';
+    const empty = q ? { ico: 'search', title: 'No tracks match', text: 'Try a different search.' }
+      : HFILTER === 'tags' ? { ico: 'checkCircle', kind: 'green', title: 'All matched files are tagged', text: 'rekordbox shows the right artist and title for every one.' }
+      : HFILTER === 'convert' ? { ico: 'checkCircle', kind: 'green', title: 'Everything plays on this player', text: 'No matched file needs converting for the player picked on Prepare for player.' }
+      : HFILTER === 'upgrade' ? { ico: 'checkCircle', kind: 'green', title: 'No upgrades waiting', text: 'None of your MP3s has a shop link that sells a lossless version.' }
+      : { ico: 'folder', title: 'No matched files yet', text: 'Files in your music folder that match a playlist track show up here.' };
+    return tagNote() + trackTable(rows, empty) + strayLine;
   },
 };
 

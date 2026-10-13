@@ -210,10 +210,13 @@ needs attention:
 | **Lossless available** | You have the MP3, and the shop link sells a lossless version. |
 | **Matched by hand** | You picked this file yourself. |
 
-The **Needs attention** and **Lossless available** chips above the list show
-only those tracks. While any file still needs tags, a notice above the playlist
-lists how many and offers **Write tags** right there, so you don't have to go
-to Prepare for player for that.
+The **Needs tags**, **Needs convert** and **Lossless available** chips above
+the list show only those tracks, and the counts on the Prepare for player cards
+open the same chips. While any file still needs tags, a notice above the
+playlist lists how many and offers **Write tags** right there, so you don't
+have to go to Prepare for player for that. A file that needs the same work but
+isn't in the playlist is mentioned under the list, with a link to Not in
+playlist.
 
 The small play button in front of a file name previews it right in the app; a
 player bar appears at the bottom with seek and volume. The same button sits in
