@@ -24,6 +24,7 @@ let DATA = null;          // last /api/state (or any mutating call: every call r
 let PAGE = 'missing';     // current page id
 let Q = '';               // search text
 let EDIT_ID = null;       // track id (or 'x<i>' for a local file) with the inline edit form open
+let PREV = null;          // { page, top }: the page before this one and where it was scrolled to
 let INBOX = null;         // last /api/inbox result (pages/inbox.js)
 let INFLIGHT = 0;         // API calls in progress
 let LAST_OK = 0, LAST_ERR = '', RETRY = null;
@@ -308,12 +309,19 @@ const NAV = [
 ];
 function go(page) {
   if (!PAGES[page]) return;
-  if (page !== PAGE && PAGES[PAGE] && PAGES[PAGE].onHide) PAGES[PAGE].onHide();
+  const body = $('#page-body');
+  // Coming straight back to the page you left (Missing → Discover → Missing) lands where you
+  // were; opening any page another way starts at the top.
+  const top = PREV && PREV.page === page ? PREV.top : 0;
+  if (page !== PAGE) {
+    PREV = { page: PAGE, top: body ? body.scrollTop : 0 };
+    PAGES[PAGE] && PAGES[PAGE].onHide && PAGES[PAGE].onHide();
+  }
   PAGE = page; EDIT_ID = null; closeMenu();
   render();
   const p = PAGES[page];
   p.onShow && p.onShow();
-  const body = $('#page-body'); if (body) body.scrollTop = 0;
+  if (body) body.scrollTop = top;
 }
 
 /* ---------- render ---------- */
