@@ -28,6 +28,8 @@ export interface ScView {
   setBounds(rect: ScRect): void;
   navigate(url: string, play?: boolean): void;
   back(): void;
+  /** drive the SoundCloud player bar: "toggle" (play/pause), "next", "prev", or "seek" by n seconds */
+  player(action: string, n?: number): Promise<{ ok: boolean; at?: number; of?: number }>;
   /** the track the SoundCloud player bar is showing, straight from the page */
   nowPlaying(): Promise<{ url: string; title: string; artist: string; playing: boolean } | null>;
   /** the page the view is on ("" before the first load) */
@@ -84,6 +86,11 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         else if (data.action === "playlist") { const l = core.activeLib(); if (l) sc.navigate(l.url); }
         else if (typeof data.url === "string" && /^https:\/\/(www\.|m\.)?soundcloud\.com\//.test(data.url)) sc.navigate(data.url, !!data.play);
         return { ok: true };
+      }
+      case "player": {   // {action: toggle|next|prev|seek, n?}: the Discover page's keys
+        const a = String(data.action || "");
+        if (!/^(toggle|next|prev|seek)$/.test(a)) throw new Error("unknown player action");
+        return sc.player(a, Math.max(-600, Math.min(600, Number(data.n) || 0)));
       }
       case "signout": await sc.signOut(); return { ok: true };
       case "status": {

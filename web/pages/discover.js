@@ -6,7 +6,8 @@
    placeholder: this file reports the placeholder's position (POST /api/sc/show|bounds|hide),
    polls POST /api/sc/status while the page is open and renders the bar from it.
    The heart next to Add likes the playing track (a Likes library's Add already is a like).
-   Globals used elsewhere: SC (last status), scAddUrl(url), dcOpen(url), dcToast(), dcLike(). */
+   Player keys (DC_KEYS) work on this page and, forwarded by the Electron side, on the SoundCloud page.
+   Globals used elsewhere: SC (last status), scAddUrl(url), dcOpen(url), dcToast(), dcLike(), dcKey(key). */
 
 let SC = { available: false, signed_in: false, me: null, can: null, now: null, url: '' };
 const DC = { active: false, covered: false, timer: null, ro: null, html: '', msg: null, busy: false, pending: null };
@@ -44,7 +45,7 @@ function dcBarHtml() {
   const signin = `<button class="btn btn-sm btn-primary" onclick="dcOpen('https://soundcloud.com/signin')" title="Sign in to add tracks from here">${icon('cloud')}Sign in to add</button>`;
   let now, acts = '';
   if (!n) {
-    now = `<div class="dc-text"><div class="dc-title muted">Nothing playing yet</div><div class="dc-sub">Press play on any track below — it shows up here.</div></div>`;
+    now = `<div class="dc-text"><div class="dc-title muted">Nothing playing yet</div><div class="dc-sub dc-keys">Press play on any track below, or ${kbd('Space')} · ${dcKeysHtml()}</div></div>`;
     if (!SC.signed_in) acts = signin;
   } else {
     const title = t ? t.title : n.title, user = t ? t.user : n.artist;
@@ -57,13 +58,13 @@ function dcBarHtml() {
     const related = `<button class="btn btn-sm" onclick="scPost('nav',{url:scRelated('${esc(n.url)}')})" title="Tracks SoundCloud suggests after this one">${icon('sparkles')}Related tracks</button>`;
     // the heart: like / unlike the playing track (not for a Likes library, where Add is the like)
     const heart = SC.signed_in && t && !likes
-      ? `<button class="btn btn-sm btn-icon dc-heart${n.liked ? ' on' : ''}" ${DC.busy ? 'disabled' : ''} onclick="dcLike('${esc(n.url)}',${n.liked ? 'false' : 'true'})" title="${n.liked ? 'Liked on SoundCloud · click to unlike' : n.liked === null ? 'Like on SoundCloud' : 'Like on SoundCloud'}" aria-label="${n.liked ? 'Unlike' : 'Like'}">${icon('heart')}</button>`
+      ? `<button class="btn btn-sm btn-icon dc-heart${n.liked ? ' on' : ''}" ${DC.busy ? 'disabled' : ''} onclick="dcLike('${esc(n.url)}',${n.liked ? 'false' : 'true'})" title="${n.liked ? 'Liked on SoundCloud · click to unlike (L)' : 'Like on SoundCloud (L)'}" aria-label="${n.liked ? 'Unlike' : 'Like'}">${icon('heart')}</button>`
       : '';
     if (!SC.signed_in) acts = `${related}${signin}`;
     else if (SC.can && !SC.can.ok) acts = `${related}${heart}`;
     else if (n.in_playlist) acts = `${related}${heart}<button class="btn btn-sm" ${DC.busy ? 'disabled' : ''} onclick="dcSet('${esc(n.url)}',false)" title="Remove from ${esc(listName)}">${icon('xCircle')}Remove</button>`;
-    else acts = `${related}${heart}<button class="btn btn-sm btn-primary" ${DC.busy || !t ? 'disabled' : ''} onclick="dcSet('${esc(n.url)}',true)" title="Add to ${esc(listName)} on SoundCloud${
-      !likes && DATA.settings && DATA.settings.like_on_add ? ' (and like it — see Settings)' : ''}">${icon('plus')}Add to ${likes ? 'Likes' : 'playlist'}</button>`;
+    else acts = `${related}${heart}<button class="btn btn-sm btn-primary" ${DC.busy || !t ? 'disabled' : ''} onclick="dcSet('${esc(n.url)}',true)" title="Add to ${esc(listName)} on SoundCloud (A)${
+      !likes && DATA.settings && DATA.settings.like_on_add ? ' · also likes it, see Settings' : ''}">${icon('plus')}Add to ${likes ? 'Likes' : 'playlist'}</button>`;
   }
   const note = SC.signed_in && SC.can && !SC.can.ok ? `<div class="dc-note">${icon('alert')}<span>${esc(SC.can.why || '')}</span></div>` : '';
   const msg = DC.msg ? `<div class="dc-msgline${DC.msg.err ? ' err' : ''}">${icon(DC.msg.err ? 'alert' : 'checkCircle')}<span>${esc(DC.msg.text)}</span></div>` : '';
@@ -75,6 +76,71 @@ function dcRenderBar() {
   if (html === DC.html) return;   // nothing changed: keep hover / focus
   DC.html = html; bar.innerHTML = html;
 }
+
+/* ---------- keys ----------
+   One layout for both places the focus can be: the app's page (listener below) and the SoundCloud
+   page, where a listener the Electron side injects reports the same keys to dcKey() (SC_KEYS_JS in
+   src/main.ts lists them too). Space here yields to the local preview player when that is the one playing. */
+const DC_KEYS = { ' ': 'toggle', ArrowLeft: 'back', ArrowRight: 'fwd', n: 'next', p: 'prev', a: 'add', l: 'like' };
+const kbd = k => `<kbd>${k}</kbd>`;
+const dcKeysHtml = () => `${kbd('←')}${kbd('→')} 10 s · ${kbd('N')}${kbd('P')} next / previous · ${kbd('A')} add · ${kbd('L')} like`;
+const dcKeyAction = key => DC_KEYS[key && key.length === 1 ? key.toLowerCase() : key];
+/** a player key, wherever it was pressed; true when it was one of ours */
+function dcKey(key) {
+  if (PAGE !== 'discover' || !DC.active || DC.covered) return false;
+  const act = dcKeyAction(key); if (!act) return false;
+  const n = SC.now, t = n && n.track;
+  const likes = !!(SC.can && SC.can.likes), listName = likes ? 'your Likes' : 'the playlist';
+  const needTrack = () => {
+    if (!n) return dcToast('Nothing is playing yet', true), false;
+    if (!SC.signed_in) return dcToast('Sign in on SoundCloud below to ' + (act === 'add' ? 'add tracks' : 'like tracks'), true), false;
+    if (!t) return dcToast('Still looking this track up, try again in a moment', true), false;
+    return true;
+  };
+  switch (act) {
+    case 'toggle': dcPlayer('toggle'); break;
+    case 'next': dcPlayer('next'); break;
+    case 'prev': dcPlayer('prev'); break;
+    case 'back': dcPlayer('seek', -10); break;
+    case 'fwd': dcPlayer('seek', 10); break;
+    case 'add':
+      if (!needTrack()) break;
+      if (SC.can && !SC.can.ok) { dcToast(SC.can.why || 'Can’t add from here', true); break; }
+      if (n.in_playlist) { dcToast('Already in ' + listName); break; }
+      dcSet(n.url, true);
+      break;
+    case 'like':
+      if (!needTrack()) break;
+      if (likes) { if (n.in_playlist) dcToast('Already in your Likes'); else dcSet(n.url, true); break; }   // a Likes library: Add is the like
+      dcLike(n.url, !n.liked);
+      break;
+  }
+  return true;
+}
+/** drive SoundCloud's player bar (toggle | next | prev | seek n); one request at a time, held keys repeat */
+async function dcPlayer(action, n) {
+  if (DC.keyBusy) return;
+  DC.keyBusy = true;
+  try {
+    const r = await scPost('player', { action, n });
+    if (r && r.ok === false) dcToast(action === 'toggle' ? 'Nothing to play on this page yet' : 'Nothing is playing yet', true);
+  } catch {}
+  DC.keyBusy = false;
+  clearTimeout(DC.pollSoon); DC.pollSoon = setTimeout(dcPoll, 400);   // the bar follows the change without waiting for the next poll
+}
+document.addEventListener('keydown', e => {
+  if (PAGE !== 'discover' || !DC.active || DC.covered || (typeof TOUR !== 'undefined' && TOUR)) return;
+  if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey || document.querySelector('.overlay')) return;
+  const el = document.activeElement, tag = el ? el.tagName : '';
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (el && el.isContentEditable)) return;
+  let key = e.key;
+  if (e.shiftKey) { key = key === 'ArrowLeft' ? 'p' : key === 'ArrowRight' ? 'n' : ''; }   // SoundCloud's own previous / next, for the same hands
+  if (!dcKeyAction(key)) return;
+  // a local preview in the bar at the bottom keeps Space while SoundCloud is not the one playing
+  if (key === ' ' && typeof PLAYER !== 'undefined' && PLAYER.path && !(SC.now && SC.now.playing)) return;
+  e.preventDefault(); e.stopPropagation();   // ahead of the preview player's Space (player.js) and the page scroll
+  dcKey(key);
+}, true);
 
 /* ---------- the native view ---------- */
 function dcRect() {
@@ -200,6 +266,11 @@ if (typeof GUIDES !== 'undefined') {
         ['heart', 'The heart', 'Likes or unlikes the playing track on SoundCloud. With “Also like tracks you add” on in Settings, adding likes it as well.'],
         ['sparkles', 'Related tracks', 'What SoundCloud suggests after this track. The same item sits in the ⋯ menu of every playlist row.'],
         ['arrowLeft', 'Back · Home · Playlist', 'Steps back a page, goes to SoundCloud’s home, or opens your playlist (or Likes) on SoundCloud.'],
+      ] },
+      { h: 'Keys', tips: [
+        '<kbd>Space</kbd> plays and pauses, <kbd>←</kbd> and <kbd>→</kbd> jump 10 seconds back or forward, <kbd>N</kbd> and <kbd>P</kbd> go to the next or previous track in SoundCloud’s queue.',
+        '<kbd>A</kbd> adds the playing track to the playlist (to your Likes for a Likes library), <kbd>L</kbd> likes or unlikes it.',
+        'They work whether you last clicked the bar or the SoundCloud page, as long as you aren’t typing in a field.',
       ] },
       { h: 'Good to know', tips: [
         'Clicking a cover anywhere in DJ HQ plays that track here. Prefer the browser? Switch <b>Opening tracks</b> in Settings.',

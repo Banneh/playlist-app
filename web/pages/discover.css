@@ -20,6 +20,7 @@ body.has-player .page-body.dc-host { padding-bottom: 92px; }
 .dc-title > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .dc-sub { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dc-sub .tag { margin-left: 2px; }
+.dc-keys kbd { font: 600 10.5px/1 var(--mono); padding: 2px 5px; border-radius: 5px; background: var(--surface-3); color: var(--text-2); border: 1px solid var(--line-2); margin: 0 1px; }
 .dc-acts { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
 /* the heart: like / unlike the playing track */

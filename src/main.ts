@@ -43,6 +43,14 @@ function scEnsure(): WebContentsView {
   });
   wc.on("will-navigate", (e, url) => { if (!inView(url)) { e.preventDefault(); shell.openExternal(url); } });
   wc.on("did-finish-load", () => { if (scView && scShown) scFit(scView, scView.getBounds().width); });
+  // player keys pressed while the SoundCloud page has the focus: a small listener in the page
+  // reports them through the console (the view is sandboxed, with no preload), and they are
+  // handed to the UI's dcKey(), the same place that handles keys pressed on the app's own page
+  wc.on("dom-ready", () => { wc.executeJavaScript(SC_KEYS_JS, true).catch(() => {}); });
+  wc.on("console-message", (e) => {
+    const m = /^djhq:key:(.+)$/.exec(e.message || "");
+    if (m && win) win.webContents.executeJavaScript(`typeof dcKey === "function" && dcKey(${JSON.stringify(m[1])})`, true).catch(() => {});
+  });
   scView = v;
   return v;
 }
@@ -55,14 +63,23 @@ function scFit(v: WebContentsView, width: number) {
   if (Math.abs(v.webContents.getZoomFactor() - z) > 0.01) v.webContents.setZoomFactor(z);
 }
 
+/** a press on a SoundCloud control, as the mouse would do it: the page's buttons (<a role="button">
+ *  these days) listen for the pointer and mouse events, and ignore a bare .click() */
+const SC_PRESS_JS = `const press = (el, x, y) => {
+  const r = el.getBoundingClientRect();
+  if (x === undefined) { x = r.left + r.width / 2; y = r.top + r.height / 2; }
+  for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'])
+    el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+};`;
 /** press the big play button of the track page that is open (polls while the page hydrates);
  *  a button already in its "pause" state means the track is playing, so it is left alone */
 const SC_PLAY_JS = `(() => new Promise((res) => {
+  ${SC_PRESS_JS}
   const t0 = Date.now();
   const tick = () => {
-    const b = [...document.querySelectorAll('button.sc-button-play.playButton, .soundTitle__playButtonHero button, .fullHero button.sc-button-play')]
+    const b = [...document.querySelectorAll('.sc-button-play.playButton, .soundTitle__playButtonHero .sc-button-play, .fullHero .sc-button-play')]
       .find((x) => !x.closest('.playControls') && !x.classList.contains('sc-button-disabled'));
-    if (b) { if (!b.classList.contains('sc-button-pause')) b.click(); return res(true); }
+    if (b) { if (!b.classList.contains('sc-button-pause')) press(b); return res(true); }
     if (Date.now() - t0 > 8000) return res(false);
     setTimeout(tick, 250);
   };
@@ -76,6 +93,50 @@ function scGo(v: WebContentsView, url: string, play?: boolean) {
   if (play) wc.once("did-finish-load", press);
   wc.loadURL(url);
 }
+
+/** keys the Discover page handles (see DC_KEYS in web/pages/discover.js): forwarded from the
+ *  SoundCloud page when the focus is there and nothing is being typed; SoundCloud's own
+ *  shortcuts (Shift+…) and everything else stay with the page */
+const SC_KEYS_JS = `(() => {
+  if (window.__djhqKeys) return; window.__djhqKeys = true;
+  const KEYS = new Set([' ', 'ArrowLeft', 'ArrowRight', 'n', 'N', 'p', 'P', 'a', 'A', 'l', 'L']);
+  document.addEventListener('keydown', (e) => {
+    if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || !KEYS.has(e.key)) return;
+    const el = document.activeElement, tag = el ? el.tagName : '';
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (el && el.isContentEditable)) return;
+    e.preventDefault(); e.stopPropagation();
+    console.log('djhq:key:' + e.key);
+  }, true);
+})()`;
+/** the player bar at the bottom of soundcloud.com, driven from outside: play/pause, the
+ *  previous or next track of SoundCloud's queue, or a jump of n seconds (class names are SoundCloud's) */
+const scPlayerJs = (action: string, n: number) => `(() => {
+  ${SC_PRESS_JS}
+  const live = (sel) => { const b = document.querySelector(sel); return b && !b.disabled && !b.classList.contains('disabled') && !b.classList.contains('sc-button-disabled') ? b : null; };
+  const hit = (sel) => { const b = live(sel); if (b) press(b); return !!b; };
+  switch (${JSON.stringify(action)}) {
+    case 'toggle': {
+      if (hit('.playControls__play')) return { ok: true };
+      // nothing queued yet: the first play button on the page (a track page's big one or the first in a list)
+      const b = [...document.querySelectorAll('.sc-button-play')].find((x) => !x.closest('.playControls') && !x.classList.contains('sc-button-disabled'));
+      if (b) press(b);
+      return { ok: !!b };
+    }
+    case 'next': return { ok: hit('.playControls__next') };
+    case 'prev': return { ok: hit('.playControls__prev') };
+    case 'seek': {
+      const w = document.querySelector('.playbackTimeline__progressWrapper');
+      const max = w ? +w.getAttribute('aria-valuemax') : 0, now = w ? +w.getAttribute('aria-valuenow') : 0;
+      if (!w || !(max > 0) || !live('.playControls__play')) return { ok: false };
+      // a press on the timeline where the new position is, so SoundCloud's own player does the seek
+      const to = Math.max(0, Math.min(max, now + ${JSON.stringify(n)}));
+      const r = w.getBoundingClientRect();
+      press(w, r.left + r.width * (to / max), r.top + r.height / 2);
+      return { ok: true, at: to, of: max };
+    }
+  }
+  return { ok: false };
+})()`;
 
 const sc: ScView = {
   async show(rect: ScRect, url?: string, play?: boolean) {
@@ -94,6 +155,10 @@ const sc: ScView = {
   setBounds(rect: ScRect) { if (scView && scShown) { scView.setBounds(rect); scFit(scView, rect.width); } },
   navigate(url: string, play?: boolean) { scGo(scEnsure(), url, play); },
   back() { const h = scView?.webContents.navigationHistory; if (h && h.canGoBack()) h.goBack(); },
+  async player(action: string, n?: number) {
+    if (!scView || !scView.webContents.getURL()) return { ok: false };
+    return scView.webContents.executeJavaScript(scPlayerJs(action, Number(n) || 0), true).catch(() => ({ ok: false }));
+  },
   url() { return scView ? scView.webContents.getURL() : ""; },
   async nowPlaying() {
     if (!scView || scView.webContents.isLoading() && !scView.webContents.getURL()) return null;

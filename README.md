@@ -278,6 +278,17 @@ length and whether it's in the playlist already:
 - **Related tracks** opens what SoundCloud suggests after it. **Back**,
   **Home** and **Playlist** step around the site.
 
+The bar's player listens to the keyboard as well, whether you last clicked the
+bar or the SoundCloud page (as long as you aren't typing in a field):
+
+| Key | Does |
+| --- | --- |
+| `Space` | play / pause |
+| `←` `→` | 10 seconds back / forward |
+| `N` `P` | next / previous track in SoundCloud's queue |
+| `A` | add the playing track to the playlist (to your Likes for a Likes library) |
+| `L` | like / unlike it |
+
 Discover is also where tracks play from the rest of the app. Click a track's
 cover on any list and it opens on Discover and starts playing; the **⋯** menu
 of a row offers **Play on Discover** and **Related tracks on Discover** as
