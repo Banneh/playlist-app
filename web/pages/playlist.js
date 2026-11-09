@@ -73,8 +73,8 @@ function trackRow(t) {
     </div>`;
 }
 function artHtml(t) {
-  const inApp = typeof scInApp === 'function' && scInApp();   // Discover: play it here; otherwise the browser
-  return `<button class="art${t.art ? '' : ' none'}" onclick="scOpen('${esc(t.url)}', true)" title="${inApp ? 'Play on Discover' : 'Open on SoundCloud'}">${
+  const inApp = typeof scInApp === 'function' && scInApp();   // plays on SoundCloud inside DJ HQ, here on the list; otherwise the browser
+  return `<button class="art${t.art ? '' : ' none'}" data-url="${esc(t.url)}" data-title="${esc(t.title)}" data-artist="${esc(t.artist)}" data-art="${esc(t.art || '')}" onclick="scOpenArt(this)" title="${inApp ? 'Play' : 'Open on SoundCloud'}">${
     t.art ? `<img src="${esc(t.art)}" loading="lazy" alt="" onerror="this.parentNode.classList.add('none');this.remove()">` : icon('music')}<span class="ov">${icon(inApp ? 'play' : 'external')}</span></button>`;
 }
 
@@ -102,7 +102,8 @@ function rowMenu(anchor, id) {
     { label: 'Match to a local file…', icon: 'link', onclick: () => openAssign(id) },
     { label: 'Edit artist / title', icon: 'pencil', onclick: () => { EDIT_ID = id; render(); const a = $('#e-artist'); a && a.focus(); } },
     '-',
-    ...(APP.sc ? [{ label: 'Play on Discover', icon: 'play', hint: 'Hear the track inside DJ HQ', onclick: () => dcOpen(t.url, true) },
+    ...(APP.sc ? [{ label: 'Play', icon: 'play', hint: 'Plays on SoundCloud inside DJ HQ while you stay here; the bar at the bottom controls it', onclick: () => dcOpen(t.url, true, { title: t.title, artist: t.artist, art: t.art }) },
+                  { label: 'Open on Discover', icon: 'cloud', hint: 'The track’s SoundCloud page, inside DJ HQ', onclick: () => dcOpen(t.url) },
                   { label: 'Related tracks on Discover', icon: 'sparkles', hint: 'What SoundCloud suggests after this track, inside DJ HQ', onclick: () => dcOpen(scRelated(t.url)) }] : []),
     { label: APP.sc ? 'Open in your browser' : 'Open on SoundCloud', icon: 'external', onclick: () => window.open(t.url, '_blank', 'noopener') },
     { label: 'Copy SoundCloud link', icon: 'copy', onclick: () => copyText(t.url, 'Link copied') },
@@ -210,7 +211,7 @@ function trackTable(rows, emptyOpts) {
 }
 function chipsHtml(varName, cur, items) {
   return items.map(([k, label, n, ico]) =>
-    `<button class="chip${cur === k ? ' on' : ''}" onclick="${varName}='${k}';render()">${ico ? icon(ico) : ''}${label}<span class="n">${n}</span></button>`).join('');
+    `<button class="chip${cur === k ? ' on' : ''}" onclick="${varName}='${k}';renderTop()">${ico ? icon(ico) : ''}${label}<span class="n">${n}</span></button>`).join('');
 }
 
 /* ---------- pages ---------- */

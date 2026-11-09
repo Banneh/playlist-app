@@ -92,6 +92,8 @@ const PATHS = {
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
   help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
   play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  skipBack: '<polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/>',
+  skipFwd: '<polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/>',
   lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   wand: '<path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/>',
   settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
@@ -331,6 +333,7 @@ function render() {
   const noLibs = !(DATA.libraries || []).length;
   const setup = !noLibs && typeof SETUP !== 'undefined' && SETUP && !!PAGES.setup;   // "Before we start", right after the first library
   document.body.classList.toggle('onboarding', noLibs || setup);
+  if (typeof scBarRender === 'function') scBarRender();   // SoundCloud's bottom bar: on every page but Discover and onboarding
   $('#app').hidden = noLibs || setup; $('#welcome').hidden = !(noLibs || setup);
   if (noLibs || setup) PAGES[PAGE] && PAGES[PAGE].onHide && PAGES[PAGE].onHide();   // the Discover view must not stay over the screen
   if (noLibs) { $('#welcome').innerHTML = PAGES.welcome.body(); PAGES.welcome.after && PAGES.welcome.after(); return; }
@@ -356,9 +359,15 @@ function render() {
   $('#ph-actions').innerHTML = page.actions ? page.actions() : '';
   const tools = page.tools ? page.tools() : '';
   $('#ph-tools').innerHTML = tools; $('#ph-tools').hidden = !tools;
-  $('#page-body').innerHTML = page.body(q);
+  // Redrawing the page (a background refresh, the Downloads scan, an inline edit …) keeps the
+  // list where it was; go() and the search decide for themselves where the page should start.
+  const body = $('#page-body'), top = body.scrollTop;
+  body.innerHTML = page.body(q);
+  body.scrollTop = top;
   page.after && page.after();
 }
+/** redraw the page and start at the top (a new search, another chip) */
+function renderTop() { render(); const b = $('#page-body'); if (b) b.scrollTop = 0; }
 
 function renderSidebar() {
   const libs = DATA.libraries || [];
@@ -537,7 +546,7 @@ async function boot() {
   await loadPrefs();
   if (PREFS.theme && PREFS.theme !== THEME) { THEME = PREFS.theme; try { localStorage.setItem(THEME_KEY, THEME); } catch {} applyTheme(); }
   if (/[?&]titlebar=inset/.test(location.search)) document.documentElement.classList.add('mac-inset');
-  $('#q').oninput = e => { Q = e.target.value; render(); };
+  $('#q').oninput = e => { Q = e.target.value; renderTop(); };
   $('#btn-refresh').onclick = manualRefresh;
   $('#lib').onchange = async e => {
     try { DATA = await api('/api/library', { op: 'select', id: e.target.value }); EDIT_ID = null; render(); if (typeof loadInbox === 'function') loadInbox(); }
