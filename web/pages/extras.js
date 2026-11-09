@@ -65,7 +65,8 @@ function exMenu(anchor, i) {
     { label: f.found ? 'Pick a different track…' : 'Find on SoundCloud…', icon: 'search', onclick: () => openFind(i) },
   ];
   if (f.found) items.push('-',
-    ...(APP.sc ? [{ label: 'Play on Discover', icon: 'play', hint: 'Hear the track inside DJ HQ', onclick: () => dcOpen(f.found.url, true) }] : []),
+    ...(APP.sc ? [{ label: 'Play', icon: 'play', hint: 'Plays on SoundCloud inside DJ HQ while you stay here; the bar at the bottom controls it', onclick: () => dcOpen(f.found.url, true, { title: f.found.title, artist: f.found.user }) },
+                  { label: 'Open on Discover', icon: 'cloud', hint: 'The track’s SoundCloud page, inside DJ HQ', onclick: () => dcOpen(f.found.url) }] : []),
     { label: APP.sc ? 'Open in your browser' : 'Open on SoundCloud', icon: 'external', onclick: () => window.open(f.found.url, '_blank', 'noopener') },
     { label: 'Copy SoundCloud link', icon: 'copy', onclick: () => copyText(f.found.url, 'Link copied') },
     { label: 'Forget this match', icon: 'xCircle', onclick: () => clearFound(i) });

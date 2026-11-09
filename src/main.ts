@@ -29,8 +29,14 @@ function scEnsure(): WebContentsView {
   const ses = session.fromPartition(SC_PARTITION);
   // a plain Chrome user agent: Google's sign-in refuses browsers that announce Electron
   ses.setUserAgent(ses.getUserAgent().replace(/ ?(Electron|dj-hq|DJ HQ)\/\S+/gi, ""));
-  const v = new WebContentsView({ webPreferences: { partition: SC_PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  // backgroundThrottling off: the view plays on with the window on another page, and a track
+  // can be started while it is detached (a cover clicked on a list); throttled, SoundCloud's
+  // player ignores the press until the view is shown
+  const v = new WebContentsView({ webPreferences: { partition: SC_PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false } });
   v.setBackgroundColor("#ffffff");
+  // a track can start from any list before Discover was ever opened: the view then lives
+  // detached from the window, and the page needs a real size to lay itself out and play
+  v.setBounds({ x: 0, y: 0, width: SC_LAYOUT_WIDTH, height: 800 });
   const wc = v.webContents;
   // sign-in buttons (Google, Apple, Facebook) open a popup window that must really open,
   // in the same session; links out of SoundCloud (shops, download gates) go to the default browser

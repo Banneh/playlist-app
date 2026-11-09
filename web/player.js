@@ -78,6 +78,7 @@ function playFile(filePath, label, sub) {
   if (!filePath) return;
   const a = plEnsure();
   if (PLAYER.path === filePath) return togglePlay();
+  if (typeof SC !== 'undefined' && SC.now && SC.now.playing && typeof dcPlayer === 'function') dcPlayer('toggle');   // one thing plays at a time
   PLAYER.path = filePath; PLAYER.label = label || filePath.split(/[\\/]/).pop(); PLAYER.sub = sub || '';
   $('#pl-title').textContent = PLAYER.label; $('#pl-title').title = filePath;
   $('#pl-sub').textContent = PLAYER.sub;

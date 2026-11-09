@@ -7,10 +7,14 @@
    polls POST /api/sc/status while the page is open and renders the bar from it.
    The heart next to Add likes the playing track (a Likes library's Add already is a like).
    Player keys (DC_KEYS) work on this page and, forwarded by the Electron side, on the SoundCloud page.
-   Globals used elsewhere: SC (last status), scAddUrl(url), dcOpen(url), dcToast(), dcLike(), dcKey(key). */
+   The view keeps playing when you leave the page, and a cover clicked on any list starts a track
+   there without leaving the list (scPlayBg): the bottom bar (#scbar, scBarRender) shows what
+   SoundCloud is playing on every other page, with the same controls and keys.
+   Globals used elsewhere: SC (last status), scAddUrl(url), dcOpen(url), dcToast(), dcLike(), dcKey(key), scBarRender(). */
 
 let SC = { available: false, signed_in: false, me: null, can: null, now: null, url: '' };
-const DC = { active: false, covered: false, timer: null, ro: null, html: '', msg: null, busy: false, pending: null };
+const DC = { active: false, covered: false, ticker: null, ticks: 0, ro: null, html: '', msg: null, busy: false, pending: null,
+             bar: '', barOn: false, dismissed: false, loading: null };   // bottom bar: last html, shown, closed by hand, { url, meta, at } while a track starts
 
 const scPost = (action, body) => fetch('/api/sc/' + action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(r => r.json());
 const scCan = () => !!(APP.sc && SC.signed_in && SC.can && SC.can.ok);
@@ -33,20 +37,36 @@ PAGES.discover = {
 };
 
 /* ---------- the bar ---------- */
+const dcLikes = () => SC.can ? SC.can.likes : /\/likes\/?$/.test(DATA.playlist_url || '');
+const dcListName = () => dcLikes() ? 'your Likes' : 'the playlist';
+const dcSignin = () => `<button class="btn btn-sm btn-primary" onclick="dcOpen('https://soundcloud.com/signin')" title="Sign in to add tracks from here">${icon('cloud')}Sign in to add</button>`;
+/** the heart and Add / Remove for the playing track n; compact (the bottom bar) leaves out
+ *  Related tracks and the sign-in button, which belong on the Discover page */
+function dcActsHtml(n, compact) {
+  const t = n && n.track, likes = dcLikes(), listName = dcListName();
+  if (!n) return !SC.signed_in && !compact ? dcSignin() : '';
+  const related = compact ? '' : `<button class="btn btn-sm" onclick="scPost('nav',{url:scRelated('${esc(n.url)}')})" title="Tracks SoundCloud suggests after this one">${icon('sparkles')}Related tracks</button>`;
+  // the heart: like / unlike the playing track (not for a Likes library, where Add is the like)
+  const heart = SC.signed_in && t && !likes
+    ? `<button class="btn btn-sm btn-icon dc-heart${n.liked ? ' on' : ''}" ${DC.busy ? 'disabled' : ''} onclick="this.blur();dcLike('${esc(n.url)}',${n.liked ? 'false' : 'true'})" title="${n.liked ? 'Liked on SoundCloud · click to unlike (L)' : 'Like on SoundCloud (L)'}" aria-label="${n.liked ? 'Unlike' : 'Like'}">${icon('heart')}</button>`
+    : '';
+  if (!SC.signed_in) return `${related}${compact ? '' : dcSignin()}`;
+  if (SC.can && !SC.can.ok) return `${related}${heart}`;
+  if (n.in_playlist) return `${related}${heart}<button class="btn btn-sm" ${DC.busy ? 'disabled' : ''} onclick="this.blur();dcSet('${esc(n.url)}',false)" title="Remove from ${esc(listName)}">${icon('xCircle')}Remove</button>`;
+  return `${related}${heart}<button class="btn btn-sm btn-primary" ${DC.busy || !t ? 'disabled' : ''} onclick="this.blur();dcSet('${esc(n.url)}',true)" title="Add to ${esc(listName)} on SoundCloud (A)${
+    !likes && DATA.settings && DATA.settings.like_on_add ? ' · also likes it, see Settings' : ''}">${icon('plus')}Add to ${likes ? 'Likes' : 'playlist'}</button>`;
+}
 function dcBarHtml() {
-  const likes = SC.can ? SC.can.likes : /\/likes\/?$/.test(DATA.playlist_url || '');
-  const listName = likes ? 'your Likes' : 'the playlist';
+  const likes = dcLikes(), listName = dcListName();
   const nav = `<div class="dc-nav">
     <button class="btn btn-ghost btn-sm btn-icon" onclick="scPost('nav',{action:'back'})" title="Back">${icon('arrowLeft')}</button>
     <button class="btn btn-ghost btn-sm" onclick="scPost('nav',{action:'home'})" title="SoundCloud home">${icon('cloud')}Home</button>
     <button class="btn btn-ghost btn-sm" onclick="scPost('nav',{action:'playlist'})" title="Open ${esc(listName)} on SoundCloud">${icon('listMusic')}${likes ? 'Likes' : 'Playlist'}</button>
   </div>`;
   const n = SC.now, t = n && n.track;
-  const signin = `<button class="btn btn-sm btn-primary" onclick="dcOpen('https://soundcloud.com/signin')" title="Sign in to add tracks from here">${icon('cloud')}Sign in to add</button>`;
-  let now, acts = '';
+  let now;
   if (!n) {
     now = `<div class="dc-text"><div class="dc-title muted">Nothing playing yet</div><div class="dc-sub dc-keys">Press play on any track below, or ${kbd('Space')} · ${dcKeysHtml()}</div></div>`;
-    if (!SC.signed_in) acts = signin;
   } else {
     const title = t ? t.title : n.title, user = t ? t.user : n.artist;
     now = `<img class="dc-art" src="${esc(t && t.art ? t.art.replace('-large', '-t120x120') : '')}" alt="" onerror="this.style.visibility='hidden'">
@@ -55,26 +75,76 @@ function dcBarHtml() {
         <div class="dc-sub">${esc(user)}${t ? ' · ' + fmtSecs(t.dur) : ''}${
           n.in_playlist ? ` · ${tag('In ' + listName, 'ok', 'check')}` : ''}</div>
       </div>`;
-    const related = `<button class="btn btn-sm" onclick="scPost('nav',{url:scRelated('${esc(n.url)}')})" title="Tracks SoundCloud suggests after this one">${icon('sparkles')}Related tracks</button>`;
-    // the heart: like / unlike the playing track (not for a Likes library, where Add is the like)
-    const heart = SC.signed_in && t && !likes
-      ? `<button class="btn btn-sm btn-icon dc-heart${n.liked ? ' on' : ''}" ${DC.busy ? 'disabled' : ''} onclick="dcLike('${esc(n.url)}',${n.liked ? 'false' : 'true'})" title="${n.liked ? 'Liked on SoundCloud · click to unlike (L)' : 'Like on SoundCloud (L)'}" aria-label="${n.liked ? 'Unlike' : 'Like'}">${icon('heart')}</button>`
-      : '';
-    if (!SC.signed_in) acts = `${related}${signin}`;
-    else if (SC.can && !SC.can.ok) acts = `${related}${heart}`;
-    else if (n.in_playlist) acts = `${related}${heart}<button class="btn btn-sm" ${DC.busy ? 'disabled' : ''} onclick="dcSet('${esc(n.url)}',false)" title="Remove from ${esc(listName)}">${icon('xCircle')}Remove</button>`;
-    else acts = `${related}${heart}<button class="btn btn-sm btn-primary" ${DC.busy || !t ? 'disabled' : ''} onclick="dcSet('${esc(n.url)}',true)" title="Add to ${esc(listName)} on SoundCloud (A)${
-      !likes && DATA.settings && DATA.settings.like_on_add ? ' · also likes it, see Settings' : ''}">${icon('plus')}Add to ${likes ? 'Likes' : 'playlist'}</button>`;
   }
+  const acts = dcActsHtml(n, false);
   const note = SC.signed_in && SC.can && !SC.can.ok ? `<div class="dc-note">${icon('alert')}<span>${esc(SC.can.why || '')}</span></div>` : '';
   const msg = DC.msg ? `<div class="dc-msgline${DC.msg.err ? ' err' : ''}">${icon(DC.msg.err ? 'alert' : 'checkCircle')}<span>${esc(DC.msg.text)}</span></div>` : '';
   return `<div class="dc-row">${nav}<div class="dc-now">${now}</div><div class="dc-acts">${acts}</div></div>${note}${msg}`;
 }
 function dcRenderBar() {
+  scBarRender();
   const bar = $('#dc-bar'); if (!bar) return;
   const html = dcBarHtml();
   if (html === DC.html) return;   // nothing changed: keep hover / focus
   DC.html = html; bar.innerHTML = html;
+}
+
+/* ---------- the bottom bar: SoundCloud's player on every other page ----------
+   Shown while SoundCloud has a track (playing or paused) or one is starting, hidden on Discover
+   itself, where the big bar is. Close pauses it and hides the bar until the next play. */
+const dcSameUrl = (a, b) => String(a || '').replace(/[?#].*$/, '').replace(/\/+$/, '').toLowerCase() === String(b || '').replace(/[?#].*$/, '').replace(/\/+$/, '').toLowerCase();
+function scBarHtml() {
+  const n = SC.now, t = n && n.track, ld = DC.loading;
+  const meta = ld && !(n && dcSameUrl(n.url, ld.url)) ? (ld.meta || {}) : null;   // what the list knew while SoundCloud loads the track
+  const title = meta ? meta.title || 'Starting…' : t ? t.title : n.title;
+  const artist = meta ? meta.artist || '' : t ? t.user : n.artist;
+  const art = meta ? meta.art || '' : t && t.art ? t.art.replace('-large', '-t120x120') : '';
+  const playing = !meta && !!n.playing;
+  const sub = meta ? 'Starting on SoundCloud…' : `${esc(artist)}${t ? ' · ' + fmtSecs(t.dur) : ''}${n.in_playlist ? ' · In ' + esc(dcListName()) : ''}`;
+  return `<div class="sb-inner">
+    <button class="btn btn-ghost btn-sm btn-icon" onclick="this.blur();dcPlayer('prev')" title="Previous track (P)">${icon('skipBack')}</button>
+    <button class="btn btn-primary btn-icon sb-toggle" onclick="this.blur();dcPlayer('toggle')" title="${playing ? 'Pause' : 'Play'} (Space)">${meta ? '<span class="spin"></span>' : playing ? plIcon('pause') : icon('play')}</button>
+    <button class="btn btn-ghost btn-sm btn-icon" onclick="this.blur();dcPlayer('next')" title="Next track (N)">${icon('skipFwd')}</button>
+    <img class="sb-art" src="${esc(art)}" alt="" onerror="this.style.visibility='hidden'">
+    <div class="sb-meta" onclick="go('discover')" title="Open on Discover">
+      <div class="sb-title"><span>${esc(title)}</span>${playing ? '<span class="dc-eq" aria-hidden="true"><i></i><i></i><i></i></span>' : ''}</div>
+      <div class="sb-sub trunc">${sub}</div>
+    </div>
+    <div class="sb-acts">${dcActsHtml(meta ? null : n, true)}</div>
+    <button class="btn btn-ghost btn-sm" onclick="go('discover')" title="Open the Discover page: the SoundCloud page this track is on">${icon('cloud')}Discover</button>
+    <button class="btn btn-ghost btn-sm btn-icon" onclick="scBarClose()" title="Pause and hide">${icon('x')}</button>
+  </div>`;
+}
+function scBarRender() {
+  const box = $('#scbar'); if (!box) return;
+  const n = SC.now;
+  if (DC.loading) {
+    if (n && dcSameUrl(n.url, DC.loading.url)) DC.loading = null;
+    else if (Date.now() - DC.loading.at > 20000) { DC.loading = null; toast('SoundCloud didn’t start the track — open Discover to see why', true); }
+  }
+  if (n && n.playing) DC.dismissed = false;
+  const show = !!APP.sc && !(PAGE === 'discover' && DC.active) && !document.body.classList.contains('onboarding') && !!(DC.loading || (n && !DC.dismissed));
+  DC.barOn = show;
+  box.hidden = !show; document.body.classList.toggle('has-scbar', show);
+  if (!show) { DC.bar = ''; return; }
+  const html = scBarHtml();
+  if (html !== DC.bar) { DC.bar = html; box.innerHTML = html; }
+}
+function scBarClose() {
+  DC.dismissed = true; DC.loading = null;
+  if (SC.now && SC.now.playing) dcPlayer('toggle');
+  scBarRender();
+}
+/** start a track on SoundCloud without leaving the page you are on (the cover, Play in a row menu) */
+function scPlayBg(url, meta) {
+  DC.dismissed = false;
+  DC.loading = { url, meta: meta || null, at: Date.now() };
+  if (typeof PLAYER !== 'undefined' && PLAYER.audio && !PLAYER.audio.paused) PLAYER.audio.pause();   // one thing plays at a time
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // Space goes to the player, not the cover
+  scPost('nav', { url, play: true }).catch(e => toast('Couldn’t reach SoundCloud: ' + e.message, true));
+  scBarRender();
+  dcTicker();
+  clearTimeout(DC.pollSoon); DC.pollSoon = setTimeout(dcPoll, 1500);
 }
 
 /* ---------- keys ----------
@@ -85,9 +155,11 @@ const DC_KEYS = { ' ': 'toggle', ArrowLeft: 'back', ArrowRight: 'fwd', n: 'next'
 const kbd = k => `<kbd>${k}</kbd>`;
 const dcKeysHtml = () => `${kbd('←')}${kbd('→')} 10 s · ${kbd('N')}${kbd('P')} next / previous · ${kbd('A')} add · ${kbd('L')} like`;
 const dcKeyAction = key => DC_KEYS[key && key.length === 1 ? key.toLowerCase() : key];
-/** a player key, wherever it was pressed; true when it was one of ours */
+const dcOnPage = () => PAGE === 'discover' && DC.active && !DC.covered;
+/** a player key, wherever it was pressed (the Discover page, the SoundCloud page, or any page
+ *  while the bottom bar is up); true when it was one of ours */
 function dcKey(key) {
-  if (PAGE !== 'discover' || !DC.active || DC.covered) return false;
+  if (!dcOnPage() && !DC.barOn) return false;
   const act = dcKeyAction(key); if (!act) return false;
   const n = SC.now, t = n && n.track;
   const likes = !!(SC.can && SC.can.likes), listName = likes ? 'your Likes' : 'the playlist';
@@ -129,7 +201,7 @@ async function dcPlayer(action, n) {
   clearTimeout(DC.pollSoon); DC.pollSoon = setTimeout(dcPoll, 400);   // the bar follows the change without waiting for the next poll
 }
 document.addEventListener('keydown', e => {
-  if (PAGE !== 'discover' || !DC.active || DC.covered || (typeof TOUR !== 'undefined' && TOUR)) return;
+  if ((!dcOnPage() && !DC.barOn) || (typeof TOUR !== 'undefined' && TOUR)) return;
   if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey || document.querySelector('.overlay')) return;
   const el = document.activeElement, tag = el ? el.tagName : '';
   if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (el && el.isContentEditable)) return;
@@ -162,26 +234,37 @@ function dcMount() {
   if (DC.ro) DC.ro.disconnect();
   const f = $('#dc-frame');
   if (f && typeof ResizeObserver !== 'undefined') { DC.ro = new ResizeObserver(() => dcShow()); DC.ro.observe(f); }
-  if (!DC.timer) { DC.timer = setInterval(dcPoll, 1500); dcPoll(); }
+  dcTicker(); dcPoll();
   dcShow();
 }
 function dcUnmount() {
   DC.active = false;
   if (DC.ro) { DC.ro.disconnect(); DC.ro = null; }
-  if (DC.timer) { clearInterval(DC.timer); DC.timer = null; }
   const body = $('#page-body'); if (body) body.classList.remove('dc-host');
   dcHide();
+  scBarRender();   // the track keeps playing: the bottom bar takes over
+}
+/** one timer for the whole app: polls SoundCloud's status every 1.5 s on Discover and while a
+ *  track starts, every 3 s while the bottom bar is up, and not at all when nothing is playing */
+function dcTicker() {
+  if (DC.ticker || !APP.sc) return;
+  DC.ticker = setInterval(() => {
+    DC.ticks++;
+    if (DC.active || DC.loading) return dcPoll();
+    if (SC.now && (SC.now.playing || !DC.dismissed) && DC.ticks % 2 === 0) dcPoll();
+  }, 1500);
 }
 window.addEventListener('resize', () => dcShow());
 
 /* ---------- status + actions ---------- */
 async function dcPoll() {
   if (!APP.sc) return;
+  dcTicker();
   try {
     const s = await scPost('status');
     if (s && s.available) SC = s;
   } catch {}
-  if (DC.active) dcRenderBar();
+  dcRenderBar();
 }
 /** add (true) or remove (false) a track by URL from the Discover bar */
 async function dcSet(url, add) {
@@ -231,11 +314,13 @@ async function scAddUrl(url) {
     toast('Added ' + (r.title ? '“' + r.title + '”' : 'the track') + ' to the playlist');
   } catch (e) { toast('Couldn’t add it: ' + e.message, true); }
 }
-/** open a SoundCloud URL on the Discover page; with play, the track on it starts playing */
-function dcOpen(url, play) {
+/** open a SoundCloud URL on Discover; with play, the track on it starts playing right where you
+ *  are (the bottom bar shows it; meta = {title, artist, art} from the list, for the bar while it loads) */
+function dcOpen(url, play, meta) {
   if (!APP.sc) return window.open(url, '_blank', 'noopener');
   if (PAGE === 'discover' && DC.active) return void scPost('nav', { url, play: !!play }).catch(() => {});
-  DC.pending = { url, play: !!play };   // the view is (re)attached by dcShow, which passes the page along
+  if (play) return scPlayBg(url, meta);
+  DC.pending = { url, play: false };   // the view is (re)attached by dcShow, which passes the page along
   go('discover');
 }
 /** Settings → "Open SoundCloud links": on Discover (the default in the desktop app) or in the browser */
@@ -246,12 +331,16 @@ function titleLink(url) {
   if (!APP.sc) return '';
   return scInApp()
     ? `<button class="tl" onclick="window.open('${esc(url)}','_blank','noopener')" title="Open in your browser" aria-label="Open in your browser">${icon('external')}</button>`
-    : `<button class="tl" onclick="dcOpen('${esc(url)}', true)" title="Play on Discover" aria-label="Play on Discover">${icon('play')}</button>`;
+    : `<button class="tl" onclick="dcOpen('${esc(url)}', true)" title="Play on SoundCloud, inside DJ HQ" aria-label="Play on SoundCloud, inside DJ HQ">${icon('play')}</button>`;
 }
 /** open a SoundCloud link where the user wants them: Discover (playing the track when asked) or the browser */
-function scOpen(url, play) {
-  if (scInApp()) return dcOpen(url, play);
+function scOpen(url, play, meta) {
+  if (scInApp()) return dcOpen(url, play, meta);
   window.open(url, '_blank', 'noopener');
+}
+/** a cover button: data-url / -title / -artist / -art (see artHtml in pages/playlist.js) */
+function scOpenArt(el) {
+  scOpen(el.dataset.url, true, { title: el.dataset.title, artist: el.dataset.artist, art: el.dataset.art });
 }
 
 /* ---------- the Guide: the two Discover pages, and what the artwork does here ---------- */
@@ -270,10 +359,14 @@ if (typeof GUIDES !== 'undefined') {
       { h: 'Keys', tips: [
         '<kbd>Space</kbd> plays and pauses, <kbd>←</kbd> and <kbd>→</kbd> jump 10 seconds back or forward, <kbd>N</kbd> and <kbd>P</kbd> go to the next or previous track in SoundCloud’s queue.',
         '<kbd>A</kbd> adds the playing track to the playlist (to your Likes for a Likes library), <kbd>L</kbd> likes or unlikes it.',
-        'They work whether you last clicked the bar or the SoundCloud page, as long as you aren’t typing in a field.',
+        'They work whether you last clicked the bar or the SoundCloud page, as long as you aren’t typing in a field, and on every other page while the bar at the bottom is up.',
+      ] },
+      { h: 'The bar at the bottom', tips: [
+        'Click a cover on any list and the track starts on SoundCloud without leaving the list. A bar at the bottom shows it, with play / pause, previous and next, the heart and <b>Add</b>; <b>Discover</b> on it opens the page the track is on.',
+        'Leaving Discover while something plays keeps it playing; the same bar takes over. Its <b>×</b> pauses and hides it.',
       ] },
       { h: 'Good to know', tips: [
-        'Clicking a cover anywhere in DJ HQ plays that track here. Prefer the browser? Switch <b>Opening tracks</b> in Settings.',
+        'Prefer the browser for covers and links? Switch <b>Opening tracks</b> in Settings.',
         'The session is SoundCloud’s own, kept on this computer only. <b>Sign out</b> in Settings forgets it.',
         'Toasts can’t be seen under the page, so feedback for Add and the heart shows in the bar instead.',
       ] },
@@ -294,9 +387,9 @@ if (typeof GUIDES !== 'undefined') {
       ] },
     ],
   };
-  const art = ['music', 'Artwork', 'Click it to play the track on Discover, inside DJ HQ. <b>Opening tracks</b> in Settings switches that to your browser.'];
+  const art = ['music', 'Artwork', 'Click it to hear the track: it plays on SoundCloud inside DJ HQ while you stay on the list, and the bar at the bottom controls it. <b>Opening tracks</b> in Settings switches that to your browser.'];
   for (const k of ['all']) { const s = GUIDES[k] && GUIDES[k].sections[0]; if (s && s.items && s.items[0][1] === 'Artwork') s.items[0] = art; }
-  if (GUIDES.missing) GUIDES.missing.sections[2].tips[2] = 'Click a cover to hear the track on Discover first; a <b>Play on Discover</b> item sits in every row’s ⋯ menu as well.';
+  if (GUIDES.missing) GUIDES.missing.sections[2].tips[2] = 'Click a cover to hear the track first, without leaving the list; <b>Play</b> and <b>Open on Discover</b> sit in every row’s ⋯ menu as well.';
 }
 /** toasts can't be seen under the native view: the bar shows them instead */
 function dcToast(msg, isErr) {
