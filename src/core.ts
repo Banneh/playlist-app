@@ -1694,24 +1694,34 @@ function bestTrackNames(names: string[], dur: number, tracks: PlTrack[]): [PlTra
  *  entry of a zip) in the downloads folder, matched against the tracks like the
  *  library matcher does. With the auto-move setting on, exact matches of tracks
  *  you don't have yet are moved straight away and listed in `moved`. */
+/** every audio file in the downloads folder, loose or inside a zip */
+async function scanInbox(dir: string): Promise<{ files: InboxFile[]; errors: string[] }> {
+  const plain: InboxFile[] = (await scanFolder(dir)).map((f) => ({ ...f, matchNames: [f.name] }));
+  const zips = await scanInboxZips(dir);
+  return { files: [...plain, ...zips.files], errors: zips.errors };
+}
+
 export async function inboxView(): Promise<any> {
   const lib = requireLib();
   const dir = inboxDir();
-  const base = { dir, exists: fs.existsSync(dir), items: [] as any[], others: 0, already: 0,
+  const base = { dir, exists: fs.existsSync(dir), items: [] as any[], unmatched: [] as any[], others: 0, already: 0,
                  moved: [] as string[], move_errors: [] as string[], zip_errors: [] as string[] };
   if (!base.exists || !lib.playlist) return base;
   const view = await buildView();
   const rows = new Map<number, any>(view.tracks.map((r: any) => [r.id, r]));
   const libNames = new Set((await scanLocal(lib)).map((f) => f.base));
-  const plain: InboxFile[] = (await scanFolder(dir)).map((f) => ({ ...f, matchNames: [f.name] }));
-  const zips = await scanInboxZips(dir);
-  base.zip_errors = zips.errors;
-  for (const f of [...plain, ...zips.files]) {
+  const scan = await scanInbox(dir);
+  base.zip_errors = scan.errors;
+  for (const f of scan.files) {
     if (libNames.has(f.name)) { base.already++; continue; } // copied in already
     const [t, score] = bestTrackNames(f.matchNames, f.dur, lib.playlist.tracks);
     const row = t && rows.get(t.id);
-    if (!t || !row || score < 0.6) { base.others++; continue; }
     const lossy = LOSSY.test(f.fmt[0]);
+    if (!t || !row || score < 0.6) {   // not in the playlist: can still be moved in, or looked up on SoundCloud first
+      const [artist, title] = extraArtistTitle(f);
+      base.unmatched.push({ name: f.name, zip: f.zip || null, dur: fmtDur(Math.round(f.dur)), lossy, artist, title, n: base.unmatched.length + 1 });
+      continue;
+    }
     let action: "move" | "upgrade" | null = null;
     if (!row.have) action = "move";
     else if (row.lossy && !lossy) action = "upgrade";
@@ -1720,6 +1730,7 @@ export async function inboxView(): Promise<any> {
                       id: t.id, n: row.n, artist: row.artist, title: row.title, score: Math.min(1, score),
                       action, cur_file: row.file });
   }
+  base.others = base.unmatched.length;
   // auto-move: exact matches (same name, same length) of tracks we don't have yet
   if (STATE.settings?.auto_move && base.items.length && !libDirs(lib).some((d) => sameDir(d, dir))) {
     const movedTracks = new Set<number>();
@@ -1745,8 +1756,11 @@ function moveFile(src: string, dst: string): void {
 }
 
 /** Move one inbox file (or one entry of a zip in the inbox) into the library and
- *  pin it to its track. When the track already has a (lossy) file, that file goes
- *  to originals/<lib>/replaced/. Zips stay where they are. */
+ *  pin it to its track (`id`). When the track already has a (lossy) file, that file goes
+ *  to originals/<lib>/replaced/. Zips stay where they are.
+ *  Without an id the file is a download that matches nothing in the playlist: it is moved
+ *  as it is and, with `track` (a SoundCloud search result), remembered as found for that
+ *  track, the way Not in playlist does; a track already in the playlist is matched outright. */
 export async function inboxMove(data: any): Promise<any> {
   const lib = requireLib();
   const name = path.basename(String(data.file || ""));
@@ -1754,8 +1768,11 @@ export async function inboxMove(data: any): Promise<any> {
   if (!name) throw new Error("no file given");
   const dst = path.join(lib.dir, name);
   if (fs.existsSync(dst)) throw new Error(`${name}: a file with this name is already in the library`);
-  const tid = String(data.id);
-  if (!lib.playlist?.tracks.some((t) => String(t.id) === tid)) throw new Error("track is not in the playlist");
+  const found = data.track && typeof data.track === "object" ? data.track : null;
+  const inList = (id: any) => !!lib.playlist?.tracks.some((t) => String(t.id) === String(id));
+  // the playlist track the file is for: the one given, or the found track when it is in the playlist already
+  const tid = data.id != null && data.id !== "" ? String(data.id) : found && inList(found.id) ? String(found.id) : "";
+  if (data.id != null && data.id !== "" && !inList(tid)) throw new Error("track is not in the playlist");
   const src = path.join(inboxDir(), zip || name);
   if (!fs.existsSync(src)) throw new Error(`${zip || name}: no longer in the downloads folder`);
   // stage the new file first (a failed extraction must not touch the library)
@@ -1766,7 +1783,7 @@ export async function inboxMove(data: any): Promise<any> {
     staged = dst.replace(/(\.[^.]+)$/, ".tmp$1");   // the folder scan ignores *.tmp.<ext>
     extractEntry(src, entry, staged);
   }
-  const row = (await buildView()).tracks.find((r: any) => String(r.id) === tid);
+  const row = tid ? (await buildView()).tracks.find((r: any) => String(r.id) === tid) : null;
   let kept: [string, string] | null = null;
   if (row?.have && row.file) {
     const rdir = path.join(backupDir(lib), "replaced");
@@ -1788,12 +1805,30 @@ export async function inboxMove(data: any): Promise<any> {
     throw e;
   }
   for (const a of Object.keys(STATE.assigned)) if (STATE.assigned[a] === name) { delete STATE.assigned[a]; delete STATE.by_hand[a]; }
-  STATE.assigned[tid] = name;   // pinned to the track, but not "by hand": the download is the file for it
-  delete STATE.by_hand[tid];
-  delete STATE.overrides[tid];
-  delete STATE.na[tid];
+  delete STATE.found["x:" + dst];
+  if (tid) {
+    STATE.assigned[tid] = name;   // pinned to the track, but not "by hand": the download is the file for it
+    delete STATE.by_hand[tid];
+    delete STATE.overrides[tid];
+    delete STATE.na[tid];
+  } else if (found && found.url) {   // not in the playlist yet: Not in playlist shows it as found, one Add away
+    STATE.found["x:" + dst] = { id: Number(found.id), url: String(found.url), title: String(found.title || ""),
+                                user: String(found.user || ""), dur: Number(found.dur) || 0 };
+  }
   saveState();
   return buildView();
+}
+
+/** Search SoundCloud for a download that matches nothing in the playlist:
+ *  {file, zip?, q?} → {q, candidates}, scored like Not in playlist's Find. */
+export async function inboxFind(data: any): Promise<any> {
+  const lib = requireLib();
+  const name = path.basename(String(data.file || ""));
+  const zip = data.zip ? path.basename(String(data.zip)) : "";
+  const f = (await scanInbox(inboxDir())).files.find((x) => x.name === name && (x.zip || "") === zip);
+  if (!f) throw new Error(`${name}: no longer in the downloads folder`);
+  const q = String(data.q || "").trim() || extraQuery(f);
+  return { q, candidates: await searchCandidates(lib, f, q) };
 }
 
 export async function inboxMoveAll(): Promise<any> {

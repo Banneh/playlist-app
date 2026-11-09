@@ -289,12 +289,17 @@ bar or the SoundCloud page (as long as you aren't typing in a field):
 | `A` | add the playing track to the playlist (to your Likes for a Likes library) |
 | `L` | like / unlike it |
 
-Discover is also where tracks play from the rest of the app. Click a track's
-cover on any list and it opens on Discover and starts playing; the **⋯** menu
-of a row offers **Play on Discover** and **Related tracks on Discover** as
-well. A small arrow that appears next to the title on hover opens the track in
-your browser instead. Prefer the browser for everything? Switch **Opening
-tracks** in Settings, and the arrow becomes a play button for Discover.
+Discover's player also serves the rest of the app. Click a track's cover on
+any list and it starts playing on SoundCloud while you stay on the list; a bar
+at the bottom of the window shows the track with play/pause, previous and
+next, the heart and **Add to playlist**, and its **Discover** button opens the
+page the track is on. The same keys work there. Leaving Discover while
+something plays keeps it playing, and the bar takes over; its **×** pauses and
+hides it. The **⋯** menu of a row offers **Play**, **Open on Discover** and
+**Related tracks on Discover** as well. A small arrow that appears next to the
+title on hover opens the track in your browser instead. Prefer the browser for
+everything? Switch **Opening tracks** in Settings, and the arrow becomes a
+play button for SoundCloud inside the app.
 
 While you're signed in, **Add to playlist** on Not in playlist is one click
 too, instead of a trip to the site. **Sign out…** in Settings forgets the
@@ -341,6 +346,14 @@ show up here.
    **Upgrade**. The old MP3 goes to the backup folder, not the bin.
 4. **Move all** does the whole list at once, after telling you how many files
    are upgrades.
+
+Audio that matches no track in the playlist is listed below, under **Not in
+the playlist**. **Move** puts such a file into your library as it is, where
+Not in playlist picks it up. **Find on SoundCloud** searches for the track
+first: pick the right candidate and the file moves in matched to it, and, with
+the box ticked (signed in on Discover), the track goes into the playlist on
+SoundCloud in the same step, so it lands in Have right away. A candidate that
+is already in the playlist simply becomes the file for that track.
 
 Bandcamp purchases arrive as zips; DJ HQ looks inside them, lists the tracks
 that belong to the playlist (tagged "from Album.zip") and unpacks only those,
@@ -613,8 +626,9 @@ bodies are JSON.
 | `POST /api/find` | `{file, q?}` | SoundCloud candidates for a local file (not a view) |
 | `POST /api/found` | `{file, track \| null}` | remember / forget the picked track |
 | `POST /api/find-all` | | search every unresolved file, accept sure matches |
-| `POST /api/inbox` | | downloads that match the playlist, including tracks inside zips (not a view; carries `moved` when auto-move acted) |
-| `POST /api/inbox-move` · `/api/inbox-move-all` | `{file, id, zip?}` · | move downloads into the library (unpacks from a zip when `zip` is given) |
+| `POST /api/inbox` | | downloads that match the playlist (`items`) and audio that matches nothing (`unmatched`), including tracks inside zips (not a view; carries `moved` when auto-move acted) |
+| `POST /api/inbox-move` · `/api/inbox-move-all` | `{file, id?, zip?, track?}` · | move downloads into the library (unpacks from a zip when `zip` is given); without `id` the file is moved as it is, `track` (a search result) remembers it as found for that track |
+| `POST /api/inbox-find` | `{file, zip?, q?}` | search SoundCloud for an unmatched download, scored like `/api/find` |
 | `POST /api/export-xml` | | write `rekordbox.xml` (returns path and counts) |
 | `POST /api/reveal` · `/api/pick-folder` | `{path}` · | Electron only |
 | `POST /api/sc/status` | | Discover: who is signed in and what the embedded player is playing (not a view; `available: false` headless) |

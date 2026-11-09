@@ -8,3 +8,11 @@
 @media (max-width: 980px) {
   .thead.ib-row, .tr.ib-row { grid-template-columns: 40px minmax(0, 1fr) 48px 160px; }
 }
+
+/* downloads that match nothing: two buttons in the action column, the find dialog's add option */
+.ib-row.ib-other .ib-acts { display: flex; justify-content: flex-end; gap: 6px; }
+.ib-other .art.none { display: grid; place-items: center; }
+.ib-addopt { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+.ib-addopt input { accent-color: var(--accent); }
+.tr.ib-row.ib-other { grid-template-columns: 30px 40px minmax(0, 1fr) 48px 262px; }
+@media (max-width: 980px) { .tr.ib-row.ib-other { grid-template-columns: 40px minmax(0, 1fr) 48px 240px; } }

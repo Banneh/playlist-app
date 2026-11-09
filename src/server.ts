@@ -217,6 +217,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/find-all": return route(() => core.findAll());
           case "/api/inbox":          return route(() => core.inboxView());
           case "/api/inbox-move":     return route(() => core.inboxMove(data));
+          case "/api/inbox-find":     return route(() => core.inboxFind(data));
           case "/api/inbox-move-all": return route(() => core.inboxMoveAll());
           case "/api/export-xml":     return route(() => core.exportRekordboxXml());
           case "/api/reveal": {

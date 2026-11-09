@@ -99,6 +99,10 @@ const GUIDES = {
         ['file', 'Zips', 'Bandcamp purchases arrive as zips. DJ HQ looks inside, lists the tracks that belong to the playlist (tagged “from Album.zip”) and unpacks only those. The zip stays where it is.'],
         ['check', 'Move all', 'The whole list at once, after telling you how many of them are upgrades.'],
       ] },
+      { h: 'Not in the playlist', items: [
+        ['search', 'Find on SoundCloud', 'For a download that matches no track: search for it, pick the right candidate, and the file moves in matched to that track. Tick the box and the track goes into the playlist on SoundCloud in the same step.'],
+        ['folderIn', 'Move', 'Moves such a file into your library as it is. It shows up on Not in playlist, where you can find and add it later.'],
+      ] },
       { h: 'Good to know', tips: [
         'Unfinished downloads are ignored. Let them finish, then click <b>Rescan</b>.',
         'Files that are already in your library by name are counted at the top but not listed.',

@@ -111,6 +111,9 @@ function demoInbox() {
         id: 900006, n: 6, artist: 'Luma District', title: 'Northern Sky', score: 1, action: 'upgrade',
         cur_file: 'Luma District - Northern Sky.mp3' },
     ],
+    unmatched: [
+      { name: 'Vela Sound - Afterglow (Club Mix).wav', zip: null, dur: '7:04', lossy: false, artist: 'Vela Sound', title: 'Afterglow (Club Mix)', n: 1 },
+    ],
     others: 1, already: 0,
   };
 }
