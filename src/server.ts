@@ -34,6 +34,8 @@ export interface ScView {
   nowPlaying(): Promise<{ url: string; title: string; artist: string; playing: boolean; at: number; of: number } | null>;
   /** the track a list asked to play last and whether SoundCloud started it; null when none was asked for */
   starting(): { url: string; state: "starting" | "playing" | "failed" | "gone" } | null;
+  /** true while SoundCloud's bot check (a DataDome captcha) is up in the view; false when there is no view */
+  captcha(): Promise<boolean>;
   /** the page the view is on ("" before the first load) */
   url(): string;
   /** the session's oauth_token cookie, null when nobody is signed in */
@@ -86,7 +88,10 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         else if (data.action === "signin") sc.navigate("https://soundcloud.com/signin");
         else if (data.action === "home") sc.navigate("https://soundcloud.com/discover");
         else if (data.action === "playlist") { const l = core.activeLib(); if (l) sc.navigate(l.url); }
-        else if (typeof data.url === "string" && /^https:\/\/(www\.|m\.)?soundcloud\.com\//.test(data.url)) sc.navigate(data.url, !!data.play);
+        else if (typeof data.url === "string" && /^https:\/\/(www\.|m\.)?soundcloud\.com\//.test(data.url)) {
+          if (data.play && await sc.captcha()) throw new Error(core.SC_CAPTCHA);   // the track would never start: say why at once
+          sc.navigate(data.url, !!data.play);
+        }
         return { ok: true };
       }
       case "player": {   // {action: toggle|pause|next|prev|seek|seekto, n?}: the player keys and the bar's seek line
@@ -117,12 +122,15 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           const likedSet = me && t ? core.likedIdsCached(me) : null;   // null until the likes list is known
           now = { ...now, url, track: t, in_playlist: inList, liked: likedSet && t ? likedSet.has(t.id) : null };
         }
-        return { available: true, url: sc.url(), signed_in: !!me, me, can, now, start: sc.starting() };
+        // one look at the page, cheap enough for the poll; last, since the calls above may be what made the view
+        const captcha = await sc.captcha();
+        return { available: true, url: sc.url(), signed_in: !!me, me, can, now, start: sc.starting(), captcha };
       }
       case "add": case "remove":
         return enqueue(async () => {   // the token is read right before the write, so a sign-out in the view is respected
           const token = await sc.token();
           if (!token) throw new Error("sign in to SoundCloud on the Discover page first");
+          if (await sc.captcha()) throw new Error(core.SC_CAPTCHA);
           const like = action === "add" && ("like" in data ? !!data.like : !!core.getSettings().like_on_add);
           return core.scSetInPlaylist(token, String(data.url || ""), action === "add", like);
         });
@@ -130,6 +138,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         return enqueue(async () => {
           const token = await sc.token();
           if (!token) throw new Error("sign in to SoundCloud on the Discover page first");
+          if (await sc.captcha()) throw new Error(core.SC_CAPTCHA);
           return core.scSetLiked(token, String(data.url || ""), !!data.on);
         });
       case "likes": {   // {force?}: the Your Likes page (not a view)

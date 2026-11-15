@@ -154,7 +154,7 @@ const GUIDES = {
     lead: 'How DJ HQ works on this computer. Every change saves as you make it.',
     sections: [
       { h: 'The cards', items: [
-        ['folder', 'Library', 'The folders and the playlist this library keeps in sync. <b>Add folder</b> adds another folder; the first one stays the main folder, where downloads are moved into. <b>Include subfolders</b> also scans the folders inside each one. <b>Remove this library</b> forgets it in DJ HQ only; the files stay.'],
+        ['folder', 'Library', 'The folders and the playlist this library keeps in sync. <b>Add folder</b> adds another folder; the first one stays the main folder, where downloads are moved into. <b>Include subfolders</b> also scans the folders inside each one. <b>Change link…</b> points the library at another SoundCloud link, such as the share link of a playlist you made private; matches and edits stay. <b>Remove this library</b> forgets it in DJ HQ only; the files stay.'],
         ['inbox', 'Downloads', 'Which folder is watched for fresh downloads, and whether exact matches are moved into the library automatically.'],
         ['refresh', 'Checking the playlist', 'How often SoundCloud is checked for changes while the window is open. <b>Refresh</b> in the top right checks right away and rescans the folders too.'],
         ['sun', 'Appearance', 'Light, dark, or whatever your computer is using.'],

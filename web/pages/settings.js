@@ -1,6 +1,7 @@
-/* Page: Settings — library (its folders, subfolder scanning), downloads folder + auto-move,
-   refresh interval, appearance, backups and about. Reads DATA.settings / DATA.backup_bytes,
-   writes through POST /api/settings; folder changes go through POST /api/library. */
+/* Page: Settings — library (its folders, subfolder scanning, its SoundCloud link), downloads
+   folder + auto-move, refresh interval, appearance, backups and about. Reads DATA.settings /
+   DATA.backup_bytes, writes through POST /api/settings; folder and link changes go through
+   POST /api/library. */
 
 const ST_INTERVALS = [[5, 'Every 5 minutes'], [15, 'Every 15 minutes'], [30, 'Every 30 minutes'], [60, 'Every hour'], [120, 'Every 2 hours']];
 
@@ -51,6 +52,7 @@ PAGES.settings = {
            <span>Also look inside the folders within each library folder. Off, only files directly in a library folder count. Files in subfolders show up as <i>subfolder/file</i>.</span></span>
        </label>
        ${DATA.playlist_url ? `<button class="btn btn-sm" onclick="scOpen(DATA.playlist_url)">${icon(scInApp() ? 'cloud' : 'external')}${isLikes ? 'Open your Likes on SoundCloud' : 'Open playlist on SoundCloud'}</button>` : ''}
+       <button class="btn btn-sm" onclick="stChangeLink()" title="Point this library at another SoundCloud link, e.g. the share link of the playlist once it is private">${icon('link')}Change link…</button>
        <button class="btn btn-sm" onclick="uiAddLibrary()">${icon('plus')}Add another library…</button>
        <button class="btn btn-sm btn-danger" onclick="removeLibrary()">${icon('trash')}Remove this library…</button>`);
 
@@ -161,6 +163,59 @@ async function stToggleSubfolders(el) {
   const on = !!el.checked;
   const ok = await stLibrary({ op: 'subfolders', on }, on ? 'Subfolders are scanned too' : 'Only the library folders themselves are scanned');
   if (!ok) { el.checked = !on; render(); }
+}
+/* the library's SoundCloud link: the new one is fetched first, the old one stays if that fails */
+function stChangeLink() {
+  const lib = (DATA.libraries || []).find(l => l.id === DATA.active) || {};
+  return dialog({
+    title: 'Change the SoundCloud link',
+    sub: 'Made the playlist private? Paste the link from Share on SoundCloud. Matches, edits and everything else in the library stay as they are; if the new link misses tracks the library has, you are asked first.',
+    body: `<div class="wl-form" id="cl-form"><div class="field">
+        <label for="cl-url">SoundCloud link</label>
+        <input id="cl-url" class="input" value="${esc(lib.url || '')}" spellcheck="false" autocomplete="off" autocapitalize="off">
+        <div class="hint">A public playlist link, or a private playlist’s share link: https://soundcloud.com/you/sets/your-playlist/s-…</div>
+        <div class="wl-err" id="cl-url-err" hidden></div>
+      </div></div>`,
+    foot: `<span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn btn-primary" data-a="ok">${icon('link')}Use this link</button>`,
+    open(dlg, done) {
+      const form = dlg.querySelector('#cl-form'), input = form.querySelector('#cl-url');
+      input.oninput = () => wlClear(form, 'cl', 'url');
+      const submit = () => {
+        const v = input.value.trim();
+        if (!v) return wlError(form, 'cl', 'url', 'Paste the link to your SoundCloud playlist.');
+        if (!wlLooksLikeSoundCloud(v)) return wlError(form, 'cl', 'url', 'That doesn’t look like a SoundCloud link. It should start with https://soundcloud.com/');
+        done(v);
+      };
+      dlg.querySelector('[data-a=ok]').onclick = submit;
+      input.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } };
+      input.focus(); input.select();
+    },
+  }).then(url => { if (url) stSetLink(url); });
+}
+async function stSetLink(url, confirm) {
+  toast('Fetching the playlist from the new link…');
+  try {
+    const res = await api('/api/library', { op: 'set_url', url, confirm: !!confirm });
+    if (res.confirm) {   // the new link misses tracks the library had: nothing changed yet
+      const c = res.confirm, gone = c.had - c.same;
+      const ok = await uiConfirm({
+        title: `${plural(gone, 'track')} of ${c.had} aren’t in the new link`,
+        body: `<p>The new link shows ${plural(c.of, 'track')}, ${c.same} of them already in this library${c.unreadable ? `, and ${plural(c.unreadable, 'track')} could not be read` : ''}.`
+          + ` ${c.same < c.had / 2 ? 'It looks like a different playlist. ' : ''}If you use it, the ${plural(gone, 'track')} that aren’t in it leave the library, with their matches; changing the link back won’t bring the matches back.</p>`,
+        ok: 'Use this link anyway', danger: true, icon: 'link',
+      });
+      return ok ? stSetLink(url, true) : toast('Link not changed');
+    }
+    DATA = res;
+    LAST_OK = Date.now(); LAST_ERR = '';
+    render();
+    const r = DATA.fetch_report || {}, unread = unreadableNote(r);
+    setStatus('Playlist checked ' + fmtTime(LAST_OK) + unread);
+    if (!r.had) return toast('Link changed' + unread);
+    toast(`Link changed · ${r.same} of ${plural(r.of, 'track')} were in the playlist before` + unread);
+  } catch (e) {
+    toast('Couldn’t change the link, the library keeps the old one: ' + e.message, true);
+  }
 }
 async function stSave(patch, msg) {
   try {

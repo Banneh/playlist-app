@@ -10,9 +10,11 @@
    The view keeps playing when you leave the page, and a cover clicked on any list starts a track
    there without leaving the list (scPlayBg): the player bar at the bottom (#player, shared with files
    from disk, see player.js) shows what SoundCloud is playing on every other page, with a seek line and the same keys.
-   Globals used elsewhere: SC (last status), scAddUrl(url), dcOpen(url), dcToast(), dcLike(), dcKey(key), scBarRender(). */
+   SoundCloud's bot check (a captcha, SC.captcha) blocks all of that until it is solved in the view: every other
+   page shows a note that leads to Discover (scCaptchaRender), and a track is not started meanwhile.
+   Globals used elsewhere: SC (last status), scAddUrl(url), dcOpen(url), dcToast(), dcLike(), dcKey(key), scBarRender(), scCaptchaRender(). */
 
-let SC = { available: false, signed_in: false, me: null, can: null, now: null, url: '' };
+let SC = { available: false, signed_in: false, me: null, can: null, now: null, url: '', captcha: false };
 const DC = { active: false, covered: false, ticker: null, ticks: 0, ro: null, html: '', msg: null, busy: false, pending: null,
              bar: '', barOn: false, dismissed: false, loading: null };   // bottom bar: last html, shown, closed by hand, { url, meta, at } while a track starts
 
@@ -77,12 +79,14 @@ function dcBarHtml() {
       </div>`;
   }
   const acts = dcActsHtml(n, false);
-  const note = SC.signed_in && SC.can && !SC.can.ok ? `<div class="dc-note">${icon('alert')}<span>${esc(SC.can.why || '')}</span></div>` : '';
+  const note = SC.captcha ? `<div class="dc-note">${icon('alert')}<span>SoundCloud wants to check you are human. Solve the check on the page below; playing from lists, Add and the heart work again once it is gone.</span></div>`
+    : SC.signed_in && SC.can && !SC.can.ok ? `<div class="dc-note">${icon('alert')}<span>${esc(SC.can.why || '')}</span></div>` : '';
   const msg = DC.msg ? `<div class="dc-msgline${DC.msg.err ? ' err' : ''}">${icon(DC.msg.err ? 'alert' : 'checkCircle')}<span>${esc(DC.msg.text)}</span></div>` : '';
   return `<div class="dc-row">${nav}<div class="dc-now">${now}</div><div class="dc-acts">${acts}</div></div>${note}${msg}`;
 }
 function dcRenderBar() {
   scBarRender();
+  scCaptchaRender();
   const bar = $('#dc-bar'); if (!bar) return;
   const html = dcBarHtml();
   if (html === DC.html) return;   // nothing changed: keep hover / focus
@@ -110,6 +114,7 @@ function scBarModel() {
     // A track whose link changed plays under another URL, so the URL alone must not keep the spinner up
     const st = SC.start && dcSameUrl(SC.start.url, DC.loading.url) ? SC.start.state : '';
     if (st === 'playing' || (n && dcSameUrl(n.url, DC.loading.url))) DC.loading = null;
+    else if (SC.captcha) { DC.loading = null; toast(SC_CAPTCHA_MSG, true); }   // the start itself ran into the bot check
     else if (st === 'gone') { DC.loading = null; toast('This track is no longer on SoundCloud', true); }
     else if (st === 'failed' || Date.now() - DC.loading.at > 25000) { DC.loading = null; toast('SoundCloud didn’t start the track — open Discover to see why', true); }
   }
@@ -158,12 +163,16 @@ function scBarClose() {
 }
 /** start a track on SoundCloud without leaving the page you are on (the cover, Play in a row menu) */
 function scPlayBg(url, meta) {
+  if (SC.captcha) return toast(SC_CAPTCHA_MSG, true);   // it would never start: the check comes first
   DC.dismissed = false;
   DC.loading = { url, meta: meta || null, at: Date.now() };
   DC.epoch = (DC.epoch || 0) + 1; SC.start = null;   // a status asked for before this click says nothing about this track
   if (typeof PLAYER !== 'undefined' && PLAYER.path) stopPlayer();   // one thing plays at a time, in one bar
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // Space goes to the player, not the cover
-  scPost('nav', { url, play: true }).then(dcPoll, e => toast('Couldn’t reach SoundCloud: ' + e.message, true));
+  scPost('nav', { url, play: true }).then(r => {
+    if (r && r.error) { DC.loading = null; toast(r.error, true); scBarRender(); }   // the bot check came up meanwhile
+    dcPoll();
+  }, e => toast('Couldn’t reach SoundCloud: ' + e.message, true));
   scBarRender();
   dcTicker();
   clearTimeout(DC.pollSoon); DC.pollSoon = setTimeout(dcPoll, 600);
@@ -274,8 +283,30 @@ function dcTicker() {
   DC.ticker = setInterval(() => {
     DC.ticks++;
     if (DC.active || DC.loading) return dcPoll();
-    if (SC.now && (SC.now.playing || !DC.dismissed) && DC.ticks % 2 === 0) dcPoll();
+    if ((SC.captcha || (SC.now && (SC.now.playing || !DC.dismissed))) && DC.ticks % 2 === 0) return dcPoll();
+    // the view exists (a track was played, Discover was open): a bot check that comes up there while
+    // nothing plays is noticed too, every 15 s; without a view there is nothing to look at
+    if (SC.url && DC.ticks % 10 === 0) dcPoll();
   }, 1500);
+}
+
+/* ---------- SoundCloud's bot check ----------
+   While a captcha is up in the view, nothing that goes through it works (playing from a list,
+   Add, the heart): a note on top of every page but Discover, where the check itself shows, sends
+   you there first. It goes away by itself with the next status once the check is solved. */
+const SC_CAPTCHA_MSG = 'SoundCloud wants to check you are human — open Discover and solve the check there first';
+function scCaptchaRender() {
+  const body = $('#page-body'); if (!body) return;
+  let el = document.getElementById('sc-captcha');
+  const want = !!(APP.sc && SC.captcha) && PAGE !== 'discover' && !!(DATA && DATA.ready) && !(typeof TOUR !== 'undefined' && TOUR);
+  if (!want) { if (el) el.remove(); return; }
+  if (el && body.firstElementChild === el) return;
+  if (el) el.remove();
+  const t = document.createElement('div');
+  t.innerHTML = noteHtml('<b>SoundCloud wants to check you are human.</b> Until you solve its check on the Discover page, tracks won’t play from your lists and Add and the heart won’t work.',
+    `<button class="btn btn-sm btn-primary" onclick="go('discover')" title="Open Discover, where SoundCloud shows its check">${icon('cloud')}Open Discover</button>`, 'amber', 'alert');
+  el = t.firstElementChild; el.id = 'sc-captcha';
+  body.prepend(el);
 }
 window.addEventListener('resize', () => dcShow());
 
@@ -308,6 +339,7 @@ async function dcSet(url, add) {
   } catch (e) {
     DC.busy = false;
     dcToast('Couldn’t ' + (add ? 'add' : 'remove') + ' it: ' + e.message, true);
+    dcPoll();   // a bot check behind it shows at once
   }
   dcRenderBar();
 }
@@ -326,6 +358,7 @@ async function dcLike(url, on) {
   } catch (e) {
     DC.busy = false;
     dcToast('Couldn’t ' + (on ? 'like' : 'unlike') + ' it: ' + e.message, true);
+    dcPoll();
   }
   dcRenderBar();
 }
@@ -337,7 +370,7 @@ async function scAddUrl(url) {
     const r = DATA.sc_result || {};
     render();
     toast('Added ' + (r.title ? '“' + r.title + '”' : 'the track') + ' to the playlist');
-  } catch (e) { toast('Couldn’t add it: ' + e.message, true); }
+  } catch (e) { toast('Couldn’t add it: ' + e.message, true); dcPoll(); }
 }
 /** open a SoundCloud URL on Discover; with play, the track on it starts playing right where you
  *  are (the bottom bar shows it; meta = {title, artist, art} from the list, for the bar while it loads) */

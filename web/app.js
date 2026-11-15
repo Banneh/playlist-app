@@ -149,6 +149,11 @@ function setStatus(text, isErr) {
   u.innerHTML = `<span class="dot"></span><span class="trunc" title="${esc(text)}">${esc(text)}</span>`;
   u.classList.toggle('err', !!isErr);
 }
+/** " · 3 tracks could not be read" after a fetch that SoundCloud didn't fully answer (view.fetch_report) */
+function unreadableNote(r) {
+  const n = r && r.unreadable || 0;
+  return n ? ` · ${plural(n, 'track')} could not be read` : '';
+}
 async function refreshPlaylist({ manual = false } = {}) {
   if (!DATA || !(DATA.libraries || []).length) return;
   if (!manual) {
@@ -164,7 +169,8 @@ async function refreshPlaylist({ manual = false } = {}) {
     DATA = fresh; LAST_OK = Date.now(); LAST_ERR = '';
     if (manual || !busy()) render();
     if (typeof loadInbox === 'function') loadInbox();     // new downloads may have landed meanwhile
-    setStatus('Playlist checked ' + fmtTime(LAST_OK));
+    const unread = unreadableNote(fresh.fetch_report);
+    setStatus('Playlist checked ' + fmtTime(LAST_OK) + unread);
     let diff = '';
     if (before && fresh.ready) {
       const now = new Set(fresh.tracks.map(t => t.id));
@@ -172,7 +178,7 @@ async function refreshPlaylist({ manual = false } = {}) {
       const removed = [...before].filter(id => !now.has(id)).length;
       if (added || removed) diff = `${added} new, ${removed} removed`;
     }
-    if (manual) toast('Playlist and folder refreshed' + (diff ? ' · ' + diff : ''));
+    if (manual) toast('Playlist and folder refreshed' + (diff ? ' · ' + diff : '') + unread);
     else if (diff) toast('Playlist updated: ' + diff);
   } catch (e) {
     LAST_ERR = e.message;
@@ -363,6 +369,7 @@ function render() {
   // list where it was; go() and the search decide for themselves where the page should start.
   const body = $('#page-body'), top = body.scrollTop;
   body.innerHTML = page.body(q);
+  if (typeof scCaptchaRender === 'function') scCaptchaRender();   // SoundCloud's bot check, on top of every page but Discover
   body.scrollTop = top;
   page.after && page.after();
 }
@@ -424,10 +431,11 @@ async function addLibrary(dir, url) {
     const first = (DATA.libraries || []).length === 1 && !PREFS.setupPending && !PREFS.setupDone && typeof SETUP !== 'undefined' && PAGES.setup;
     if (first) { SETUP = true; setPref('setupPending', true); }
     render();
-    setStatus('Playlist checked ' + fmtTime(LAST_OK));
+    const unread = unreadableNote(DATA.fetch_report);
+    setStatus('Playlist checked ' + fmtTime(LAST_OK) + unread);
     if (!first && typeof maybeStartTour === 'function') setTimeout(maybeStartTour, 400);
     if (typeof loadInbox === 'function') loadInbox();
-    if (!first) toast('Library added');
+    if (!first || unread) toast((first ? 'Library connected' : 'Library added') + unread);
     return true;
   } catch (e) {
     toast('Couldn’t add the library: ' + e.message, true);

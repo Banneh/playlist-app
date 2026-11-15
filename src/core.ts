@@ -253,7 +253,7 @@ function requireLib(): Library {
 async function httpGet(url: string): Promise<string> {
   const r = await fetch(url, { headers: { "User-Agent": UA } });
   if (!r.ok) {
-    const e: any = new Error(`HTTP ${r.status} fetching ${url.split("?")[0]}`);
+    const e: any = new Error(`HTTP ${r.status} fetching ${noSecret(url.split("?")[0])}`);
     e.status = r.status;
     throw e;
   }
@@ -268,19 +268,54 @@ async function scrapeClientId(html: string): Promise<string> {
   throw new Error("could not scrape a SoundCloud client_id");
 }
 
+/** A pasted SoundCloud link as the library keeps it: https://soundcloud.com/<path>, no query
+ *  or fragment (Share adds si= and utm_* tracking), no trailing slash. A private playlist's
+ *  share link carries its secret as the last path segment (/s-AbC123); the
+ *  ?secret_token=s-AbC123 form is turned into that. Other hosts come back trimmed only. */
+export function normScUrl(raw: string): string {
+  let s = String(raw || "").trim();
+  if (/^(?:www\.|m\.|on\.)?soundcloud\.com\//i.test(s)) s = "https://" + s;
+  let u: URL;
+  try { u = new URL(s); } catch { return s; }
+  if (!/^(?:www\.|m\.)?soundcloud\.com$/i.test(u.hostname)) return s;
+  let p = u.pathname.replace(/\/+$/, "");
+  const tok = u.searchParams.get("secret_token");
+  if (tok && /^s-[A-Za-z0-9]+$/.test(tok) && !scSecret(p)) p += "/" + tok;
+  return "https://soundcloud.com" + p;
+}
+/** normScUrl, after following a short link from the phone app's Share (on.soundcloud.com/…) */
+async function expandScUrl(raw: string): Promise<string> {
+  const url = normScUrl(raw);
+  if (!/^https?:\/\/on\.soundcloud\.com\//i.test(url)) return url;
+  const r = await fetch(url, { headers: { "User-Agent": UA } });
+  return normScUrl(r.url);
+}
+/** the secret of a share link ("s-AbC123"), else null */
+export function scSecret(url: string): string | null {
+  // /<user>/sets/<name>/s-… or /<user>/<track>/s-… (a playlist merely named "s-club" is no secret)
+  const segs = String(url || "").split(/[?#]/)[0].replace(/^https?:\/\/[^\/]+/i, "").split("/").filter(Boolean);
+  const last = segs[segs.length - 1] || "";
+  if (!/^s-[A-Za-z0-9]+$/.test(last)) return null;
+  return (segs.length === 4 && segs[1] === "sets") || (segs.length === 3 && segs[1] !== "sets") ? last : null;
+}
+/** a URL with its share-link secret blanked, for error messages */
+const noSecret = (url: string) => { const s = scSecret(url); return s ? url.split(s).join("s-…") : url; };
+
 /** "https://soundcloud.com/<user>/likes" -> "<user>", else null */
 export function likesUser(url: string): string | null {
   const m = String(url || "").trim().match(/^https?:\/\/(?:www\.|m\.)?soundcloud\.com\/([^\/?#]+)\/likes\/?(?:[?#].*)?$/i);
   return m ? m[1] : null;
 }
 
-/** api-v2 call that rescrapes the client_id once when it has gone stale. */
-async function withClientId<T>(html: string, fn: () => Promise<T>): Promise<T> {
-  if (!STATE.client_id) STATE.client_id = await scrapeClientId(html);
+/** api-v2 call that rescrapes the client_id once when it has gone stale. `page` is a
+ *  soundcloud.com page's HTML, or a way to load one when it is needed. */
+async function withClientId<T>(page: string | (() => Promise<string>), fn: () => Promise<T>): Promise<T> {
+  const html = async () => typeof page === "string" ? page : page();
+  if (!STATE.client_id) STATE.client_id = await scrapeClientId(await html());
   try { return await fn(); }
   catch (e: any) {
     if (e.status !== 401 && e.status !== 403) throw e;
-    STATE.client_id = await scrapeClientId(html);
+    STATE.client_id = await scrapeClientId(await html());
     return fn();
   }
 }
@@ -301,30 +336,62 @@ async function fetchLikeIds(userId: number): Promise<number[]> {
   return ids.slice(0, 1000);
 }
 
-export async function fetchPlaylist(lib: Library): Promise<void> {
-  const likes = likesUser(lib.url);
-  const html = await httpGet(lib.url);
+/** Fetch the library's playlist (or likes) into its snapshot. Returns how many of its tracks
+ *  SoundCloud would not hand out (deleted, blocked, or private and not shared with the link). */
+export async function fetchPlaylist(lib: Library): Promise<number> {
+  const r = await readPlaylist(lib.url, lib.playlist);
+  lib.playlist = r.playlist;
+  saveState();
+  return r.unreadable;
+}
+
+/** Read a playlist or likes link from SoundCloud without touching the state. `prev` is the
+ *  snapshot it replaces: its first-seen times are kept (none at all = a first fetch). */
+async function readPlaylist(rawUrl: string, prev: Playlist | null): Promise<{ playlist: Playlist; unreadable: number }> {
+  const url = normScUrl(rawUrl);
+  const likes = likesUser(url);
+  let html = "", pageErr: any = null;
+  try { html = await httpGet(url); }
+  catch (e) { if (likes) throw e; pageErr = e; }   // a playlist gets a second chance through resolve below
   const m = html.match(/window\.__sc_hydration\s*=\s*(\[[\s\S]*?\]);<\/script>/);
-  if (!m) throw new Error(likes ? "could not read the likes page (is the profile public?)" : "could not read playlist page (is the URL a public playlist?)");
-  const hyd = JSON.parse(m[1]);
-  let ids: number[], title: string;
+  const hyd = m ? JSON.parse(m[1]) : [];
+  // the client_id comes from the page's scripts; without the page, any other page will do
+  const page = html || (() => httpGet(SC_DISCOVER));
+  let ids: number[], title: string, plId = 0, secret: string | null = null;
   if (likes) {
+    if (!m) throw new Error("could not read the likes page (is the profile public?)");
     const user = hyd.find((i: any) => i.hydratable === "user")?.data;
     if (!user || typeof user.id !== "number") throw new Error("no SoundCloud user found at this URL");
     ids = await withClientId(html, () => fetchLikeIds(user.id));
     if (!ids.length) throw new Error("no public likes found (are your likes public?)");
     title = `${user.username || likes}'s likes`;
   } else {
-    const pl = hyd.find((i: any) => i.hydratable === "playlist")?.data;
-    if (!pl) throw new Error("no playlist found at this URL");
+    let pl = hyd.find((i: any) => i.hydratable === "playlist")?.data;
+    if (!pl || !Array.isArray(pl.tracks)) {
+      // the page didn't carry it (a private playlist's share link may not): ask api-v2 what the link is
+      pl = await withClientId(page, async () =>
+        JSON.parse(await httpGet(`https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(url)}&client_id=${STATE.client_id}`)))
+        .catch((e: any) => { if (![401, 403, 404].includes(e.status)) throw e; return null; });   // offline, 429, 5xx: say so
+      if (pl && pl.kind !== "playlist") throw new Error("no playlist found at this URL");
+      if (!pl || !Array.isArray(pl.tracks)) {
+        if (pageErr && pageErr.status !== 404) throw pageErr;   // SoundCloud trouble (a 503, a bot block), not a private playlist
+        throw new Error(scSecret(url)
+          ? "could not read the playlist from this share link (was the link reset on SoundCloud?)"
+          : "could not read the playlist. It may be private: on SoundCloud, open Share on the playlist and paste that link here");
+      }
+    }
     ids = pl.tracks.map((t: any) => t.id);
     title = pl.title || "Playlist";
+    plId = Number(pl.id) || 0;
+    secret = pl.secret_token || scSecret(url);
   }
-  const tracks: Record<number, any> = await withClientId(html, async () => {
+  // a private playlist hands out its private tracks only when the batch names it and its secret
+  const via = secret && plId ? `&playlistId=${plId}&playlistSecretToken=${encodeURIComponent(secret)}` : "";
+  const tracks: Record<number, any> = await withClientId(page, async () => {
     const got: Record<number, any> = {};
     for (let i = 0; i < ids.length; i += 40) {
       const batch = ids.slice(i, i + 40).join(",");
-      const url = `https://api-v2.soundcloud.com/tracks?ids=${batch}&client_id=${STATE.client_id}`;
+      const url = `https://api-v2.soundcloud.com/tracks?ids=${batch}&client_id=${STATE.client_id}${via}`;
       for (const t of JSON.parse(await httpGet(url))) got[t.id] = t;
     }
     return got;
@@ -332,16 +399,15 @@ export async function fetchPlaylist(lib: Library): Promise<void> {
   // first-seen time per track: kept across fetches; tracks already in the
   // snapshot (or in a library's very first fetch) are not "new"
   const prevAdded = new Map<number, number>();
-  for (const p of lib.playlist?.tracks || []) prevAdded.set(p.id, p.added || 0);
+  for (const p of prev?.tracks || []) prevAdded.set(p.id, p.added || 0);
   const now = Date.now();
   const out: PlTrack[] = [];
   for (const tid of ids) {
     const t = tracks[tid];
-    if (!t) continue;
-    out.push(trackFromApi(t, !lib.playlist ? 0 : prevAdded.has(tid) ? prevAdded.get(tid)! : now));
+    if (!t) continue;   // counted below: the UI says how many could not be read
+    out.push(trackFromApi(t, !prev ? 0 : prevAdded.has(tid) ? prevAdded.get(tid)! : now));
   }
-  lib.playlist = { title, url: lib.url, tracks: out };
-  saveState();
+  return { playlist: { title, url, tracks: out }, unreadable: ids.length - out.length };
 }
 
 /** One snapshot row from an api-v2 track object. */
@@ -372,18 +438,24 @@ export interface ScUser { id: number; username: string; permalink: string; avata
 export interface ScNow { url: string; id: number; title: string; user: string; dur: number; art: string; }
 
 const SC_ORIGIN = { Origin: "https://soundcloud.com", Referer: "https://soundcloud.com/" };
+const SC_DISCOVER = "https://soundcloud.com/discover";
 
 /** Signed-in calls go through the embedded SoundCloud page when one is available: SoundCloud's
  *  bot protection (DataDome) only accepts writes that carry a real browser's fingerprint and
  *  cookies. The transport runs fetch() inside that page and returns status + body text. */
 export type ScTransport = (method: string, url: string, headers: Record<string, string>, body?: string) => Promise<{ status: number; body: string }>;
 let scTransport: ScTransport | null = null;
+/** what every SoundCloud action says while the bot check is up in the view (see main.ts) */
+export const SC_CAPTCHA = "SoundCloud wants to check you are human — open Discover and solve the check there first";
+/** a 403's body is DataDome's challenge: {"url":"https://geo.captcha-delivery.com/captcha/?…"} */
+export const scCaptchaBody = (txt: string) => /captcha-delivery\.com/i.test(String(txt || ""));
 export function setScTransport(t: ScTransport | null): void { scTransport = t; }
 
 async function ensureClientId(): Promise<string> {
   if (!STATE.client_id) {
-    const page = activeLib()?.url || "https://soundcloud.com/discover";
-    STATE.client_id = await scrapeClientId(await httpGet(page));
+    const page = activeLib()?.url || SC_DISCOVER;
+    // any soundcloud.com page carries the scripts; the library's own may be gone or unreadable
+    STATE.client_id = await scrapeClientId(await httpGet(page).catch(() => httpGet(SC_DISCOVER)));
     saveState();
   }
   return STATE.client_id;
@@ -414,6 +486,7 @@ async function scFetch(method: string, pathAndQuery: string, token?: string | nu
     const detail = txt.replace(/\s+/g, " ").trim().slice(0, 160);
     console.error(`soundcloud ${status} on ${where}: ${txt.slice(0, 600)}`);
     if (status === 401) throw new Error("SoundCloud signed you out — sign in again on the Discover page");
+    if (status === 403 && token && scTransport && scCaptchaBody(txt)) throw new Error(SC_CAPTCHA);   // refused in the view: solvable there
     if (status === 403) throw new Error(`SoundCloud refused this (403 on ${where})${detail ? ": " + detail : ""}`);
     if (status === 404) throw new Error(`SoundCloud could not find that (${where})`);
     throw new Error(`SoundCloud answered ${status} on ${where}${detail ? ": " + detail : ""}`);
@@ -434,8 +507,9 @@ export async function scMe(token: string): Promise<ScUser> {
 
 const resolveCache = new Map<string, any>();
 /** resolve a soundcloud.com URL to its api-v2 object (track / playlist / user); cached */
+const resolveKey = (url: string) => normScUrl(url).split(/[?#]/)[0].replace(/\/+$/, "");   // keeps a share link's /s-… secret
 async function scResolve(url: string): Promise<any> {
-  const key = url.split(/[?#]/)[0].replace(/\/+$/, "");
+  const key = resolveKey(url);
   const hit = resolveCache.get(key);
   if (hit) return hit;
   const obj = await scFetch("GET", `resolve?url=${encodeURIComponent(key)}`);
@@ -489,14 +563,19 @@ export async function scSetInPlaylist(token: string, url: string, add: boolean, 
     if (add && !have) await scFetch("PUT", `users/${me.id}/track_likes/${tid}`, token);
     if (!add && have) await scFetch("DELETE", `users/${me.id}/track_likes/${tid}`, token);
   } else {
-    // the playlist update takes the whole track list: take SoundCloud's current one, not our snapshot
-    resolveCache.delete(lib.url.split(/[?#]/)[0].replace(/\/+$/, ""));
-    const pl = await scResolve(lib.url);
+    // the playlist update takes the whole track list: take SoundCloud's current one, not our snapshot,
+    // and as the signed-in owner sees it (an anonymous read may leave out their private tracks)
+    const pl = await scFetch("GET", `resolve?url=${encodeURIComponent(resolveKey(lib.url))}`, token);
     const ids: number[] = (pl.tracks || []).map((x: any) => Number(x.id)).filter((n: number) => n > 0);
+    // tracks the read can't see (private ones) would be missing from the list we send, and
+    // SoundCloud would drop them from the playlist: rather not write at all
+    if (typeof pl.track_count === "number" && ids.length < pl.track_count)
+      throw new Error(`SoundCloud showed DJ HQ only ${ids.length} of the playlist's ${pl.track_count} tracks, so it was left unchanged `
+        + "(saving would remove the ones it can't see). Add or remove the track on SoundCloud instead.");
     const next = add ? (ids.includes(tid) ? ids : [...ids, tid]) : ids.filter((n) => n !== tid);
     if (next.length !== ids.length)   // the web player's own shape: plain ids, whole list
       await scFetch("PUT", `playlists/${pl.id}`, token, { playlist: { tracks: next } });
-    resolveCache.delete(lib.url.split(/[?#]/)[0].replace(/\/+$/, ""));
+    resolveCache.delete(resolveKey(lib.url));
   }
   // patch the snapshot: likes list newest first, playlists in order of adding
   lib.playlist.tracks = lib.playlist.tracks.filter((x) => x.id !== tid);
@@ -1062,7 +1141,7 @@ export async function buildView(libArg?: Library): Promise<any> {
   let dev = STATE.device || "xdj-700";
   if (!DEVICES[dev]) dev = "xdj-700";
   const base: any = {
-    libraries: STATE.libraries.map((l) => ({ id: l.id, name: libName(l), dir: l.dir, dirs: libDirs(l), subfolders: !!l.subfolders })),
+    libraries: STATE.libraries.map((l) => ({ id: l.id, name: libName(l), dir: l.dir, dirs: libDirs(l), subfolders: !!l.subfolders, url: l.url })),
     active: lib ? lib.id : null,
     device: dev,
     devices: Object.entries(DEVICES).map(([id, d]) => ({ id, label: d.label })),
@@ -1341,7 +1420,11 @@ function userDir(raw: any): string {
 
 /** POST /api/library: {op: "add", dir, url} · {op: "select", id} · {op: "remove", id}
  *  · {op: "add_folder", dir, id?} · {op: "remove_folder", dir, id?} · {op: "subfolders", on, id?}
- *  (the folder ops act on the active library unless `id` says otherwise). */
+ *  · {op: "set_url", url, id?} (the folder ops and set_url act on the active library unless
+ *  `id` says otherwise). add and set_url answer with view.fetch_report = {unreadable}, set_url
+ *  also with {same, of, had}: how many of the tracks were already in the old playlist. When the
+ *  new link misses tracks the library had, set_url changes nothing and answers {confirm: report}
+ *  (not a view) unless `confirm: true` was sent. */
 export async function libraryOp(data: any): Promise<any> {
   const op = data.op;
   const libs = STATE.libraries;
@@ -1352,7 +1435,7 @@ export async function libraryOp(data: any): Promise<any> {
   };
   if (op === "add") {
     const d = userDir(data.dir);
-    const url = (data.url || "").trim();
+    const url = await expandScUrl(data.url);
     if (!url.startsWith("http")) throw new Error("please give a full SoundCloud playlist or likes URL");
     if (libs.some((l) => libDirs(l).some((x) => sameDir(x, d))))
       throw new Error("this folder is already a library");
@@ -1361,7 +1444,33 @@ export async function libraryOp(data: any): Promise<any> {
     const lib: Library = { id: nid, dir: d, url, playlist: null };
     libs.push(lib);
     STATE.active = nid;
-    await fetchPlaylist(lib); // throws on bad URL / no internet; lib stays for retry
+    const unreadable = await fetchPlaylist(lib); // throws on bad URL / no internet; lib stays for retry
+    const view = await buildView();
+    view.fetch_report = { unreadable };
+    return view;
+  } else if (op === "set_url") {
+    // a new link for the same library, typically the same playlist made private (its share link):
+    // read it first; only a good read replaces the link and the snapshot. Everything keyed by
+    // track id or file stays as it is, and refresh's merge keeps the first-seen times.
+    const lib = target();
+    const url = await expandScUrl(data.url);
+    if (!url.startsWith("http")) throw new Error("please give a full SoundCloud playlist or likes URL");
+    if (!!likesUser(url) !== !!likesUser(lib.url))
+      throw new Error(likesUser(lib.url) ? "this library follows a Likes page; add a new library for a playlist"
+                                         : "this library follows a playlist; add a new library for a Likes page");
+    const r = await readPlaylist(url, lib.playlist);
+    const before = new Set((lib.playlist?.tracks || []).map((t) => t.id));
+    const same = r.playlist.tracks.filter((t) => before.has(t.id)).length;
+    const report = { unreadable: r.unreadable, same, of: r.playlist.tracks.length, had: before.size };
+    // tracks the library had that the new link doesn't show lose their matches with the next view:
+    // nothing is changed until the user has seen how many (a wrong playlist, tracks it can't read)
+    if (same < before.size && !data.confirm) return { confirm: report };
+    lib.url = url;
+    lib.playlist = r.playlist;
+    saveState();
+    const view = await buildView();
+    view.fetch_report = report;
+    return view;
   } else if (op === "select") {
     if (libs.some((l) => l.id === data.id)) STATE.active = data.id;
   } else if (op === "remove") {
@@ -1400,8 +1509,10 @@ export async function libraryOp(data: any): Promise<any> {
 }
 
 export async function refresh(): Promise<any> {
-  await fetchPlaylist(requireLib());
-  return buildView();
+  const unreadable = await fetchPlaylist(requireLib());
+  const view = await buildView();
+  view.fetch_report = { unreadable };
+  return view;
 }
 
 export async function setDevice(device: string): Promise<any> {

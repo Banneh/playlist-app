@@ -22,7 +22,7 @@ function wlFieldsHtml(p, draft = {}) {
     <div class="field">
       <label for="${p}-url">SoundCloud playlist link</label>
       <input id="${p}-url" class="input" value="${esc(draft.url || '')}" placeholder="https://soundcloud.com/you/sets/your-playlist" spellcheck="false" autocomplete="off" autocapitalize="off">
-      <div class="hint">A public playlist, or your Likes page: https://soundcloud.com/you/likes</div>
+      <div class="hint">A public playlist, a private one’s link from Share on SoundCloud, or your Likes page: https://soundcloud.com/you/likes</div>
       <div class="wl-err" id="${p}-url-err" hidden></div>
     </div>`;
 }
@@ -127,11 +127,12 @@ PAGES.welcome = {
            Fetch it now to see which tracks are in your folder and which are still missing.</p>
         <div class="acts">
           <button class="btn btn-primary" onclick="manualRefresh()">${icon('refresh')}Fetch playlist</button>
+          ${lib ? `<button class="btn" onclick="stChangeLink()" title="Point this library at another SoundCloud link, e.g. the share link of a private playlist">${icon('link')}Change link…</button>` : ''}
           ${DATA.playlist_url ? `<a class="btn" href="${esc(DATA.playlist_url)}" target="_blank" rel="noopener">${icon('external')}Open on SoundCloud</a>` : ''}
         </div>
       </div>
       <div class="wl-hints">
-        <div class="wl-hint">${icon('check')}<span>The playlist must be <b>public</b>. Private playlists can’t be read.</span></div>
+        <div class="wl-hint">${icon('check')}<span>The playlist must be <b>public</b>, or linked with the link from <b>Share</b> on SoundCloud if it is private. <b>Change link…</b> swaps it.</span></div>
         <div class="wl-hint">${icon('check')}<span>The first fetch needs an internet connection. After that DJ HQ checks for changes every 15 minutes on its own.</span></div>
         ${lib ? `<div class="wl-hint">${icon('folder')}<span>Music folder: <span class="wl-path" title="${esc(lib.dir)}">${esc(shortPath(lib.dir))}</span></span></div>` : ''}
       </div>
@@ -172,7 +173,7 @@ async function wlConnect(form) {
 function uiAddLibrary() {
   return dialog({
     title: 'Add a library',
-    sub: 'Link a folder of music files to a public SoundCloud playlist. Switch between libraries from the sidebar.',
+    sub: 'Link a folder of music files to a SoundCloud playlist. Switch between libraries from the sidebar.',
     body: `<div class="wl-form" id="al-form">${wlFieldsHtml('al')}</div>`,
     foot: `<span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn btn-primary" data-a="ok">${icon('plus')}Add library</button>`,
     open(dlg, done) {

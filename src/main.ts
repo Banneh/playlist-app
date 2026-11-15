@@ -4,6 +4,7 @@
  *  own session (persist:soundcloud), so the user signs in once and stays in. */
 import { app, BrowserWindow, dialog, nativeTheme, session, shell, WebContentsView } from "electron";
 import * as path from "path";
+import * as core from "./core";
 import { ScRect, ScView, startServer } from "./server";
 
 // Packaged app keeps its data in the OS user-data dir; running from source uses
@@ -17,8 +18,10 @@ let win: BrowserWindow | null = null;
 // ---------------- embedded SoundCloud ----------------
 const SC_PARTITION = "persist:soundcloud";
 const SC_HOME = "https://soundcloud.com/discover";
-/** hosts that may load inside the view: SoundCloud itself and the sign-in providers it offers */
-const SC_HOSTS = /(^|\.)(soundcloud\.com|sndcdn\.com|google\.com|googleapis\.com|gstatic\.com|apple\.com|facebook\.com|fbcdn\.net|recaptcha\.net)$/i;
+/** hosts that may load inside the view: SoundCloud itself, the sign-in providers it offers and
+ *  its bot check (DataDome's captcha-delivery.com): a check that ever opens on its own must stay in
+ *  this session, or the cookie it hands out on success lands in the wrong browser */
+const SC_HOSTS = /(^|\.)(soundcloud\.com|sndcdn\.com|google\.com|googleapis\.com|gstatic\.com|apple\.com|facebook\.com|fbcdn\.net|recaptcha\.net|captcha-delivery\.com)$/i;
 const inView = (url: string) => { try { return SC_HOSTS.test(new URL(url).hostname); } catch { return false; } };
 
 let scView: WebContentsView | null = null;
@@ -215,6 +218,36 @@ const scPlayerJs = (action: string, n: number) => `(() => {
   return { ok: false };
 })()`;
 
+/** SoundCloud's bot check. soundcloud.com runs DataDome's tag: a request it refuses (a whole page,
+ *  or a fetch to one of the api-v2 paths the tag watches, likes and playlists among them) comes back
+ *  403 with a challenge from captcha-delivery.com, which the tag shows in an iframe laid over the
+ *  page, the same one a refused page load gets (with a `dd` object, rt 'c', in the page). While it
+ *  is up, playing and every write through the view fail. /captcha/ is the check a person solves;
+ *  /interstitial/ is the device check that passes by itself, so it does not count. */
+const SC_CAPTCHA_URL = /^https:\/\/([^\/]+\.)?captcha-delivery\.com\/captcha/i;
+const SC_CAPTCHA_JS = `(() => {
+  const dd = (u) => { try { const x = new URL(u, location.href); return /(^|\\.)captcha-delivery\\.com$/i.test(x.hostname) && /^\\/captcha/i.test(x.pathname); } catch { return false; } };
+  for (const f of document.querySelectorAll('iframe')) {
+    if (!dd(f.src)) continue;
+    const r = f.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) return true;   // a frame the tag left behind, hidden, is no check
+  }
+  const c = window.dd;   // a page that is only the check, before its script has drawn the frame
+  return !!(c && typeof c === 'object' && c.rt === 'c' && /captcha-delivery\\.com/i.test(String(c.host || '')));
+})()`;
+/** when a write through the view last came back refused by the bot check: the tag may take a
+ *  moment to draw the check, and the notice should not wait for it */
+let scCaptchaAt = 0;
+async function scCaptcha(): Promise<boolean> {
+  const wc = scView?.webContents;
+  if (!wc || wc.isDestroyed() || !wc.getURL()) return false;   // no view yet: nothing to look at, and none is made for it
+  if (Date.now() - scCaptchaAt < 15000 || SC_CAPTCHA_URL.test(wc.getURL())) return true;   // or the view is on the check itself
+  const r = await scEval<boolean>(SC_CAPTCHA_JS);
+  if (r !== null) return !!r;
+  // the page did not answer (busy loading): the frames the view has loaded say it too
+  try { return wc.mainFrame.framesInSubtree.some((f) => SC_CAPTCHA_URL.test(f.url)); } catch { return false; }
+}
+
 const sc: ScView = {
   async show(rect: ScRect, url?: string, play?: boolean) {
     if (!win) return;
@@ -254,6 +287,7 @@ const sc: ScView = {
     })()`);
   },
   starting() { return scStart; },
+  captcha: scCaptcha,
   async token() {
     const cookies = await session.fromPartition(SC_PARTITION).cookies.get({ name: "oauth_token", domain: "soundcloud.com" });
     const c = cookies.find((x) => x.value);
@@ -261,6 +295,7 @@ const sc: ScView = {
   },
   async api(method, url, headers, body) {
     const wc = scEnsure().webContents;
+    if (SC_CAPTCHA_URL.test(wc.getURL())) throw new Error(core.SC_CAPTCHA);   // on the check itself: don't navigate away from it
     // the page must be a loaded soundcloud.com page (the user may add from Not in playlist before ever opening Discover)
     // (the page's document is enough for a fetch: its load event can be many seconds later, see scEval)
     const onSc = /^https:\/\/(www\.|m\.)?soundcloud\.com\//.test(wc.getURL());
@@ -272,6 +307,8 @@ const sc: ScView = {
         if (!onSc) wc.loadURL(SC_HOME);
       });
     }
+    // the bot check is up: the request would only be refused again (or wait for the check)
+    if (await scCaptcha()) throw new Error(core.SC_CAPTCHA);
     const code = `(async () => {
       try {
         const r = await fetch(${JSON.stringify(url)}, { method: ${JSON.stringify(method)}, headers: ${JSON.stringify(headers)},
@@ -279,7 +316,10 @@ const sc: ScView = {
         return { status: r.status, body: await r.text() };
       } catch (e) { return { status: 0, body: String(e && e.message || e) }; }
     })()`;
-    return wc.mainFrame.executeJavaScript(code, true) as Promise<{ status: number; body: string }>;
+    const r = await (wc.mainFrame.executeJavaScript(code, true) as Promise<{ status: number; body: string }>);
+    // refused by the bot check: its answer is {"url":"https://geo.captcha-delivery.com/captcha/?…"}
+    if (r && r.status === 403 && core.scCaptchaBody(r.body)) scCaptchaAt = Date.now();
+    return r;
   },
   async signOut() {
     const ses = session.fromPartition(SC_PARTITION);

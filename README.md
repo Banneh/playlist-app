@@ -48,8 +48,8 @@ Everything runs on your computer; nothing is uploaded anywhere.
 
 ## What DJ HQ does
 
-A *library* in DJ HQ is a music folder (or several) linked to one public
-SoundCloud playlist. The app fetches the playlist, scans the folders and works
+A *library* in DJ HQ is a music folder (or several) linked to one SoundCloud
+playlist: a public one, or a private one through its share link. The app fetches the playlist, scans the folders and works
 out which file belongs to which track by comparing names and lengths.
 Everything else builds on that:
 
@@ -79,8 +79,8 @@ Everything else builds on that:
 
 The playlist is checked again every 15 minutes while the window is open, and
 whenever you press **Refresh**. DJ HQ writes to SoundCloud only when you ask it
-to on Discover, signed in there as yourself; everything else reads public pages
-and needs no login.
+to on Discover, signed in there as yourself; everything else reads what anyone
+with the link can see and needs no login.
 
 ## Install
 
@@ -141,13 +141,25 @@ settings stay where they are. **⋯ → Check for updates…** checks right away
 
 1. Click **Browse…** and pick the folder where your tracks live (or type the
    path).
-2. Paste the link to your SoundCloud playlist. It has to be public, that's
-   all. If you collect by liking tracks instead, paste your Likes page
-   (`https://soundcloud.com/you/likes`); it works the same way.
+2. Paste the link to your SoundCloud playlist. A public playlist's address
+   works as it is. For a private playlist, open **Share** on it on SoundCloud
+   and paste that link (it ends in `/s-` and a code); anyone with the link can
+   see the playlist, so keep it to yourself. If you collect by liking tracks
+   instead, paste your Likes page (`https://soundcloud.com/you/likes`); it
+   works the same way.
 3. Click **Connect library**.
 
 DJ HQ fetches the playlist, scans the folder and matches files to tracks. That
-takes a few seconds for a few hundred tracks.
+takes a few seconds for a few hundred tracks. If SoundCloud won't hand out some
+of the tracks (deleted, blocked in your country, or private and not shared
+with the link), the status line says how many could not be read.
+
+To point a library at another link later, for example after making its playlist
+private, use **Settings → Change link…**. The new link is fetched first; your
+matches, edits and "new" marks stay, and the old link is kept if the new one
+can't be read. If the new link misses tracks the library has (another playlist,
+or tracks it can't read), DJ HQ says how many and asks before it changes
+anything, since those tracks leave the library with their matches.
 
 ![Before we start: the downloads folder, the target player, subfolders and appearance, asked once](docs/screens/setup.png)
 
@@ -306,6 +318,13 @@ play button for SoundCloud inside the app.
 While you're signed in, **Add to playlist** on Not in playlist is one click
 too, instead of a trip to the site. **Sign out…** in Settings forgets the
 session.
+
+Now and then SoundCloud's bot protection asks you to prove you're human and
+shows a check (a captcha) on the page. Until it is solved, nothing that goes
+through Discover works: tracks don't start from your lists, and Add and the
+heart fail. DJ HQ notices it and puts a note on top of every other page with
+an **Open Discover** button; solve the check there and the note goes away by
+itself. Meanwhile those actions say so at once instead of waiting.
 
 Discover needs the desktop app. In a browser tab (headless mode) the page says
 so, and you use soundcloud.com next to DJ HQ instead.
@@ -494,6 +513,9 @@ library keeps its own matches, edits and "new" marks.
 - **Clicking a cover opens Discover but nothing plays.** SoundCloud asks for a
   sign-in before it plays anything. Sign in once on the Discover page; the
   session is kept.
+- **"SoundCloud wants to check you are human".** SoundCloud's bot protection
+  put a check (a captcha) on the Discover page. Open Discover, solve it, and
+  playing, Add and the heart work again.
 - **A download doesn't show up.** Zips and unfinished downloads are ignored:
   unzip, let it finish, then **Rescan**. A file whose name already exists in
   your folder counts as "already in your library".
@@ -536,9 +558,11 @@ Windows. Running from source uses the project folder instead. In there:
 
 **About SoundCloud.** There's no API key: the app reads the same public
 endpoints the SoundCloud web player uses. That works today and may break
-whenever SoundCloud changes their site. Only public playlists work. The app
+whenever SoundCloud changes their site. Public playlists work, and private ones
+through their share link, which DJ HQ keeps in `state.json`. The app
 writes to SoundCloud only from Discover, where you are signed in as yourself,
-and only when you add, remove or like a track; DJ HQ never sees your password,
+and only when you add, remove or like a track (it won't change a playlist it
+can't see in full, since saving would drop the tracks it can't see); DJ HQ never sees your password,
 since the sign-in happens on soundcloud.com inside the app. The playlist is
 fetched on launch, every 15 minutes while the window is open, and when you
 press Refresh; a track search runs only when you use Find on SoundCloud or
@@ -612,9 +636,9 @@ bodies are JSON.
 | --- | --- | --- |
 | `GET /api/state` | | current view |
 | `GET /api/app` | | app version, platform and whether it runs packaged (not a view) |
-| `POST /api/refresh` | | fetch the playlist, then the view |
+| `POST /api/refresh` | | fetch the playlist, then the view (with `fetch_report: {unreadable}`, tracks SoundCloud wouldn't hand out) |
 | `POST /api/rescan` | | rescan the library folders |
-| `POST /api/library` | `{op: "add", dir, url}` · `{op: "select", id}` · `{op: "remove", id}` · `{op: "add_folder", dir}` · `{op: "remove_folder", dir}` · `{op: "subfolders", on}` | manage libraries and their folders (the folder ops take an optional `id`, default: the active library) |
+| `POST /api/library` | `{op: "add", dir, url}` · `{op: "select", id}` · `{op: "remove", id}` · `{op: "add_folder", dir}` · `{op: "remove_folder", dir}` · `{op: "subfolders", on}` · `{op: "set_url", url, confirm?}` | manage libraries, their folders and their SoundCloud link (the folder ops and `set_url` take an optional `id`, default: the active library). `add` and `set_url` add `fetch_report: {unreadable}`, `set_url` also `{same, of, had}`; a new link that misses tracks the library had changes nothing and answers `{confirm: report}` until it is sent again with `confirm: true` |
 | `POST /api/device` | `{device}` | target player (`xdj-700`, `nxs2`, `cdj-3000`) |
 | `POST /api/settings` | `{inbox_dir?, auto_move?, refresh_min?, like_on_add?, sc_open?}` | downloads folder (`""` = default), auto-move, check interval in minutes, like-on-add, where SoundCloud links open (`"discover"` or `"browser"`) |
 | `GET /api/file?path=` | | streams a local audio file for the preview (library and downloads folders only) |
@@ -633,7 +657,7 @@ bodies are JSON.
 | `POST /api/inbox-find` | `{file, zip?, q?}` | search SoundCloud for an unmatched download, scored like `/api/find` |
 | `POST /api/export-xml` | | write `rekordbox.xml` (returns path and counts) |
 | `POST /api/reveal` · `/api/pick-folder` | `{path}` · | Electron only |
-| `POST /api/sc/status` | | Discover: who is signed in and what the embedded player is playing (not a view; `available: false` headless) |
+| `POST /api/sc/status` | | Discover: who is signed in, what the embedded player is playing and `captcha` (SoundCloud's bot check is up in the view) (not a view; `available: false` headless) |
 | `POST /api/sc/add` · `/api/sc/remove` | `{url, like?}` | add a track to / remove it from the playlist on SoundCloud, signed in on Discover (adds `sc_result`) |
 | `POST /api/sc/like` | `{url, on}` | like / unlike a track (adds `sc_like`) |
 | `POST /api/sc/likes` | `{force?}` | the signed-in account's likes checked against all libraries (not a view) |
@@ -648,9 +672,9 @@ The macOS apps are ad-hoc signed; they aren't notarized, hence the one-time
 
 ### Out of scope
 
-Spotify and Apple Music playlists, private playlists (needs OAuth), writing to
-SoundCloud playlists, automated downloading through gates, and editing the
-rekordbox database. Issues and PRs welcome.
+Spotify and Apple Music playlists, private playlists read through a SoundCloud
+sign-in instead of their share link, automated downloading through gates, and
+editing the rekordbox database. Issues and PRs welcome.
 
 ## License
 
