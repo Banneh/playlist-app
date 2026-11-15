@@ -333,7 +333,7 @@ function render() {
   const noLibs = !(DATA.libraries || []).length;
   const setup = !noLibs && typeof SETUP !== 'undefined' && SETUP && !!PAGES.setup;   // "Before we start", right after the first library
   document.body.classList.toggle('onboarding', noLibs || setup);
-  if (typeof scBarRender === 'function') scBarRender();   // SoundCloud's bottom bar: on every page but Discover and onboarding
+  if (typeof scBarRender === 'function') scBarRender();   // the player bar: SoundCloud's track shows on every page but Discover and onboarding
   $('#app').hidden = noLibs || setup; $('#welcome').hidden = !(noLibs || setup);
   if (noLibs || setup) PAGES[PAGE] && PAGES[PAGE].onHide && PAGES[PAGE].onHide();   // the Discover view must not stay over the screen
   if (noLibs) { $('#welcome').innerHTML = PAGES.welcome.body(); PAGES.welcome.after && PAGES.welcome.after(); return; }

@@ -242,7 +242,9 @@ isn't in the playlist is mentioned under the list, with a link to Not in
 playlist.
 
 The small play button in front of a file name previews it right in the app; a
-player bar appears at the bottom with seek and volume. The same button sits in
+player bar appears at the bottom with a seek line you can click or drag, and
+mute. It is the same bar that shows a track playing on SoundCloud, so there is
+only ever one player. The same button sits in
 the match dialog, so you can check a shaky match by ear.
 
 ![Previewing a file: the player bar at the bottom of the window](docs/screens/preview.png)

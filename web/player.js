@@ -1,9 +1,12 @@
-/* In-app preview of local files: one <audio>, a mini bar at the bottom of the main area
-   (#player) and small play buttons wherever a file is listed. Files are streamed by the
-   app itself through GET /api/file?path=… (library folders and the downloads folder only).
-   Globals: playFile(path, label, sub), togglePlay(), stopPlayer(), playBtn(path, label, sub). */
+/* The player bar at the bottom of the main area (#player): one bar for both things the app
+   can play. A file from disk plays in an <audio> here (streamed through GET /api/file?path=…,
+   library folders and the downloads folder only); a SoundCloud track plays in the Discover
+   view and this bar drives it (scBarModel / dcPlayer / scSeekTo in pages/discover.js).
+   One thing plays at a time and the bar shows that one: starting a file pauses SoundCloud,
+   starting SoundCloud unloads the file. The seek line can be clicked or dragged for both.
+   Globals: playFile(path, label, sub), togglePlay(), stopPlayer(), playBtn(path, label, sub), plRender(). */
 
-const PLAYER = { audio: null, path: '', label: '', sub: '' };
+const PLAYER = { audio: null, path: '', label: '', sub: '', since: 0, drag: null, tick: null, ui: {} };
 
 const PL_PATHS = {
   pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
@@ -41,12 +44,19 @@ function plEnsure() {
   if (PLAYER.audio) return PLAYER.audio;
   const box = $('#player');
   box.innerHTML = `<div class="pl-inner">
+      <button class="btn btn-ghost btn-sm btn-icon pl-sc" id="pl-prev" title="Previous track (P)">${icon('skipBack')}</button>
       <button class="btn btn-primary btn-icon pl-toggle" id="pl-toggle" title="Play / pause (Space)">${icon('play')}</button>
-      <div class="pl-meta"><div class="pl-title trunc" id="pl-title"></div><div class="pl-sub trunc" id="pl-sub"></div></div>
+      <button class="btn btn-ghost btn-sm btn-icon pl-sc" id="pl-next" title="Next track (N)">${icon('skipFwd')}</button>
+      <span class="pl-art" id="pl-art"></span>
+      <div class="pl-meta" id="pl-meta">
+        <div class="pl-title"><span id="pl-title"></span><span class="dc-eq" id="pl-eq" aria-hidden="true" hidden><i></i><i></i><i></i></span></div>
+        <div class="pl-sub trunc" id="pl-sub"></div>
+      </div>
       <span class="pl-time tnum" id="pl-cur">0:00</span>
-      <div class="pl-bar" id="pl-bar" title="Seek"><i id="pl-fill"></i></div>
+      <div class="pl-bar" id="pl-bar" role="slider" aria-label="Seek" aria-valuemin="0" title="Click or drag to seek (← → jump 10 s)"><div class="pl-track"><i id="pl-fill"></i></div><b id="pl-knob"></b></div>
       <span class="pl-time tnum" id="pl-dur">0:00</span>
-      <button class="btn btn-ghost btn-sm btn-icon" id="pl-mute" title="Mute">${plIcon('volume')}</button>
+      <div class="pl-acts" id="pl-acts"></div>
+      <button class="btn btn-ghost btn-sm btn-icon pl-file" id="pl-mute" title="Mute">${plIcon('volume')}</button>
       <button class="btn btn-ghost btn-sm btn-icon" id="pl-close" title="Close">${icon('x')}</button>
     </div>`;
   const a = document.createElement('audio');
@@ -63,14 +73,89 @@ function plEnsure() {
     toast('Can’t preview this file format', true);
     stopPlayer();
   });
-  box.querySelector('#pl-toggle').onclick = togglePlay;
-  box.querySelector('#pl-close').onclick = stopPlayer;
+  const isSc = () => !PLAYER.path;
+  const blur = fn => e => { e.currentTarget.blur(); fn(); };   // Space stays with the player, not the button
+  box.querySelector('#pl-toggle').onclick = blur(() => isSc() ? dcPlayer('toggle') : togglePlay());
+  box.querySelector('#pl-prev').onclick = blur(() => dcPlayer('prev'));
+  box.querySelector('#pl-next').onclick = blur(() => dcPlayer('next'));
+  box.querySelector('#pl-close').onclick = () => isSc() ? scBarClose() : stopPlayer();
+  box.querySelector('#pl-meta').onclick = () => { if (isSc()) go('discover'); };
   box.querySelector('#pl-mute').onclick = () => { a.muted = !a.muted; box.querySelector('#pl-mute').innerHTML = plIcon(a.muted ? 'muted' : 'volume'); box.querySelector('#pl-mute').title = a.muted ? 'Unmute' : 'Mute'; };
-  box.querySelector('#pl-bar').onclick = e => {
-    const r = e.currentTarget.getBoundingClientRect();
-    if (isFinite(a.duration) && a.duration > 0) a.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * a.duration;
+  // the seek line: a click jumps there, a drag follows the pointer and seeks when it is let go
+  const bar = box.querySelector('#pl-bar');
+  const frac = e => { const r = bar.getBoundingClientRect(); return r.width > 0 ? Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) : 0; };
+  bar.addEventListener('pointerdown', e => {
+    const m = plModel();
+    if (e.button !== 0 || !m || m.loading || !(m.of > 0)) return;
+    e.preventDefault();
+    try { bar.setPointerCapture(e.pointerId); } catch {}
+    PLAYER.drag = { f: frac(e), of: m.of };
+    bar.classList.add('dragging');
+    plPaint();
+  });
+  bar.addEventListener('pointermove', e => { if (PLAYER.drag) { PLAYER.drag.f = frac(e); plPaint(); } });
+  const drop = seek => e => {
+    const d = PLAYER.drag; if (!d) return;
+    PLAYER.drag = null; bar.classList.remove('dragging');
+    if (seek) plSeekTo(frac(e) * d.of);
+    plPaint();
   };
+  bar.addEventListener('pointerup', drop(true));
+  bar.addEventListener('pointercancel', drop(false));
   return a;
+}
+
+/** what the bar shows: the file that is loaded, else SoundCloud's track (null: no bar).
+ *  { src: 'file' | 'sc', title, tip, sub (html), art, playing, loading, at, of (seconds), acts (html) } */
+function plModel() {
+  const a = PLAYER.audio;
+  // SoundCloud started playing (on Discover) while a file was in the bar: the file makes way.
+  // Not in the first moments after the file started, when SoundCloud is still being paused for it
+  if (PLAYER.path && typeof SC !== 'undefined' && SC.now && SC.now.playing && Date.now() - PLAYER.since > 2500) stopPlayer();
+  if (PLAYER.path && a) {
+    return { src: 'file', title: PLAYER.label, tip: PLAYER.path, sub: esc(PLAYER.sub), art: '', playing: !a.paused, loading: false,
+             at: a.currentTime || 0, of: isFinite(a.duration) && a.duration > 0 ? a.duration : 0, acts: '' };
+  }
+  return typeof scBarModel === 'function' ? scBarModel() : null;
+}
+/** jump to a position in seconds, in whichever player the bar is showing */
+function plSeekTo(secs) {
+  const a = PLAYER.audio;
+  if (PLAYER.path && a) { if (isFinite(a.duration) && a.duration > 0) a.currentTime = Math.max(0, Math.min(a.duration, secs)); }
+  else if (typeof scSeekTo === 'function') scSeekTo(secs);
+}
+/** draw the bar for what plays now; only the parts that changed are touched, so hover, focus
+ *  and a drag on the seek line survive the SoundCloud status polls */
+function plRender() {
+  const box = $('#player'); if (!box) return;
+  const m = plModel();
+  if (!m) {
+    if (!box.hidden) { box.hidden = true; document.body.classList.remove('has-player'); }
+    clearInterval(PLAYER.tick); PLAYER.tick = null; PLAYER.drag = null;
+    return;
+  }
+  plEnsure();
+  const put = (k, v, fn) => { if (PLAYER.ui[k] !== v) { PLAYER.ui[k] = v; fn(v); } };
+  put('src', m.src, v => { box.dataset.src = v; });
+  put('toggle', m.loading ? 'load' : m.playing ? 'pause' : 'play', v => {
+    const t = $('#pl-toggle');
+    t.innerHTML = v === 'load' ? '<span class="spin"></span>' : v === 'pause' ? plIcon('pause') : icon('play');
+    t.title = v === 'load' ? 'Starting…' : v === 'pause' ? 'Pause (Space)' : 'Play (Space)';
+  });
+  put('title', m.title, v => { $('#pl-title').textContent = v; });
+  put('tip', m.src === 'sc' ? 'Open on Discover' : m.tip || '', v => { $('#pl-meta').title = v; });
+  put('eq', m.src === 'sc' && m.playing, v => { $('#pl-eq').hidden = !v; });
+  put('sub', m.sub, v => { $('#pl-sub').innerHTML = v; });
+  put('art', m.src + '|' + m.art, () => {
+    $('#pl-art').innerHTML = m.art ? `<img src="${esc(m.art)}" alt="" onerror="this.remove()">` : icon(m.src === 'sc' ? 'cloud' : 'music');
+  });
+  put('acts', m.acts, v => { $('#pl-acts').innerHTML = v; });
+  if (box.hidden) { box.hidden = false; document.body.classList.add('has-player'); }
+  // SoundCloud's position comes from a poll every few seconds: the line moves on its own in between
+  const run = m.src === 'sc' && m.playing;
+  if (run && !PLAYER.tick) PLAYER.tick = setInterval(plPaint, 500);
+  else if (!run && PLAYER.tick) { clearInterval(PLAYER.tick); PLAYER.tick = null; }
+  plPaint(m);
 }
 
 /** start a file, or pause/resume it when it is the one already loaded */
@@ -78,13 +163,9 @@ function playFile(filePath, label, sub) {
   if (!filePath) return;
   const a = plEnsure();
   if (PLAYER.path === filePath) return togglePlay();
-  if (typeof SC !== 'undefined' && SC.now && SC.now.playing && typeof dcPlayer === 'function') dcPlayer('toggle');   // one thing plays at a time
+  if (typeof scYield === 'function') scYield();   // one thing plays at a time: SoundCloud pauses and hands the bar over
   PLAYER.path = filePath; PLAYER.label = label || filePath.split(/[\\/]/).pop(); PLAYER.sub = sub || '';
-  $('#pl-title').textContent = PLAYER.label; $('#pl-title').title = filePath;
-  $('#pl-sub').textContent = PLAYER.sub;
-  $('#pl-cur').textContent = '0:00'; $('#pl-dur').textContent = '0:00'; $('#pl-fill').style.width = '0%';
-  $('#player').hidden = false;
-  document.body.classList.add('has-player');
+  PLAYER.since = Date.now();
   a.src = '/api/file?path=' + encodeURIComponent(filePath);
   a.play().catch(() => { /* the error event reports formats we can't decode */ });
   plSync();
@@ -94,25 +175,33 @@ function togglePlay() {
   if (!a || !PLAYER.path) return;
   if (a.paused) a.play().catch(() => {}); else a.pause();
 }
+/** unload the file; the bar goes away unless SoundCloud has something to show in it */
 function stopPlayer() {
   const a = PLAYER.audio;
   if (a) { a.pause(); a.removeAttribute('src'); a.load(); }
   PLAYER.path = ''; PLAYER.label = ''; PLAYER.sub = '';
-  const box = $('#player'); if (box) box.hidden = true;
-  document.body.classList.remove('has-player');
   plSync();
 }
-function plPaint() {
-  const a = PLAYER.audio; if (!a) return;
-  $('#pl-cur').textContent = plTime(a.currentTime);
-  $('#pl-dur').textContent = plTime(a.duration);
-  $('#pl-fill').style.width = (isFinite(a.duration) && a.duration > 0 ? (100 * a.currentTime / a.duration) : 0) + '%';
+/** the seek line and the two times; while the line is dragged it shows where the pointer is */
+function plPaint(model) {
+  if (!PLAYER.audio) return;
+  const m = model && model.src ? model : plModel(); if (!m) return;
+  const d = PLAYER.drag, of = d ? d.of : m.of;
+  const at = d ? d.f * d.of : Math.min(m.at, of || m.at);
+  const pct = of > 0 ? Math.max(0, Math.min(100, 100 * at / of)) : 0;
+  $('#pl-cur').textContent = plTime(at);
+  $('#pl-dur').textContent = plTime(of);
+  $('#pl-fill').style.width = pct + '%';
+  $('#pl-knob').style.left = pct + '%';
+  const bar = $('#pl-bar');
+  bar.classList.toggle('off', !(of > 0) || !!m.loading);
+  bar.setAttribute('aria-valuemax', Math.round(of)); bar.setAttribute('aria-valuenow', Math.round(at));
+  bar.setAttribute('aria-valuetext', plTime(at) + ' of ' + plTime(of));
 }
-/** keep every play button and the bar's toggle in step with the audio element */
+/** keep the bar and every play button in step with what plays */
 function plSync() {
+  plRender();
   const a = PLAYER.audio, playing = !!a && !!PLAYER.path && !a.paused;
-  const t = $('#pl-toggle');
-  if (t) { t.innerHTML = playing ? plIcon('pause') : icon('play'); t.title = playing ? 'Pause (Space)' : 'Play (Space)'; }
   document.querySelectorAll('[data-play]').forEach(el => {
     const on = playing && el.dataset.play === PLAYER.path;
     el.classList.toggle('is-playing', on);
@@ -120,10 +209,19 @@ function plSync() {
     el.title = on ? 'Pause' : 'Preview';
   });
 }
+/* keys for a file in the bar: Space plays / pauses, ← → jump 10 s (SoundCloud's keys are in pages/discover.js) */
 document.addEventListener('keydown', e => {
-  if (e.key !== ' ' || !PLAYER.path || $('#player').hidden) return;
-  const tag = (document.activeElement && document.activeElement.tagName) || '';
-  if (/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(tag) || document.activeElement.isContentEditable) return;
-  if (document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('play-btn')) return;
+  const seek = e.key === 'ArrowLeft' ? -10 : e.key === 'ArrowRight' ? 10 : 0;
+  if ((e.key !== ' ' && !seek) || !PLAYER.path || $('#player').hidden) return;
+  if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+  const el = document.activeElement, tag = (el && el.tagName) || '';
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(tag) || (el && el.isContentEditable)) return;
+  if (seek) {
+    // dialogs and the tour use the arrows themselves
+    if (document.querySelector('.overlay') || (typeof TOUR !== 'undefined' && TOUR)) return;
+    e.preventDefault(); plSeekTo(PLAYER.audio.currentTime + seek); plPaint();
+    return;
+  }
+  if (tag === 'BUTTON' || (el && el.classList && el.classList.contains('play-btn'))) return;
   e.preventDefault(); togglePlay();
 });

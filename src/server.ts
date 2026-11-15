@@ -28,10 +28,12 @@ export interface ScView {
   setBounds(rect: ScRect): void;
   navigate(url: string, play?: boolean): void;
   back(): void;
-  /** drive the SoundCloud player bar: "toggle" (play/pause), "next", "prev", or "seek" by n seconds */
+  /** drive the SoundCloud player bar: "toggle" (play/pause), "pause", "next", "prev", "seek" by n seconds or "seekto" second n */
   player(action: string, n?: number): Promise<{ ok: boolean; at?: number; of?: number }>;
   /** the track the SoundCloud player bar is showing, straight from the page */
-  nowPlaying(): Promise<{ url: string; title: string; artist: string; playing: boolean } | null>;
+  nowPlaying(): Promise<{ url: string; title: string; artist: string; playing: boolean; at: number; of: number } | null>;
+  /** the track a list asked to play last and whether SoundCloud started it; null when none was asked for */
+  starting(): { url: string; state: "starting" | "playing" | "failed" | "gone" } | null;
   /** the page the view is on ("" before the first load) */
   url(): string;
   /** the session's oauth_token cookie, null when nobody is signed in */
@@ -87,10 +89,11 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         else if (typeof data.url === "string" && /^https:\/\/(www\.|m\.)?soundcloud\.com\//.test(data.url)) sc.navigate(data.url, !!data.play);
         return { ok: true };
       }
-      case "player": {   // {action: toggle|next|prev|seek, n?}: the Discover page's keys
+      case "player": {   // {action: toggle|pause|next|prev|seek|seekto, n?}: the player keys and the bar's seek line
         const a = String(data.action || "");
-        if (!/^(toggle|next|prev|seek)$/.test(a)) throw new Error("unknown player action");
-        return sc.player(a, Math.max(-600, Math.min(600, Number(data.n) || 0)));
+        if (!/^(toggle|pause|next|prev|seek|seekto)$/.test(a)) throw new Error("unknown player action");
+        const n = Number(data.n) || 0;
+        return sc.player(a, a === "seekto" ? Math.max(0, Math.min(86400, n)) : Math.max(-600, Math.min(600, n)));
       }
       case "signout": await sc.signOut(); return { ok: true };
       case "status": {
@@ -114,7 +117,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           const likedSet = me && t ? core.likedIdsCached(me) : null;   // null until the likes list is known
           now = { ...now, url, track: t, in_playlist: inList, liked: likedSet && t ? likedSet.has(t.id) : null };
         }
-        return { available: true, url: sc.url(), signed_in: !!me, me, can, now };
+        return { available: true, url: sc.url(), signed_in: !!me, me, can, now, start: sc.starting() };
       }
       case "add": case "remove":
         return enqueue(async () => {   // the token is read right before the write, so a sign-out in the view is respected

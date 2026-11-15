@@ -52,7 +52,7 @@ function scEnsure(): WebContentsView {
   // player keys pressed while the SoundCloud page has the focus: a small listener in the page
   // reports them through the console (the view is sandboxed, with no preload), and they are
   // handed to the UI's dcKey(), the same place that handles keys pressed on the app's own page
-  wc.on("dom-ready", () => { wc.executeJavaScript(SC_KEYS_JS, true).catch(() => {}); });
+  wc.on("dom-ready", () => { scEval(SC_KEYS_JS); });
   wc.on("console-message", (e) => {
     const m = /^djhq:key:(.+)$/.exec(e.message || "");
     if (m && win) win.webContents.executeJavaScript(`typeof dcKey === "function" && dcKey(${JSON.stringify(m[1])})`, true).catch(() => {});
@@ -77,27 +77,92 @@ const SC_PRESS_JS = `const press = (el, x, y) => {
   for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'])
     el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
 };`;
-/** press the big play button of the track page that is open (polls while the page hydrates);
- *  a button already in its "pause" state means the track is playing, so it is left alone */
-const SC_PLAY_JS = `(() => new Promise((res) => {
+/** Run a script in the SoundCloud page as it is right now. webContents.executeJavaScript holds a
+ *  script back until the page's load event, and soundcloud.com is usable (and playing) long before
+ *  that: a slow ad or tracker script kept the status poll and the play press waiting for seconds,
+ *  with the bar stuck on its spinner. The main frame runs it at once; null when there is no page. */
+function scEval<T = unknown>(code: string): Promise<T | null> {
+  const wc = scView?.webContents;
+  if (!wc || wc.isDestroyed() || !wc.getURL()) return Promise.resolve(null);
+  try { return wc.mainFrame.executeJavaScript(code, true).then((r) => r as T, () => null); }
+  catch { return Promise.resolve(null); }
+}
+
+const scPath = (url: string) => { try { return decodeURI(new URL(url).pathname).replace(/\/+$/, "").toLowerCase(); } catch { return ""; } };
+const scSamePage = (a: string, b: string) => { try { const x = new URL(a), y = new URL(b); return x.host === y.host && scPath(a) === scPath(b) && x.search === y.search; } catch { return false; } };
+const scOnSite = (url: string) => /^https:\/\/(www\.)?soundcloud\.com\//.test(url);
+
+/** Open another soundcloud.com page through the site's own router (a press on a link, which it
+ *  turns into an in-page navigation): no reload, so it takes a fraction of a second and whatever
+ *  is playing plays on. The play buttons of the page being left are marked for a few seconds, so
+ *  the track starter below never presses one of them while the new page is still being drawn. */
+const scRouteJs = (url: string) => `(() => {
   ${SC_PRESS_JS}
-  const t0 = Date.now();
-  const tick = () => {
-    const b = [...document.querySelectorAll('.sc-button-play.playButton, .soundTitle__playButtonHero .sc-button-play, .fullHero .sc-button-play')]
-      .find((x) => !x.closest('.playControls') && !x.classList.contains('sc-button-disabled'));
-    if (b) { if (!b.classList.contains('sc-button-pause')) press(b); return res(true); }
-    if (Date.now() - t0 > 8000) return res(false);
-    setTimeout(tick, 250);
-  };
-  tick();
-}))()`;
-/** open a page in the view and, when asked, start the track on it once it has loaded */
-function scGo(v: WebContentsView, url: string, play?: boolean) {
+  if (!document.body || document.readyState === 'loading') return null;
+  document.querySelectorAll('.sc-button-play, .blockedTrack, .missingListenHero').forEach((x) => { x.__djhqStale = Date.now(); });
+  const u = new URL(${JSON.stringify(url)});
+  const a = document.createElement('a');
+  a.href = u.pathname + u.search + u.hash;
+  a.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0';
+  document.body.appendChild(a);
+  press(a, 0, 0);
+  a.remove();
+  return 'routed';
+})()`;
+/** One step of starting the track whose page is open: press its big play button and say what
+ *  happened. "playing": the button shows pause, so SoundCloud is playing this track; "gone": the
+ *  page says the track is not there; "wait": the page is not drawn yet, or a press was made a moment
+ *  ago and gets time to take (a second press would pause it again). */
+const scStartJs = (url: string, ms: number) => `(() => {
+  ${SC_PRESS_JS}
+  const fresh = (x) => !(x.__djhqStale && Date.now() - x.__djhqStale < 3000);
+  if ([...document.querySelectorAll('.blockedTrack, .missingListenHero')].some(fresh)) return 'gone';
+  const here = decodeURI(location.pathname).replace(/\\/+$/, '').toLowerCase();
+  // the page of this track (after 4 s also the page SoundCloud redirected a renamed track to)
+  if (here !== ${JSON.stringify(scPath(url))} && ${ms} < 4000) return 'wait';
+  const b = [...document.querySelectorAll('.soundTitle__playButtonHero .sc-button-play, .fullHero .sc-button-play, .l-listen-hero .sc-button-play, .sc-button-play.playButton')]
+    .find((x) => fresh(x) && !x.closest('.playControls') && !x.classList.contains('sc-button-disabled'));
+  if (!b) return 'wait';
+  if (b.classList.contains('sc-button-pause')) return 'playing';
+  const now = Date.now();
+  if (window.__djhqPressed && now - window.__djhqPressed < 2500) return 'wait';
+  window.__djhqPressed = now;
+  press(b);
+  return 'pressed';
+})()`;
+
+/** the track a list asked for last and how far it got; the status poll hands it to the UI, whose
+ *  bottom bar shows its spinner until this says the track plays (or could not be started) */
+let scStart: { url: string; state: "starting" | "playing" | "failed" | "gone" } | null = null;
+let scGoSeq = 0;
+const SC_START_MS = 20000;
+
+/** open a page in the view and, when asked, start the track on it */
+async function scGo(v: WebContentsView, url: string, play?: boolean) {
   const wc = v.webContents;
-  const press = () => { wc.executeJavaScript(SC_PLAY_JS, true).catch(() => {}); };
-  if (wc.getURL() === url && !wc.isLoading()) { if (play) press(); return; }
-  if (play) wc.once("did-finish-load", press);
-  wc.loadURL(url);
+  const seq = ++scGoSeq;   // a newer request takes over from this one
+  scStart = play ? { url, state: "starting" } : null;
+  const cur = wc.getURL();
+  // a track to start is on its page whatever the query says (?in=… of a set it was opened from)
+  let there = !wc.isLoadingMainFrame() && (play ? scOnSite(cur) && scOnSite(url) && scPath(cur) === scPath(url) : scSamePage(cur, url));
+  if (!there && scOnSite(cur) && scOnSite(url) && !wc.isLoadingMainFrame()) {
+    there = (await scEval<string>(scRouteJs(url))) === "routed";
+    if (seq !== scGoSeq) return;
+    // the router did not take it (or SoundCloud changed how links work): load the page the plain way
+    if (there) setTimeout(() => { if (seq === scGoSeq && scView === v && scPath(wc.getURL()) !== scPath(url) && !wc.isLoadingMainFrame()) wc.loadURL(url); }, 1500);
+  }
+  if (!there) wc.loadURL(url);
+  if (!play) return;
+  const t0 = Date.now();
+  const step = async () => {
+    if (seq !== scGoSeq || scView !== v) return;
+    const r = await scEval<string>(scStartJs(url, Date.now() - t0));
+    if (seq !== scGoSeq) return;
+    if (r === "playing" || r === "gone") { scStart = { url, state: r }; return; }
+    if (Date.now() - t0 > SC_START_MS) { scStart = { url, state: "failed" }; return; }
+    setTimeout(step, 250);
+  };
+  step();
 }
 
 /** keys the Discover page handles (see DC_KEYS in web/pages/discover.js): forwarded from the
@@ -115,7 +180,7 @@ const SC_KEYS_JS = `(() => {
   }, true);
 })()`;
 /** the player bar at the bottom of soundcloud.com, driven from outside: play/pause, the
- *  previous or next track of SoundCloud's queue, or a jump of n seconds (class names are SoundCloud's) */
+ *  previous or next track of SoundCloud's queue, a jump of n seconds or to second n (class names are SoundCloud's) */
 const scPlayerJs = (action: string, n: number) => `(() => {
   ${SC_PRESS_JS}
   const live = (sel) => { const b = document.querySelector(sel); return b && !b.disabled && !b.classList.contains('disabled') && !b.classList.contains('sc-button-disabled') ? b : null; };
@@ -128,14 +193,20 @@ const scPlayerJs = (action: string, n: number) => `(() => {
       if (b) press(b);
       return { ok: !!b };
     }
+    case 'pause': {   // only when it plays: a file from disk takes over
+      const b = live('.playControls__play');
+      if (b && b.classList.contains('playing')) press(b);
+      return { ok: true };
+    }
     case 'next': return { ok: hit('.playControls__next') };
     case 'prev': return { ok: hit('.playControls__prev') };
-    case 'seek': {
+    case 'seek': case 'seekto': {   // a jump of n seconds, or to second n (the seek line of the app's bar)
+      const rel = ${JSON.stringify(action)} === 'seek';
       const w = document.querySelector('.playbackTimeline__progressWrapper');
       const max = w ? +w.getAttribute('aria-valuemax') : 0, now = w ? +w.getAttribute('aria-valuenow') : 0;
       if (!w || !(max > 0) || !live('.playControls__play')) return { ok: false };
       // a press on the timeline where the new position is, so SoundCloud's own player does the seek
-      const to = Math.max(0, Math.min(max, now + ${JSON.stringify(n)}));
+      const to = Math.max(0, Math.min(max, (rel ? now : 0) + ${JSON.stringify(n)}));
       const r = w.getBoundingClientRect();
       press(w, r.left + r.width * (to / max), r.top + r.height / 2);
       return { ok: true, at: to, of: max };
@@ -162,23 +233,27 @@ const sc: ScView = {
   navigate(url: string, play?: boolean) { scGo(scEnsure(), url, play); },
   back() { const h = scView?.webContents.navigationHistory; if (h && h.canGoBack()) h.goBack(); },
   async player(action: string, n?: number) {
-    if (!scView || !scView.webContents.getURL()) return { ok: false };
-    return scView.webContents.executeJavaScript(scPlayerJs(action, Number(n) || 0), true).catch(() => ({ ok: false }));
+    if (action === "pause") { scGoSeq++; scStart = null; }   // a track that is still being started is called off too
+    return (await scEval<{ ok: boolean; at?: number; of?: number }>(scPlayerJs(action, Number(n) || 0))) || { ok: false };
   },
   url() { return scView ? scView.webContents.getURL() : ""; },
   async nowPlaying() {
-    if (!scView || scView.webContents.isLoading() && !scView.webContents.getURL()) return null;
     // the player bar at the bottom of soundcloud.com; class names are SoundCloud's and may change
-    return scView.webContents.executeJavaScript(`(() => {
+    return scEval<{ url: string; title: string; artist: string; playing: boolean; at: number; of: number }>(`(() => {
       const badge = document.querySelector('.playbackSoundBadge');
       const t = badge && (badge.querySelector('.playbackSoundBadge__titleLink') || badge.querySelector('a[href][title]:not(.playbackSoundBadge__avatar)'));
       if (!t) return null;
       const a = badge.querySelector('a.playbackSoundBadge__lightLink') || badge.querySelector('.playbackSoundBadge__lightLink a');
       const p = document.querySelector('.playControls__play');
-      return { url: t.href, title: t.getAttribute('title') || t.textContent.trim(), artist: a ? (a.getAttribute('title') || a.textContent.trim()) : '',
+      // position and length in seconds, from the timeline (0 when it is not there)
+      const w = document.querySelector('.playbackTimeline__progressWrapper');
+      const num = (k) => { const v = w ? +w.getAttribute(k) : 0; return v > 0 ? v : 0; };
+      return { at: num('aria-valuenow'), of: num('aria-valuemax'),
+               url: t.href, title: t.getAttribute('title') || t.textContent.trim(), artist: a ? (a.getAttribute('title') || a.textContent.trim()) : '',
                playing: !!(p && p.classList.contains('playing')) };
-    })()`, true).catch(() => null);
+    })()`);
   },
+  starting() { return scStart; },
   async token() {
     const cookies = await session.fromPartition(SC_PARTITION).cookies.get({ name: "oauth_token", domain: "soundcloud.com" });
     const c = cookies.find((x) => x.value);
@@ -187,11 +262,13 @@ const sc: ScView = {
   async api(method, url, headers, body) {
     const wc = scEnsure().webContents;
     // the page must be a loaded soundcloud.com page (the user may add from Not in playlist before ever opening Discover)
+    // (the page's document is enough for a fetch: its load event can be many seconds later, see scEval)
     const onSc = /^https:\/\/(www\.|m\.)?soundcloud\.com\//.test(wc.getURL());
-    if (!onSc || wc.isLoading()) {
+    if (!onSc || wc.isLoadingMainFrame()) {
       await new Promise<void>((resolve) => {
-        const t = setTimeout(resolve, 20000);
-        wc.once("did-finish-load", () => { clearTimeout(t); resolve(); });
+        const done = () => { clearTimeout(t); wc.removeListener("dom-ready", done); resolve(); };
+        const t = setTimeout(done, 20000);
+        wc.on("dom-ready", done);
         if (!onSc) wc.loadURL(SC_HOME);
       });
     }
@@ -202,7 +279,7 @@ const sc: ScView = {
         return { status: r.status, body: await r.text() };
       } catch (e) { return { status: 0, body: String(e && e.message || e) }; }
     })()`;
-    return wc.executeJavaScript(code, true);
+    return wc.mainFrame.executeJavaScript(code, true) as Promise<{ status: number; body: string }>;
   },
   async signOut() {
     const ses = session.fromPartition(SC_PARTITION);
