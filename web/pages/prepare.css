@@ -36,3 +36,9 @@
 .dlg-body .path + .pp-steps-lead { margin-top: 14px; }
 .dlg-body .steps + p { margin-top: 12px; }
 
+
+/* the "names to check" line on the Tags card */
+.pp-names { display: flex; align-items: flex-start; gap: 7px; margin-top: 10px; font-size: 12.5px; color: var(--text-2); }
+.pp-names .ic { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; color: var(--amber); }
+.pp-names.ok .ic { color: var(--green); }
+.pp-names b { color: var(--text); font-weight: 600; }

@@ -22,10 +22,11 @@ function fileLine(t) {
   const tags = [];
   if (t.manual_match) tags.push(tag('Matched by hand', '', 'pin', 'You picked this file yourself'));
   else if (t.score !== null && t.score < 0.995) tags.push(tag(Math.round(t.score * 100) + '% match', 'outline', '', 'How closely the file name and length match the playlist entry'));
-  if (t.tagged === false) tags.push(tag('Needs tags', 'warn', 'tag', 'Artist / title are not written into the file yet'));
+  if (t.tagged === false) tags.push(tag('Needs tags', 'warn', 'tag', 'The artist / title in the file are missing or differ from the name shown here'));
   if (t.incompat) tags.push(tag('Convert · ' + t.incompat, 'warn', 'sliders', 'Not playable on the selected player as-is'));
   if (t.lossy) tags.push(tag('MP3', '', '', 'Lossy file'));
   if (t.upgrade) tags.push(tag('Lossless available', 'accent', 'arrowUp', 'You have the MP3; the shop link sells a lossless file'));
+  if (t.key) tags.push(tag(t.key, 'outline', '', t.pn ? 'Key from the file tags · processed by Platinum Notes' : 'Key from the file tags'));
   return `<div class="t-file">${playBtn(filePath(t, t.file), t.title, t.artist) || `<span class="ic">${icon('music')}</span>`}<span class="fn link" onclick="openAssign(${t.id})" title="${esc(t.file)} — click to match a different file">${esc(t.file)}</span>${
     tags.length ? `<span class="tags">${tags.join('')}</span>` : ''}</div>`;
 }
@@ -62,7 +63,8 @@ function trackRow(t) {
         <div class="t-title"><span title="${esc(t.title)}">${esc(t.title)}</span>${typeof titleLink === 'function' ? titleLink(t.url) : ''}${
           t.is_new ? tag('New', 'new', '', 'Added to the playlist ' + fmtDate(t.added)) : ''}${
           t.is_new_file ? tag('New file', 'newfile', '', 'File arrived ' + fmtDate(t.acquired)) : ''}${
-          t.edited ? tag('Edited', 'outline', 'pencil', 'Artist / title edited by hand') : ''}</div>
+          t.edited ? tag('Edited', 'outline', 'pencil', 'Artist / title edited by hand') : ''}${
+          t.check_name ? `<span class="link" onclick="openCheckNames('check', ${t.id})">${tag('Check name', 'warn', 'alert', ncTip(t))}</span>` : ''}</div>
         <div class="t-sub">${esc(t.artist)}${t.user && t.user !== t.artist ? ` <span class="via">· via ${esc(t.user)}</span>` : ''}</div>
         ${fileLine(t)}
       </div>
@@ -101,6 +103,7 @@ function rowMenu(anchor, id) {
   const items = [
     { label: 'Match to a local file…', icon: 'link', onclick: () => openAssign(id) },
     { label: 'Edit artist / title', icon: 'pencil', onclick: () => { EDIT_ID = id; render(); const a = $('#e-artist'); a && a.focus(); } },
+    { label: 'Swap artist and title', icon: 'swap', disabled: !t.artist, hint: 'For uploads named “Title - Artist”', onclick: () => swapName(id) },
     '-',
     ...(APP.sc ? [{ label: 'Play', icon: 'play', hint: 'Plays on SoundCloud inside DJ HQ while you stay here; the bar at the bottom controls it', onclick: () => dcOpen(t.url, true, { title: t.title, artist: t.artist, art: t.art }) },
                   { label: 'Open on Discover', icon: 'cloud', hint: 'The track’s SoundCloud page, inside DJ HQ', onclick: () => dcOpen(t.url) },
@@ -118,6 +121,11 @@ async function saveEdit(id) {
   EDIT_ID = null;
   try { DATA = await api('/api/edit', { id, artist, title }); render(); toast('Saved — tags will use your values'); }
   catch (e) { render(); toast('Error: ' + e.message, true); }
+}
+async function swapName(id) {
+  const t = DATA.tracks.find(x => x.id === id); if (!t) return;
+  try { DATA = await api('/api/edit', { id, artist: t.title, title: t.artist }); render(); toast('Swapped — tags will use the new order'); }
+  catch (e) { toast('Error: ' + e.message, true); }
 }
 async function resetEdit(id) {
   EDIT_ID = null;
@@ -188,9 +196,9 @@ function copyLinks() {
 function tagNote() {
   const n = DATA.untagged || 0;
   if (!n) return '';
-  return noteHtml(`<b>${plural(n, 'file')}</b> in your folder still ${n === 1 ? 'needs' : 'need'} artist and title tags. rekordbox shows ${n === 1 ? 'it' : 'them'} blank until then.`,
-    `<button class="btn btn-sm btn-primary" onclick="tagFromList(this)" title="Write artist / title into the untagged files">${icon('tag')}Write tags ${badge(n)}</button>
-     <button class="btn btn-sm btn-ghost" onclick="HFILTER='tags';go('have')" title="List the files that still need tags">Show them</button>`,
+  return noteHtml(`Artist and title tags are missing or out of date in <b>${plural(n, 'file')}</b> in your folder. rekordbox shows what is in the file.`,
+    `<button class="btn btn-sm btn-primary" onclick="tagFromList(this)" title="Write artist / title into these files">${icon('tag')}Write tags ${badge(n)}</button>
+     <button class="btn btn-sm btn-ghost" onclick="HFILTER='tags';go('have')" title="List the files that need tags">Show them</button>`,
     'amber', 'tag');
 }
 async function tagFromList(btn) {
@@ -215,6 +223,10 @@ function chipsHtml(varName, cur, items) {
 }
 
 /* ---------- pages ---------- */
+/** the Missing chips: all · free download · buy · no link · check name */
+const missingFilter = t => MFILTER === 'all' ? true : MFILTER === 'free' ? hasLink(t, 'free') : MFILTER === 'buy' ? hasLink(t, 'buy')
+  : MFILTER === 'names' ? !!t.check_name : !t.links.length;
+
 PAGES.missing = {
   title: () => 'Missing',
   actions: () => DATA.missing ? `<button class="btn" onclick="openWorkThrough()" title="Go through the missing tracks one by one: open the link, catch the download, move it in">${icon('play')}Work through</button>` : '',
@@ -226,19 +238,21 @@ PAGES.missing = {
   },
   tools: () => {
     const rows = DATA.tracks.filter(t => !t.have && !t.na && matchesQ(t, Q.trim().toLowerCase()));
-    const n = { all: rows.length, free: rows.filter(t => hasLink(t, 'free')).length, buy: rows.filter(t => hasLink(t, 'buy')).length, none: rows.filter(t => !t.links.length).length };
-    const shown = rows.filter(t => MFILTER === 'all' || (MFILTER === 'free' ? hasLink(t, 'free') : MFILTER === 'buy' ? hasLink(t, 'buy') : !t.links.length));
+    const n = { all: rows.length, free: rows.filter(t => hasLink(t, 'free')).length, buy: rows.filter(t => hasLink(t, 'buy')).length, none: rows.filter(t => !t.links.length).length,
+                names: rows.filter(t => t.check_name).length };
+    const shown = rows.filter(missingFilter);
     const withLink = shown.filter(t => t.links.length).length;
-    return chipsHtml('MFILTER', MFILTER, [['all', 'All', n.all], ['free', 'Free download', n.free, 'download'], ['buy', 'Buy', n.buy, 'bag'], ['none', 'No link', n.none]])
+    return chipsHtml('MFILTER', MFILTER, [['all', 'All', n.all], ['free', 'Free download', n.free, 'download'], ['buy', 'Buy', n.buy, 'bag'], ['none', 'No link', n.none],
+      ['names', 'Check name', n.names, 'alert']])
       + `<span class="spacer"></span><button class="btn btn-ghost btn-sm" onclick="copyLinks()" ${withLink ? '' : 'disabled'} title="Copy “Artist – Title ⇥ link” for every track shown, one per line (shop link first when there is one)">${icon('copy')}Copy ${plural(withLink, 'link')}</button>`;
   },
   body: q => {
     let rows = DATA.tracks.filter(t => !t.have && !t.na && matchesQ(t, q));
-    rows = rows.filter(t => MFILTER === 'all' || (MFILTER === 'free' ? hasLink(t, 'free') : MFILTER === 'buy' ? hasLink(t, 'buy') : !t.links.length));
+    rows = rows.filter(missingFilter);
     LAST_ROWS = rows;
     const na = DATA.tracks.filter(t => t.na && matchesQ(t, q));
     const empty = q || MFILTER !== 'all'
-      ? { ico: 'search', title: 'No tracks match', text: q ? 'Try a different search.' : 'Nothing in this filter.' }
+      ? { ico: 'search', title: 'No tracks match', text: q ? 'Try a different search.' : MFILTER === 'names' ? 'No names left to check here.' : 'Nothing in this filter.' }
       : { ico: 'checkCircle', kind: 'green', title: 'Nothing missing', text: 'Every track in the playlist is in your music folder.' };
     return tagNote() + trackTable(rows, empty) + (na.length ? `
       <div class="section">Not available right now ${badge(na.length)}<span class="hint">· back in Missing automatically when a link appears</span></div>
@@ -246,9 +260,9 @@ PAGES.missing = {
   },
 };
 
-/** the Have chips: all · lossless available · needs tags · needs convert ("attention" from older links = both) */
+/** the Have chips: all · lossless available · needs tags · needs convert · check name ("attention" from older links = tags or convert) */
 const haveFilter = t => HFILTER === 'all' ? true : HFILTER === 'upgrade' ? !!t.upgrade : HFILTER === 'tags' ? t.tagged === false
-  : HFILTER === 'convert' ? !!t.incompat : (t.tagged === false || !!t.incompat);
+  : HFILTER === 'convert' ? !!t.incompat : HFILTER === 'names' ? !!t.check_name : (t.tagged === false || !!t.incompat);
 
 PAGES.have = {
   title: () => 'Have',
@@ -261,7 +275,8 @@ PAGES.have = {
     const rows = DATA.tracks.filter(t => t.have && matchesQ(t, Q.trim().toLowerCase()));
     return chipsHtml('HFILTER', HFILTER, [['all', 'All', rows.length], ['upgrade', 'Lossless available', rows.filter(t => t.upgrade).length, 'arrowUp'],
       ['tags', 'Needs tags', rows.filter(t => t.tagged === false).length, 'tag'],
-      ['convert', 'Needs convert', rows.filter(t => !!t.incompat).length, 'sliders']]);
+      ['convert', 'Needs convert', rows.filter(t => !!t.incompat).length, 'sliders'],
+      ['names', 'Check name', rows.filter(t => t.check_name).length, 'alert']]);
   },
   body: q => {
     let rows = DATA.tracks.filter(t => t.have && matchesQ(t, q));
@@ -272,12 +287,16 @@ PAGES.have = {
                  : HFILTER === 'convert' ? (DATA.extras || []).filter(f => f.incompat).length : 0;
     const strayLine = strays ? `<div class="note-line"><span>${plural(strays, 'more file')} ${strays === 1 ? 'needs' : 'need'} ${HFILTER === 'tags' ? 'tags' : 'converting'} but ${
       strays === 1 ? 'isn’t' : 'aren’t'} in the playlist.</span><button class="btn btn-sm btn-ghost" onclick="go('extras')">${icon('folder')}Not in playlist</button></div>` : '';
+    // tracks without a file have names to check too: the review covers them all
+    const nameLine = HFILTER === 'names' && DATA.name_checks ? `<div class="note-line"><span>${
+      plural(DATA.name_checks, 'name')} to check in the library, including tracks you don’t have yet.</span><button class="btn btn-sm btn-ghost" onclick="openCheckNames('check')">${icon('alert')}Check names</button></div>` : '';
     const empty = q ? { ico: 'search', title: 'No tracks match', text: 'Try a different search.' }
       : HFILTER === 'tags' ? { ico: 'checkCircle', kind: 'green', title: 'All matched files are tagged', text: 'rekordbox shows the right artist and title for every one.' }
       : HFILTER === 'convert' ? { ico: 'checkCircle', kind: 'green', title: 'Everything plays on this player', text: 'No matched file needs converting for the player picked on Prepare for player.' }
       : HFILTER === 'upgrade' ? { ico: 'checkCircle', kind: 'green', title: 'No upgrades waiting', text: 'None of your MP3s has a shop link that sells a lossless version.' }
+      : HFILTER === 'names' ? { ico: 'checkCircle', kind: 'green', title: 'No names to check', text: 'Every matched track has an artist and title that something confirms, or that you decided.' }
       : { ico: 'folder', title: 'No matched files yet', text: 'Files in your music folder that match a playlist track show up here.' };
-    return tagNote() + trackTable(rows, empty) + strayLine;
+    return tagNote() + trackTable(rows, empty) + strayLine + nameLine;
   },
 };
 

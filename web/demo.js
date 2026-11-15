@@ -35,7 +35,8 @@ const buyLink = (artist, slug, fmt = 'WAV', title = 'Buy the WAV') =>
 function demoView() {
   const now = Date.now(), day = 24 * 60 * 60 * 1000;
   const base = (n, id, artist, title, dur, initials, hue, extra) => ({
-    n, id, artist, title, user: artist, dur,
+    n, id, artist, title, user: artist, dur, sc_title: `${artist} - ${title}`,
+    name_conf: 'high', name_why: 'name-left', name_ok: false, check_name: false,
     url: `https://soundcloud.com/sample/${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
     art: demoArt(initials, hue),
     have: false, na: false, auto: true, file: null, score: null, manual_match: false,
@@ -58,15 +59,17 @@ function demoView() {
     base(6, 900006, 'Luma District', 'Northern Sky', '6:27', 'LD', 210, {
       have: true, file: 'Luma District - Northern Sky.mp3', score: 1, tagged: true, lossy: true, upgrade: true,
       links: [buyLink('lumadistrict', 'northern-sky', 'lossless', 'Buy lossless')] }),
-    base(7, 900007, 'Faye Idris', 'Paper Lanterns', '4:48', 'FI', 345, {}),
+    // uploaded by a label as "Title - Artist": nothing says which side is the artist
+    base(7, 900007, 'Paper Lanterns', 'Faye Idris', '4:48', 'FI', 345, {
+      user: 'Lantern Records', name_conf: 'low', name_why: 'no-signal', check_name: true }),
     base(8, 900008, 'Solenne', 'Afterglow (Dub)', '7:31', 'SO', 95, { na: true, auto: false }),
   ];
   const extras = [
     { name: 'Rook & Finch - Velvet Hours.wav', incompat: null, dur: '6:03', lossy: false, artist: 'Rook & Finch', title: 'Velvet Hours',
-      edited: false, tagged: true,
+      edited: false, tagged: true, name_conf: 'high', name_why: 'file-name', name_ok: false, check_name: false,
       found: { id: 900101, url: 'https://soundcloud.com/sample/velvet-hours', title: 'Velvet Hours', user: 'Rook & Finch', dur: '6:03' } },
     { name: 'Unknown - Live Jam 03.aiff', incompat: null, dur: '8:12', lossy: false, artist: 'Unknown', title: 'Live Jam 03',
-      edited: false, tagged: false, found: null },
+      edited: false, tagged: false, name_conf: 'high', name_why: 'file-name', name_ok: false, check_name: false, found: null },
   ];
   const local_files = [
     ...tracks.filter(t => t.file).map(t => ({ name: t.file, dur: t.dur })),
@@ -89,6 +92,7 @@ function demoView() {
     new_tracks: tracks.filter(t => t.is_new).length,
     new_files: tracks.filter(t => t.is_new_file).length,
     seen_mark: now - 3 * day,
+    name_checks: tracks.filter(t => t.check_name).length + extras.filter(f => f.check_name).length,
     untagged: tracks.filter(t => t.tagged === false).length + extras.filter(f => f.tagged === false).length,
     incompatible: tracks.filter(t => t.file && t.incompat).length + extras.filter(f => f.incompat).length,
     local_count: local_files.length,

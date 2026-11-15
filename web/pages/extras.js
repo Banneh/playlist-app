@@ -8,9 +8,10 @@ const exMatches = (f, q) => !q || (f.artist + ' ' + f.title + ' ' + f.name + ' '
 /* ---------- row ---------- */
 function exFileLine(f) {
   const tags = [];
-  if (f.tagged === false) tags.push(tag('Needs tags', 'warn', 'tag', 'Artist / title are not written into the file yet'));
+  if (f.tagged === false) tags.push(tag('Needs tags', 'warn', 'tag', 'The artist / title in the file are missing or differ from the name shown here'));
   if (f.incompat) tags.push(tag('Convert · ' + f.incompat, 'warn', 'sliders', 'Not playable on the selected player as-is'));
   if (f.lossy) tags.push(tag('MP3', '', '', 'Lossy file'));
+  if (f.key) tags.push(tag(f.key, 'outline', '', f.pn ? 'Key from the file tags · processed by Platinum Notes' : 'Key from the file tags'));
   return `<div class="t-file">${playBtn(filePath(f, f.name), f.title || f.name, f.artist || '') || `<span class="ic">${icon('music')}</span>`}<span class="fn" title="${esc(f.name)}">${esc(f.name)}</span>${
     tags.length ? `<span class="tags">${tags.join('')}</span>` : ''}</div>`;
 }
@@ -39,7 +40,8 @@ function exRow(f, i) {
       <span class="num"></span>
       <div class="t-meta">
         <div class="t-title"><span title="${esc(f.title)}">${esc(f.title)}</span>${
-          f.edited ? tag('Edited', 'outline', 'pencil', 'Artist / title edited by hand') : ''}</div>
+          f.edited ? tag('Edited', 'outline', 'pencil', 'Artist / title edited by hand') : ''}${
+          f.check_name ? `<span class="link" onclick="openCheckNames('check', DATA.extras[${i}].name)">${tag('Check name', 'warn', 'alert', ncTip(f))}</span>` : ''}</div>
         <div class="t-sub">${f.artist ? esc(f.artist)
           : `<span class="ex-noartist" onclick="exEdit(${i})" title="Add the artist so the search and the tags are right">${icon('pencil')}No artist yet — add one</span>`}</div>
         ${exFileLine(f)}
@@ -62,6 +64,7 @@ function exMenu(anchor, i) {
   const f = DATA.extras[i]; if (!f) return;
   const items = [
     { label: 'Edit artist / title', icon: 'pencil', onclick: () => exEdit(i) },
+    { label: 'Swap artist and title', icon: 'swap', disabled: !f.artist, hint: 'For files named “Title - Artist”', onclick: () => exSwap(i) },
     { label: f.found ? 'Pick a different track…' : 'Find on SoundCloud…', icon: 'search', onclick: () => openFind(i) },
   ];
   if (f.found) items.push('-',
@@ -81,6 +84,11 @@ async function saveExtra(i) {
   EDIT_ID = null;
   try { DATA = await api('/api/edit', { file, artist, title }); render(); toast('Saved — tags will use your values'); }
   catch (e) { render(); toast('Error: ' + e.message, true); }
+}
+async function exSwap(i) {
+  const f = DATA.extras[i]; if (!f) return;
+  try { DATA = await api('/api/edit', { file: f.name, artist: f.title, title: f.artist }); render(); toast('Swapped — tags will use the new order'); }
+  catch (e) { toast('Error: ' + e.message, true); }
 }
 async function resetExtra(i) {
   const file = DATA.extras[i].name;

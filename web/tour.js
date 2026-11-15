@@ -32,7 +32,7 @@ const TOUR_STEPS = () => [
   { page: 'extras', target: '#page-body .tr .cell .btn', fallback: '.nav-item[data-page="extras"]', place: 'left', title: 'Not in playlist',
     text: 'Files that aren’t in the playlist yet. Find each one on SoundCloud and add it to the playlist there; the file is matched automatically afterwards.' },
   { page: 'prepare', target: '#page-body .cards', fallback: '.nav-item[data-page="prepare"]', place: 'top', title: 'Prepare for player',
-    text: 'Pick your player, write the tags rekordbox reads, convert the files it can’t play (your cues survive), and export a rekordbox playlist.' },
+    text: 'Pick your player, check the names DJ HQ isn’t sure about, write the tags rekordbox reads, convert the files it can’t play (your cues survive), and export a rekordbox playlist.' },
   { page: 'missing', target: '#btn-refresh', place: 'bottom', title: 'Always up to date',
     text: 'The playlist is checked every 15 minutes while the window is open. Refresh checks right now and rescans your folder too.' },
   { page: 'missing', target: '#btn-guide', fallback: '#btn-refresh', place: 'bottom', title: 'The Guide',

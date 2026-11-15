@@ -239,11 +239,12 @@ needs attention:
 
 | Tag | Meaning |
 | --- | --- |
-| **Needs tags** | Artist and title aren't written into the file yet. rekordbox would show it blank. |
+| **Needs tags** | Artist and title in the file are missing or differ from the name shown, for example after you swapped or edited it. |
 | **Convert · 24-bit** (or 88.2 kHz, …) | The selected player can't play this file as it is. |
 | **MP3** | A lossy file. |
 | **Lossless available** | You have the MP3, and the shop link sells a lossless version. |
 | **Matched by hand** | You picked this file yourself. |
+| **Check name** | Artist and title may be the wrong way round, or split in the wrong place. Shown on every list, also for tracks you don't have yet. |
 
 The **Needs tags**, **Needs convert** and **Lossless available** chips above
 the list show only those tracks, and the counts on the Prepare for player cards
@@ -420,9 +421,26 @@ values.
 1. **Pick your player** at the top. Everything below adapts to what it can
    play: the XDJ-700 and XDJ-1000 only take 16-bit WAV at 44.1 or 48 kHz, while
    the CDJ-2000NXS2, XDJ-XZ and CDJ-3000 also play 24-bit, 96 kHz and FLAC.
-2. **Write tags** writes the artist and title into every file that doesn't have
-   them, in the way rekordbox actually reads them (it's picky about WAVs). The
-   genre becomes the playlist name.
+2. **Write tags** writes the artist and title into every file where they are
+   missing or differ from the names DJ HQ shows, in the way rekordbox actually
+   reads them (it's picky about WAVs). The genre becomes the playlist name.
+   Everything else in the file's tags stays:
+   the key and energy from Mixed In Key, comments, cover art and the mark
+   Platinum Notes leaves on files it has processed. The key shows next to the
+   file name and goes into the rekordbox export.
+
+   Artist and title come from the SoundCloud title: artist before the dash,
+   title after it. "Premiere:", a catalogue number or vinyl side in front, and
+   "Free DL" in any spelling are left out, and an en dash counts as a dash.
+   When the uploader's name (or SoundCloud's artist field) is on the right of
+   the dash, the two are swapped. A remix keeps the original artist; the
+   remixer stays in the title. When nothing confirms the order, the track gets
+   a **Check name** tag, and **Check names** on the Tags card walks through
+   those names one at a time: **Keep** (Enter), **Swap** (S), **Edit** (E),
+   skip or go back with the arrow keys. Switch to **All names** to go through
+   the whole library. Your choices are kept and win over what DJ HQ reads;
+   **Write tags** then puts them into the files. **⋯ → Swap artist and title**
+   on a row does the same for one track.
 3. **Convert** turns files your player can't play into ones it can, in place:
    same file name, same length, so rekordbox keeps your hot cues and beat
    grids. The originals are backed up first, and **Restore originals** puts
@@ -606,7 +624,7 @@ npm run dist        # build installers locally into release/
 | `src/core.ts` | state, SoundCloud access, matching, link classification, tagging, conversion, inbox, export |
 | `src/server.ts` | the HTTP API and the static UI files |
 | `src/main.ts` | the Electron shell |
-| `src/id3.ts` | ID3v2.3 / RIFF tag writer |
+| `src/id3.ts` | ID3v2 tag reader (key, Platinum Notes mark) and v2.3 writer, RIFF/AIFF chunk helpers |
 | `web/app.css` | design tokens and components for the light and dark themes |
 | `web/app.js` | the UI shell: sidebar, routing, menus, dialogs |
 | `web/pages/` | one file per page |

@@ -8,7 +8,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { execFile } from "child_process";
-import { buildId3v23, appendId3ToWav } from "./id3";
+import { buildId3v23, carriedFrames, carriedChunks, appendChunks, prependTag, readKeyInfo, id3Version } from "./id3";
 import { listEntries, extractEntry, ZipEntry } from "./zip";
 
 const AUDIO_EXT = [".wav", ".mp3", ".aiff", ".aif", ".flac", ".m4a", ".ogg"];
@@ -82,15 +82,22 @@ export interface Library {
   acq_init?: boolean;
 }
 
-// dur_cache entry: [size, mtime, duration, [codec, sr, bits], [artist, title, genre]]
-type CacheEntry = [number, number, number, [string, number, number], [string, string, string]];
+// dur_cache entry: [size, mtime, duration, [codec, sr, bits], [artist, title, genre], [key, pn]]
+// (entries written before the key was read have five elements: scanFolder adds the
+// sixth from the file's tag alone, without a new ffprobe run)
+type CacheEntry = [number, number, number, [string, number, number], [string, string, string],
+  [string | null, boolean | null]?];
 
 export interface AppState {
   libraries: Library[];
   active: string | null;
   dur_cache: Record<string, any[]>;
   overrides: Record<string, string>;
-  edits: Record<string, { artist: string; title: string }>;
+  /** artist / title typed in or swapped by hand, keyed by track id or "x:" + path; win
+   *  over the derived ones. `ok` (artist and title empty) records a derived name the user
+   *  kept as it is in Check names: nameSig of the values confirmed, so it lapses by
+   *  itself if the derivation ever changes. */
+  edits: Record<string, { artist: string; title: string; ok?: string }>;
   /** manual file assignment: track id -> file name ("" = forced no file) */
   assigned: Record<string, string>;
   /** track ids whose assigned entry the user picked in the match dialog (the others come from
@@ -712,7 +719,7 @@ export async function scLikesCheck(token: string, force = false): Promise<any> {
   }
   const active = activeLib();
   const rows = tracks.map((t, i) => {
-    const [artist, title] = artistTitle(t);
+    const { artist, title } = artistTitle(t);
     return { n: i + 1, id: t.id, title, artist, user: t.user, dur: fmtDur(t.dur), url: t.url, art: t.art,
              links: trackLinks(t), have: have.get(t.id) || null, in_playlist: inPl.get(t.id) || [],
              in_active: !!active?.playlist?.tracks.some((x) => x.id === t.id) };
@@ -767,12 +774,15 @@ export function compatReason(fmt: [string, number, number], devKey: string): str
 
 /** name: the key the UI and state use (relative to its library folder, "/"-separated,
  *  prefixed with the folder name for extra folders); base: the file name alone. */
-interface LocalFile { name: string; base: string; path: string; dur: number; fmt: [string, number, number]; tags: [string, string, string]; }
+interface LocalFile { name: string; base: string; path: string; dur: number; fmt: [string, number, number]; tags: [string, string, string];
+  /** musical key from the file's tags, and whether Platinum Notes processed it (null = can't tell) */
+  key?: string | null; pn?: boolean | null; }
 
 async function refreshCache(p: string): Promise<void> {
   const st = fs.statSync(p);
   const pr = await probe(p);
-  STATE.dur_cache[p] = [st.size, Math.floor(st.mtimeMs / 1000), pr.dur, pr.fmt, pr.tags];
+  const k = readKeyInfo(p);
+  STATE.dur_cache[p] = [st.size, Math.floor(st.mtimeMs / 1000), pr.dur, pr.fmt, pr.tags, [k.key, k.pn]];
 }
 
 /** Every audio file of a library: all its folders, with their subfolders when the
@@ -814,8 +824,10 @@ async function scanFolder(d: string, recursive = false): Promise<LocalFile[]> {
       const c = cache[p] as CacheEntry | undefined;
       if (!c || c[0] !== st.size || c[1] !== Math.floor(st.mtimeMs / 1000) || c.length < 5)
         await refreshCache(p);
+      else if (c.length < 6) { const k = readKeyInfo(p); c[5] = [k.key, k.pn]; }
       const en = cache[p] as CacheEntry;
-      files.push({ name: rel + f, base: f, path: p, dur: en[2], fmt: en[3], tags: en[4] });
+      files.push({ name: rel + f, base: f, path: p, dur: en[2], fmt: en[3], tags: en[4],
+                   key: en[5]?.[0] ?? null, pn: en[5]?.[1] ?? null });
     }
   };
   if (fs.existsSync(d) && fs.statSync(d).isDirectory()) await walk(d, "");
@@ -879,27 +891,237 @@ function sim(a: string, b: string): number {
   return 0.6 * jac + 0.4 * ratio(na, nb);
 }
 
+/** Free-download and follower-special junk: any bracket that says "free dl/download"
+ *  ("[LIMITED FREE DL]", "( FREE DL )", "[FREE-DL]", "(Free DL <3)"), only those words
+ *  when the bracket also credits a remix ("(KLOUD Edit FREE DL)"), a bare one at the
+ *  end ("… FREE DL", "… - Free Download"), "[CRS123]". Catalogue codes elsewhere stay. */
 function cleanTitle(s: string): string {
-  return s.replace(
-    /\s*[\[\(](free\s*(dl|download)[^\]\)]*|crs\d+|[^\]\)]*follower special[^\]\)]*)[\]\)]/gi,
-    "").trim();
+  return s
+    .replace(/\s*([\[\(])([^\]\)]*\bfree[\s_-]*(?:dl|download)\b[^\]\)]*)([\]\)])/gi, (_, o, x, c) => {
+      const rest = x.replace(/\s*[-|:]?\s*\bfree[\s_-]*(dl|download)\b\s*!*/gi, " ").trim();
+      return REMIX_WORD.test(rest) ? ` ${o}${rest}${c}` : " ";
+    })
+    .replace(/\s*[\[\(](crs\d+|[^\]\)]*follower special[^\]\)]*)[\]\)]/gi, " ")
+    .replace(/\s*[-|:]?\s*\bfree[\s_-]*(dl|download)\s*!*\s*$/i, "")
+    .replace(/\s+/g, " ").trim();
 }
 
-function artistTitle(t: PlTrack): [string, string] {
-  const title = cleanTitle(t.title);
-  const i = title.indexOf(" - ");
-  if (i >= 0) return [title.slice(0, i).trim(), title.slice(i + 3).trim()];
-  return [(t.pub_artist || t.user || "").trim(), title];
+/** What stands in front of the real "Artist - Title": "Premiere:", "EE PREMIERE:",
+ *  "Premiere |", "[PREMIERE]", a catalogue bracket "[DIRW11]", a vinyl side "A1.",
+ *  and a catalogue number used as a first dash part when the title repeats it in
+ *  brackets ("STICKYHITSVA01 - GI.O - … [STICKYHITSVA01]"; "PRADA2000 - …" is an artist). */
+function stripPrefix(s: string): string {
+  return s
+    .replace(/^\[\s*premiere\s*\]\s*/i, "")
+    .replace(/^(?:[^:|\[\]()]{1,25}?\s)?premiere\s*[:|]\s*/i, "")
+    .replace(/^\[[a-z]{2,}\s?-?\d+[a-z]?\]\s*/i, "")
+    .replace(/^[a-d][1-9]\s*[.)]\s+/i, "")
+    .replace(/^([A-Z]{3,}[A-Z0-9]*\d{2,})\s+-\s+(?=.*\s-\s.*[\[(]\1[\])])/, "")
+    .trim();
 }
+
+/** How sure the resolver is of an artist/title pair, and why (a short code the UI
+ *  turns into a sentence):
+ *  name-left  the uploader / SoundCloud artist is on the left of the dash (high)
+ *  name-right … only on the right, so the two were swapped (high)
+ *  remixer    … only named in the remix brackets: the order is kept (medium)
+ *  known-left the left side is an artist confirmed elsewhere in the library (medium)
+ *  known-right the right side is such an artist, order kept anyway (low)
+ *  no-signal  nothing says which side is the artist (low)
+ *  pipe / loose-dash  split at " | " or "x- y" with nothing to confirm it (medium)
+ *  fragment   one side of the dash was empty, brackets only, or ended in a dash (low)
+ *  remix-only the right side is the uploader's remix ("Title - NAME REMIX"), no artist (low)
+ *  mix-only   the right side is only remix words ("Title - TRANCE REMIX"), no artist (low)
+ *  pub / uploader  no dash: SoundCloud's artist field / the uploader's name
+ *  file-name / no-dash  a local file's name, with / without a dash */
+type NameConf = "high" | "medium" | "low";
+interface Named { artist: string; title: string; conf: NameConf; why: string; }
+
+/** lowercase letters and digits only, accents dropped ("TØM" -> "tøm", "E.T." -> "et") */
+const nameTokens = (s: string): string[] =>
+  s.toLowerCase().normalize("NFKD").replace(/\p{M}+/gu, "").split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+const compact = (s: string) => nameTokens(s).join("");
+/** "A, B & C x D vs E aka F feat. G" -> its names */
+const nameParts = (s: string): string[] =>
+  s.split(/\s*(?:,|&|(?<=\s)x(?=\s)|\bvs\.?(?=\s)|\baka\b|\band\b|\bfeat\.?(?=\s)|\bft\.?(?=\s)|\bfeaturing\b)\s*/i)
+    .map((p) => p.trim()).filter(Boolean);
+
+/** Does the text start with the name (token runs, as nameIn)? */
+function nameAtStart(name: string, text: string): boolean {
+  const c = compact(name);
+  let run = "";
+  for (const t of nameTokens(text)) {
+    run += t;
+    if (run === c) return true;
+    if (run.length >= c.length) return false;
+  }
+  return false;
+}
+
+/** Is the text the name itself, or one of the names in it ("A & B", "A x B")? */
+const wholeName = (name: string, text: string) =>
+  !!compact(name) && [text, ...nameParts(text)].some((p) => compact(p) === compact(name));
+
+/** A side made of nothing but remix and style words ("TRANCE REMIX", "Extended Mix") */
+const MIX_WORDS = new Set(["remix", "edit", "bootleg", "rework", "flip", "tool", "refix", "mashup", "vip", "version",
+  "dub", "mix", "extended", "original", "club", "radio", "trance", "techno", "house", "hard", "hardstyle", "rave",
+  "intro", "outro", "short", "instrumental", "acapella", "vocal", "sped", "speed", "up", "slowed", "the"]);
+const genericMix = (s: string) => REMIX_WORD.test(s) && nameTokens(s).every((t) => MIX_WORDS.has(t));
+
+/** A side split into what it names plainly and what it names in brackets or after
+ *  "feat." (a remixer or a guest, not the artist of the track). */
+function sideText(s: string): { plain: string; aside: string } {
+  const aside: string[] = [];
+  let plain = s.replace(/[\[(]([^\])]*)[\])]/g, (_, x) => { aside.push(x); return " "; });
+  plain = plain.replace(/\b(?:feat|ft|featuring)\b\.?(.*)$/i, (_, x) => { aside.push(x); return " "; });
+  return { plain, aside: aside.join(" ") };
+}
+
+/** Does the name occur in the text as whole words? Token runs, never substrings, so
+ *  "E.T." doesn't match inside "Sweet"; one- and two-letter names must also appear
+ *  as written, set off by spaces or punctuation. */
+function nameIn(name: string, text: string): boolean {
+  const c = compact(name);
+  if (!c) return false;
+  if (c.length <= 2) {
+    const raw = name.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^\\p{L}\\p{N}])${raw}(?=$|[^\\p{L}\\p{N}])`, "iu").test(text.toLowerCase());
+  }
+  const tk = nameTokens(text);
+  for (let i = 0; i < tk.length; i++) {
+    let run = "";
+    for (let j = i; j < tk.length && run.length < c.length; j++) {
+      run += tk[j];
+      if (run === c) return true;
+    }
+  }
+  return false;
+}
+
+/** The uploader's names: display name, the profile slug in the URL, each artist in
+ *  SoundCloud's artist field. */
+function uploaderNames(t: PlTrack): string[] {
+  const out = [t.user || ""];
+  const slug = /soundcloud\.com\/([^/?#]+)/i.exec(t.url || "")?.[1] || "";
+  if (slug && !/^user-?\d+$/i.test(slug)) out.push(slug.replace(/[-_]+/g, " "));
+  if (t.pub_artist) out.push(t.pub_artist, ...nameParts(t.pub_artist));
+  for (const n of [...out]) { const m = /^dj\.?\s+(.+)$/i.exec(n.trim()); if (m) out.push(m[1]); } // "DJ Discostoff" is "Discostoff's Edit"
+  return [...new Set(out.map((n) => n.trim()).filter((n) => compact(n).length > 0))];
+}
+
+/** Split "Artist - Title" at the first separator: a spaced dash, en or em dash (high),
+ *  else " | " or "word- word" (medium; one example each in real data, so shown for
+ *  a look). The left side is the artist, as before; null when there is no separator. */
+function splitName(s: string): { l: string; r: string; sep: "dash" | "pipe" | "loose-dash" } | null {
+  let m = /\s+[-–—]+\s+|\s[–—]|[–—]\s/.exec(s);
+  if (m) return { l: s.slice(0, m.index).trim(), r: s.slice(m.index + m[0].length).trim(), sep: "dash" };
+  m = /\s\|\s/.exec(s);
+  if (m) return { l: s.slice(0, m.index).trim(), r: s.slice(m.index + m[0].length).trim(), sep: "pipe" };
+  m = /(?<=\S)-\s+/.exec(s);
+  if (m && /[\p{L}\p{N})\]]$/u.test(s.slice(0, m.index)))
+    return { l: s.slice(0, m.index).trim(), r: s.slice(m.index + m[0].length).trim(), sep: "loose-dash" };
+  return null;
+}
+
+/** Common clean-up and split for a SoundCloud title or a file name: junk and prefixes
+ *  off, a dangling dash noted, then the split. */
+function prepName(raw: string) {
+  let s = stripPrefix(cleanTitle(raw));
+  const dangling = /(^|\s)[-–—|]$|^[-–—|](\s|$)/.test(s);
+  s = s.replace(/^[-–—|](\s+|$)|(^|\s+)[-–—|]$/g, "").trim();
+  return { s, dangling, sp: splitName(s) };
+}
+const REMIX_WORD = /\b(remix|edit|bootleg|rework|flip|tool|refix|mashup|vip|version|dub|mix)\b/i;
+const bracketOnly = (s: string) => /^[\[(][^\])]*[\])]$/.test(s);
+
+/** Artist and title of a playlist track from what SoundCloud stores: the title, the
+ *  uploader, its profile slug and the artist field. Remixes keep the convention:
+ *  the artist is the left side of the dash. `known` holds names (compact) that
+ *  other tracks of the same library confirmed as artists; see knownArtists. */
+function artistTitle(t: PlTrack, known?: Set<string>): Named {
+  const { s, dangling, sp } = prepName(t.title);
+  const fallback = (t.pub_artist || t.user || "").trim();
+  if (!sp) return { artist: fallback, title: s, conf: t.pub_artist ? "high" : "medium", why: t.pub_artist ? "pub" : "uploader" };
+  let { l, r } = sp;
+  // "Operation Blade - (SMITHERS Edit)", "- Title": put it back together, artist as without a dash
+  if (!l || !r || bracketOnly(r) || bracketOnly(l))
+    return { artist: fallback, title: [l, r].filter(Boolean).join(" "), conf: "low", why: "fragment" };
+  const L = sideText(l), R = sideText(r);
+  const names = uploaderNames(t);
+  const onLeft = names.some((n) => nameIn(n, L.plain));
+  const onRight = names.filter((n) => nameIn(n, R.plain));
+  const aside = names.some((n) => nameIn(n, L.aside) || nameIn(n, R.aside));
+  let res: Named;
+  if (onLeft) res = { artist: l, title: r, conf: "high", why: "name-left" };
+  // "BOOM BOOM POW - PUK REMIX": the right side is the uploader's remix, not the artist;
+  // put it back together like a dash-less remix upload. "Artist - Title NAME Edit" is
+  // a remixer, below.
+  else if (onRight.some((n) => nameAtStart(n, R.plain)) && REMIX_WORD.test(R.plain))
+    return { artist: fallback, title: `${l} (${r})`, conf: "low", why: "remix-only" };
+  // the right side is the name, or one of the names in it ("Title - A & UPLOADER"), and
+  // not because the left is "(X edit)" by that same person
+  else if (onRight.some((n) => wholeName(n, R.plain)) && !onRight.some((n) => nameIn(n, L.aside)))
+    res = { artist: r, title: l, conf: "high", why: "name-right" };
+  else if (aside || onRight.length) res = { artist: l, title: r, conf: "medium", why: "remixer" };
+  else if (known && nameParts(L.plain).some((p) => known.has(compact(p)))) res = { artist: l, title: r, conf: "medium", why: "known-left" };
+  else if (known && nameParts(R.plain).some((p) => known.has(compact(p)))) res = { artist: l, title: r, conf: "low", why: "known-right" };
+  // "Title - TRANCE REMIX": no name anywhere, the right side is only remix words
+  else if (genericMix(R.plain)) return { artist: fallback, title: `${l} (${r})`, conf: "low", why: "mix-only" };
+  else if (sp.sep !== "dash") res = { artist: l, title: r, conf: "medium", why: sp.sep };
+  else res = { artist: l, title: r, conf: "low", why: "no-signal" };
+  if (dangling) { res.conf = "low"; res.why = "fragment"; }
+  return res;
+}
+
+/** Artists the library itself vouches for: the artist side of every track whose order
+ *  a name confirmed, and every artist typed in by hand. Built once per view. */
+function knownArtists(tracks: PlTrack[], first: Map<number, Named>): Set<string> {
+  const out = new Set<string>();
+  const add = (a: string) => { for (const p of nameParts(sideText(a).plain)) { const c = compact(p); if (c.length > 2) out.add(c); } };
+  for (const t of tracks) {
+    const n = first.get(t.id);
+    if (n && (n.why === "name-left" || n.why === "name-right" || n.why === "remixer")) add(n.artist);
+  }
+  for (const ed of Object.values(STATE.edits)) if (ed.artist) add(ed.artist);
+  return out;
+}
+
+/** Every track's name, the known-artist pass included. */
+function libraryNames(tracks: PlTrack[]): Map<number, Named> {
+  const first = new Map(tracks.map((t) => [t.id, artistTitle(t)] as [number, Named]));
+  const known = knownArtists(tracks, first);
+  for (const t of tracks) {
+    const n = first.get(t.id)!;
+    if (n.why === "no-signal" || n.why === "pipe" || n.why === "loose-dash" || n.why === "mix-only") first.set(t.id, artistTitle(t, known));
+  }
+  return first;
+}
+
+/** Worth a look in Check names: nothing confirms the order, or a risky split. */
+const nameNeedsLook = (n: Named) => n.conf === "low" || n.why === "pipe" || n.why === "loose-dash";
+/** The key a confirmed (kept as is) name is stored under in edits[].ok */
+const nameSig = (artist: string, title: string) => `${artist}\t${title}`;
+/** A hand edit: values typed in or swapped (an entry with only `ok` is a confirmation) */
+const handEdit = (ed: AppState["edits"][string] | undefined) => !!ed && !!(ed.artist || ed.title);
 
 const looseEq = (a: string, b: string) => norm(a) === norm(b);
+/** exact, apart from runs of spaces: for names the user decided on, which should end up
+ *  in the file as they are, junk words included */
+const sameName = (a: string, b: string) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
 
-/** Artist/title for a local file that isn't in the playlist: "Artist - Title.ext",
- *  overridden by an inline edit. */
+/** Artist/title for a local file that isn't in the playlist, from "Artist - Title.ext"
+ *  (no uploader to check against, so a clean dash split is trusted). */
+function extraName(f: LocalFile): Named {
+  const { s, dangling, sp } = prepName(f.base.replace(/\.[^.]+$/, ""));
+  if (!sp) return { artist: "", title: s, conf: "medium", why: "no-dash" };
+  if (dangling || !sp.l || !sp.r || bracketOnly(sp.r) || bracketOnly(sp.l))
+    return { artist: "", title: [sp.l, sp.r].filter(Boolean).join(" "), conf: "low", why: "fragment" };
+  return { artist: sp.l, title: sp.r, conf: sp.sep === "dash" ? "high" : "medium", why: sp.sep === "dash" ? "file-name" : sp.sep };
+}
+
+/** extraName overridden by an inline edit */
 function extraArtistTitle(f: LocalFile): [string, string] {
-  const stem = f.base.replace(/\.[^.]+$/, "");
-  const i = stem.indexOf(" - ");
-  let [a, t] = i >= 0 ? [stem.slice(0, i).trim(), stem.slice(i + 3).trim()] : ["", stem];
+  let { artist: a, title: t } = extraName(f);
   const ed = STATE.edits["x:" + f.path];
   if (ed) { a = ed.artist || a; t = ed.title || t; }
   return [a, t];
@@ -1021,8 +1243,12 @@ export function trackLinks(t: PlTrack): BuyLink[] {
 const linksSig = (ls: BuyLink[]) => ls.map((l) => l.url).sort().join("|");
 const LOSSY = /^(mp3|aac|vorbis|opus|wma)/;
 
-function isTagged(f: LocalFile, artist: string, title: string, genre: string): boolean {
-  return looseEq(f.tags[0], artist) && looseEq(f.tags[1], title) && looseEq(f.tags[2], genre);
+/** The file's tags match the names here; `exact` for a name the user decided on, which
+ *  goes into the file as it is, not just loosely equal. An empty name is never written
+ *  (writeTags keeps the file's own), so it isn't compared either. */
+function isTagged(f: LocalFile, artist: string, title: string, genre: string, exact = false): boolean {
+  const eq = exact ? sameName : looseEq;
+  return (!artist || eq(f.tags[0], artist)) && (!title || eq(f.tags[1], title)) && (!genre || looseEq(f.tags[2], genre));
 }
 
 // ---------------- tagging & conversion ----------------
@@ -1049,11 +1275,27 @@ function metaArgs(artist: string, title: string, genre: string): string[] {
   return out;
 }
 
+/** The file's ID3 tag with title, artist and genre replaced (the given ones) and
+ *  every other frame kept: Mixed In Key's key and energy, comments, cover art,
+ *  Serato data, Platinum Notes' marker. ID3v2.3/UTF-16, which rekordbox reads. */
+function mergedTag(p: string, artist: string, title: string, genre: string): Buffer {
+  const set = ([["TPE1", artist], ["TIT2", title], ["TCON", genre]] as const).filter(([, v]) => v).map(([id]) => id);
+  return buildId3v23(artist, title, genre, carriedFrames(p, set));
+}
+
+const ID3_EXT = [".wav", ".mp3", ".aiff", ".aif"];
+
 /** Rewrite the file with new tags, bit-perfect audio (MD5-verified). WAV gets a
- *  RIFF INFO chunk (from ffmpeg) plus an ID3v2.3/UTF-16 `id3 ` chunk (rekordbox
- *  ignores anything else); mp3/aiff get ID3v2.3; flac/m4a/ogg native tags. */
+ *  RIFF INFO chunk (from ffmpeg) plus an `id3 ` chunk (rekordbox ignores anything
+ *  else), aiff an `ID3 ` chunk, mp3 a leading tag: in all three DJ HQ writes the
+ *  ID3 tag itself (mergedTag), because ffmpeg would drop frames it doesn't know
+ *  (GEOB) and turn COMM into TXXX. The WAV/AIFF chunks ffmpeg doesn't write
+ *  (Platinum Notes' PLTN, cues, bext) are carried over. flac/m4a/ogg: native tags.
+ *  An mp3/aiff with no ID3v2.3/2.4 tag (none at all, ID3v2.2, ID3v1 only, AIFF text
+ *  chunks only) has nothing to carry frame by frame: ffmpeg copies what it can read. */
 async function writeTags(p: string, artist: string, title: string, genre: string): Promise<void> {
   const ext = path.extname(p).toLowerCase();
+  const own = ext === ".wav" || (ID3_EXT.includes(ext) && id3Version(p) >= 3); // DJ HQ writes the ID3 tag
   const md5 = await audioMd5(p);
   if (!md5) throw new Error("could not checksum audio");
   const tmp = p + ".tmp" + ext;
@@ -1061,17 +1303,26 @@ async function writeTags(p: string, artist: string, title: string, genre: string
   if (ext === ".wav") {
     args.push("-map", "0:a", "-c", "copy", "-map_metadata", "-1",
       ...metaArgs(artist, title, genre), "-fflags", "+bitexact", "-flags:a", "+bitexact");
+  } else if (own) {
+    args.push("-map", "0:a", "-c", "copy", "-map_metadata", "-1");
+    if (ext === ".mp3") args.push("-id3v2_version", "0");
   } else {
     args.push("-map", "0", "-c", "copy", ...metaArgs(artist, title, genre));
     if (ext === ".mp3") args.push("-id3v2_version", "3");
     if (ext === ".aiff" || ext === ".aif") args.push("-write_id3v2", "1", "-id3v2_version", "3");
+    // ffmpeg would keep a v2.2 key only as TXXX "TKE", which readKeyInfo doesn't read
+    const key = ID3_EXT.includes(ext) ? readKeyInfo(p).key : null;
+    if (key) args.push("-metadata", `TKEY=${key}`);
   }
   args.push(tmp);
   const r = await run(FFMPEG, args, 300000);
   try {
     if (r.code !== 0) throw new Error("ffmpeg: " + r.stderr.slice(0, 200));
+    if (own && ext === ".mp3") prependTag(tmp, mergedTag(p, artist, title, genre));
+    else if (own)
+      appendChunks(tmp, [{ id: ext === ".wav" ? "id3 " : "ID3 ", data: mergedTag(p, artist, title, genre) },
+                         ...carriedChunks(p, true, true)]);
     if ((await audioMd5(tmp)) !== md5) throw new Error("audio data would change, left untouched");
-    if (ext === ".wav") appendId3ToWav(tmp, buildId3v23(artist, title, genre));
   } catch (e) {
     if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
     throw e;
@@ -1217,10 +1468,14 @@ export async function buildView(libArg?: Library): Promise<any> {
   const reavailable: string[] = [];
   let naDirty = false;
   const now = Date.now();
+  const names = libraryNames(pl.tracks);
   const rows = pl.tracks.map((t, i) => {
-    let [a, ti] = artistTitle(t);
+    const nm = names.get(t.id)!;
+    let a = nm.artist, ti = nm.title;
     const ed = STATE.edits[String(t.id)];
-    if (ed) { a = ed.artist || a; ti = ed.title || ti; }
+    const hand = handEdit(ed);
+    if (hand) { a = ed!.artist || a; ti = ed!.title || ti; }
+    const confirmed = !hand && !!ed?.ok && ed.ok === nameSig(a, ti);
     const m = matched.get(t.id);
     let have = !!m;
     const o = STATE.overrides[String(t.id)];
@@ -1236,11 +1491,13 @@ export async function buildView(libArg?: Library): Promise<any> {
       } else na = true;
     }
     let tagged: boolean | null = null, incompat: string | null = null, lossy = false;
+    let key: string | null = null, pn: boolean | null = null;
     if (m) {
       const f = fmap.get(m[0])!;
-      tagged = isTagged(f, a, ti, genre);
+      tagged = isTagged(f, a, ti, genre, hand || confirmed);
       incompat = compatReason(f.fmt, dev);
       lossy = LOSSY.test(f.fmt[0]);
+      key = f.key ?? null; pn = f.pn ?? null;
     }
     const upgrade = have && lossy && links.some((l) => l.kind === "buy" && !!l.fmt && l.fmt !== "MP3");
     // when did a file for this track first turn up? (NEW FILE until marked seen)
@@ -1249,23 +1506,31 @@ export async function buildView(libArg?: Library): Promise<any> {
       if (!(ak in STATE.acquired)) { STATE.acquired[ak] = lib.acq_init ? now : 0; naDirty = true; }
     } else if (ak in STATE.acquired) { delete STATE.acquired[ak]; naDirty = true; }
     const acquired = m ? STATE.acquired[ak] : 0;
-    return { n: i + 1, id: t.id, artist: a, title: ti, user: t.user,
+    return { n: i + 1, id: t.id, artist: a, title: ti, user: t.user, sc_title: t.title,
+             name_conf: nm.conf, name_why: nm.why, name_ok: confirmed, check_name: !hand && !confirmed && nameNeedsLook(nm),
              dur: fmtDur(t.dur), url: t.url, art: t.art,
              have, na, auto: !!m, file: m ? m[0] : null, path: m ? fmap.get(m[0])!.path : null,
              score: m && m[1] >= 0 ? Math.min(1, m[1]) : null,
              pinned: manual.has(t.id), manual_match: manual.has(t.id) && !!STATE.by_hand[t.id], links, lossy, upgrade,
              added: t.added || 0, is_new: (t.added || 0) > (lib.seen_mark || 0),
              acquired, is_new_file: acquired > (lib.seen_mark || 0),
-             tagged, incompat, override: o || null, edited: !!ed };
+             tagged, incompat, key, pn, override: o || null, edited: hand };
   });
   if (!lib.acq_init) { lib.acq_init = true; naDirty = true; } // first pass stamped existing files with 0
   if (naDirty) saveState();
   const extras = files.filter((f) => !fileHit.has(f.name)).map((f) => {
-    const [xa, xt] = extraArtistTitle(f);
+    const nm = extraName(f);
+    let xa = nm.artist, xt = nm.title;
+    const ed = STATE.edits["x:" + f.path];
+    const hand = handEdit(ed);
+    if (hand) { xa = ed!.artist || xa; xt = ed!.title || xt; }
+    const confirmed = !hand && !!ed?.ok && ed.ok === nameSig(xa, xt);
     const fnd = STATE.found["x:" + f.path];
     return { name: f.name, path: f.path, incompat: compatReason(f.fmt, dev), dur: fmtDur(Math.round(f.dur)), lossy: LOSSY.test(f.fmt[0]),
-             artist: xa, title: xt, edited: !!STATE.edits["x:" + f.path],
-             tagged: isTagged(f, xa, xt, genre),
+             artist: xa, title: xt, edited: hand,
+             name_conf: nm.conf, name_why: nm.why, name_ok: confirmed, check_name: !hand && !confirmed && nameNeedsLook(nm),
+             tagged: isTagged(f, xa, xt, genre, hand || confirmed),
+             key: f.key ?? null, pn: f.pn ?? null,
              found: fnd ? { ...fnd, dur: fmtDur(fnd.dur) } : null };
   });
   return {
@@ -1281,6 +1546,7 @@ export async function buildView(libArg?: Library): Promise<any> {
     new_tracks: rows.filter((r) => r.is_new).length,
     new_files: rows.filter((r) => r.is_new_file).length,
     seen_mark: lib.seen_mark || 0,
+    name_checks: rows.filter((r) => r.check_name).length + extras.filter((e) => e.check_name).length,
     untagged: rows.filter((r) => r.tagged === false).length
             + extras.filter((e) => e.tagged === false).length,
     incompatible: files.filter((f) => compatReason(f.fmt, dev)).length,
@@ -1343,16 +1609,21 @@ export async function convertAll(): Promise<any> {
       const isAiff = ext === ".aiff" || ext === ".aif";
       const acodec = `pcm_s${newBits <= 16 ? 16 : 24}${isAiff ? "be" : "le"}`;
       const args = ["-y", "-v", "error", "-i", f.path, "-map", "0:a",
-                    "-c:a", acodec, "-ar", String(newSr), "-map_metadata", "-1",
-                    ...metaArgs(artist, title, genre)];
-      if (isAiff) args.push("-write_id3v2", "1", "-id3v2_version", "3");
+                    "-c:a", acodec, "-ar", String(newSr), "-map_metadata", "-1"];
+      if (!isAiff) args.push(...metaArgs(artist, title, genre)); // RIFF INFO, as writeTags
       args.push(tmp);
       const r = await run(FFMPEG, args, 600000);
       if (r.code !== 0) throw new Error("ffmpeg: " + r.stderr.slice(0, 200));
       if (Math.abs((await probeDuration(tmp)) - f.dur) > 0.5)
         throw new Error("duration changed after convert, aborted");
-      if (!isAiff && (artist || title || genre))
-        appendId3ToWav(tmp, buildId3v23(artist, title, genre)); // rekordbox reads this
+      // The ID3 tag (rekordbox reads it) keeps every frame: key, energy, comments.
+      // Platinum Notes' marker (PLTN chunk, or GEOB frame) is kept too: its processing
+      // is in the samples and survives a change of bit depth or rate, and without the
+      // marker it would process the file a second time. Peak chunks are dropped, cue
+      // and loop positions only when the sample rate changes.
+      const tag = mergedTag(f.path, artist, title, genre);
+      const keep = carriedChunks(f.path, false, newSr === sr);
+      appendChunks(tmp, tag.length > 10 ? [{ id: isAiff ? "ID3 " : "id3 ", data: tag }, ...keep] : keep);
       fs.renameSync(tmp, f.path);
       await refreshCache(f.path);
       done++;
@@ -1706,6 +1977,7 @@ export async function exportRekordboxXml(): Promise<any> {
       id++;
       coll.push(`  <TRACK TrackID="${id}" Name="${xmlAttr(r.title)}" Artist="${xmlAttr(r.artist)}" Genre="${xmlAttr(view.genre)}"`
         + ` Kind="${xmlAttr(KIND[path.extname(f.name).toLowerCase()] || "Audio File")}" TotalTime="${Math.round(f.dur)}"`
+        + (f.key ? ` Tonality="${xmlAttr(f.key)}"` : "") // the file's TKEY as written (Mixed In Key: Camelot)
         + ` Location="${xmlAttr(rbLocation(f.path))}"/>`);
       keys.push(id);
     }
@@ -1961,10 +2233,21 @@ export async function markSeen(): Promise<any> {
   return buildView();
 }
 
+/** Set artist / title by hand (empty both = back to the derived ones). With `confirm`,
+ *  artist and title are the derived name the user kept as it is in Check names: stored
+ *  as a confirmation, not a hand edit, so the row loses its flag but keeps following
+ *  the derivation (and is flagged again if that ever changes). */
 export async function setEdit(data: any): Promise<any> {
-  const key = data.file ? "x:" + libPath(requireLib(), String(data.file)) : String(data.id);
+  const lib = requireLib();
+  const key = data.file ? "x:" + libPath(lib, String(data.file)) : String(data.id);
   const a = (data.artist || "").trim(), ti = (data.title || "").trim();
-  if (a || ti) STATE.edits[key] = { artist: a, title: ti };
+  if (data.confirm) {
+    // confirms the name DJ HQ reads now, not the posted one; a hand edit stays as it is
+    const tracks = lib.playlist ? lib.playlist.tracks : [];
+    const n = data.file ? extraName({ base: path.basename(key.slice(2)) } as LocalFile)
+      : tracks.some((t) => String(t.id) === key) ? libraryNames(tracks).get(Number(key)) : undefined;
+    if (n && !handEdit(STATE.edits[key])) STATE.edits[key] = { artist: "", title: "", ok: nameSig(n.artist, n.title) };
+  } else if (a || ti) STATE.edits[key] = { artist: a, title: ti };
   else delete STATE.edits[key];
   saveState();
   return buildView();

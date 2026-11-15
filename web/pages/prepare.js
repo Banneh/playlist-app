@@ -21,7 +21,7 @@ function ppAttention() {
 }
 function ppIssueTags(r) {
   const tags = [];
-  if (r.tagged === false) tags.push(tag('Needs tags', 'warn', 'tag', 'Artist / title are not written into the file yet'));
+  if (r.tagged === false) tags.push(tag('Needs tags', 'warn', 'tag', 'The artist / title in the file are missing or differ from the name shown here'));
   if (r.incompat) tags.push(tag('Convert · ' + r.incompat, 'warn', 'sliders', 'Not playable on ' + ppDevice().label + ' as-is'));
   if (r.lossy) tags.push(tag('MP3', '', '', 'Lossy file'));
   return tags.join('');
@@ -43,7 +43,7 @@ PAGES.prepare = {
   sub: () => 'Get your files ready for rekordbox and the players at the club.',
   search: false,
   body: () => {
-    const dev = ppDevice(), n = DATA.untagged || 0, c = DATA.incompatible || 0, b = DATA.backups || 0;
+    const dev = ppDevice(), n = DATA.untagged || 0, c = DATA.incompatible || 0, b = DATA.backups || 0, nc = DATA.name_checks || 0;
     const rows = ppAttention();
     const deviceCard = `
       <div class="card pp-device">
@@ -62,8 +62,12 @@ PAGES.prepare = {
           <h3>Tags</h3>
           <div class="pp-num">${n ? `<button class="big link" onclick="HFILTER='tags';go('have')" title="Show these files on the Have page">${n}<small>${n === 1 ? 'file needs' : 'files need'} tags</small></button>` : tag('All files tagged', 'ok', 'check')}</div>
           <p>Artist and title are written into each file — that’s what rekordbox shows as the track names.</p>
+          <div class="pp-names${nc ? '' : ' ok'}">${nc
+            ? `${icon('alert')}<span><b>${plural(nc, 'name')}</b> to check before you write tags: artist and title may be the wrong way round or split in the wrong place.</span>`
+            : `${icon('checkCircle')}<span>No names to check.</span>`}</div>
           <div class="card-acts">
             <button class="btn ${n ? 'btn-primary' : ''}" id="pp-tag" onclick="ppTag()" ${n ? '' : 'disabled'} title="${n ? 'Write artist / title into the untagged files' : 'Every file is already tagged'}">${icon('tag')}Write tags${n ? ` ${badge(n)}` : ''}</button>
+            <button class="btn" onclick="openCheckNames('${nc ? 'check' : 'all'}')" title="${nc ? 'Go through the doubtful names one by one: keep, swap or edit' : 'Go through every name one by one'}">${icon('listMusic')}Check names${nc ? ` ${badge(nc)}` : ''}</button>
           </div>
         </div>
         <div class="card">

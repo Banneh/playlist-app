@@ -1,0 +1,15 @@
+/* Check names (pages/names.js): one name at a time; shares the work-through layout (wt-*) */
+.nc-headrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.nc-headrow .seg .n { margin-left: 5px; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.nc-src { display: flex; gap: 10px; align-items: baseline; font-size: 12.5px; color: var(--text-2); min-width: 0; }
+.nc-src + .nc-src { margin-top: 2px; }
+.nc-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.nc-lbl { flex: 0 0 96px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); }
+.nc-name { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+.nc-row { display: flex; gap: 10px; align-items: baseline; min-width: 0; }
+.nc-big { font-size: 17px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; min-width: 0; overflow-wrap: anywhere; }
+.nc-edit { margin-top: 14px; flex-wrap: wrap; }
+.nc-why { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; font-size: 12.5px; color: var(--text-2); }
+.nc-why .tag { flex-shrink: 0; }
+.nc-reset { margin-top: 10px; }
+@media (max-width: 640px) { .nc-lbl { flex-basis: 72px; } }
