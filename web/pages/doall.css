@@ -1,0 +1,118 @@
+/* Do everything (pages/doall.js): the button and its card, the run dialog, the setup wizard,
+   the Settings rows. Tokens and components come from app.css; the wizard's progress header
+   reuses the work-through one (wt-*). */
+
+.da-slot { display: contents; }
+.page-body > .da-slot > .note { margin-bottom: 14px; }
+
+/* the card on top of Prepare for player: icon · text · buttons, in one row */
+.da-card { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.da-card .card-icon { margin-bottom: 0; flex-shrink: 0; }
+.da-txt { flex: 1; min-width: 240px; }
+.da-txt p { margin-top: 3px; }
+.da-acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.da-card.da-setup { background: var(--surface-2); box-shadow: none; }
+.da-last { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 4px; font-size: 12.5px; color: var(--text-3); }
+
+/* run dialog: the confirmation */
+.da-wait { display: flex; align-items: center; gap: 8px; padding: 14px 0; font-size: 13px; color: var(--text-3); }
+.da-plan { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.da-plan li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: var(--text-2); line-height: 1.45; }
+.da-plan li .ic { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; color: var(--accent-text); }
+.da-plan li b { color: var(--text); font-weight: 600; }
+.da-check { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; font-size: 13px; color: var(--text); cursor: pointer; }
+.da-check input { margin-top: 3px; flex-shrink: 0; }
+.da-ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: var(--text-2); overflow-wrap: anywhere; }
+.da-small { margin-top: 12px; font-size: 12px !important; color: var(--text-3) !important; }
+.dlg-body .note + .note, .dlg-body .note + .da-plan, .dlg-body .da-plan + .note, .dlg-body .da-check + .note { margin-top: 12px; }
+.da-files { margin-top: 14px; font-size: 12.5px; }
+.da-files summary { cursor: pointer; color: var(--text-2); font-weight: 600; }
+.da-files summary:hover { color: var(--text); }
+
+/* run dialog: the steps */
+.da-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.da-step { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; }
+.da-step + .da-step { border-top: 1px solid var(--line); }
+.da-step-main { flex: 1; min-width: 0; }
+.da-step-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-height: 20px; }
+.da-step-top b { font-weight: 600; font-size: 13.5px; }
+.da-step.da-pending .da-step-top b { color: var(--text-3); font-weight: 500; }
+.da-cnts { display: flex; gap: 6px; flex-wrap: wrap; }
+.da-cnt { font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.da-cnt + .da-cnt::before { content: "·"; margin-right: 6px; }
+.da-cnt-failed { color: var(--red); }
+.da-cnt-waiting { color: var(--amber); }
+.da-quiet { margin-top: 2px; font-size: 12px; color: var(--text-3); }
+.da-now { margin-top: 8px; padding: 10px 12px; border-radius: var(--r-md); background: var(--amber-soft); border: 1px solid var(--amber-line); }
+.da-now p { font-size: 13px !important; color: var(--text) !important; }
+.da-now .da-small { margin-top: 6px; color: var(--text-2) !important; }
+.da-now-bad { background: var(--red-soft); border-color: var(--red-line); }
+.da-prog { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.da-now-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+/* state icons: steps and files */
+.da-ic { width: 20px; height: 20px; flex-shrink: 0; display: inline-grid; place-items: center; }
+.da-ic .ic { width: 18px; height: 18px; }
+.da-ic.da-ok { color: var(--green); }
+.da-ic.da-bad { color: var(--red); }
+.da-ic.da-skip { color: var(--text-3); }
+.da-ic.da-waiting { color: var(--amber); }
+.da-ic.da-run { color: var(--accent-text); }
+.da-ic.da-todo i { width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--line-2); }
+.da-grid { margin-top: 8px; display: flex; flex-direction: column; gap: 2px; }
+.da-file { display: flex; align-items: center; gap: 10px; padding: 3px 0; }
+.da-fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.da-fsteps { display: flex; gap: 2px; flex-shrink: 0; }
+.da-fsteps .da-ic { width: 18px; height: 18px; }
+.da-fsteps .da-ic .ic { width: 14px; height: 14px; }
+.da-fsteps .spin { width: 11px; height: 11px; }
+
+/* run dialog: the report */
+.da-report { margin-top: 10px; display: flex; flex-direction: column; gap: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.da-rsec h4 { font-size: 13px; font-weight: 650; }
+.da-rsec p { margin-top: 3px; font-size: 13px !important; }
+.da-racts { margin-top: 8px; display: flex; gap: 8px; }
+
+/* the setup wizard */
+.da-wz-strip { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 12px; }
+.da-wz-chip { border: 0; background: var(--surface-2); color: var(--text-3); font: inherit; font-size: 11.5px; padding: 3px 8px; border-radius: 999px; cursor: pointer; }
+.da-wz-chip:hover { color: var(--text); }
+.da-wz-chip.past { color: var(--text-2); }
+.da-wz-chip.on { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+.da-wz-h { font-size: 14.5px; font-weight: 650; margin-top: 4px; }
+.da-wz > p { margin-top: 4px; }
+.da-pathrow { margin-top: 12px; }
+.da-pathrow .path { flex: 1; min-width: 0; }
+.da-pathrow .path .tag { margin-left: auto; flex-shrink: 0; }
+.da-detail { margin-top: 4px; font-size: 12px; color: var(--text-3); }
+.da-wz .note { margin-top: 12px; }
+.da-others { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+.da-other { display: flex; align-items: center; gap: 8px; }
+.da-other .path { flex: 1; min-width: 0; padding: 5px 8px; }
+.da-wz-acts { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+.da-typed { margin-top: 10px; flex-wrap: wrap; }
+.da-typed .input { flex: 1 1 260px; }
+.da-how { margin-top: 14px; font-size: 13px; }
+.da-how summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--accent-text); font-weight: 600; }
+.da-how summary .ic { width: 14px; height: 14px; }
+.da-how p { margin-top: 6px; }
+.da-how-box { margin-top: 12px; padding: 12px 14px; border-radius: var(--r-md); background: var(--surface-2); font-size: 13px; }
+.da-how-box .steps { margin-top: 6px !important; }
+.da-sum { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.da-sum-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; min-width: 0; }
+.da-sum-l { flex: 0 0 170px; color: var(--text-2); }
+.da-sum-v { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+.da-sum-row .tag { flex-shrink: 0; }
+.da-wz .st-switch { margin-top: 14px; }
+
+/* Settings card */
+.da-st-rows { width: 100%; display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.da-st-l { flex: 0 0 170px; font-size: 12.5px; color: var(--text-2); }
+.da-st-rows .path { font-size: 11.5px; }
+.da-path-plain { background: transparent; padding-left: 0; }
+.da-st-why { width: 100%; display: flex; gap: 7px; align-items: flex-start; font-size: 12.5px; color: var(--text-2); }
+.da-st-why .ic { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; color: var(--amber); }
+
+@media (max-width: 640px) {
+  .da-sum-l, .da-st-l { flex-basis: 110px; }
+}

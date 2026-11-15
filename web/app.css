@@ -388,6 +388,9 @@ html.mac-inset .page-head { padding-top: 30px; }
 .note-amber { background: var(--amber-soft); border-color: var(--amber-line); } .note-amber .ic { color: var(--amber); }
 .note-red { background: var(--red-soft); border-color: var(--red-line); } .note-red .ic { color: var(--red); }
 .note-plain { background: var(--surface); border-color: var(--line); } .note-plain .ic { color: var(--text-3); }
+/* data safety notices (app.js safetyNotesHtml): on top of every page and of the welcome screen */
+.safety-notes { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+#welcome > .safety-notes { max-width: 620px; margin: 24px auto 0; padding: 0 16px; }
 
 /* cards */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-1); padding: 18px; }

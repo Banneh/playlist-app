@@ -6,11 +6,16 @@ import * as fs from "fs";
 import * as http from "http";
 import * as path from "path";
 import * as core from "./core";
+import * as pipeline from "./pipeline";
+import { platformApps } from "./extapps";
 
 export interface ServerOpts {
   dataDir: string;
   port: number;
   pickFolder?: () => Promise<string | null>;
+  /** choose one file: an app (pn_app / mik_app: the .app bundle on macOS, the .exe on
+   *  Windows), Mixed In Key's database (mik_db) or a rekordbox XML (rb_xml) (Electron only) */
+  pickFile?: (kind: PickKind) => Promise<string | null>;
   /** show a file in the OS file manager (Electron only) */
   reveal?: (p: string) => void;
   /** true inside the packaged desktop app (enables the download link in update notices) */
@@ -18,6 +23,14 @@ export interface ServerOpts {
   /** the embedded SoundCloud view behind the Discover page (Electron only) */
   sc?: ScView;
 }
+
+export type PickKind = "pn_app" | "mik_app" | "mik_db" | "rb_xml";
+const PICK_KINDS: PickKind[] = ["pn_app", "mik_app", "mik_db", "rb_xml"];
+
+/** An error as JSON: the message, plus its stable code (and vars) when it has one. */
+const errBody = (e: any) => ({ error: String(e?.message || e),
+  ...(typeof e?.code === "string" && /^[a-z][a-z0-9_]*$/.test(e.code) ? { code: e.code } : {}),
+  ...(e?.vars && typeof e.vars === "object" ? { vars: e.vars } : {}) });
 
 export interface ScRect { x: number; y: number; width: number; height: number; }
 export interface ScView {
@@ -57,6 +70,12 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
     queue = r.catch(() => {});
     return r;
   }
+
+  // "Do everything": a job that runs outside the queue and only queues its file
+  // operations. DJHQ_FAKE_APPS (tests) swaps the outside apps for stand-ins; the
+  // packaged app never does.
+  pipeline.init({ apps: platformApps(!opts.packaged), enqueue, dataDir: opts.dataDir,
+                  pollMs: opts.packaged ? 3000 : Math.max(200, Number(process.env.DJHQ_PIPE_POLL_MS) || 3000) });
 
   // UI preferences (theme, "tour seen", dismissed update) live next to state.json: the
   // window's origin changes with the port, so browser storage would forget them.
@@ -164,6 +183,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
       if (req.url === "/api/state")
         return void core.buildView().then(json, (e) => json({ error: e.message }, 500));
       if (req.url === "/api/prefs") return json(readPrefs());
+      if (req.url === "/api/do-all/status") return json(pipeline.status());   // never builds the view
       if ((req.url || "").startsWith("/api/file?")) {   // stream a local audio file for the in-app preview
         const q = new URL(req.url || "", "http://x").searchParams;
         const p = path.resolve(String(q.get("path") || ""));
@@ -203,7 +223,8 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         let data: any = {};
         try { data = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"); } catch {}
         const route = (fn: () => Promise<any>) =>
-          enqueue(fn).then(json, (e) => json({ error: e.message }, 500));
+          enqueue(fn).then(json, (e) => json(errBody(e), 500));
+        const direct = (fn: () => Promise<any>) => void fn().then(json, (e) => json(errBody(e), 500));
         if (req.url === "/api/prefs") {   // not queued: must not wait behind a long tag/convert run
           const next = { ...readPrefs(), ...(data && typeof data === "object" ? data : {}) };
           try { fs.writeFileSync(prefsPath, JSON.stringify(next, null, 2)); } catch (e: any) { return json({ error: e.message }, 500); }
@@ -219,7 +240,14 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/clean-backups": return route(() => core.cleanBackups());
           case "/api/library":  return route(() => core.libraryOp(data));
           case "/api/device":   return route(() => core.setDevice(data.device));
-          case "/api/settings": return route(() => core.setSettings(data));
+          case "/api/settings": return route(async () => {
+            if (data && data.do_all) await pipeline.checkSettingsPatch(data.do_all);   // the app bundles / exes
+            return core.setSettings(data);
+          });
+          // not queued: the job queues its own file operations (see pipeline.ts)
+          case "/api/do-all/detect":  return direct(() => pipeline.detect());
+          case "/api/do-all/start":   return direct(() => pipeline.start(data));
+          case "/api/do-all/control": return direct(() => pipeline.controlJob(data));
           case "/api/override": return route(() => core.setOverride(data));
           case "/api/edit":     return route(() => core.setEdit(data));
           case "/api/assign":   return route(() => core.setAssign(data));
@@ -238,6 +266,12 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
             if (p !== core.rekordboxXmlPath()) return json({ error: "can only reveal the exported file" }, 400);
             opts.reveal(p);
             return json({ ok: true });
+          }
+          case "/api/pick-file": {
+            const kind = String(data.kind || "") as PickKind;
+            if (!PICK_KINDS.includes(kind)) return json({ error: "unknown file kind", code: "bad_request" }, 400);
+            if (!opts.pickFile) return json({ path: null, unsupported: true });
+            return void opts.pickFile(kind).then((p) => json({ path: p }), (e) => json(errBody(e), 500));
           }
           case "/api/pick-folder":
             if (!opts.pickFolder) return json({ path: null, unsupported: true });

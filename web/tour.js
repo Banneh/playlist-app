@@ -33,6 +33,8 @@ const TOUR_STEPS = () => [
     text: 'Files that aren’t in the playlist yet. Find each one on SoundCloud and add it to the playlist there; the file is matched automatically afterwards.' },
   { page: 'prepare', target: '#page-body .cards', fallback: '.nav-item[data-page="prepare"]', place: 'top', title: 'Prepare for player',
     text: 'Pick your player, check the names DJ HQ isn’t sure about, write the tags rekordbox reads, convert the files it can’t play (your cues survive), and export a rekordbox playlist.' },
+  { page: 'prepare', target: '#page-body .da-card', fallback: '#page-body .cards', place: 'bottom', title: 'Do everything',
+    text: 'One click for the whole chain: the new downloads move into your library, get their tags, go through Platinum Notes and Mixed In Key, and land with their keys in your rekordbox XML. Switch it on and set it up in Settings; it needs both apps on this computer.' },
   { page: 'missing', target: '#btn-refresh', place: 'bottom', title: 'Always up to date',
     text: 'The playlist is checked every 15 minutes while the window is open. Refresh checks right now and rescans your folder too.' },
   { page: 'missing', target: '#btn-guide', fallback: '#btn-refresh', place: 'bottom', title: 'The Guide',

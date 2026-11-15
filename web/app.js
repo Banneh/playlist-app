@@ -133,7 +133,12 @@ async function api(path, body) {
       ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
       : {});
     const j = await r.json();
-    if (j.error) throw new Error(j.error);
+    if (j.error) {   // the server's English text, plus its stable code (and vars) when it has one
+      const err = new Error(j.error);
+      if (j.code) err.code = j.code;
+      if (j.vars) err.vars = j.vars;
+      throw err;
+    }
     if (j.reavailable && j.reavailable.length) {
       const names = j.reavailable;
       setTimeout(() => toast('Back in Missing — a link appeared: ' + names.slice(0, 2).join(', ')
@@ -333,6 +338,34 @@ function go(page) {
   if (body) body.scrollTop = top;
 }
 
+/* ---------- data safety notices ----------
+   A library folder that isn't there right now (view.folders_away) and a state.json that
+   couldn't be read at launch (view.state_problem). Shown on top of every page, the welcome
+   screen included: a state file moved aside leaves the app with no libraries. */
+const SAFETY_TEXT = {
+  folderMissing: '<b>This library’s folder isn’t available:</b> {dir}. Plug in the drive, let the cloud folder sync, or put the folder back where it was. Until then its tracks show as missing, and your matches and “new” marks are kept.',
+  folderUnreadable: '<b>DJ HQ isn’t allowed to read this library’s folder:</b> {dir}. Allow access to it (on a Mac: System Settings → Privacy & Security → Files and Folders), then look again. Your matches and “new” marks are kept meanwhile.',
+  folderEmpty: '<b>This library’s folder lists no audio files:</b> {dir}. A cloud folder may not have synced yet. Your matches and “new” marks are kept until the files are back.',
+  lookAgain: 'Look again',
+  lookAgainHint: 'Scan the library’s folders again',
+  stateMoved: '<b>DJ HQ couldn’t read its saved data, so it started fresh.</b> The old file is kept untouched at {file}.',
+  stateKept: '<b>DJ HQ couldn’t read its saved data.</b> The file is left untouched at {file} and nothing is saved over it, so changes made now are lost when you quit.',
+};
+/** SAFETY_TEXT[key] with {name} filled in (values are escaped and shown in bold) */
+const safetyText = (key, vals = {}) => SAFETY_TEXT[key].replace(/\{(\w+)\}/g, (_, k) => `<b>${esc(vals[k])}</b>`);
+function safetyNotesHtml() {
+  if (!DATA) return '';
+  let out = '';
+  const sp = DATA.state_problem;
+  if (sp) out += noteHtml(safetyText(sp.code === 'state_unreadable_kept' ? 'stateKept' : 'stateMoved', { file: sp.file }), '', 'red', 'alert');
+  for (const a of DATA.folders_away || []) {
+    const key = a.why === 'unreadable' ? 'folderUnreadable' : a.why === 'empty' ? 'folderEmpty' : 'folderMissing';
+    out += noteHtml(safetyText(key, { dir: shortPath(a.dir) }),
+      `<button class="btn btn-sm" onclick="rescanFolder()" title="${esc(SAFETY_TEXT.lookAgainHint)}">${icon('refresh')}${esc(SAFETY_TEXT.lookAgain)}</button>`, 'amber', 'alert');
+  }
+  return out ? `<div class="safety-notes">${out}</div>` : '';
+}
+
 /* ---------- render ---------- */
 function render() {
   if (!DATA) return;
@@ -343,8 +376,8 @@ function render() {
   if (typeof scBarRender === 'function') scBarRender();   // the player bar: SoundCloud's track shows on every page but Discover and onboarding
   $('#app').hidden = noLibs || setup; $('#welcome').hidden = !(noLibs || setup);
   if (noLibs || setup) PAGES[PAGE] && PAGES[PAGE].onHide && PAGES[PAGE].onHide();   // the Discover view must not stay over the screen
-  if (noLibs) { $('#welcome').innerHTML = PAGES.welcome.body(); PAGES.welcome.after && PAGES.welcome.after(); return; }
-  if (setup) { $('#welcome').innerHTML = PAGES.setup.body(); PAGES.setup.after && PAGES.setup.after(); return; }
+  if (noLibs) { $('#welcome').innerHTML = safetyNotesHtml() + PAGES.welcome.body(); PAGES.welcome.after && PAGES.welcome.after(); return; }
+  if (setup) { $('#welcome').innerHTML = safetyNotesHtml() + PAGES.setup.body(); PAGES.setup.after && PAGES.setup.after(); return; }
 
   renderSidebar();
   const page = PAGES[PAGE] || PAGES.missing;
@@ -358,7 +391,7 @@ function render() {
   if (!DATA.ready) {   // library exists, playlist never fetched (or fetch failed on first run)
     $('#ph-title').innerHTML = `<h2>${esc(page.title())}</h2><div class="sub">${LAST_ERR ? 'Couldn’t fetch the playlist: <b>' + esc(LAST_ERR) + '</b>' : 'No playlist data yet'}</div>`;
     $('#ph-actions').innerHTML = ''; $('#ph-tools').hidden = true; $('#ph-tools').innerHTML = '';
-    $('#page-body').innerHTML = PAGES.welcome.noData();
+    $('#page-body').innerHTML = safetyNotesHtml() + PAGES.welcome.noData();
     page.onHide && page.onHide();
     return;
   }
@@ -369,7 +402,7 @@ function render() {
   // Redrawing the page (a background refresh, the Downloads scan, an inline edit …) keeps the
   // list where it was; go() and the search decide for themselves where the page should start.
   const body = $('#page-body'), top = body.scrollTop;
-  body.innerHTML = page.body(q);
+  body.innerHTML = safetyNotesHtml() + page.body(q);
   if (typeof scCaptchaRender === 'function') scCaptchaRender();   // SoundCloud's bot check, on top of every page but Discover
   body.scrollTop = top;
   page.after && page.after();
@@ -579,6 +612,7 @@ async function boot() {
     render();
     if (typeof loadInbox === 'function' && (DATA.libraries || []).length) loadInbox();
     if (APP.sc && typeof dcPoll === 'function') dcPoll();
+    if (typeof daBoot === 'function') daBoot();   // a Do everything run that is going (or was cut off) shows on its button
     if (typeof maybeStartTour === 'function') setTimeout(maybeStartTour, 600);
     setTimeout(() => checkForUpdates(), 4000);
     setInterval(() => checkForUpdates(), 24 * 60 * 60 * 1000);

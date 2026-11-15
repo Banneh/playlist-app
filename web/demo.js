@@ -97,7 +97,12 @@ function demoView() {
     incompatible: tracks.filter(t => t.file && t.incompat).length + extras.filter(f => f.incompat).length,
     local_count: local_files.length,
     settings: { inbox_dir: DEMO_HOME + '/Downloads', inbox_default: DEMO_HOME + '/Downloads', inbox_custom: false,
-                auto_move: false, refresh_min: 15, data_dir: DEMO_DATA_DIR },
+                auto_move: false, refresh_min: 15, data_dir: DEMO_DATA_DIR,
+                // Do everything, set up and switched on, so its card and button show (the tour never starts a run)
+                do_all: { on: true, pn_app: '/Applications/Platinum Notes 10.app', mik_app: '/Applications/Mixed In Key 11.app',
+                          mik_db: DEMO_HOME + '/Library/Application Support/Mixedinkey/Collection11.mikdb', rb_xml: DEMO_HOME + '/Documents/rekordbox.xml',
+                          close_apps: true, include_pending: false, pn_replace_confirmed: false, pn_mode: 'replace', pn_mode_at: now },
+                do_all_ready: true, do_all_missing: [], do_all_optional: [] },
     backup_bytes: 0,
   };
 }

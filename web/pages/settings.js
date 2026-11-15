@@ -1,5 +1,5 @@
 /* Page: Settings — library (its folders, subfolder scanning, its SoundCloud link), downloads
-   folder + auto-move, refresh interval, appearance, backups and about. Reads DATA.settings /
+   folder + auto-move, Do everything (its card is built in pages/doall.js), refresh interval, appearance, backups and about. Reads DATA.settings /
    DATA.backup_bytes, writes through POST /api/settings; folder and link changes go through
    POST /api/library. */
 
@@ -122,7 +122,9 @@ PAGES.settings = {
        <button class="btn btn-sm" onclick="startTour()">${icon('sparkles')}Show me around</button>
        <div class="st-path-row st-wide"><span class="faint">Data folder</span><div class="path" title="${esc(S.data_dir || '')}">${icon('folder')}<span>${esc(shortPath(S.data_dir || ''))}</span></div></div>`);
 
-    return `<div class="st-list">${library}${account}${links}${downloads}${refresh}${appearance}${backups}${about}</div>`;
+    const doAll = typeof daSettingsCard === 'function' ? daSettingsCard() : '';   // pages/doall.js
+
+    return `<div class="st-list">${library}${account}${links}${downloads}${doAll}${refresh}${appearance}${backups}${about}</div>`;
   },
 };
 

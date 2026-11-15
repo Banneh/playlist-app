@@ -203,27 +203,30 @@ PAGES.inbox = {
   },
   actions: () => {
     const n = INBOX && !INBOX.error ? INBOX.items.length : 0;
-    return `<button class="btn" onclick="loadInbox()" ${IB_BUSY ? 'disabled' : ''} title="Scan the downloads folder again">${IB_BUSY ? spin('Scanning…') : icon('refresh') + 'Rescan'}</button>${
+    const da = typeof daButtonsHtml === 'function' ? daButtonsHtml('header') : '';   // Do everything (pages/doall.js)
+    return da + `<button class="btn" onclick="loadInbox()" ${IB_BUSY ? 'disabled' : ''} title="Scan the downloads folder again">${IB_BUSY ? spin('Scanning…') : icon('refresh') + 'Rescan'}</button>${
       n > 1 ? `<button class="btn btn-primary" id="ib-moveall" onclick="inboxMoveAll()" title="Move every matching file into your music folder">${icon('folderIn')}Move all (${n})</button>` : ''}`;
   },
-  body: q => {
-    const head = `<div class="thead ib-row"><span class="num">#</span><span></span><span>Download</span><span class="r">Length</span><span></span></div>`;
-    const frame = inner => `<div class="table">${head}${inner}</div>`;
-    if (!INBOX) return `<div class="table"><div class="empty"><span class="spin ib-spin"></span><p>Scanning ${esc(ibDir())}…</p></div></div>`;
-    if (INBOX.error) return frame(emptyHtml({ ico: 'alert', title: 'Couldn’t scan the downloads folder', text: esc(INBOX.error),
-      acts: `<button class="btn" onclick="loadInbox()">${icon('refresh')}Try again</button>` }));
-    if (INBOX.exists === false) return frame(emptyHtml({ ico: 'folder', title: 'No downloads folder', text: `DJ HQ looks for new downloads in <b>${esc(ibDir())}</b>, but that folder doesn’t exist.` }));
-    const items = INBOX.items.filter(it => ibMatches(it, q));
-    const others = ibUnmatched().filter(it => ibMatches(it, q));
-    // audio that matches nothing in the playlist, under its own heading
-    const otherSec = others.length ? `
-      <div class="section">Not in the playlist ${badge(others.length)}<span class="hint">· move them in as they are, or find the track on SoundCloud first and add it to the playlist on the way</span></div>
-      <div class="table">${others.map(ibOtherRow).join('')}</div>` : '';
-    if (!INBOX.items.length && !ibUnmatched().length) return frame(emptyHtml({ ico: 'inbox', kind: 'accent', title: 'Nothing to move right now',
-      text: `Files you download from Hypeddit, Bandcamp and the like show up here automatically. Matches to a track in this playlist are one click from your music folder; anything else can be moved in as it is or looked up on SoundCloud first.${
-        INBOX.already ? `<br><span class="faint">${plural(INBOX.already, 'file')} in ${esc(ibDir())} ${INBOX.already === 1 ? 'is' : 'are'} already in your library</span>` : ''}` }));
-    if (!items.length && !others.length) return frame(emptyHtml({ ico: 'search', title: 'No downloads match', text: 'Try a different search.' }));
-    if (!items.length) return (q ? '' : frame(emptyHtml({ ico: 'inbox', title: 'Nothing matches the playlist', text: 'The files below are in your Downloads folder but match no track in this playlist.' }))) + otherSec;
-    return frame(items.map(ibRow).join('')) + otherSec;
-  },
+  body: q => (typeof daNoteHtml === 'function' ? daNoteHtml() : '') + ibBody(q),
 };
+/** the Downloads list (the page body under the Do everything note) */
+function ibBody(q) {
+  const head = `<div class="thead ib-row"><span class="num">#</span><span></span><span>Download</span><span class="r">Length</span><span></span></div>`;
+  const frame = inner => `<div class="table">${head}${inner}</div>`;
+  if (!INBOX) return `<div class="table"><div class="empty"><span class="spin ib-spin"></span><p>Scanning ${esc(ibDir())}…</p></div></div>`;
+  if (INBOX.error) return frame(emptyHtml({ ico: 'alert', title: 'Couldn’t scan the downloads folder', text: esc(INBOX.error),
+    acts: `<button class="btn" onclick="loadInbox()">${icon('refresh')}Try again</button>` }));
+  if (INBOX.exists === false) return frame(emptyHtml({ ico: 'folder', title: 'No downloads folder', text: `DJ HQ looks for new downloads in <b>${esc(ibDir())}</b>, but that folder doesn’t exist.` }));
+  const items = INBOX.items.filter(it => ibMatches(it, q));
+  const others = ibUnmatched().filter(it => ibMatches(it, q));
+  // audio that matches nothing in the playlist, under its own heading
+  const otherSec = others.length ? `
+    <div class="section">Not in the playlist ${badge(others.length)}<span class="hint">· move them in as they are, or find the track on SoundCloud first and add it to the playlist on the way</span></div>
+    <div class="table">${others.map(ibOtherRow).join('')}</div>` : '';
+  if (!INBOX.items.length && !ibUnmatched().length) return frame(emptyHtml({ ico: 'inbox', kind: 'accent', title: 'Nothing to move right now',
+    text: `Files you download from Hypeddit, Bandcamp and the like show up here automatically. Matches to a track in this playlist are one click from your music folder; anything else can be moved in as it is or looked up on SoundCloud first.${
+      INBOX.already ? `<br><span class="faint">${plural(INBOX.already, 'file')} in ${esc(ibDir())} ${INBOX.already === 1 ? 'is' : 'are'} already in your library</span>` : ''}` }));
+  if (!items.length && !others.length) return frame(emptyHtml({ ico: 'search', title: 'No downloads match', text: 'Try a different search.' }));
+  if (!items.length) return (q ? '' : frame(emptyHtml({ ico: 'inbox', title: 'Nothing matches the playlist', text: 'The files below are in your Downloads folder but match no track in this playlist.' }))) + otherSec;
+  return frame(items.map(ibRow).join('')) + otherSec;
+}

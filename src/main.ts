@@ -5,7 +5,7 @@
 import { app, BrowserWindow, dialog, nativeTheme, session, shell, WebContentsView } from "electron";
 import * as path from "path";
 import * as core from "./core";
-import { ScRect, ScView, startServer } from "./server";
+import { PickKind, ScRect, ScView, startServer } from "./server";
 
 // Packaged app keeps its data in the OS user-data dir; running from source uses
 // the project folder (same place the Python version kept state.json).
@@ -329,6 +329,37 @@ const sc: ScView = {
   },
 };
 
+/** The file pickers of the "Do everything" setup. On macOS an app is a folder (a
+ *  bundle) that the open panel shows as one item when "app" is the only extension;
+ *  a path inside a bundle is cut back to the bundle. */
+const PICK_TEXT: Record<PickKind, string> = {
+  pn_app: "Choose Platinum Notes",
+  mik_app: "Choose Mixed In Key",
+  mik_db: "Choose Mixed In Key’s database",
+  rb_xml: "Choose the rekordbox XML file rekordbox imports from",
+};
+async function pickFile(kind: PickKind): Promise<string | null> {
+  const mac = process.platform === "darwin", winOs = process.platform === "win32";
+  const home = app.getPath("home");
+  const opt: Electron.OpenDialogOptions = { title: PICK_TEXT[kind], properties: ["openFile"] };
+  if (kind === "pn_app" || kind === "mik_app") {
+    opt.filters = [{ name: "Apps", extensions: [mac ? "app" : winOs ? "exe" : "*"] }];
+    opt.defaultPath = mac ? "/Applications" : winOs ? path.join(process.env.LOCALAPPDATA || home, "Programs") : home;
+  } else if (kind === "mik_db") {
+    opt.filters = [{ name: "Mixed In Key database", extensions: mac ? ["mikdb"] : ["db"] }, { name: "All files", extensions: ["*"] }];
+    opt.defaultPath = mac ? path.join(home, "Library", "Application Support", "Mixedinkey")
+      : path.join(process.env.LOCALAPPDATA || home, "Mixed In Key", "Mixed In Key");
+  } else {
+    opt.filters = [{ name: "rekordbox XML", extensions: ["xml"] }];
+    opt.defaultPath = path.join(home, "Documents");
+  }
+  const r = win ? await dialog.showOpenDialog(win, opt) : await dialog.showOpenDialog(opt);
+  if (r.canceled || !r.filePaths[0]) return null;
+  let p = r.filePaths[0];
+  if (mac) { const i = p.indexOf(".app/"); if (i >= 0) p = p.slice(0, i + 4); }
+  return p;
+}
+
 app.whenReady().then(async () => {
   const server = await startServer({
     dataDir,
@@ -340,6 +371,7 @@ app.whenReady().then(async () => {
       });
       return r.canceled ? null : r.filePaths[0];
     },
+    pickFile,
     reveal: (p) => shell.showItemInFolder(p),
     packaged: app.isPackaged,
     sc,

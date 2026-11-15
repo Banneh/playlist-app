@@ -99,7 +99,8 @@ PAGES.prepare = {
       <div class="section">Files needing attention</div>
       <div class="table">${emptyHtml({ ico: 'checkCircle', kind: 'green', title: `All files are ready for ${esc(dev.label)}`,
         text: 'Every file in your folder is tagged and plays on this player.' })}</div>`;
-    return deviceCard + cards + list;
+    const doAll = typeof daCardHtml === 'function' ? daCardHtml() : '';   // Do everything (pages/doall.js); nothing while it is switched off
+    return doAll + deviceCard + cards + list;
   },
 };
 

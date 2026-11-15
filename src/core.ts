@@ -10,6 +10,7 @@ import * as path from "path";
 import { execFile } from "child_process";
 import { buildId3v23, carriedFrames, carriedChunks, appendChunks, prependTag, readKeyInfo, id3Version } from "./id3";
 import { listEntries, extractEntry, ZipEntry } from "./zip";
+import { checkXmlFile } from "./rbxml";
 
 const AUDIO_EXT = [".wav", ".mp3", ".aiff", ".aif", ".flac", ".m4a", ".ogg"];
 const UA =
@@ -110,7 +111,7 @@ export interface AppState {
   /** folder watched for fresh downloads; default ~/Downloads */
   inbox_dir?: string;
   /** user settings (see getSettings) */
-  settings?: { auto_move?: boolean; refresh_min?: number; like_on_add?: boolean; sc_open?: "discover" | "browser" };
+  settings?: { auto_move?: boolean; refresh_min?: number; like_on_add?: boolean; sc_open?: "discover" | "browser"; do_all?: DoAll };
   /** probe results for audio inside zips in the downloads folder: "<zip path>|<entry>|<size>" -> [dur, fmt, tags] */
   zip_cache?: Record<string, [number, [string, number, number], [string, string, string]]>;
   /** "<lib id>:<track id>" -> ms when a file for the track first turned up (0 = predates tracking) */
@@ -118,6 +119,30 @@ export interface AppState {
   client_id: string | null;
   device: string;
 }
+
+/** "Do everything" (move, tag, Platinum Notes, Mixed In Key, rekordbox XML) setup. Paths
+ *  are of this computer, so a config export must leave them out. */
+export interface DoAll {
+  on?: boolean;
+  /** Platinum Notes / Mixed In Key: the .app bundle (macOS) or .exe (Windows) */
+  pn_app?: string; mik_app?: string;
+  /** Mixed In Key's collection database: read (never written) for files that end up without a key tag */
+  mik_db?: string;
+  /** the rekordbox XML rekordbox imports from: tracks and keys are merged into it */
+  rb_xml?: string;
+  /** quit Platinum Notes / Mixed In Key after their step, when DJ HQ started them (default on) */
+  close_apps?: boolean;
+  /** also send library files that have no Platinum Notes mark or no key (default: only this run's downloads) */
+  include_pending?: boolean;
+  /** Platinum Notes' output mode as last read (wizard, run start); "unknown" where it can't be read (Windows) */
+  pn_mode?: "replace" | "other" | "unknown"; pn_mode_at?: number;
+  /** the user says Platinum Notes is set to replace the originals (only asked where pn_mode is "unknown") */
+  pn_replace_confirmed?: boolean;
+}
+
+/** An error the UI can show in the user's language: a short stable code plus English text. */
+export const appError = (code: string, text: string, vars?: Record<string, unknown>) =>
+  Object.assign(new Error(text), { code, ...(vars ? { vars } : {}) });
 
 let DATA_DIR = "";
 let CAN_PICK = false;
@@ -134,24 +159,76 @@ export function init(dataDir: string, canPick: boolean, canReveal = false): void
 
 const statePath = () => path.join(DATA_DIR, "state.json");
 
+/** Set when state.json was there at launch but could not be read; the view carries it
+ *  (state_problem) so the UI can say so. code "state_unreadable": the file was moved
+ *  aside to `file` and the app started fresh; "state_unreadable_kept": it could not be
+ *  moved either, so it stays where it is and nothing is saved over it this session. */
+let STATE_PROBLEM: { code: string; file: string } | null = null;
+let SAVE_BLOCKED = false;
+
 function loadState(): AppState {
-  try {
-    const st = JSON.parse(fs.readFileSync(statePath(), "utf8"));
-    st.assigned = st.assigned || {}; // older state files predate manual matching
-    st.by_hand = st.by_hand || {};
-    st.found = st.found || {};
-    st.na = st.na || {};
-    st.acquired = st.acquired || {};
-    st.settings = st.settings || {};
-    st.zip_cache = st.zip_cache || {};
-    return st;
-  } catch {
-    return { libraries: [], active: null, dur_cache: {}, overrides: {},
-             edits: {}, assigned: {}, by_hand: {}, found: {}, na: {}, acquired: {}, client_id: null, device: "xdj-700" };
+  const p = statePath();
+  let st: any = null, unreadable = false;
+  try { st = JSON.parse(fs.readFileSync(p, "utf8")); }
+  catch (e: any) { unreadable = e?.code !== "ENOENT"; } // no file at all = first run
+  if (st !== null && (typeof st !== "object" || Array.isArray(st))) { st = null; unreadable = true; }
+  if (unreadable) {
+    // Starting empty is fine, but the next save would overwrite the real file: keep its bytes.
+    const aside = `${p}.unreadable-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+    try {
+      fs.renameSync(p, aside);
+      STATE_PROBLEM = { code: "state_unreadable", file: aside };
+    } catch {
+      SAVE_BLOCKED = true;
+      STATE_PROBLEM = { code: "state_unreadable_kept", file: p };
+    }
+    console.error(`state.json could not be read; ${SAVE_BLOCKED ? "left in place, not saving over it" : "moved to " + aside}`);
   }
+  if (!st) st = {};
+  st.libraries = st.libraries || [];
+  st.active = st.active ?? null;
+  st.dur_cache = st.dur_cache || {};
+  st.overrides = st.overrides || {};
+  st.edits = st.edits || {};
+  st.assigned = st.assigned || {}; // older state files predate manual matching
+  st.by_hand = st.by_hand || {};
+  st.found = st.found || {};
+  st.na = st.na || {};
+  st.acquired = st.acquired || {};
+  st.settings = st.settings || {};
+  st.zip_cache = st.zip_cache || {};
+  st.client_id = st.client_id ?? null;
+  st.device = st.device || "xdj-700";
+  return st;
 }
 export function saveState(): void {
-  fs.writeFileSync(statePath(), JSON.stringify(STATE));
+  if (SAVE_BLOCKED) return;
+  writeFileAtomic(statePath(), JSON.stringify(STATE));
+}
+
+/** Write a whole file so that a crash or power cut leaves either the old or the new
+ *  version, never half of one: write a temp file next to it, flush it, rename it over. */
+export function writeFileAtomic(p: string, text: string): void {
+  const tmp = p + ".tmp";
+  const fd = fs.openSync(tmp, "w");
+  try {
+    fs.writeFileSync(fd, text);
+    try { fs.fsyncSync(fd); } catch {}
+  } finally { fs.closeSync(fd); }
+  try { fs.renameSync(tmp, p); }
+  catch (e: any) {
+    // Windows replaces the target too, but fails while something (a virus scanner, a
+    // backup or sync client) holds it open: wait a moment and try once more.
+    const busy = e?.code === "EPERM" || e?.code === "EBUSY" || e?.code === "EACCES";
+    try {
+      if (!busy) throw e;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+      fs.renameSync(tmp, p);
+    } catch (e2) {
+      try { fs.unlinkSync(tmp); } catch {}
+      throw e2;
+    }
+  }
 }
 
 const REFRESH_CHOICES = [5, 15, 30, 60, 120];
@@ -164,11 +241,115 @@ export function getSettings(): any {
     like_on_add: !!s.like_on_add,
     sc_open: s.sc_open === "browser" ? "browser" : "discover",
     data_dir: DATA_DIR,
+    ...doAllStatus(),
   };
+}
+
+/** The "Do everything" settings with defaults, and what keeps it from running, as stable
+ *  codes. Only cheap existence checks: this runs on every view. */
+export function doAllStatus(): { do_all: Required<Omit<DoAll, "pn_mode" | "pn_mode_at">> & { pn_mode: string | null; pn_mode_at: number | null; switched_off: boolean };
+                                 do_all_ready: boolean; do_all_missing: string[]; do_all_optional: string[] } {
+  const d: DoAll = STATE.settings?.do_all || {};
+  const exists = (p?: string) => { try { return !!p && fs.existsSync(p); } catch { return false; } };
+  const missing: string[] = [], optional: string[] = [];
+  if (!d.pn_app) missing.push("pn_app_missing"); else if (!exists(d.pn_app)) missing.push("pn_app_not_found");
+  if (!d.mik_app) missing.push("mik_app_missing"); else if (!exists(d.mik_app)) missing.push("mik_app_not_found");
+  if (!d.rb_xml) missing.push("rb_xml_missing");
+  else if (!exists(d.rb_xml)) missing.push("rb_xml_not_found");
+  else if (isExportXml(d.rb_xml)) missing.push("rb_xml_is_export");
+  else { try { fs.accessSync(d.rb_xml, fs.constants.R_OK | fs.constants.W_OK); } catch { missing.push("rb_xml_not_writable"); } }
+  if (!d.pn_mode) missing.push("pn_mode_unchecked");
+  else if (d.pn_mode === "other") missing.push("pn_mode_wrong");
+  else if (d.pn_mode === "unknown" && !d.pn_replace_confirmed) missing.push("pn_mode_unknown");
+  if (!d.mik_db) optional.push("mik_db_missing"); else if (!exists(d.mik_db)) optional.push("mik_db_not_found");
+  return {
+    do_all: { on: !!d.on, pn_app: d.pn_app || "", mik_app: d.mik_app || "", mik_db: d.mik_db || "", rb_xml: d.rb_xml || "",
+              close_apps: d.close_apps !== false, include_pending: !!d.include_pending,
+              pn_replace_confirmed: !!d.pn_replace_confirmed, pn_mode: d.pn_mode || null, pn_mode_at: d.pn_mode_at || null,
+              // off by the user's choice (not just never set up): the button is hidden then
+              switched_off: d.on === false },
+    do_all_ready: missing.length === 0, do_all_missing: missing, do_all_optional: optional,
+  };
+}
+
+/** Remember Platinum Notes' output mode as just read (detection, run start). */
+export function setPnMode(mode: "replace" | "other" | "unknown"): void {
+  const s = STATE.settings || (STATE.settings = {});
+  const d = s.do_all || (s.do_all = {});
+  if (d.pn_mode === mode) { d.pn_mode_at = Date.now(); return; }
+  d.pn_mode = mode; d.pn_mode_at = Date.now();
+  saveState();
+}
+
+/** DJ HQ's own Export XML file: rewritten whole on every export, so it can't be the
+ *  file Do everything merges into (what it adds there would be lost). */
+function isExportXml(p: string): boolean {
+  const real = (x: string) => { try { return fs.realpathSync.native(x); } catch { return path.resolve(x); } };
+  return real(p).toLowerCase() === real(rekordboxXmlPath()).toLowerCase();
+}
+
+/** A path as the user typed or pasted it: trimmed, one pair of surrounding quotes off
+ *  (Windows' "Copy as path" adds them), a Terminal-escaped one ("Platinum\ Notes")
+ *  unescaped, ~ and file:// URLs expanded, made absolute. "" when empty. */
+export function typedPath(v: unknown): string {
+  let s = String(v ?? "").trim();
+  if (s.length > 1 && /^(["']).*\1$/.test(s)) s = s.slice(1, -1).trim();
+  if (process.platform !== "win32" && /\\ /.test(s)) s = s.replace(/\\(.)/g, "$1");
+  if (/^file:/i.test(s)) {
+    s = s.replace(/^file:(\/\/localhost|\/\/)?/i, "");
+    try { s = decodeURIComponent(s); } catch { /* keep as is */ }
+    if (/^\/[A-Za-z]:\//.test(s)) s = s.slice(1);
+  }
+  if (!s) return "";
+  return path.resolve(s.replace(/^~(?=$|[\/\\])/, os.homedir()));
+}
+
+/** Check and apply a do_all patch (see DoAll). Paths: "" or null clears one. The app
+ *  paths are checked for their bundle / exe by the server before this runs. */
+function patchDoAll(p: any): void {
+  if (!p || typeof p !== "object") throw appError("bad_request", "do_all must be an object");
+  const s = STATE.settings || (STATE.settings = {});
+  const d: DoAll = { ...(s.do_all || {}) };
+  for (const k of ["on", "close_apps", "include_pending", "pn_replace_confirmed"] as const)
+    if (k in p) d[k] = !!p[k];
+  const file = (v: any): string | null => typedPath(v) || null;
+  for (const k of ["pn_app", "mik_app"] as const) if (k in p) {
+    const v = file(p[k]);
+    if (v && !fs.existsSync(v)) throw appError(k + "_not_found", "that app isn't there");
+    // stored as the real path (true case, no symlink): it is compared with running apps' paths
+    if (v) { try { d[k] = fs.realpathSync.native(v); } catch { d[k] = v; } } else delete d[k];
+  }
+  if ("mik_db" in p) {
+    const v = file(p.mik_db);
+    if (v) {
+      if (!fs.existsSync(v) || !fs.statSync(v).isFile()) throw appError("mik_db_not_found", "that file isn't there");
+      let head = "";
+      try { const fd = fs.openSync(v, "r"); const b = Buffer.alloc(16); fs.readSync(fd, b, 0, 16, 0); fs.closeSync(fd); head = b.toString("latin1"); } catch {}
+      if (head !== "SQLite format 3\0") throw appError("mik_db_not_sqlite", "that file isn't a Mixed In Key database");
+      d.mik_db = v;
+    } else delete d.mik_db;
+  }
+  if ("rb_xml" in p) {
+    const v = file(p.rb_xml);
+    if (v) {
+      if (!fs.existsSync(v) || !fs.statSync(v).isFile()) throw appError("rb_xml_not_found", "that file isn't there");
+      let head = "";
+      try { const fd = fs.openSync(v, "r"); const b = Buffer.alloc(4096); const n = fs.readSync(fd, b, 0, 4096, 0); fs.closeSync(fd); head = b.toString("utf8", 0, n); } catch {}
+      if (!/<DJ_PLAYLISTS[\s>]/.test(head)) throw appError("rb_xml_not_rekordbox", "that file isn't a rekordbox XML collection");
+      if (isExportXml(v)) throw appError("rb_xml_is_export", "that is the file DJ HQ's Export XML rewrites; choose rekordbox's own XML file", { path: v });
+      // the whole file, merged with a made-up track in memory: a file the run couldn't
+      // merge into is refused now, not after the audio was processed
+      try { checkXmlFile(v); }
+      catch (e: any) { throw appError(typeof e?.code === "string" ? e.code : "rb_xml_failed", String(e?.message || e), { path: v, error: String(e?.message || e) }); }
+      d.rb_xml = v;
+    } else delete d.rb_xml;
+  }
+  s.do_all = d;
 }
 /** POST /api/settings {inbox_dir?: string|null ("" or null = back to ~/Downloads), auto_move?: boolean, refresh_min?: number,
  *  like_on_add?: boolean (Discover: also like a track when adding it to the playlist),
- *  sc_open?: "discover" | "browser" (where SoundCloud links open; the desktop app defaults to Discover)} */
+ *  sc_open?: "discover" | "browser" (where SoundCloud links open; the desktop app defaults to Discover),
+ *  do_all?: a partial DoAll (the "Do everything" setup; see patchDoAll)} */
 export async function setSettings(data: any): Promise<any> {
   const s = STATE.settings || (STATE.settings = {});
   if ("inbox_dir" in data) {
@@ -182,6 +363,7 @@ export async function setSettings(data: any): Promise<any> {
   if ("auto_move" in data) s.auto_move = !!data.auto_move;
   if ("like_on_add" in data) s.like_on_add = !!data.like_on_add;
   if ("sc_open" in data) s.sc_open = data.sc_open === "browser" ? "browser" : "discover";
+  if ("do_all" in data) patchDoAll(data.do_all);
   if ("refresh_min" in data) {
     const n = Number(data.refresh_min);
     if (!REFRESH_CHOICES.includes(n)) throw new Error("refresh interval must be one of " + REFRESH_CHOICES.join(", ") + " minutes");
@@ -785,14 +967,29 @@ async function refreshCache(p: string): Promise<void> {
   STATE.dur_cache[p] = [st.size, Math.floor(st.mtimeMs / 1000), pr.dur, pr.fmt, pr.tags, [k.key, k.pn]];
 }
 
+/** A library folder that can't be listed right now: "missing" (not there: an unmounted
+ *  drive, a renamed folder, a cloud folder not synced yet), "unreadable" (no permission),
+ *  or "empty" (readable, but no audio files in it). */
+interface FolderAway { dir: string; why: "missing" | "unreadable" | "empty"; }
+export function folderTrouble(d: string): "missing" | "unreadable" | null {
+  try { if (!fs.statSync(d).isDirectory()) return "missing"; }
+  catch (e: any) { return e?.code === "ENOENT" || e?.code === "ENOTDIR" ? "missing" : "unreadable"; }
+  try { fs.readdirSync(d); return null; } catch { return "unreadable"; }
+}
+
 /** Every audio file of a library: all its folders, with their subfolders when the
- *  library asks for that. Keys (name) are unique across folders; a path that is
+ *  library asks for that. With `away`, the folders that could not be listed (or came
+ *  back empty) are reported there. Keys (name) are unique across folders; a path that is
  *  reachable twice (nested folders) is listed once. */
-async function scanLocal(lib: Library): Promise<LocalFile[]> {
+async function scanLocal(lib: Library, away?: FolderAway[]): Promise<LocalFile[]> {
   const out: LocalFile[] = [];
   const seenPath = new Set<string>(), seenKey = new Set<string>();
   for (const [d, prefix] of dirPrefixes(lib)) {
-    for (const f of await scanFolder(d, !!lib.subfolders)) {
+    const why = folderTrouble(d);
+    if (why) { away?.push({ dir: d, why }); continue; }
+    const list = await scanFolder(d, !!lib.subfolders);
+    if (!list.length) away?.push({ dir: d, why: "empty" });
+    for (const f of list) {
       const key = prefix + f.name;
       if (seenPath.has(f.path) || seenKey.has(key)) continue;
       seenPath.add(f.path); seenKey.add(key);
@@ -830,10 +1027,15 @@ async function scanFolder(d: string, recursive = false): Promise<LocalFile[]> {
                    key: en[5]?.[0] ?? null, pn: en[5]?.[1] ?? null });
     }
   };
-  if (fs.existsSync(d) && fs.statSync(d).isDirectory()) await walk(d, "");
-  const under = (k: string) => recursive ? k.startsWith(d + path.sep) : path.dirname(k) === d;
-  for (const k of Object.keys(cache))
-    if (under(k) && !seen.has(k)) delete cache[k];
+  const away = folderTrouble(d);
+  if (!away) await walk(d, "");
+  // A folder that is gone or lists nothing (unmounted drive, cloud folder not synced) keeps
+  // its cache: dropping it would mean probing (on a cloud folder: downloading) every file again.
+  if (!away && files.length) {
+    const under = (k: string) => recursive ? k.startsWith(d + path.sep) : path.dirname(k) === d;
+    for (const k of Object.keys(cache))
+      if (under(k) && !seen.has(k)) delete cache[k];
+  }
   saveState();
   return files;
 }
@@ -1402,34 +1604,46 @@ export async function buildView(libArg?: Library): Promise<any> {
     can_reveal: CAN_REVEAL,
     settings: getSettings(),
     backup_bytes: backupBytes(lib),
+    state_problem: STATE_PROBLEM,
   };
   if (!lib || !lib.playlist) return { ...base, ready: false };
-  const files = await scanLocal(lib);
+  const away: FolderAway[] = [];
+  const files = await scanLocal(lib, away);
   const pl = lib.playlist;
   const genre = pl.title || "Trance";
   const fmap = new Map(files.map((f) => [f.name, f]));
   const byPath = new Map(files.map((f) => [f.path, f]));
-  // manual assignments win over auto-matching; drop entries whose file vanished
   const trackIds = new Set(pl.tracks.map((t) => t.id));
+  // A folder that is gone or unreadable, or one that lists no audio although files in it
+  // are pinned or found, is "not available": the drive is unplugged, the cloud folder hasn't
+  // synced, the folder was renamed. Its files aren't gone for good, so nothing of this
+  // library is forgotten (pins, found, file-arrival times) until every folder is back.
+  const inDir = (d: string, p: string) => p.startsWith(d + path.sep);
+  const notAvailable = away.filter((a) => a.why !== "empty"
+    || Object.entries(STATE.assigned).some(([k, f]) => f && trackIds.has(Number(k)) && inDir(a.dir, libPath(lib, f)))
+    || Object.keys(STATE.found).some((k) => inDir(a.dir, k.slice(2))));
+  const keep = notAvailable.length > 0;
+  // manual assignments win over auto-matching; drop entries whose file vanished
   let assignedDirty = false;
-  for (const k of Object.keys(STATE.assigned)) {
+  if (!keep) for (const k of Object.keys(STATE.assigned)) {
     const fname = STATE.assigned[k];
     if (!trackIds.has(Number(k)) || (fname !== "" && !fmap.has(fname))) {
       delete STATE.assigned[k]; delete STATE.by_hand[k];
       assignedDirty = true;
     }
   }
-  for (const k of Object.keys(STATE.by_hand)) if (!(k in STATE.assigned)) { delete STATE.by_hand[k]; assignedDirty = true; }
+  if (!keep) for (const k of Object.keys(STATE.by_hand)) if (!(k in STATE.assigned)) { delete STATE.by_hand[k]; assignedDirty = true; }
   // local files whose SoundCloud match has since been added to the playlist:
   // pin the file to that track (unless the track already has a manual file)
   const foundPrefixes = libDirs(lib).map((d) => "x:" + d + path.sep);
   for (const k of Object.keys(STATE.found)) {
     if (!foundPrefixes.some((pre) => k.startsWith(pre))) continue;
     const ff = byPath.get(k.slice(2));
-    if (!ff) { delete STATE.found[k]; assignedDirty = true; continue; }
+    if (!ff) { if (!keep) { delete STATE.found[k]; assignedDirty = true; } continue; }
     const fname = ff.name;
     const tid = String(STATE.found[k].id);
     if (!trackIds.has(Number(tid))) continue;
+    if (keep && STATE.assigned[tid] && !fmap.has(STATE.assigned[tid])) continue; // its pinned file may be in the folder that's away
     if (!STATE.assigned[tid] || !fmap.has(STATE.assigned[tid])) {
       for (const a of Object.keys(STATE.assigned)) if (STATE.assigned[a] === fname) { delete STATE.assigned[a]; delete STATE.by_hand[a]; }
       STATE.assigned[tid] = fname;
@@ -1464,7 +1678,7 @@ export async function buildView(libArg?: Library): Promise<any> {
     }
   }
   for (const [tid, fname] of manual)
-    if (fname) matched.set(tid, [fname, -1]);
+    if (fname && fmap.has(fname)) matched.set(tid, [fname, -1]); // a pin into a folder that's away stays, without a file
   const reavailable: string[] = [];
   let naDirty = false;
   const now = Date.now();
@@ -1504,7 +1718,7 @@ export async function buildView(libArg?: Library): Promise<any> {
     const ak = `${lib.id}:${t.id}`;
     if (m) {
       if (!(ak in STATE.acquired)) { STATE.acquired[ak] = lib.acq_init ? now : 0; naDirty = true; }
-    } else if (ak in STATE.acquired) { delete STATE.acquired[ak]; naDirty = true; }
+    } else if (ak in STATE.acquired && !keep) { delete STATE.acquired[ak]; naDirty = true; }
     const acquired = m ? STATE.acquired[ak] : 0;
     return { n: i + 1, id: t.id, artist: a, title: ti, user: t.user, sc_title: t.title,
              name_conf: nm.conf, name_why: nm.why, name_ok: confirmed, check_name: !hand && !confirmed && nameNeedsLook(nm),
@@ -1516,7 +1730,8 @@ export async function buildView(libArg?: Library): Promise<any> {
              acquired, is_new_file: acquired > (lib.seen_mark || 0),
              tagged, incompat, key, pn, override: o || null, edited: hand };
   });
-  if (!lib.acq_init) { lib.acq_init = true; naDirty = true; } // first pass stamped existing files with 0
+  // first pass stamped existing files with 0 (not while a folder is away: its files would be NEW when it returns)
+  if (!lib.acq_init && !keep) { lib.acq_init = true; naDirty = true; }
   if (naDirty) saveState();
   const extras = files.filter((f) => !fileHit.has(f.name)).map((f) => {
     const nm = extraName(f);
@@ -1536,6 +1751,7 @@ export async function buildView(libArg?: Library): Promise<any> {
   return {
     ...base, ready: true, playlist: pl.title, playlist_url: pl.url,
     genre, tracks: rows, extras,
+    folders_away: notAvailable,   // [{dir, why: "missing" | "unreadable" | "empty"}]: nothing of this library is pruned meanwhile
     local_files: files.map((f) => ({ name: f.name, path: f.path, dur: fmtDur(Math.round(f.dur)) })),
     have: rows.filter((r) => r.have).length,
     missing: rows.filter((r) => !r.have && !r.na).length,
@@ -1578,6 +1794,46 @@ export async function tagAll(): Promise<any> {
   view = await buildView();
   view.tag_report = { done, errors };
   return view;
+}
+
+/** What DJ HQ knows about some files of the active library (keys as the view hands
+ *  them out): the names it would tag them with, whether the tags already say so,
+ *  whether the name needs a look (Check names), duration, musical key and Platinum
+ *  Notes mark from the file's tags. One view build for the lot; files not in the
+ *  library (any more) are left out. */
+export interface BatchFile { key: string; path: string; track_id: number | null; artist: string; title: string; genre: string;
+  tagged: boolean; check_name: boolean; dur: number; size: number; tkey: string | null; pn: boolean | null; }
+export async function batchInfo(keys: string[]): Promise<BatchFile[]> {
+  const lib = requireLib();
+  const view = await buildView(lib);
+  if (!view.ready) return [];
+  const files = new Map((await scanLocal(lib)).map((f) => [f.name, f]));
+  const rows = new Map<string, any>();
+  for (const r of view.tracks || []) if (r.file) rows.set(r.file, r);
+  for (const e of view.extras || []) rows.set(e.name, e);
+  const out: BatchFile[] = [];
+  for (const k of keys) {
+    const f = files.get(k), r = rows.get(k);
+    if (!f || !r) continue;
+    let size = 0;
+    try { size = fs.statSync(f.path).size; } catch {}
+    out.push({ key: k, path: f.path, track_id: typeof r.id === "number" ? r.id : null, artist: r.artist, title: r.title,
+               genre: view.genre || "Trance", tagged: r.tagged !== false, check_name: !!r.check_name,
+               dur: f.dur, size, tkey: f.key ?? null, pn: f.pn ?? null });
+  }
+  return out;
+}
+
+/** Tag one library file (writeTags: bit-perfect audio, other frames and chunks kept). */
+export async function tagFile(key: string, artist: string, title: string, genre: string): Promise<void> {
+  await writeTags(libPath(requireLib(), key), artist, title, genre);
+}
+
+/** Library files of the active library that look unprocessed: no Platinum Notes mark
+ *  (where the format can tell) or no musical key in the tags. */
+export async function unprocessedFiles(): Promise<string[]> {
+  const lib = requireLib();
+  return (await scanLocal(lib)).filter((f) => f.pn === false || !f.key).map((f) => f.name);
 }
 
 export async function convertAll(): Promise<any> {
@@ -2084,7 +2340,7 @@ async function scanInbox(dir: string): Promise<{ files: InboxFile[]; errors: str
   return { files: [...plain, ...zips.files], errors: zips.errors };
 }
 
-export async function inboxView(): Promise<any> {
+export async function inboxView(opts: { auto?: boolean } = {}): Promise<any> {
   const lib = requireLib();
   const dir = inboxDir();
   const base = { dir, exists: fs.existsSync(dir), items: [] as any[], unmatched: [] as any[], others: 0, already: 0,
@@ -2115,13 +2371,13 @@ export async function inboxView(): Promise<any> {
   }
   base.others = base.unmatched.length;
   // auto-move: exact matches (same name, same length) of tracks we don't have yet
-  if (STATE.settings?.auto_move && base.items.length && !libDirs(lib).some((d) => sameDir(d, dir))) {
+  if (opts.auto !== false && STATE.settings?.auto_move && base.items.length && !libDirs(lib).some((d) => sameDir(d, dir))) {
     const movedTracks = new Set<number>();
     const keep: any[] = [];
     for (const it of base.items) {
       const exact = it.action === "move" && it.score >= 0.999 && Math.abs(it.dur_diff) <= 2 && !movedTracks.has(it.id);
       if (!exact) { keep.push(it); continue; }
-      try { await inboxMove({ file: it.name, id: it.id, zip: it.zip }); base.moved.push(it.name); movedTracks.add(it.id); }
+      try { await inboxMoveOne({ file: it.name, id: it.id, zip: it.zip }); base.moved.push(it.name); movedTracks.add(it.id); }
       catch (e: any) { base.move_errors.push(`${it.name}: ${e.message}`); keep.push(it); }
     }
     base.items = keep;
@@ -2145,6 +2401,12 @@ function moveFile(src: string, dst: string): void {
  *  as it is and, with `track` (a SoundCloud search result), remembered as found for that
  *  track, the way Not in playlist does; a track already in the playlist is matched outright. */
 export async function inboxMove(data: any): Promise<any> {
+  await inboxMoveOne(data);
+  return buildView();
+}
+
+/** inboxMove without the view: the moved file's library key and path, and its track. */
+export async function inboxMoveOne(data: any): Promise<{ key: string; path: string; track_id: number | null }> {
   const lib = requireLib();
   const name = path.basename(String(data.file || ""));
   const zip = data.zip ? path.basename(String(data.zip)) : "";
@@ -2199,7 +2461,7 @@ export async function inboxMove(data: any): Promise<any> {
                                 user: String(found.user || ""), dur: Number(found.dur) || 0 };
   }
   saveState();
-  return buildView();
+  return { key: name, path: dst, track_id: tid ? Number(tid) : null };   // the main folder's files are keyed by name
 }
 
 /** Search SoundCloud for a download that matches nothing in the playlist:
@@ -2219,12 +2481,23 @@ export async function inboxMoveAll(): Promise<any> {
   let done = scan.moved.length;   // auto-move may have handled some already
   const errors: string[] = [...scan.move_errors];
   for (const it of scan.items) {
-    try { await inboxMove({ file: it.name, id: it.id, zip: it.zip }); done++; }
-    catch (e: any) { errors.push(e.message); }
+    try { await inboxMoveOne({ file: it.name, id: it.id, zip: it.zip }); done++; }
+    catch (e: any) { errors.push(withName(it.name, e.message)); }
   }
   const view = await buildView();
   view.inbox_report = { done, errors };
   return view;
+}
+
+/** "<file>: <message>", unless the message names the file already */
+const withName = (name: string, msg: string) => String(msg).startsWith(name + ":") ? String(msg) : `${name}: ${msg}`;
+
+/** What "Move all" would move right now, without moving anything (auto-move is not
+ *  run either): the matched downloads, never the unmatched ones. Each entry is what
+ *  inboxMoveOne takes, plus its names for display. */
+export async function inboxMovePlan(): Promise<{ file: string; zip: string | null; id: number; artist: string; title: string; action: string }[]> {
+  const scan = await inboxView({ auto: false });
+  return scan.items.map((it: any) => ({ file: it.name, zip: it.zip, id: it.id, artist: it.artist, title: it.title, action: it.action }));
 }
 
 export async function markSeen(): Promise<any> {
