@@ -5,13 +5,20 @@
 import { app, BrowserWindow, dialog, nativeTheme, session, shell, systemPreferences, WebContentsView } from "electron";
 import * as path from "path";
 import * as core from "./core";
-import { PickKind, ScRect, ScView, startServer } from "./server";
+import { IN_USE_TEXT, PickKind, ScRect, ScView, startServer } from "./server";
 
-// Packaged app keeps its data in the OS user-data dir; running from source uses
-// the project folder (same place the Python version kept state.json).
+// Packaged app keeps its data (djhq.db) in the OS user-data dir; running from source uses
+// the project folder (same place the Python version kept state.json). Keep it on a local
+// disk: a cloud sync client copying the database and its journal apart can damage it.
 const dataDir =
   process.env.DJHQ_DATA_DIR ||
   (app.isPackaged ? app.getPath("userData") : path.resolve(__dirname, ".."));
+
+// The packaged app opened a second time (a double click on Windows) brings the first window
+// forward instead of failing on the data folder that window holds.
+const singleLock = app.isPackaged && !process.env.DJHQ_DATA_DIR;
+if (singleLock && !app.requestSingleInstanceLock()) app.exit(0);
+else if (singleLock) app.on("second-instance", () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
 
 let win: BrowserWindow | null = null;
 
@@ -364,10 +371,12 @@ async function pickFile(kind: PickKind): Promise<string | null> {
   return p;
 }
 
-/** Export configuration: a save dialog (Documents by default), then the file written whole. */
-async function saveFile(defaultName: string, text: string): Promise<string | null> {
-  const opt: Electron.SaveDialogOptions = { title: "Save the DJ HQ configuration", defaultPath: path.join(app.getPath("documents"), defaultName),
-    filters: [{ name: "DJ HQ configuration", extensions: ["json"] }] };
+/** Export configuration (or the raw data): a save dialog (Documents by default), then the file written whole. */
+async function saveFile(defaultName: string, text: string, kind: "config" | "raw" = "config"): Promise<string | null> {
+  const raw = kind === "raw";
+  const opt: Electron.SaveDialogOptions = { title: raw ? "Save DJ HQ’s raw data" : "Save the DJ HQ configuration",
+    defaultPath: path.join(app.getPath("documents"), defaultName),
+    filters: [{ name: raw ? "DJ HQ raw data" : "DJ HQ configuration", extensions: ["json"] }] };
   const r = win ? await dialog.showSaveDialog(win, opt) : await dialog.showSaveDialog(opt);
   if (r.canceled || !r.filePath) return null;
   core.writeFileAtomic(r.filePath, text);
@@ -387,23 +396,32 @@ function axTrusted(prompt: boolean): boolean {
 }
 
 app.whenReady().then(async () => {
-  const server = await startServer({
-    dataDir,
-    port: Number(process.env.DJHQ_PORT || 0),
-    pickFolder: async () => {
-      const r = await dialog.showOpenDialog(win!, {
-        title: "Choose your music folder",
-        properties: ["openDirectory"],
-      });
-      return r.canceled ? null : r.filePaths[0];
-    },
-    pickFile,
-    saveFile,
-    ...(process.platform === "darwin" ? { axTrusted } : {}),
-    reveal: (p) => shell.showItemInFolder(p),
-    packaged: app.isPackaged,
-    sc,
-  });
+  let server: Awaited<ReturnType<typeof startServer>>;
+  try {
+    server = await startServer({
+      dataDir,
+      port: Number(process.env.DJHQ_PORT || 0),
+      pickFolder: async () => {
+        const r = await dialog.showOpenDialog(win!, {
+          title: "Choose your music folder",
+          properties: ["openDirectory"],
+        });
+        return r.canceled ? null : r.filePaths[0];
+      },
+      pickFile,
+      saveFile,
+      ...(process.platform === "darwin" ? { axTrusted } : {}),
+      reveal: (p) => shell.showItemInFolder(p),
+      packaged: app.isPackaged,
+      sc,
+    });
+  } catch (e: any) {
+    if (e?.code !== "db_in_use") throw e;
+    console.error("DJ HQ is already open. " + IN_USE_TEXT(dataDir));
+    dialog.showErrorBox("DJ HQ is already open", IN_USE_TEXT(dataDir));
+    app.exit(1);
+    return;
+  }
   const port = (server.address() as any).port;
 
   const mac = process.platform === "darwin";
@@ -426,3 +444,7 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => app.quit());
+// every save is on disk already; closing releases the database's lock and journal file
+app.on("will-quit", () => core.shutdown());
+process.on("SIGINT", () => app.quit());
+process.on("SIGTERM", () => app.quit());

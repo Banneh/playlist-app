@@ -132,6 +132,7 @@ const CF_TEXT = {
     job_active: 'A Do everything run is going. Wait for it to finish, or cancel it, before importing.',
     config_backup_failed: 'DJ HQ couldn’t save a copy of the current data first, so nothing was changed ({error}). Check that DJ HQ’s data folder has space and can be written to, then import again.',
     config_view_failed: 'The imported data couldn’t be shown, so the data from before is back in place ({error}).',
+    store_blocked: 'DJ HQ can’t save right now (see the notice at the top), so nothing was imported.',
     link_missing: 'This library has no SoundCloud link yet. Use Change link… in Settings.',
   },
 };

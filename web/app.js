@@ -285,7 +285,7 @@ function uiConfirm({ title, body, ok = 'OK', danger = false, icon: ico }) {
 }
 
 /* ---------- preferences ----------
-   Stored by the app (data folder / prefs.json), not by the browser: the window's origin
+   Stored by the app (in its database in the data folder), not by the browser: the window's origin
    includes the port, which changes on every launch, so localStorage forgets everything. */
 let PREFS = {};
 async function loadPrefs() {
@@ -344,8 +344,8 @@ function go(page) {
 }
 
 /* ---------- data safety notices ----------
-   A library folder that isn't there right now (view.folders_away) and a state.json that
-   couldn't be read at launch (view.state_problem). Shown on top of every page, the welcome
+   A library folder that isn't there right now (view.folders_away) and saved data that
+   couldn't be used at launch (view.state_problem). Shown on top of every page, the welcome
    screen included: a state file moved aside leaves the app with no libraries. */
 const SAFETY_TEXT = {
   folderMissing: '<b>This library’s folder isn’t available:</b> {dir}. Plug in the drive, let the cloud folder sync, or put the folder back where it was. Until then its tracks show as missing, and your matches and “new” marks are kept.',
@@ -366,14 +366,24 @@ const SAFETY_TEXT = {
   lookAgainHint: 'Scan the library’s folders again',
   stateMoved: '<b>DJ HQ couldn’t read its saved data, so it started fresh.</b> The old file is kept untouched at {file}.',
   stateKept: '<b>DJ HQ couldn’t read its saved data.</b> The file is left untouched at {file} and nothing is saved over it, so changes made now are lost when you quit.',
+  stateNewer: '<b>This data was saved by a newer version of DJ HQ.</b> Nothing is saved from this version, so changes made now are lost when you quit. Update DJ HQ to carry on.',
+  stateImportFailed: '<b>DJ HQ couldn’t move its saved data into its new database.</b> Nothing was changed: the data is still at {file}. Changes made now are lost when you quit.',
+  stateStoreFailed: '<b>DJ HQ can’t save to its database at {file}, so nothing is saved.</b> Changes made now are lost when you quit. Check that the data folder and the file can be written to, then start DJ HQ again.',
+  stateDbReplaced: '<b>DJ HQ couldn’t read its database,</b> so it moved it to {file} and loaded the state.json it found in the data folder instead (now kept as {from}). That file may be older than your last changes.',
+  stateJsonIgnored: '<b>A state.json in the data folder is not used:</b> {file}. It was saved after DJ HQ moved its data into its database (djhq.db), for example by an older DJ HQ, and DJ HQ keeps using the database. To use the file instead: quit DJ HQ, move djhq.db out of the data folder and start DJ HQ again. To keep things as they are, move the file out of the data folder.',
 };
+/** view.state_problem.code -> its SAFETY_TEXT key */
+const STATE_PROBLEM_TEXT = { state_unreadable: 'stateMoved', state_unreadable_kept: 'stateKept', state_newer: 'stateNewer',
+  state_import_failed: 'stateImportFailed', state_store_failed: 'stateStoreFailed', state_db_replaced: 'stateDbReplaced',
+  state_json_ignored: 'stateJsonIgnored' };
 /** SAFETY_TEXT[key] with {name} filled in (values are escaped and shown in bold) */
 const safetyText = (key, vals = {}) => SAFETY_TEXT[key].replace(/\{(\w+)\}/g, (_, k) => `<b>${esc(vals[k])}</b>`);
 function safetyNotesHtml() {
   if (!DATA) return '';
   let out = '';
   const sp = DATA.state_problem;
-  if (sp) out += noteHtml(safetyText(sp.code === 'state_unreadable_kept' ? 'stateKept' : 'stateMoved', { file: sp.file }), '', 'red', 'alert');
+  // a state.json that isn't used loses nothing by itself: amber, not red
+  if (sp) out += noteHtml(safetyText(STATE_PROBLEM_TEXT[sp.code] || 'stateMoved', { file: sp.file, from: sp.from }), '', sp.code === 'state_json_ignored' ? 'amber' : 'red', 'alert');
   if (DATA.link_missing && (DATA.libraries || []).length)
     out += noteHtml(SAFETY_TEXT.linkMissing, typeof stChangeLink === 'function' ? `<button class="btn btn-sm" onclick="stChangeLink()">${icon('link')}${esc(SAFETY_TEXT.changeLink)}</button>` : '', 'amber', 'link');
   for (const a of DATA.folders_away || []) {

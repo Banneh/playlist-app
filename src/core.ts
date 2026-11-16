@@ -11,6 +11,7 @@ import { execFile } from "child_process";
 import { buildId3v23, carriedFrames, carriedChunks, appendChunks, prependTag, readKeyInfo, id3Version } from "./id3";
 import { listEntries, extractEntry, ZipEntry } from "./zip";
 import { checkXmlFile } from "./rbxml";
+import * as store from "./store";
 
 const AUDIO_EXT = [".wav", ".mp3", ".aiff", ".aif", ".flac", ".m4a", ".ogg"];
 const UA =
@@ -162,38 +163,30 @@ export function init(dataDir: string, canPick: boolean, canReveal = false): void
   CAN_PICK = canPick;
   CAN_REVEAL = canReveal;
   fs.mkdirSync(DATA_DIR, { recursive: true });
-  STATE = loadState();
+  // throws {code: "db_in_use"} when another DJ HQ has this data folder open
+  const r = store.open(DATA_DIR, withDefaults);
+  STATE = r.state;
+  STATE_PROBLEM = r.problem;
+  SAVE_BLOCKED = r.blocked;
+  if (!exitHooked) { exitHooked = true; process.on("exit", shutdown); }
 }
+let exitHooked = false;
 
-const statePath = () => path.join(DATA_DIR, "state.json");
-
-/** Set when state.json was there at launch but could not be read; the view carries it
- *  (state_problem) so the UI can say so. code "state_unreadable": the file was moved
- *  aside to `file` and the app started fresh; "state_unreadable_kept": it could not be
- *  moved either, so it stays where it is and nothing is saved over it this session. */
-let STATE_PROBLEM: { code: string; file: string } | null = null;
+/** Set when the saved data could not be used at launch; the view carries it (state_problem)
+ *  so the UI can say so. "state_unreadable": the file (state.json of an older version, or the
+ *  database) was moved aside to `file` and the app started fresh; "state_unreadable_kept": it
+ *  could not be moved either, so it stays where it is and nothing is saved this session;
+ *  "state_newer": the database was saved by a newer version (shown, never written);
+ *  "state_import_failed": state.json couldn't be moved into the database (it is used as it is,
+ *  nothing is saved, the next launch tries again); "state_store_failed": the database can't be
+ *  opened, created or written at `file` (nothing is saved); "state_db_replaced": the database
+ *  was moved aside to `file` and the state.json next to it loaded instead (now at `from`);
+ *  "state_json_ignored": a state.json written after the database took over is left unused at
+ *  `file` (saving goes on). */
+let STATE_PROBLEM: { code: string; file: string; from?: string } | null = null;
 let SAVE_BLOCKED = false;
+export const stateProblem = () => STATE_PROBLEM;
 
-function loadState(): AppState {
-  const p = statePath();
-  let st: any = null, unreadable = false;
-  try { st = JSON.parse(fs.readFileSync(p, "utf8")); }
-  catch (e: any) { unreadable = e?.code !== "ENOENT"; } // no file at all = first run
-  if (st !== null && (typeof st !== "object" || Array.isArray(st))) { st = null; unreadable = true; }
-  if (unreadable) {
-    // Starting empty is fine, but the next save would overwrite the real file: keep its bytes.
-    const aside = `${p}.unreadable-${new Date().toISOString().replace(/[:.]/g, "-")}`;
-    try {
-      fs.renameSync(p, aside);
-      STATE_PROBLEM = { code: "state_unreadable", file: aside };
-    } catch {
-      SAVE_BLOCKED = true;
-      STATE_PROBLEM = { code: "state_unreadable_kept", file: p };
-    }
-    console.error(`state.json could not be read; ${SAVE_BLOCKED ? "left in place, not saving over it" : "moved to " + aside}`);
-  }
-  return withDefaults(st || {});
-}
 /** Every key the code reads without a check, filled in (older state files, an imported one). */
 export function withDefaults(st: any): AppState {
   st.libraries = st.libraries || [];
@@ -212,31 +205,38 @@ export function withDefaults(st: any): AppState {
   st.device = st.device || "xdj-700";
   return st;
 }
+/** Write the changes since the last save to the database (only the rows that changed). */
 export function saveState(): void {
   if (SAVE_BLOCKED) return;
-  writeFileAtomic(statePath(), JSON.stringify(STATE));
+  store.save(STATE);
 }
+/** false while nothing may be saved (see STATE_PROBLEM) */
+export const canSave = () => !SAVE_BLOCKED && store.canSave();
+/** UI preferences (theme, "tour seen", dismissed update): kept in the database next to the state */
+export const getPrefs = () => store.getPrefs();
+export const setPrefs = (patch: Record<string, unknown>) => store.setPrefs(patch);
+/** a consistent copy of the database (state and preferences) at `dst` */
+export const backupDb = (dst: string) => store.snapshot(dst);
+/** close the database (quit); every save is already on disk, this releases the lock */
+export function shutdown(): void { store.close(); }
 
 /** Bumped whenever STATE is replaced as a whole (an import): a view that was being built
  *  from the old state starts over instead of pruning the new one with the old folders. */
 let STATE_GEN = 0;
-/** Put a whole new state in place (configuration import): written first, then swapped in
- *  one synchronous step, so no request ever sees half of it. The user chose to replace the
- *  saved data, so a state file that could not be read at launch no longer blocks saving.
- *  Returns the way back: the previous state in place again, its file copied back from
- *  `backup` (the copy made before; none: there was no file). */
-export function replaceState(next: AppState): (backup: string | null) => void {
-  const prev = { state: STATE, blocked: SAVE_BLOCKED };
-  writeFileAtomic(statePath(), JSON.stringify(next));
+/** Put a whole new state in place (configuration import): written first (one transaction),
+ *  then swapped in one synchronous step, so no request ever sees half of it. Refused while
+ *  nothing may be saved: an import must not write over data that couldn't be read. Returns
+ *  the way back: the previous state written and in place again. */
+export function replaceState(next: AppState): () => void {
+  if (SAVE_BLOCKED) throw appError("store_blocked", "DJ HQ can't save right now, so nothing was imported");
+  const prev = STATE;
+  store.save(next);
   STATE = next;
   STATE_GEN++;
-  SAVE_BLOCKED = false;
-  return (backup) => {
-    if (backup) writeFileAtomic(statePath(), fs.readFileSync(backup, "utf8"));
-    else { try { fs.unlinkSync(statePath()); } catch {} }
-    STATE = prev.state;
+  return () => {
+    store.save(prev);
+    STATE = prev;
     STATE_GEN++;
-    SAVE_BLOCKED = prev.blocked;
   };
 }
 export const dataDir = () => DATA_DIR;
@@ -660,7 +660,7 @@ function trackFromApi(t: any, added: number): PlTrack {
 // ---------------- soundcloud account (the Discover page) ----------------
 // The desktop app shows soundcloud.com in an embedded view where the user signs in
 // normally; the session's oauth_token cookie is handed to these functions per call and
-// is never written to state.json. Writes go through the same api-v2 the web player uses.
+// is never written to the saved data. Writes go through the same api-v2 the web player uses.
 
 export interface ScUser { id: number; username: string; permalink: string; avatar: string; }
 /** a track the embedded player reports, resolved against SoundCloud */

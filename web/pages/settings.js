@@ -121,7 +121,8 @@ PAGES.settings = {
       'Keeps your music folder in sync with a SoundCloud playlist and gets your tracks ready for rekordbox.',
       `<button class="btn btn-sm" onclick="checkForUpdates({ manual: true })">${icon('refresh')}Check for updates</button>
        <button class="btn btn-sm" onclick="startTour()">${icon('sparkles')}Show me around</button>
-       <div class="st-path-row st-wide"><span class="faint">Data folder</span><div class="path" title="${esc(S.data_dir || '')}">${icon('folder')}<span>${esc(shortPath(S.data_dir || ''))}</span></div></div>`);
+       <div class="st-path-row st-wide"><span class="faint">Data folder</span><div class="path" title="${esc(S.data_dir || '')}">${icon('folder')}<span>${esc(shortPath(S.data_dir || ''))}</span></div></div>
+       <div class="st-path-row st-wide"><button class="btn btn-sm" onclick="stRawExport()" title="For support, or to go back to an older DJ HQ. Contains your private playlist links.">${icon('download')}Export raw data (JSON)</button><span class="faint" style="flex-shrink: 1; min-width: 0">For support, or to go back to an older DJ HQ. Contains your private playlist links.</span></div>`);
 
     const doAll = typeof daSettingsCard === 'function' ? daSettingsCard() : '';   // pages/doall.js
     const config = typeof cfSettingsCard === 'function' ? cfSettingsCard() : '';  // pages/config.js: export / import
@@ -269,6 +270,21 @@ function stSetInterval(v) {
   stSave({ refresh_min: n }, label ? 'Checking the playlist ' + label.replace(/^Every/, 'every') : 'Saved');
 }
 function stTheme(v) { setTheme(v); render(); }
+/** Export raw data (JSON): the saved data (not the preferences), as the state.json of DJ HQ 1.7 and older.
+   The desktop app asks where to save it; headless, the server sends it as a download. */
+async function stRawExport() {
+  try {
+    const r = await api('/api/state/raw', {});
+    if (r.canceled) return;
+    if (r.unsupported) {
+      const a = document.createElement('a');
+      a.href = '/api/state/raw'; a.download = 'state.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      return toast('Downloading state.json');
+    }
+    toast('Saved to ' + shortPath(r.path));
+  } catch (e) { toast('Couldn’t export the raw data: ' + e.message, true); }
+}
 async function stCleanBackups() {
   const bytes = DATA.backup_bytes || 0;
   const ok = await uiConfirm({

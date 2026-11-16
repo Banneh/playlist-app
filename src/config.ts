@@ -10,9 +10,9 @@
  *
  *  An import is two steps: plan (read and check the file, nothing written; a random,
  *  single-use plan id held in memory) and apply (folders chosen on this computer, then the
- *  whole new state is built in memory, the current files are copied to backups/, and the new
- *  state is written and swapped in at once). v1 replaces everything: the id-keyed maps are
- *  global, so a second library merged next to existing ones isn't safe yet.
+ *  whole new state is built in memory, a copy of the current database is saved in backups/,
+ *  and the new state is written and swapped in at once). v1 replaces everything: the id-keyed
+ *  maps are global, so a second library merged next to existing ones isn't safe yet.
  *
  *  The export reads STATE directly and lists folders by name only: it never builds the view,
  *  so a folder that is away while exporting can't prune anything. */
@@ -470,29 +470,25 @@ export function probe(data: any): any {
 const backupsDir = () => path.join(core.dataDir(), "backups");
 const stamp = (d = new Date()) => { const z = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}`; };
-const BACKUP_RE = /^(\d{8}-\d{6}(?:-\d+)?)-before-import\.(state|prefs)\.json$/;
+/** a backup set: the database copy, or (DJ HQ 1.7 and older) state.json and prefs.json */
+const BACKUP_RE = /^(\d{8}-\d{6}(?:-\d+)?)-before-import\.(?:(?:state|prefs)\.json|djhq\.db)$/;
 const BACKUP_KEEP_DAYS = 7;
-/** Copy state.json and prefs.json to backups/<time>-before-import.*; the last 5 such sets are
- *  kept, and every set of the past week (several tries in a row never push out the data from
- *  before the first). Nothing else in backups/ (or the data folder) is touched. */
+/** Copy the database (state and preferences, one consistent file) to
+ *  backups/<time>-before-import.djhq.db; the last 5 such sets are kept, and every set of the
+ *  past week (several tries in a row never push out the data from before the first). Nothing
+ *  else in backups/ (or the data folder) is touched. */
 function backupCurrent(): string[] {
   const dir = backupsDir();
   fs.mkdirSync(dir, { recursive: true });
   let st = stamp();
   for (let n = 2; fs.readdirSync(dir).some((f) => f.startsWith(st + "-before-import.")); n++) st = `${stamp()}-${n}`;
-  const made: string[] = [];
-  for (const [name, kind] of [["state.json", "state"], ["prefs.json", "prefs"]]) {
-    const src = path.join(core.dataDir(), name);
-    if (!fs.existsSync(src)) continue;
-    const dst = path.join(dir, `${st}-before-import.${kind}.json`);
-    fs.copyFileSync(src, dst);
-    made.push(dst);
-  }
+  const dst = path.join(dir, `${st}-before-import.djhq.db`);
+  core.backupDb(dst);
   const sets = [...new Set(fs.readdirSync(dir).map((f) => BACKUP_RE.exec(f)?.[1]).filter((x): x is string => !!x))].sort();
   const recent = stamp(new Date(Date.now() - BACKUP_KEEP_DAYS * 24 * 60 * 60 * 1000));
   for (const old of sets.slice(0, Math.max(0, sets.length - 5)).filter((s) => s < recent))
     for (const f of fs.readdirSync(dir)) if (BACKUP_RE.exec(f)?.[1] === old) { try { fs.unlinkSync(path.join(dir, f)); } catch {} }
-  return made;
+  return [dst];
 }
 
 const sameOrInside = (a: string, b: string) => { const r = path.relative(b, a); return !r || (!r.startsWith("..") && !path.isAbsolute(r)); };
@@ -639,26 +635,31 @@ export async function apply(data: any, opts: { jobActive: boolean }): Promise<an
   if (core.DEVICES[p.doc.device]) next.device = p.doc.device;
   const state: AppState = core.withDefaults(next);
 
-  // the current files first, then the new state written and swapped in at once
+  // a copy of the current data first, then the new state written and swapped in at once
+  if (!core.canSave()) throw fail("store_blocked", "DJ HQ can't save right now, so nothing was imported");
   try { report.backups = backupCurrent(); }
   catch (e: any) {
     throw fail("config_backup_failed", `DJ HQ couldn't save a copy of the current data before importing, so nothing was changed (${e?.message || e})`, { error: String(e?.message || e) });
   }
   const theme = p.doc.prefs?.theme;
-  if (theme === "system" || theme === "light" || theme === "dark") {
-    const pp = path.join(core.dataDir(), "prefs.json");
-    let prefs: any = {};
-    try { prefs = JSON.parse(fs.readFileSync(pp, "utf8")); } catch {}
-    if (!isObj(prefs)) prefs = {};
-    core.writeFileAtomic(pp, JSON.stringify({ ...prefs, theme }, null, 2));
-  }
-  const undo = core.replaceState(state);
+  const prevPrefs = core.getPrefs();
+  const setTheme = theme === "system" || theme === "light" || theme === "dark";
+  const themeBack = () => { if (setTheme) { try { core.setPrefs({ theme: prevPrefs.theme }); } catch {} } };
+  let undo: () => void;
+  try {
+    if (setTheme) core.setPrefs({ theme });
+    undo = core.replaceState(state);
+  } catch (e) { themeBack(); throw e; }
   PLANS.delete(p.id);   // used up: the state is in place
   let view: any;
-  try { view = await core.buildView(); }
+  try {
+    if (process.env.DJHQ_TEST_FAIL_VIEW && !__dirname.includes("app.asar")) throw new Error("test: the view failed");
+    view = await core.buildView();
+  }
   catch (e: any) {
-    // the new state can't be shown: the one from before goes back, file and all
-    undo(report.backups.find((f: string) => f.endsWith(".state.json")) || null);
+    // the new state can't be shown: the one from before goes back, theme and all
+    undo();
+    themeBack();
     throw fail("config_view_failed", `the imported data couldn't be shown, so the data from before is back in place (${e?.message || e})`, { error: String(e?.message || e) });
   }
   view.import_report = report;

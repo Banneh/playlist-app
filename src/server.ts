@@ -1,7 +1,7 @@
 /** DJ HQ HTTP server: serves web/index.html and the JSON API documented in
  *  README.md ("HTTP API"). Runs inside the Electron main process, or
  *  standalone: `node dist/server.js`. Mutating requests are queued so file
- *  operations never overlap. */
+ *  operations never overlap. The saved data is in djhq.db in the data folder (see store.ts). */
 import * as fs from "fs";
 import * as http from "http";
 import * as path from "path";
@@ -17,8 +17,9 @@ export interface ServerOpts {
   /** choose one file: an app (pn_app / mik_app: the .app bundle on macOS, the .exe on
    *  Windows), Mixed In Key's database (mik_db) or a rekordbox XML (rb_xml) (Electron only) */
   pickFile?: (kind: PickKind) => Promise<string | null>;
-  /** ask where to save a file (a save dialog) and write `text` there; null when cancelled (Electron only) */
-  saveFile?: (defaultName: string, text: string) => Promise<string | null>;
+  /** ask where to save a file (a save dialog) and write `text` there; null when cancelled (Electron only).
+   *  kind: a configuration (default) or the raw data (state.json) */
+  saveFile?: (defaultName: string, text: string, kind?: "config" | "raw") => Promise<string | null>;
   /** show a file in the OS file manager (Electron only) */
   reveal?: (p: string) => void;
   /** macOS desktop app: is it trusted for Accessibility (Do everything's "Press Start for me").
@@ -84,12 +85,9 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
   pipeline.init({ apps: platformApps(!opts.packaged), enqueue, dataDir: opts.dataDir, axTrusted: opts.axTrusted,
                   pollMs: opts.packaged ? 3000 : Math.max(200, Number(process.env.DJHQ_PIPE_POLL_MS) || 3000) });
 
-  // UI preferences (theme, "tour seen", dismissed update) live next to state.json: the
-  // window's origin changes with the port, so browser storage would forget them.
-  const prefsPath = path.join(opts.dataDir, "prefs.json");
-  const readPrefs = (): Record<string, unknown> => {
-    try { return JSON.parse(fs.readFileSync(prefsPath, "utf8")); } catch { return {}; }
-  };
+  // UI preferences (theme, "tour seen", dismissed update) are kept in the database with the
+  // rest: the window's origin changes with the port, so browser storage would forget them.
+  const readPrefs = (): Record<string, unknown> => core.getPrefs();
   // the configuration file saved last (Show in folder may reveal it, nothing else the request names)
   let savedConfig = "";
   // the export can carry a private playlist link: only this computer's own pages may download it
@@ -103,7 +101,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
   };
 
   // Discover page: the embedded SoundCloud view and the signed-in user's actions.
-  // Status calls are not queued (they poll); add/remove touch state.json, so they are.
+  // Status calls are not queued (they poll); add/remove touch the saved data, so they are.
   const rect = (d: any): ScRect => ({ x: Math.round(+d.x || 0), y: Math.round(+d.y || 0), width: Math.max(0, Math.round(+d.width || 0)), height: Math.max(0, Math.round(+d.height || 0)) });
   let nowCache: { url: string; now: core.ScNow | null } = { url: "", now: null };
   async function scRoute(action: string, data: any): Promise<any> {
@@ -195,6 +193,14 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         return void core.buildView().then(json, (e) => json({ error: e.message }, 500));
       if (req.url === "/api/prefs") return json(readPrefs());
       if (req.url === "/api/do-all/status") return json(pipeline.status());   // never builds the view
+      if (req.url === "/api/state/raw") {   // the saved data as state.json of DJ HQ 1.7 and older (support, going back)
+        if (!localHost(req)) return send(403, "text/plain", "forbidden");   // it carries private links and paths
+        return void enqueue(async () => JSON.stringify(core.STATE)).then((text) => {
+          res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Content-Length": Buffer.byteLength(text),
+            "Content-Disposition": 'attachment; filename="state.json"', "Cache-Control": "no-store" });
+          res.end(text);
+        }, (e) => json(errBody(e), 500));
+      }
       if ((req.url || "").startsWith("/api/config/export?") || req.url === "/api/config/export") {   // headless: the file as a download
         if (!localHost(req)) return send(403, "text/plain", "forbidden");
         const q = new URL(req.url || "", "http://x").searchParams;
@@ -247,9 +253,8 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           enqueue(fn).then(json, (e) => json(errBody(e), 500));
         const direct = (fn: () => Promise<any>) => void fn().then(json, (e) => json(errBody(e), 500));
         if (req.url === "/api/prefs") {   // not queued: must not wait behind a long tag/convert run
-          const next = { ...readPrefs(), ...(data && typeof data === "object" ? data : {}) };
-          try { fs.writeFileSync(prefsPath, JSON.stringify(next, null, 2)); } catch (e: any) { return json({ error: e.message }, 500); }
-          return json(next);
+          try { return json(core.setPrefs(data && typeof data === "object" && !Array.isArray(data) ? data : {})); }
+          catch (e: any) { return json({ error: e.message }, 500); }
         }
         if ((req.url || "").startsWith("/api/sc/")) return void scRoute(req.url!.slice(8), data).then(json, (e) => json({ error: e.message }, 500));
         switch (req.url) {
@@ -290,6 +295,13 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
             return void enqueue(async () => JSON.stringify(config.buildExport({ leaveLinksOut: !!data.leave_links_out, theme: readPrefs().theme }), null, 2))
               .then((text) => save(config.exportFileName(), text))
               .then((p) => { if (p) savedConfig = path.resolve(p); json(p ? { path: p } : { canceled: true }); }, (e) => json(errBody(e), 500));
+          }
+          case "/api/state/raw": {   // a save dialog for the raw data; headless answers {unsupported} and the page downloads GET /api/state/raw
+            if (!opts.saveFile) return json({ unsupported: true });
+            const save = opts.saveFile;
+            return void enqueue(async () => JSON.stringify(core.STATE))
+              .then((text) => save("state.json", text, "raw"))
+              .then((p) => json(p ? { path: p } : { canceled: true }), (e) => json(errBody(e), 500));
           }
           case "/api/config/import/plan": {   // {text} (headless: the file's contents) or {pick: true} (a file dialog); nothing is written
             if (data.pick) {
@@ -340,13 +352,26 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
   });
 }
 
+/** what a second DJ HQ on the same data folder says before it gives up */
+export const IN_USE_TEXT = (dir: string) =>
+  `Another DJ HQ window, or the headless server, is using this data folder:\n${dir}\nClose it first.`;
+
 if (require.main === module) {
   const dataDir = process.env.DJHQ_DATA_DIR || path.resolve(__dirname, "..");
-  startServer({ dataDir, port: Number(process.env.DJHQ_PORT || 8765) }).then((s) => {
+  let started: Promise<http.Server>;
+  try { started = startServer({ dataDir, port: Number(process.env.DJHQ_PORT || 8765) }); }
+  catch (e: any) { started = Promise.reject(e); }
+  started.then((s) => {
     const addr = s.address() as any;
     console.log(`DJ HQ (headless) on http://localhost:${addr.port}  data: ${dataDir}`);
+    // Ctrl+C / kill: close the database (releases the lock), then go
+    const stop = () => { s.close(); core.shutdown(); process.exit(0); };
+    process.on("SIGINT", stop);
+    process.on("SIGTERM", stop);
   }, (e) => {
-    console.error("failed to start:", e.message);
+    if (e?.code === "db_in_use") console.error("DJ HQ is already open. " + IN_USE_TEXT(dataDir));
+    else console.error("failed to start:", e.message);
+    core.shutdown();
     process.exit(1);
   });
 }

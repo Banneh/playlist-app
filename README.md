@@ -694,10 +694,15 @@ goes in steps, and nothing changes before the last one:
    is complete**. Nothing shows as a new file that wasn't new before.
 
 An import replaces the libraries on this computer (adding one next to existing
-ones comes later). Before it writes anything it saves the current `state.json`
-and `prefs.json` in `backups/` in the data folder (the last five imports, and
-every import of the past week, are kept); to go back, quit DJ HQ and copy the
-backup over `state.json`.
+ones comes later). Before it writes anything it saves a copy of the current
+data (`<time>-before-import.djhq.db`) in `backups/` in the data folder (the
+last five imports, and every import of the past week, are kept). To go back:
+quit DJ HQ, delete `djhq.db-journal` if there is one, and copy the backup over
+`djhq.db`. A backup made by DJ HQ 1.7 or older (`…-before-import.state.json`):
+quit DJ HQ, move `djhq.db` out of the data folder, copy the backup in as
+`state.json` (and the `…-before-import.prefs.json` of the same time, if there is
+one, as `prefs.json`, for the appearance settings) and start DJ HQ, which moves
+them into a new database.
 
 ## Tips and troubleshooting
 
@@ -766,26 +771,55 @@ Windows. Running from source uses the project folder instead. In there:
 
 | | |
 | --- | --- |
-| `state.json` | libraries, playlist snapshots, manual matches, edits, "new" marks |
+| `djhq.db` | the database: libraries, playlist snapshots, manual matches, edits, "new" marks, settings and appearance (`djhq.db-journal` sits next to it while DJ HQ runs) |
 | `originals/<library>/` | originals backed up before a conversion |
 | `originals/<library>/replaced/` | MP3s replaced by a lossless download |
 | `rekordbox.xml` | the last rekordbox export |
-| `prefs.json` | appearance, "tour seen", dismissed update notices |
 | `pipeline.json` | the current or last Do everything run, so it survives a restart |
-| `backups/` | `state.json` and `prefs.json` as they were before each configuration import (the last five) |
+| `backups/` | copies of `djhq.db` from before each configuration import (the last five, and all of the past week) |
+| `state.json.imported-<time>` | the `state.json` of DJ HQ 1.7 or older, as it was when it was moved into `djhq.db` (kept, never read again; `prefs.json` likewise) |
 | `Partitions/` | the SoundCloud sign-in session behind Discover (Settings → Sign out clears it) |
 
-`state.json` is replaced in one step on every save, so a crash never leaves
-half a file. If it can't be read at launch, DJ HQ moves it aside as
-`state.json.unreadable-<time>`, starts fresh and says so, rather than saving
-over it. When a library folder isn't there (an unplugged drive, a cloud folder
+Every save is one SQLite transaction that writes only what changed, flushed to
+disk before DJ HQ goes on, so a crash or power cut leaves the data of the last
+finished save. If the database can't be read at launch, DJ HQ moves it aside as
+`djhq.db.unreadable-<time>`, starts fresh and says so, rather than saving over
+it. Data saved by a newer DJ HQ is shown but never written by an older one.
+Only one DJ HQ (window or headless server) can use a data folder at a time; a
+second one says so and quits.
+
+Keep the data folder on a local disk, not in iCloud Drive, Dropbox, OneDrive or
+Google Drive: a sync client that copies the database and its journal at
+different moments can damage it. To move your data, use **Export
+configuration** (see above).
+
+**Going back to an older version.** DJ HQ 1.8 and later keep their data in
+`djhq.db`; the first start moves `state.json` and `prefs.json` into it and
+keeps the files as `state.json.imported-<time>` (a `state.json.README.txt` next
+to them says the same). DJ HQ 1.7 and older don't read `djhq.db` and start
+empty. To take your current data back to one: while DJ HQ is still running,
+save it with **Settings → Export raw data (JSON)** (or `GET /api/state/raw`
+headless); quit DJ HQ; put that file into the data folder as `state.json`.
+Renaming `state.json.imported-<time>` back to `state.json` works too, but that
+is the data as it was before the upgrade. The raw export leaves out the
+appearance settings (theme, tour seen): rename `prefs.json.imported-<time>`
+back to `prefs.json` to keep them.
+
+**Coming forward again.** While `djhq.db` holds data, DJ HQ 1.8 and later
+keep using it and never read a `state.json` again: one saved after the move
+(by an older DJ HQ, or a raw export put back) is left as it is, and a notice
+says it isn't used. To carry on with that file instead: quit DJ HQ, move
+`djhq.db` out of the data folder and start DJ HQ, which moves `state.json` into
+a new database. To keep the database, move `state.json` out of the data folder.
+
+When a library folder isn't there (an unplugged drive, a cloud folder
 that hasn't synced, a renamed folder), the app says so and forgets nothing:
 manual matches and "new" marks come back with the folder.
 
 **About SoundCloud.** There's no API key: the app reads the same public
 endpoints the SoundCloud web player uses. That works today and may break
 whenever SoundCloud changes their site. Public playlists work, and private ones
-through their share link, which DJ HQ keeps in `state.json`. The app
+through their share link, which DJ HQ keeps in `djhq.db`. The app
 writes to SoundCloud only from Discover, where you are signed in as yourself,
 and only when you add, remove or like a track (it won't change a playlist it
 can't see in full, since saving would drop the tracks it can't see); DJ HQ never sees your password,
@@ -798,7 +832,8 @@ Find all.
 
 ### Run from source
 
-Needs [Node.js](https://nodejs.org) 20 or newer.
+Needs [Node.js](https://nodejs.org) 22.13 or newer (headless mode uses its
+built-in SQLite; the desktop app brings its own).
 
 ```
 git clone https://github.com/Banneh/playlist-app.git
@@ -830,6 +865,7 @@ npm run dist        # build installers locally into release/
 | Path | What it is |
 | --- | --- |
 | `src/core.ts` | state, SoundCloud access, matching, link classification, tagging, conversion, inbox, export |
+| `src/store.ts` | the database (`djhq.db`, built-in `node:sqlite`): saving only what changed, the one-time import of `state.json`, damaged and newer databases |
 | `src/server.ts` | the HTTP API and the static UI files |
 | `src/main.ts` | the Electron shell |
 | `src/id3.ts` | ID3v2 tag reader (key, Platinum Notes mark) and v2.3 writer, RIFF/AIFF chunk helpers |
@@ -892,9 +928,11 @@ bodies are JSON.
 | `POST /api/config/export-info` | | what the export dialog warns about: libraries with private links, folders that are away, `can_save` (not a view) |
 | `POST /api/config/export` | `{leave_links_out?}` | Electron: a save dialog, then `{path}` or `{canceled}`; headless answers `unsupported` (not a view) |
 | `GET /api/config/export?leave_links_out=1` | | the configuration file as a download (only for `Host` 127.0.0.1 / localhost) |
+| `GET /api/state/raw` | | the saved data (all but the appearance settings), as the `state.json` of DJ HQ 1.7 and older, as a download (only for `Host` 127.0.0.1 / localhost) |
+| `POST /api/state/raw` | | Electron: a save dialog for the same file, then `{path}` or `{canceled}`; headless answers `unsupported` (not a view) |
 | `POST /api/config/import/plan` | `{text}` · `{pick: true}` | reads and checks a configuration file (or asks for one with a file dialog); writes nothing; answers a single-use `plan` id and a summary per library, plus what it `replaces` (not a view, not queued) |
 | `POST /api/config/import/probe` | `{plan, lib, folder, dir}` | how many of that folder's matched and known files are in `dir` (names only, nothing changes; `problem` for a folder that can't be used) |
-| `POST /api/config/import/apply` | `{plan, folders: [[main, extra \| null, …] per library], confirm_replace?, no_files?: [library index], machine?}` | backs up `state.json` / `prefs.json`, replaces the libraries and settings, answers the view with `import_report`; refuses with `confirm_replace`, `no_files_found`, `folder_*`, `job_active` |
+| `POST /api/config/import/apply` | `{plan, folders: [[main, extra \| null, …] per library], confirm_replace?, no_files?: [library index], machine?}` | saves a copy of `djhq.db` in `backups/`, replaces the libraries and settings, answers the view with `import_report`; refuses with `confirm_replace`, `no_files_found`, `folder_*`, `job_active`, `store_blocked` (nothing can be saved right now) |
 | `GET /api/file?path=` | | streams a local audio file for the preview (library and downloads folders only) |
 | | | file keys (`file`, `name`) are relative to the library folder, `/`-separated; files of an extra folder carry its name in front |
 | `POST /api/clean-backups` | | deletes the active library's backups (adds `clean_report`) |

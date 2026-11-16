@@ -175,11 +175,11 @@ const GUIDES = {
         ['sun', 'Appearance', 'Light, dark, or whatever your computer is using.'],
         ['history', 'Backups', 'The untouched originals of converted files and the MP3s that lossless downloads replaced. <b>Clean up</b> deletes them; after that Restore originals can’t bring those files back.'],
         ['copy', 'Move or back up your setup', '<b>Export configuration…</b> saves your libraries, matches, edits, marks and settings in one file; <b>Import configuration…</b> loads it on another computer, the Windows PC, or here again. On import you show DJ HQ where each library’s music is on this computer, and it counts the files it finds before anything changes. The music, the backed-up originals, the SoundCloud sign-in and the Do everything setup are not in the file. A private playlist link can be left out of the file; paste it again with <b>Change link…</b>.'],
-        ['info', 'About', 'The version, a manual update check, the tour, and where DJ HQ keeps its data.'],
+        ['info', 'About', 'The version, a manual update check, the tour, and where DJ HQ keeps its data. <b>Export raw data (JSON)</b> saves the data DJ HQ has stored (all but the appearance settings) in one file, for support or to go back to an older DJ HQ; it contains your private playlist links.'],
       ] },
       { h: 'Good to know', tips: [
         'Another playlist with its own folder? <b>Add another library…</b> links them; switch libraries from the name at the top of the sidebar.',
-        'The data folder holds the matches, edits and the backups. Deleting the app doesn’t touch it.',
+        'The data folder holds the matches, edits and the backups. Deleting the app doesn’t touch it. Keep it on this computer’s own disk, not in a cloud folder.',
         'An import replaces the libraries on this computer. The data from before is saved first, in the <i>backups</i> folder inside the data folder.',
         'Imported before the music was copied? The library waits for its files and keeps every match until you press <b>The copy is complete</b>.',
       ] },

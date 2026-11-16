@@ -8,3 +8,11 @@ node_modules/
 dist/
 release/
 prefs.json
+# the data folder when run from source (the project folder)
+djhq.db
+djhq.db-journal
+*.imported-*
+*.unreadable-*
+backups/
+pipeline.json
+state.json.README.txt
