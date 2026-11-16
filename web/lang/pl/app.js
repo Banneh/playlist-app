@@ -70,7 +70,7 @@ I18N.add('pl', 'app', {
 
   // the page head
   head: {
-    search: 'Szukaj wykonawcy lub tytułu…',
+    search: 'Szukaj utworu…',
     refreshing: 'Odświeżanie…',
     refreshHint: 'Wczytaj playlistę z SoundCloud jeszcze raz i ponownie przeskanuj folder z muzyką (DJ HQ robi to też automatycznie co 15 minut)',
     guide: 'Przewodnik po tej stronie',

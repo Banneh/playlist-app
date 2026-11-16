@@ -160,6 +160,7 @@ app.whenReady().then(async () => {
   const wc = win.webContents;
   wc.setAudioMuted(true);
   await wc.loadURL(`http://127.0.0.1:${port}/?titlebar=inset&lang=en`);   // the README screenshots are English
+  wc.setZoomFactor(1);   // a zoom remembered for 127.0.0.1 in Electron's own profile would scale every picture
   const js = (code) => wc.executeJavaScript(`(async () => { ${code} })()`, true);
   const shot = async (name, rect) => {
     await sleep(350);

@@ -39,7 +39,7 @@ I18N.add('pl', 'common', {
   artist: 'Wykonawca',
   title: 'Tytuł',
   file: 'Plik',
-  length: 'Długość',
+  length: 'Czas',
   status: 'Status',
   have: 'Mam',
   missing: 'Brak',
