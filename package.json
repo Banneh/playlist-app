@@ -45,7 +45,10 @@
       ],
       "category": "public.app-category.music",
       "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
-      "identity": null
+      "identity": null,
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "DJ HQ asks System Events to press Start Processing in Platinum Notes for you, when you switch that on in Do everything."
+      }
     },
     "dmg": {
       "writeUpdateInfo": false

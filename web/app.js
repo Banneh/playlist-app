@@ -169,6 +169,11 @@ async function refreshPlaylist({ manual = false } = {}) {
       return;
     }
   }
+  if (DATA.link_missing) {   // imported without its link: nothing to fetch; a manual refresh still rescans the folders
+    setStatus(SAFETY_TEXT.linkMissingStatus);
+    if (manual) { try { DATA = await api('/api/rescan', {}); render(); toast(SAFETY_TEXT.rescanned); } catch (e) { toast('Error: ' + e.message, true); } }
+    return;
+  }
   const before = DATA.ready ? new Set(DATA.tracks.map(t => t.id)) : null;
   try {
     const fresh = await api('/api/refresh', {});
@@ -346,6 +351,17 @@ const SAFETY_TEXT = {
   folderMissing: '<b>This library’s folder isn’t available:</b> {dir}. Plug in the drive, let the cloud folder sync, or put the folder back where it was. Until then its tracks show as missing, and your matches and “new” marks are kept.',
   folderUnreadable: '<b>DJ HQ isn’t allowed to read this library’s folder:</b> {dir}. Allow access to it (on a Mac: System Settings → Privacy & Security → Files and Folders), then look again. Your matches and “new” marks are kept meanwhile.',
   folderEmpty: '<b>This library’s folder lists no audio files:</b> {dir}. A cloud folder may not have synced yet. Your matches and “new” marks are kept until the files are back.',
+  folderWaiting: '<b>This library is waiting for its music files:</b> {dir}. It was imported before the music was copied here. Copy the files into the folder; every match is kept and follows its file as it arrives. Once the copy is complete, say so, and matches whose file still isn’t there are dropped.',
+  filesReady: 'The copy is complete',
+  filesReadyHint: 'Drop the matches whose file still isn’t in the folder',
+  filesReadyTitle: 'Is the music copy complete?',
+  filesReadyBody: '<p>Matches of files that still aren’t in the library’s folders are dropped, as for any file that is gone. Files that arrive later are matched again by DJ HQ, or by you.</p>',
+  filesReadyOk: 'Yes, it’s complete',
+  filesReadyDone: 'The library is complete',
+  linkMissing: '<b>This library has no SoundCloud link yet.</b> It was imported without it, so the playlist isn’t checked for changes. Everything else works with the track list from the file.',
+  changeLink: 'Change link…',
+  linkMissingStatus: 'No SoundCloud link yet · use Change link… in Settings',
+  rescanned: 'Folders rescanned · this library has no SoundCloud link yet',
   lookAgain: 'Look again',
   lookAgainHint: 'Scan the library’s folders again',
   stateMoved: '<b>DJ HQ couldn’t read its saved data, so it started fresh.</b> The old file is kept untouched at {file}.',
@@ -358,10 +374,13 @@ function safetyNotesHtml() {
   let out = '';
   const sp = DATA.state_problem;
   if (sp) out += noteHtml(safetyText(sp.code === 'state_unreadable_kept' ? 'stateKept' : 'stateMoved', { file: sp.file }), '', 'red', 'alert');
+  if (DATA.link_missing && (DATA.libraries || []).length)
+    out += noteHtml(SAFETY_TEXT.linkMissing, typeof stChangeLink === 'function' ? `<button class="btn btn-sm" onclick="stChangeLink()">${icon('link')}${esc(SAFETY_TEXT.changeLink)}</button>` : '', 'amber', 'link');
   for (const a of DATA.folders_away || []) {
-    const key = a.why === 'unreadable' ? 'folderUnreadable' : a.why === 'empty' ? 'folderEmpty' : 'folderMissing';
+    const key = a.why === 'unreadable' ? 'folderUnreadable' : a.why === 'empty' ? 'folderEmpty' : a.why === 'waiting' ? 'folderWaiting' : 'folderMissing';
     out += noteHtml(safetyText(key, { dir: shortPath(a.dir) }),
-      `<button class="btn btn-sm" onclick="rescanFolder()" title="${esc(SAFETY_TEXT.lookAgainHint)}">${icon('refresh')}${esc(SAFETY_TEXT.lookAgain)}</button>`, 'amber', 'alert');
+      `<button class="btn btn-sm" onclick="rescanFolder()" title="${esc(SAFETY_TEXT.lookAgainHint)}">${icon('refresh')}${esc(SAFETY_TEXT.lookAgain)}</button>`
+      + (a.why === 'waiting' ? `<button class="btn btn-sm" onclick="filesReady()" title="${esc(SAFETY_TEXT.filesReadyHint)}">${icon('check')}${esc(SAFETY_TEXT.filesReady)}</button>` : ''), 'amber', 'alert');
   }
   return out ? `<div class="safety-notes">${out}</div>` : '';
 }
@@ -493,6 +512,13 @@ async function removeLibrary() {
  *  or a found file, look at the downloads folder again (quietly, in the background). */
 function inboxChanged() {
   if (INBOX && typeof loadInbox === 'function') loadInbox({ quiet: true });
+}
+/** an imported library that waited for its music: the user says the copy is complete */
+async function filesReady() {
+  const ok = await uiConfirm({ title: SAFETY_TEXT.filesReadyTitle, body: SAFETY_TEXT.filesReadyBody, ok: SAFETY_TEXT.filesReadyOk, icon: 'check' });
+  if (!ok) return;
+  try { DATA = await api('/api/library', { op: 'files_ready' }); render(); toast(SAFETY_TEXT.filesReadyDone); }
+  catch (e) { toast('Error: ' + e.message, true); }
 }
 async function rescanFolder() {
   try { DATA = await api('/api/rescan', {}); render(); toast('Folders rescanned'); }

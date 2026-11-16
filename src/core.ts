@@ -81,6 +81,12 @@ export interface Library {
   seen_mark?: number;
   /** file-arrival tracking has been initialised for this library (files present then aren't "new") */
   acq_init?: boolean;
+  /** imported from a configuration file before the music was copied here: the folder counts as
+   *  "not available" (nothing is pruned) and pins follow the files' spelling on disk as they
+   *  turn up, until the user says the copy is complete */
+  files_pending?: boolean;
+  /** the library's id on the computer a configuration file came from (kept for later matching) */
+  uid?: string;
 }
 
 // dur_cache entry: [size, mtime, duration, [codec, sr, bits], [artist, title, genre], [key, pn]]
@@ -132,6 +138,8 @@ export interface DoAll {
   rb_xml?: string;
   /** quit Platinum Notes / Mixed In Key after their step, when DJ HQ started them (default on) */
   close_apps?: boolean;
+  /** macOS: press Start Processing in Platinum Notes for the user (needs Accessibility; default off) */
+  press_start?: boolean;
   /** also send library files that have no Platinum Notes mark or no key (default: only this run's downloads) */
   include_pending?: boolean;
   /** Platinum Notes' output mode as last read (wizard, run start); "unknown" where it can't be read (Windows) */
@@ -184,7 +192,10 @@ function loadState(): AppState {
     }
     console.error(`state.json could not be read; ${SAVE_BLOCKED ? "left in place, not saving over it" : "moved to " + aside}`);
   }
-  if (!st) st = {};
+  return withDefaults(st || {});
+}
+/** Every key the code reads without a check, filled in (older state files, an imported one). */
+export function withDefaults(st: any): AppState {
   st.libraries = st.libraries || [];
   st.active = st.active ?? null;
   st.dur_cache = st.dur_cache || {};
@@ -205,6 +216,30 @@ export function saveState(): void {
   if (SAVE_BLOCKED) return;
   writeFileAtomic(statePath(), JSON.stringify(STATE));
 }
+
+/** Bumped whenever STATE is replaced as a whole (an import): a view that was being built
+ *  from the old state starts over instead of pruning the new one with the old folders. */
+let STATE_GEN = 0;
+/** Put a whole new state in place (configuration import): written first, then swapped in
+ *  one synchronous step, so no request ever sees half of it. The user chose to replace the
+ *  saved data, so a state file that could not be read at launch no longer blocks saving.
+ *  Returns the way back: the previous state in place again, its file copied back from
+ *  `backup` (the copy made before; none: there was no file). */
+export function replaceState(next: AppState): (backup: string | null) => void {
+  const prev = { state: STATE, blocked: SAVE_BLOCKED };
+  writeFileAtomic(statePath(), JSON.stringify(next));
+  STATE = next;
+  STATE_GEN++;
+  SAVE_BLOCKED = false;
+  return (backup) => {
+    if (backup) writeFileAtomic(statePath(), fs.readFileSync(backup, "utf8"));
+    else { try { fs.unlinkSync(statePath()); } catch {} }
+    STATE = prev.state;
+    STATE_GEN++;
+    SAVE_BLOCKED = prev.blocked;
+  };
+}
+export const dataDir = () => DATA_DIR;
 
 /** Write a whole file so that a crash or power cut leaves either the old or the new
  *  version, never half of one: write a temp file next to it, flush it, rename it over. */
@@ -231,7 +266,7 @@ export function writeFileAtomic(p: string, text: string): void {
   }
 }
 
-const REFRESH_CHOICES = [5, 15, 30, 60, 120];
+export const REFRESH_CHOICES = [5, 15, 30, 60, 120];
 /** What the Settings page shows and edits. inbox_dir is kept top-level for older state files. */
 export function getSettings(): any {
   const s = STATE.settings || (STATE.settings = {});
@@ -264,7 +299,7 @@ export function doAllStatus(): { do_all: Required<Omit<DoAll, "pn_mode" | "pn_mo
   if (!d.mik_db) optional.push("mik_db_missing"); else if (!exists(d.mik_db)) optional.push("mik_db_not_found");
   return {
     do_all: { on: !!d.on, pn_app: d.pn_app || "", mik_app: d.mik_app || "", mik_db: d.mik_db || "", rb_xml: d.rb_xml || "",
-              close_apps: d.close_apps !== false, include_pending: !!d.include_pending,
+              close_apps: d.close_apps !== false, press_start: !!d.press_start, include_pending: !!d.include_pending,
               pn_replace_confirmed: !!d.pn_replace_confirmed, pn_mode: d.pn_mode || null, pn_mode_at: d.pn_mode_at || null,
               // off by the user's choice (not just never set up): the button is hidden then
               switched_off: d.on === false },
@@ -310,7 +345,7 @@ function patchDoAll(p: any): void {
   if (!p || typeof p !== "object") throw appError("bad_request", "do_all must be an object");
   const s = STATE.settings || (STATE.settings = {});
   const d: DoAll = { ...(s.do_all || {}) };
-  for (const k of ["on", "close_apps", "include_pending", "pn_replace_confirmed"] as const)
+  for (const k of ["on", "close_apps", "press_start", "include_pending", "pn_replace_confirmed"] as const)
     if (k in p) d[k] = !!p[k];
   const file = (v: any): string | null => typedPath(v) || null;
   for (const k of ["pn_app", "mik_app"] as const) if (k in p) {
@@ -393,7 +428,7 @@ export function activeLib(): Library | null {
   return libs.find((l) => l.id === STATE.active) || libs[0];
 }
 
-function libName(lib: Library): string {
+export function libName(lib: Library): string {
   return lib.playlist?.title || path.basename(lib.dir.replace(/\/+$/, "")) || lib.id;
 }
 
@@ -405,7 +440,7 @@ export function libDirs(lib: Library): string[] {
  *  folder's files are keyed by their relative path alone, so old state stays valid).
  *  An extra folder named like another one, or like a subfolder of the main folder
  *  while subfolders are scanned, gets " (2)", " (3)" … so keys stay unambiguous. */
-function dirPrefixes(lib: Library): Map<string, string> {
+export function dirPrefixes(lib: Library): Map<string, string> {
   const out = new Map<string, string>();
   const used = new Set<string>();
   if (lib.subfolders) {
@@ -528,11 +563,16 @@ async function fetchLikeIds(userId: number): Promise<number[]> {
 /** Fetch the library's playlist (or likes) into its snapshot. Returns how many of its tracks
  *  SoundCloud would not hand out (deleted, blocked, or private and not shared with the link). */
 export async function fetchPlaylist(lib: Library): Promise<number> {
+  if (!lib.url) throw linkMissing();
   const r = await readPlaylist(lib.url, lib.playlist);
   lib.playlist = r.playlist;
   saveState();
   return r.unreadable;
 }
+
+/** A library imported from a configuration file whose link was left out has url "": it keeps
+ *  its snapshot and everything else, and only fetching waits for Change link…. */
+const linkMissing = () => appError("link_missing", "this library has no SoundCloud link yet; set it with Change link… in Settings");
 
 /** Read a playlist or likes link from SoundCloud without touching the state. `prev` is the
  *  snapshot it replaces: its first-seen times are kept (none at all = a first fetch). */
@@ -722,6 +762,7 @@ export async function scCanWrite(token: string): Promise<{ ok: boolean; why?: st
   const lib = activeLib();
   if (!lib) return { ok: false, why: "no library", likes: false };
   const me = await scMe(token);
+  if (!lib.url) return { ok: false, likes: false, why: "This library has no SoundCloud link yet; set it with Change link… in Settings." };
   const likes = likesUser(lib.url);
   if (likes) {
     if (likes.toLowerCase() !== me.permalink.toLowerCase())
@@ -970,7 +1011,7 @@ async function refreshCache(p: string): Promise<void> {
 /** A library folder that can't be listed right now: "missing" (not there: an unmounted
  *  drive, a renamed folder, a cloud folder not synced yet), "unreadable" (no permission),
  *  or "empty" (readable, but no audio files in it). */
-interface FolderAway { dir: string; why: "missing" | "unreadable" | "empty"; }
+interface FolderAway { dir: string; why: "missing" | "unreadable" | "empty" | "waiting"; }
 export function folderTrouble(d: string): "missing" | "unreadable" | null {
   try { if (!fs.statSync(d).isDirectory()) return "missing"; }
   catch (e: any) { return e?.code === "ENOENT" || e?.code === "ENOTDIR" ? "missing" : "unreadable"; }
@@ -1589,7 +1630,73 @@ function restorableCount(lib: Library | null): number {
 
 const fmtDur = (d: number) => `${Math.floor(d / 60)}:${String(d % 60).padStart(2, "0")}`;
 
+/** A library imported before its music was copied here (files_pending): pins whose file isn't
+ *  in the scan are moved to a file that turned up under another spelling (matchKeys). The
+ *  wait ends only when the user says the copy is complete (files_ready): every pinned file
+ *  being there says nothing about the files still on their way, whose arrival times would be
+ *  dropped (and then come back as NEW FILE). */
+function filesPending(lib: Library, files: LocalFile[], fmap: Map<string, LocalFile>, trackIds: Set<number>): void {
+  const pins = Object.entries(STATE.assigned).filter(([k, f]) => f && trackIds.has(Number(k)));
+  const waiting = pins.filter(([, f]) => !fmap.has(f));
+  if (waiting.length && files.length) {
+    const taken = new Set(pins.map(([, f]) => f));
+    const m = matchKeys(waiting.map(([, f]) => f), files.map((f) => f.name).filter((n) => !taken.has(n)));
+    let moved = false;
+    for (const [k, f] of waiting) { const to = m.map.get(f); if (to) { STATE.assigned[k] = to.to; moved = true; } }
+    if (moved) saveState();
+  }
+}
+
+/** Find files again after they were copied to another computer or folder: each wanted key
+ *  ("/"-separated, relative) is matched to one of `onDisk` by its exact key, then with
+ *  Unicode composition and case folded (NFD from macOS, a case-changing copy), then by a file
+ *  name that is unique on both sides. One file takes at most one key: two keys that would land
+ *  on the same file, or a name found twice, count as not found (`ambiguous`). */
+export function matchKeys(wanted: string[], onDisk: string[]): { map: Map<string, { to: string; how: "exact" | "folded" | "base" }>; ambiguous: number } {
+  const map = new Map<string, { to: string; how: "exact" | "folded" | "base" }>();
+  const want = [...new Set(wanted)];
+  const disk = new Set(onDisk), taken = new Set<string>();
+  for (const w of want) if (disk.has(w)) { map.set(w, { to: w, how: "exact" }); taken.add(w); }
+  const fold = (s: string) => s.normalize("NFC").toLowerCase();
+  const base = (s: string) => fold(s.slice(s.lastIndexOf("/") + 1));
+  let ambiguous = 0;
+  for (const [fn, how] of [[fold, "folded"], [base, "base"]] as const) {
+    const byDisk = new Map<string, string[]>(), byWant = new Map<string, string[]>();
+    for (const d of onDisk) if (!taken.has(d)) { const k = fn(d); byDisk.set(k, [...(byDisk.get(k) || []), d]); }
+    for (const w of want) if (!map.has(w)) { const k = fn(w); byWant.set(k, [...(byWant.get(k) || []), w]); }
+    ambiguous = 0;
+    for (const [k, ws] of byWant) {
+      const ds = byDisk.get(k) || [];
+      if (ws.length === 1 && ds.length === 1) { map.set(ws[0], { to: ds[0], how }); taken.add(ds[0]); }
+      else if (ds.length) ambiguous += ws.length;
+    }
+  }
+  return { map, ambiguous };
+}
+
+/** The audio files under a folder as relative "/" keys, from the directory listing alone
+ *  (no probe, no stat of the files, nothing cached): what scanFolder would list, at any depth
+ *  with `recursive`. Reading the names downloads nothing from an online-only cloud folder. */
+export function listAudioKeys(d: string, recursive: boolean, cap = 200000): string[] {
+  const out: string[] = [];
+  const walk = (dir: string, rel: string): void => {
+    let entries: fs.Dirent[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (out.length >= cap) return;
+      const f = e.name;
+      if (f.startsWith(".")) continue;
+      if (e.isDirectory()) { if (recursive) walk(path.join(dir, f), rel + f + "/"); continue; }
+      if (!e.isFile() || !AUDIO_EXT.includes(path.extname(f).toLowerCase()) || /\.tmp\.[^.]+$/i.test(f)) continue;
+      out.push(rel + f);
+    }
+  };
+  walk(d, "");
+  return out;
+}
+
 export async function buildView(libArg?: Library): Promise<any> {
+  const gen = STATE_GEN;
   const lib = libArg || activeLib();
   let dev = STATE.device || "xdj-700";
   if (!DEVICES[dev]) dev = "xdj-700";
@@ -1605,10 +1712,13 @@ export async function buildView(libArg?: Library): Promise<any> {
     settings: getSettings(),
     backup_bytes: backupBytes(lib),
     state_problem: STATE_PROBLEM,
+    // imported without its SoundCloud link: nothing is fetched until Change link… sets one
+    link_missing: !!lib && !lib.url,
   };
   if (!lib || !lib.playlist) return { ...base, ready: false };
   const away: FolderAway[] = [];
   const files = await scanLocal(lib, away);
+  if (gen !== STATE_GEN) return buildView();   // the state was replaced (an import) while the folders were scanned
   const pl = lib.playlist;
   const genre = pl.title || "Trance";
   const fmap = new Map(files.map((f) => [f.name, f]));
@@ -1622,11 +1732,15 @@ export async function buildView(libArg?: Library): Promise<any> {
   const notAvailable = away.filter((a) => a.why !== "empty"
     || Object.entries(STATE.assigned).some(([k, f]) => f && trackIds.has(Number(k)) && inDir(a.dir, libPath(lib, f)))
     || Object.keys(STATE.found).some((k) => inDir(a.dir, k.slice(2))));
+  if (lib.files_pending) { filesPending(lib, files, fmap, trackIds); notAvailable.push({ dir: lib.dir, why: "waiting" }); }
   const keep = notAvailable.length > 0;
-  // manual assignments win over auto-matching; drop entries whose file vanished
+  // manual assignments win over auto-matching; drop entries whose file vanished. The pins
+  // are one map for all libraries: those of another library's tracks are its business
+  const otherIds = new Set(STATE.libraries.filter((l) => l !== lib).flatMap((l) => (l.playlist?.tracks || []).map((t) => t.id)));
   let assignedDirty = false;
   if (!keep) for (const k of Object.keys(STATE.assigned)) {
     const fname = STATE.assigned[k];
+    if (!trackIds.has(Number(k)) && otherIds.has(Number(k))) continue;
     if (!trackIds.has(Number(k)) || (fname !== "" && !fmap.has(fname))) {
       delete STATE.assigned[k]; delete STATE.by_hand[k];
       assignedDirty = true;
@@ -1645,7 +1759,7 @@ export async function buildView(libArg?: Library): Promise<any> {
     if (!trackIds.has(Number(tid))) continue;
     if (keep && STATE.assigned[tid] && !fmap.has(STATE.assigned[tid])) continue; // its pinned file may be in the folder that's away
     if (!STATE.assigned[tid] || !fmap.has(STATE.assigned[tid])) {
-      for (const a of Object.keys(STATE.assigned)) if (STATE.assigned[a] === fname) { delete STATE.assigned[a]; delete STATE.by_hand[a]; }
+      for (const a of Object.keys(STATE.assigned)) if (STATE.assigned[a] === fname && trackIds.has(Number(a))) { delete STATE.assigned[a]; delete STATE.by_hand[a]; }
       STATE.assigned[tid] = fname;
       delete STATE.overrides[tid];
     }
@@ -1656,6 +1770,7 @@ export async function buildView(libArg?: Library): Promise<any> {
   const manual = new Map<number, string>(); // track id -> file name ("" = no file)
   const manualFiles = new Set<string>();
   for (const [k, fname] of Object.entries(STATE.assigned)) {
+    if (!trackIds.has(Number(k))) continue;   // another library's pin: its file name means nothing here
     manual.set(Number(k), fname);
     if (fname) manualFiles.add(fname);
   }
@@ -1930,7 +2045,7 @@ export async function cleanBackups(): Promise<any> {
   return view;
 }
 
-const sameDir = (a: string, b: string) => {
+export const sameDir = (a: string, b: string) => {
   try { return fs.realpathSync(a) === fs.realpathSync(b); } catch { return path.resolve(a) === path.resolve(b); }
 };
 const insideDir = (inner: string, outer: string) => {
@@ -1947,7 +2062,7 @@ function userDir(raw: any): string {
 
 /** POST /api/library: {op: "add", dir, url} · {op: "select", id} · {op: "remove", id}
  *  · {op: "add_folder", dir, id?} · {op: "remove_folder", dir, id?} · {op: "subfolders", on, id?}
- *  · {op: "set_url", url, id?} (the folder ops and set_url act on the active library unless
+ *  · {op: "set_url", url, id?} · {op: "files_ready", id?} (the folder ops and set_url act on the active library unless
  *  `id` says otherwise). add and set_url answer with view.fetch_report = {unreadable}, set_url
  *  also with {same, of, had}: how many of the tracks were already in the old playlist. When the
  *  new link misses tracks the library had, set_url changes nothing and answers {confirm: report}
@@ -1982,7 +2097,8 @@ export async function libraryOp(data: any): Promise<any> {
     const lib = target();
     const url = await expandScUrl(data.url);
     if (!url.startsWith("http")) throw new Error("please give a full SoundCloud playlist or likes URL");
-    if (!!likesUser(url) !== !!likesUser(lib.url))
+    // (a library imported without its link has none to compare with: the track check below still guards it)
+    if (lib.url && !!likesUser(url) !== !!likesUser(lib.url))
       throw new Error(likesUser(lib.url) ? "this library follows a Likes page; add a new library for a playlist"
                                          : "this library follows a playlist; add a new library for a Likes page");
     const r = await readPlaylist(url, lib.playlist);
@@ -2028,6 +2144,10 @@ export async function libraryOp(data: any): Promise<any> {
   } else if (op === "subfolders") {
     const lib = target();
     if (data.on) lib.subfolders = true; else delete lib.subfolders;
+  } else if (op === "files_ready") {
+    // an imported library whose music was being copied: the user says the copy is complete, so
+    // pins whose file still isn't there are dropped with the next view, as for any other library
+    delete target().files_pending;
   } else {
     throw new Error("unknown library op");
   }
@@ -2090,7 +2210,7 @@ interface Candidate extends Found { score: number; name: number; dur_diff: numbe
 /** api-v2 GET with the scraped client_id; rescrapes it once on 401/403. */
 async function scApi(lib: Library, pathAndQuery: string): Promise<any> {
   for (let attempt = 0; ; attempt++) {
-    if (!STATE.client_id) { STATE.client_id = await scrapeClientId(await httpGet(lib.url)); saveState(); }
+    if (!STATE.client_id) { STATE.client_id = await scrapeClientId(await httpGet(lib.url || SC_DISCOVER)); saveState(); }
     try {
       return JSON.parse(await httpGet(`https://api-v2.soundcloud.com/${pathAndQuery}&client_id=${STATE.client_id}`));
     } catch (e: any) {

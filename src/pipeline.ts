@@ -10,15 +10,19 @@
  *  dialog and a restart (a job that was running at startup comes back "interrupted",
  *  to be resumed or dismissed). One job at a time.
  *
- *  Completion of the outside apps' work is detected from the files themselves (the
- *  Platinum Notes mark, the key tag, a changed and settled modification time) and
- *  Platinum Notes' run log; none of that is verified against the real apps yet, so
- *  every wait also offers "Mark as done" and "Skip this step", and has no timeout. */
+ *  Completion of the outside apps' work is read from the files themselves: a file is
+ *  done with Platinum Notes when it carries its mark, and with Mixed In Key when it has
+ *  a key tag (both settled for one poll). Platinum Notes' run log backs that up: it
+ *  tells a file it skipped (already processed) from one it failed, and whether the run
+ *  is over, which decides whether the app may be asked to quit. Verified with Platinum
+ *  Notes 10.5 and Mixed In Key 11.2.6 on macOS, with WAV and MP3 files (M4A, AIFF and
+ *  FLAC follow the code's reading, not a live run). Every wait still offers "Mark as done"
+ *  and "Skip this step" as a way on, and has no timeout. */
 import * as fs from "fs";
 import * as path from "path";
 import * as core from "./core";
 import { readKeyInfo } from "./id3";
-import { AppId, ExtApps, PnMode, QuitResult, samePathKey } from "./extapps";
+import { AppId, ExtApps, PnMode, PressResult, QuitResult, samePathKey, UiAccess } from "./extapps";
 import { checkXmlFile, mergeIntoFile, OWNED_PLAYLIST, XmlWrite } from "./rbxml";
 
 /** Everything this module says to the user, by code. {name} is filled from the
@@ -62,10 +66,13 @@ export const TEXT: Record<string, string> = {
   step_mik: "Mixed In Key",
   step_xml: "Add to rekordbox",
   step_finish: "Report",
-  pn_press_start: "Platinum Notes has the files. Press “Start Processing” there. DJ HQ is waiting for it to finish ({done} of {total} done).",
-  mik_analysing: "Mixed In Key is analysing the files. DJ HQ is waiting for the keys ({done} of {total} done).",
+  pn_press_start: "Platinum Notes is open with the files (no window? click its icon in the Dock). Press “Start Processing” there; DJ HQ notices by itself when it has finished ({done} of {total} done).",
+  pn_pressing: "DJ HQ is pressing “Start Processing” in Platinum Notes for you ({done} of {total} done).",
+  pn_processing: "DJ HQ pressed “Start Processing” in Platinum Notes. It notices by itself when the files are done ({done} of {total} done).",
+  mik_analysing: "Mixed In Key is analysing the files. DJ HQ notices by itself when they have their keys ({done} of {total} done).",
   app_open_failed: "{app} couldn't be opened with the files: {error}",
-  app_still_open: "{app} didn't close (a dialog may be open there). Close it yourself when you're ready.",
+  app_still_open: "{app} didn't close (a dialog may be open there), so DJ HQ left it open. Close it yourself when you're ready.",
+  app_still_processing: "{app} may still be processing, so DJ HQ left it open. Close it yourself once it has finished.",
   app_left_open: "{app} was already open, so DJ HQ left it open.",
   pn_app_invalid: "Platinum Notes can't be used: {error}",
   mik_app_invalid: "Mixed In Key can't be used: {error}",
@@ -78,6 +85,11 @@ export const TEXT: Record<string, string> = {
   already_processed: "Platinum Notes has processed it before.",
   pn_unsupported_format: "Platinum Notes doesn't take this file type.",
   pn_file_failed: "Platinum Notes reports it couldn't process this file.",
+  pn_left_as_is: "Platinum Notes left this file as it is: it has most likely processed it before. DJ HQ can't read its mark in this file type.",
+  retagged: "Files whose artist, title or genre were lost in Platinum Notes and Mixed In Key, written again by DJ HQ: {n}.",
+  retag_failed: "Couldn't write the tags again after Platinum Notes and Mixed In Key ({file}): {error}. Write tags on Prepare for player can do it later.",
+  retag_failed_all: "Couldn't write the tags again after Platinum Notes and Mixed In Key: {error}. Write tags on Prepare for player can do it later.",
+  pn_no_mark: "Platinum Notes reports it processed this file, but the file doesn't carry its mark. Check that it is set to “Replace original files”.",
   mik_unsupported_format: "Mixed In Key doesn't take this file type.",
   has_key: "Already has a key.",
   marked_done: "Marked as done by you.",
@@ -97,7 +109,7 @@ export const TEXT: Record<string, string> = {
   rb_xml_in_use: "Another program had the rekordbox XML file open, so nothing was written. Try again in a moment.",
   rb_added: "Added to the rekordbox XML.",
   rb_updated: "Its key in the rekordbox XML was updated ({from} → {to}).",
-  rb_listed: "Already in the rekordbox XML; added to the {playlist} playlist.",
+  rb_listed: "Already in the rekordbox XML; it is in the {playlist} playlist.",
   // job
   interrupted: "DJ HQ was closed while this run was going. Resume it, or dismiss it.",
   cancelled: "Cancelled. Files already moved or tagged stay that way.",
@@ -153,9 +165,12 @@ export interface StepRec {
   /** a failure of the step as a whole (not one file's) */
   error?: Msg | null;
   /** outside apps: was it running before, did DJ HQ start it, what quitting it gave */
-  was_running?: boolean; launched?: boolean; quit?: QuitResult | "left_open" | null;
+  was_running?: boolean; launched?: boolean; quit?: QuitResult | "left_open" | "processing" | null;
   /** when files were last handed to the app; Platinum Notes' run log this step read (written after that) */
   sent_at?: number; log?: string | null;
+  /** Platinum Notes: what pressing Start for the user gave (null: not tried); when DJ HQ
+   *  clicked it (a press that then started no run is "not_found" again, with this set) */
+  pressed?: PressResult | null; clicked?: number | null;
   /** xml: the merge result */
   xml?: { file: string; backup: string | null; added: number; updated: number; existing: number; entries: number } | null;
 }
@@ -173,11 +188,21 @@ export interface Job {
   report?: any;
 }
 
-interface Deps { apps: ExtApps; enqueue: <T>(fn: () => Promise<T>) => Promise<T>; dataDir: string; pollMs: number; }
+interface Deps {
+  apps: ExtApps; enqueue: <T>(fn: () => Promise<T>) => Promise<T>; dataDir: string; pollMs: number;
+  /** Electron on macOS: is DJ HQ trusted for Accessibility (prompt: ask macOS to ask the user) */
+  axTrusted?: (prompt: boolean) => boolean;
+}
 let DEPS: Deps;
 let JOB: Job | null = null;
 let RUNNING = false;
 const control: { cancel: boolean; signal: { action: "mark_done" | "skip_step"; step: StepId } | null } = { cancel: false, signal: null };
+/** the last press of Start in this session: "not_allowed" with Accessibility granted means
+ *  macOS refused the Apple Events to System Events (the Automation consent) */
+let LAST_PRESS: PressResult | null = null;
+/** Platinum Notes begins its run log the moment Start is pressed: a press with no log after
+ *  this long started nothing */
+const PRESS_NO_RUN_MS = 15000;
 let wakeFn: (() => void) | null = null;
 
 const jobPath = () => path.join(DEPS.dataDir, "pipeline.json");
@@ -295,6 +320,29 @@ export async function detect(): Promise<any> {
     pn_log_dir: a.pnLogDir(),
     setup: core.doAllStatus(),
   };
+}
+
+/** POST /api/do-all/access {prompt?}: may DJ HQ press Start in Platinum Notes for the
+ *  user (macOS). With prompt: ask macOS to ask the user (Electron's own prompt the first
+ *  time), else open the matching list in System Settings. "unsupported" elsewhere. */
+export async function accessibility(data: any): Promise<{ platform: string; state: UiAccess | "unsupported" }> {
+  const a = DEPS.apps;
+  if (!a.pressStart || !a.uiAccess) return { platform: a.platform, state: "unsupported" };
+  const prompt = !!data?.prompt;
+  let state: UiAccess;
+  if (DEPS.axTrusted) {
+    // the app's own flag first: the probe below would show macOS' Automation prompt,
+    // which only a press of the button should do
+    if (!DEPS.axTrusted(prompt)) return { platform: a.platform, state: "missing" };
+    // without a probe, a press macOS refused since says what the flag can't
+    state = prompt ? await a.uiAccess().catch(() => "unknown" as UiAccess) : LAST_PRESS === "not_allowed" ? "automation" : "granted";
+    if (prompt && state === "granted") LAST_PRESS = null;
+  } else {
+    state = await a.uiAccess().catch(() => "unknown" as UiAccess);
+    if (prompt && state === "missing" && a.openPrivacy) await a.openPrivacy("accessibility").catch(() => {});
+  }
+  if (prompt && state === "automation" && a.openPrivacy) await a.openPrivacy("automation").catch(() => {});
+  return { platform: a.platform, state };
 }
 
 // ---------------- starting ----------------
@@ -420,6 +468,8 @@ export async function controlJob(data: any): Promise<any> {
         save();
         // an app DJ HQ opened for this step is closed (or the user told) as after a wait
         if ((step === "pn" || step === "mik") && cur.launched && !cur.quit) await closeApp(step, cur);
+        // what Mixed In Key finished meanwhile lost DJ HQ's names, as after a wait
+        if (step === "mik") await retagAfterApps();
         go();
         break;
       }
@@ -590,10 +640,12 @@ const ID3_TYPES = [".wav", ".mp3", ".aif", ".aiff"];   // where readKeyInfo find
 const mtimeOf = (p: string) => { try { return fs.statSync(p).mtimeMs; } catch { return -1; } };
 
 /** Platinum Notes' newest run log of a run started after `since` (the hand-over): its file
- *  name starts with the run's UTC time, in whole seconds ("2026-11-15T15:43:03Z Run 1.log";
- *  the run number is not unique), and the file itself was written after `since`.
- *  Gives each processed file's result by file-name stem (the logged path is not always
- *  the input path), and whether the run is over. */
+ *  name starts with the run's UTC start time, in whole seconds ("2026-11-15T23:02:32Z Run
+ *  1.log"; the run number is always 1), and the file itself was written after `since`.
+ *  Gives each finished file's result by its input path and by file-name stem, and
+ *  whether the run is over (the last line ends in "Processing finished"). A result with
+ *  error = 1 and resultPath "<null>" is a file Platinum Notes didn't process: one that
+ *  already carries its mark (it says "Already Processed"), or a real failure. */
 function pnLog(since: number): { name: string; finished: boolean; results: Map<string, { ok: boolean }> } | null {
   const dir = DEPS.apps.pnLogDir();
   if (!dir) return null;
@@ -614,10 +666,14 @@ function pnLog(since: number): { name: string; finished: boolean; results: Map<s
   const results = new Map<string, { ok: boolean }>();
   const re = /Finished File '(.*)' \{([\s\S]*?)\n\}/g;
   for (let m; (m = re.exec(text));) {
-    const result = /resultPath = "?(.*?)"?;\s*$/m.exec(m[2])?.[1] ?? "";
-    results.set(stemKey(m[1]), { ok: !!result && result !== "<null>" });
+    const field = (k: string) => new RegExp("^\\s*" + k + ' = "?(.*?)"?;\\s*$', "m").exec(m![2])?.[1] ?? "";
+    const result = field("resultPath"), error = field("error");
+    const r = { ok: !!result && result !== "<null>" && (error === "" || error === "0") };
+    results.set(stemKey(m[1]), r);
+    const input = field("path");
+    if (input) results.set(samePathKey(input), r);
   }
-  return { name: best.name, finished: /Processing finished\s*$/.test(text.trimEnd()) || /: Processing finished/.test(text), results };
+  return { name: best.name, finished: /Processing finished\s*$/.test(text.trimEnd()), results };
 }
 const stemKey = (name: string) => samePathKey(path.basename(name).replace(/\.[^.]+$/, ""));
 
@@ -646,15 +702,33 @@ async function stepApp(app: AppId, st: StepRec): Promise<void> {
       if (!it.before_pn && k.pn === true) { setItem(it, s, "skipped", "already_processed"); continue; }
       it.before_pn = it.before_pn || { mtime: mtimeOf(it.path), pn: k.pn };
     } else {
-      if (!it.before_mik && !it.source && k.key) { setItem(it, s, "skipped", "has_key"); it.tkey = k.key; it.key_source = "tag"; continue; }
+      // a key already there: done at once (Mixed In Key doesn't rewrite a file it knows,
+      // so there would be nothing to wait for)
+      if (!it.before_mik && k.key) { setItem(it, s, "skipped", "has_key"); it.tkey = k.key; it.key_source = "tag"; continue; }
       it.before_mik = it.before_mik || { mtime: mtimeOf(it.path), key: k.key };
     }
     batch.push(it);
   }
+  // FLAC/M4A carry no key DJ HQ can read, and Mixed In Key doesn't rewrite a file it knows:
+  // one that has a key in its database is done at once, like a file with a key tag
+  if (app === "mik") {
+    const fresh = batch.filter((it) => !ID3_TYPES.includes(path.extname(it.path!).toLowerCase()) && !it.sent?.mik);
+    const db = core.doAllStatus().do_all.mik_db;
+    if (fresh.length && db) {
+      let known = new Map<string, string>();
+      try { known = (await a.readMikKeys(db, fresh.map((it) => it.path!))) || new Map(); } catch {}
+      for (const it of fresh) {
+        const k = known.get(it.path!);
+        if (!k) continue;
+        setItem(it, s, "skipped", "key_from_db", { key: k }); it.tkey = k; it.key_source = "mik_db";
+        batch.splice(batch.indexOf(it), 1);
+      }
+    }
+  }
   save();
   if (batch.length) await waitForApp(app, st, appPath, batch);
   if (control.cancel || (st.state as string) === "failed") return;
-  if (app === "mik") await keysAfterMik(batch);
+  if (app === "mik") { await keysAfterMik(batch); await retagAfterApps(); }
   if (st.state === "running" || st.state === "waiting") st.state = "ok";
 }
 
@@ -676,15 +750,14 @@ function doneNow(app: AppId, it: Item): boolean {
 function doneCheck(app: AppId, it: Item, m: number): boolean {
   const k = readKeyInfo(it.path!);
   if (app === "pn") {
-    const b = it.before_pn!;
-    // formats where the mark can't be read (m4a) count by the changed file alone
-    return m !== b.mtime && (k.pn === null ? true : k.pn === true);
+    // the mark is the signal (Platinum Notes writes it into every file it processed,
+    // tagged or not); formats where it can't be read (m4a) count by the changed file
+    return k.pn === null ? m !== it.before_pn!.mtime : k.pn === true;
   }
-  const b = it.before_mik!;
   // FLAC/M4A: DJ HQ reads no key from these (no ID3), so the rewritten file has to do;
   // the key then comes from Mixed In Key's database
-  if (!ID3_TYPES.includes(path.extname(it.path!).toLowerCase())) return m !== b.mtime;
-  return !!k.key && (m !== b.mtime || !b.key);
+  if (!ID3_TYPES.includes(path.extname(it.path!).toLowerCase())) return m !== it.before_mik!.mtime;
+  return !!k.key;
 }
 
 async function waitForApp(app: AppId, st: StepRec, appPath: string, batch: Item[]): Promise<void> {
@@ -716,28 +789,73 @@ async function waitForApp(app: AppId, st: StepRec, appPath: string, batch: Item[
     const now = Date.now();
     for (const it of part) it.sent = { ...(it.sent || {}), [app]: now };
     st.sent_at = now;
+    st.pressed = null; st.clicked = null;
     save();
   }
   const since = st.sent_at || st.started || Date.now();
   for (const it of open) setItem(it, s, "waiting");
   st.state = "waiting";
   JOB!.status = "waiting";
-  const waitCode = app === "pn" ? "pn_press_start" : "mik_analysing";
+  // Platinum Notes waits for its Start button. Pressed for the user only when asked to
+  // (Settings), in a copy DJ HQ just started with these files (one the user had open may
+  // hold other files of theirs); anything in the way leaves it to the user
+  const pressing = app === "pn" && send.length > 0 && probe === false && core.doAllStatus().do_all.press_start && !!a.pressStart;
+  // A press runs beside the wait, never in its way: Mark as done, Skip and Cancel are seen at
+  // once, and stop a press that hasn't clicked yet (a click after them would start a run the
+  // user just turned down, or one DJ HQ then asks to quit)
+  let pressEnd = false;
+  const stopPress = () => pressEnd || control.cancel || (!!control.signal && control.signal.step === app);
+  let pressing_: Promise<void> | null = null;
+  let pressedAt = 0, clickedAt = 0, pressedChanged = false;
+  const press = (opts: { ms: number; quiet?: boolean }) => {
+    pressing_ = (async () => {
+      let r: PressResult;
+      if (DEPS.axTrusted && !DEPS.axTrusted(false)) r = "not_allowed";
+      else {
+        r = await a.pressStart!(appPath, send.map((it) => it.path!), { ...opts, stop: stopPress }).catch(() => "failed" as PressResult);
+        if (r === "pressed" || r === "not_allowed") LAST_PRESS = r;
+      }
+      if (r === "stopped") return;
+      st.pressed = r; pressedAt = Date.now(); pressedChanged = true;
+      if (r === "pressed") st.clicked = clickedAt = Date.now();
+    })().finally(() => { pressing_ = null; });
+  };
+  const codeNow = () => app === "mik" ? "mik_analysing" : pressing_ && !st.pressed ? "pn_pressing" : st.pressed === "pressed" ? "pn_processing" : "pn_press_start";
+  if (pressing) press({ ms: 30000 });
+  let waitCode = codeNow();
   st.wait = msg(waitCode, { done: 0, total: batch.length });
   save();
   const last = new Map<number, number>();
   let signal: typeof control.signal = null;
   for (;;) {
     if (control.cancel) break;
-    if (control.signal && control.signal.step === app) { signal = control.signal; control.signal = null; }
+    if (control.signal && control.signal.step === app) { signal = control.signal; control.signal = null; pressEnd = true; }
     let changed = false;
     const log = app === "pn" ? pnLog(since) : null;
     if (log && st.log !== log.name) { st.log = log.name; changed = true; }
+    // Start was pressed, but no run began (its log is made the moment it starts): a dialog
+    // or sheet may be in the way. The user is asked to look, and DJ HQ doesn't click again
+    if (pressing && !log && st.pressed === "pressed" && clickedAt && Date.now() - clickedAt > PRESS_NO_RUN_MS) {
+      st.pressed = "not_found"; changed = true;
+    }
+    // the button couldn't be pressed yet (no window: the screen was locked, say): try
+    // again now and then, quietly, until a run has begun (its log), by whoever
+    if (pressing && !pressing_ && !clickedAt && !log && st.pressed && st.pressed !== "pressed" && st.pressed !== "not_allowed" && Date.now() - pressedAt > 10000)
+      press({ ms: 0, quiet: true });
+    if (pressedChanged) { pressedChanged = false; changed = true; }
+    if (codeNow() !== waitCode) { waitCode = codeNow(); changed = true; }
     for (const it of batch) {
       if (it.steps[s].state !== "waiting") continue;
       if (fileDone(app, it, last)) { setItem(it, s, "ok"); changed = true; continue; }
-      const r = log?.finished ? log.results.get(stemKey(it.path!)) : undefined;
-      if (r && !r.ok) { setItem(it, s, "failed", "pn_file_failed"); changed = true; }
+      // the run is over: what Platinum Notes says about a file it didn't mark
+      const r = log?.finished ? log.results.get(samePathKey(it.path!)) || log.results.get(stemKey(it.path!)) : undefined;
+      if (!r) continue;
+      if (doneNow(app, it)) setItem(it, s, "ok", r.ok ? undefined : "already_processed");
+      // a format whose mark DJ HQ can't read (m4a), left untouched: most likely one it had
+      // processed before ("Already Processed"), which can't be told apart from a failure
+      else if (!r.ok && readKeyInfo(it.path!).pn === null) setItem(it, s, "skipped", "pn_left_as_is");
+      else setItem(it, s, "failed", r.ok ? "pn_no_mark" : "pn_file_failed");
+      changed = true;
     }
     const left = batch.filter((it) => it.steps[s].state === "waiting");
     if (signal) {
@@ -752,22 +870,77 @@ async function waitForApp(app: AppId, st: StepRec, appPath: string, batch: Item[
     if (changed || st.wait?.vars?.done !== done) { st.wait = msg(waitCode, { done, total: batch.length }); save(); }
     await sleep(DEPS.pollMs);
   }
+  pressEnd = true;
+  if (pressing_) await pressing_;   // stops before its click, within a moment
   st.wait = null;
   if (control.cancel) return;   // the app is left as it is: it may still be working on the files
   JOB!.status = "running";
   if (signal?.action === "skip_step") st.state = "skipped";
   save();
-  await closeApp(app, st);
+  // every file done: Platinum Notes writes the end of its log a moment later; a step the
+  // user ended may leave it in the middle of a run, which nothing waits for
+  await closeApp(app, st, signal ? 0 : 30000);
 }
 
-/** Close the app after its step, but only if this run started it; or say it was left open. */
-async function closeApp(app: AppId, st: StepRec): Promise<void> {
+/** Is Platinum Notes idle after this step: no run started since the hand-over (no log;
+ *  the log is begun when Start is pressed), its newest log says "Processing finished",
+ *  or the app is gone. Waits up to `ms` for that. True where no log can be read
+ *  (Windows): there the files alone decide. */
+async function pnIdle(st: StepRec, appPath: string, ms: number): Promise<boolean> {
+  if (!DEPS.apps.pnLogDir()) return true;
+  // DJ HQ pressed Start: the run's log may not be there yet, so no log isn't idle at once
+  const until = Date.now() + ms, logUntil = Date.now() + (st.pressed === "pressed" ? PRESS_NO_RUN_MS : 0);
+  for (;;) {
+    const log = pnLog(st.sent_at || st.started || 0);
+    if (!log && Date.now() < logUntil) { await new Promise((r) => setTimeout(r, Math.min(DEPS.pollMs, 1000))); continue; }
+    if (!log || log.finished) return true;
+    if ((await DEPS.apps.isRunning("pn", appPath).catch(() => null)) === false) return true;
+    if (Date.now() >= until) return false;
+    await new Promise((r) => setTimeout(r, Math.min(DEPS.pollMs, 1000)));
+  }
+}
+
+/** Close the app after its step, but only if this run started it; or say it was left open.
+ *  Platinum Notes is only asked once its run is over (`waitMs` for that): asked while
+ *  it processes, it puts up a "really quit?" dialog and goes on. */
+async function closeApp(app: AppId, st: StepRec, waitMs = 0): Promise<void> {
   const set = core.doAllStatus().do_all;
   const appPath = app === "pn" ? set.pn_app : set.mik_app;
   if (st.launched && set.close_apps) {
-    st.quit = await DEPS.apps.quit(app, appPath).catch(() => "failed" as QuitResult);
-    if (st.quit !== "closed") say("app_still_open", { app: APP_NAME[app] });
+    if (app === "pn" && !(await pnIdle(st, appPath, waitMs))) { st.quit = "processing"; say("app_still_processing", { app: APP_NAME[app] }); }
+    else {
+      st.quit = await DEPS.apps.quit(app, appPath).catch(() => "failed" as QuitResult);
+      if (st.quit !== "closed") say("app_still_open", { app: APP_NAME[app] });
+    }
   } else if (st.was_running) { st.quit = "left_open"; say("app_left_open", { app: APP_NAME[app] }); }
+  save();
+}
+
+/** A WAV that went through Platinum Notes and then Mixed In Key comes out with only Mixed
+ *  In Key's tags: its title (the file name) and key, without DJ HQ's artist and genre
+ *  (seen in the live test; MP3s and a WAV that skipped Platinum Notes keep them). So
+ *  after Mixed In Key the names are written again wherever they no longer say the right
+ *  thing; the key, Mixed In Key's data and Platinum Notes' mark stay. A failure is only
+ *  reported: the file still goes on, and Write tags on Prepare can do it later. */
+async function retagAfterApps(): Promise<void> {
+  // a file the user stopped waiting for (Mark as done, Skip) while Mixed In Key stays open
+  // may still be written by it: left alone
+  const mikOpen = stepRec("mik").quit !== "closed";
+  const done = JOB!.items.filter((it) => it.key && it.steps.mik.state !== "failed" && it.steps.mik.state !== "pending"
+    && !(mikOpen && (it.steps.mik.code === "marked_done" || it.steps.mik.code === "step_skipped"))
+    && (it.steps.pn.state === "ok" || it.steps.mik.state === "ok"));
+  if (!done.length) return;
+  let n = 0;
+  try {
+    const files = await inLib(() => core.batchInfo(done.map((it) => it.key!)));
+    for (const f of files) {
+      if (control.cancel) return;
+      if (f.tagged) continue;
+      try { await inLib(() => core.tagFile(f.key, f.artist, f.title, f.genre)); n++; }
+      catch (e: any) { say("retag_failed", { file: f.key, error: errText(e) }); }
+    }
+  } catch (e: any) { say("retag_failed_all", { error: errText(e) }); }
+  if (n) say("retagged", { n });
   save();
 }
 

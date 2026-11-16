@@ -1,5 +1,6 @@
 /* Page: Settings — library (its folders, subfolder scanning, its SoundCloud link), downloads
-   folder + auto-move, Do everything (its card is built in pages/doall.js), refresh interval, appearance, backups and about. Reads DATA.settings /
+   folder + auto-move, Do everything (its card is built in pages/doall.js), refresh interval, appearance, backups,
+   moving or backing up the setup (export / import, built in pages/config.js) and about. Reads DATA.settings /
    DATA.backup_bytes, writes through POST /api/settings; folder and link changes go through
    POST /api/library. */
 
@@ -123,8 +124,9 @@ PAGES.settings = {
        <div class="st-path-row st-wide"><span class="faint">Data folder</span><div class="path" title="${esc(S.data_dir || '')}">${icon('folder')}<span>${esc(shortPath(S.data_dir || ''))}</span></div></div>`);
 
     const doAll = typeof daSettingsCard === 'function' ? daSettingsCard() : '';   // pages/doall.js
+    const config = typeof cfSettingsCard === 'function' ? cfSettingsCard() : '';  // pages/config.js: export / import
 
-    return `<div class="st-list">${library}${account}${links}${downloads}${doAll}${refresh}${appearance}${backups}${about}</div>`;
+    return `<div class="st-list">${library}${account}${links}${downloads}${doAll}${refresh}${appearance}${backups}${config}${about}</div>`;
   },
 };
 

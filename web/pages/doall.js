@@ -55,7 +55,7 @@ const DA_TEXT = {
   },
   xmlAdded: { one: '{n} added', other: '{n} added' },
   xmlUpdated: { one: '{n} key updated', other: '{n} keys updated' },
-  quit: { closed: 'Closed again.', left_open: 'Left open: it was open before the run.', busy: 'Still open: close it yourself when you’re ready.', failed: 'Still open: close it yourself when you’re ready.' },
+  quit: { closed: 'Closed again.', left_open: 'Left open: it was open before the run.', busy: 'Still open: close it yourself when you’re ready.', failed: 'Still open: close it yourself when you’re ready.', processing: 'Left open: it may still be processing. Close it once it has finished.' },
 
   // the run dialog: the confirmation built from the preview
   pvSub: 'This is what happens when you start. Nothing has changed yet.',
@@ -66,6 +66,7 @@ const DA_TEXT = {
   pvUpgrades: { one: 'One of them replaces an MP3 you have. The MP3 goes to the backup folder.', other: '{n} of them replace MP3s you have. The MP3s go to the backup folder.' },
   pvTag: { one: 'Write the tags of <b>{n} file</b> where they differ from the names in DJ HQ.', other: 'Write the tags of <b>{n} files</b> where they differ from the names in DJ HQ.' },
   pvPn: { one: 'Open <b>{n} file</b> in Platinum Notes. You press Start Processing there.', other: 'Open <b>{n} files</b> in Platinum Notes. You press Start Processing there.' },
+  pvPnAuto: { one: 'Open <b>{n} file</b> in Platinum Notes and press Start Processing there for you (when DJ HQ opens Platinum Notes itself; if it is open already, you press it).', other: 'Open <b>{n} files</b> in Platinum Notes and press Start Processing there for you (when DJ HQ opens Platinum Notes itself; if it is open already, you press it).' },
   pvPnNone: 'Platinum Notes has nothing to do: every file was processed before or is a type it doesn’t take.',
   pvMik: { one: 'Open <b>{n} file</b> in Mixed In Key to find its key.', other: 'Open <b>{n} files</b> in Mixed In Key to find their keys.' },
   pvMikNone: 'Mixed In Key has nothing to do: every file has a key already.',
@@ -90,10 +91,14 @@ const DA_TEXT = {
   subFailed: 'The run stopped at “{step}”.',
   pollFailed: 'DJ HQ can’t get the run’s state right now ({error}). Trying again…',
   jobGone: 'This run is no longer there. It may have been cleared in another window.',
-  waitPn: { one: 'Platinum Notes is open with {total} file. Press <b>Start Processing</b> there. DJ HQ goes on by itself when it is done.', other: 'Platinum Notes is open with {total} files. Press <b>Start Processing</b> there. DJ HQ goes on by itself when they are done.' },
-  waitMik: { one: 'Mixed In Key is analysing {total} file. DJ HQ goes on by itself when it has its key.', other: 'Mixed In Key is analysing {total} files. DJ HQ goes on by itself when they have their keys.' },
+  waitPn: { one: 'Platinum Notes is open with {total} file. Press <b>Start Processing</b> there (no window? click its icon in the Dock). DJ HQ notices by itself when Platinum Notes has finished, and goes on.', other: 'Platinum Notes is open with {total} files. Press <b>Start Processing</b> there (no window? click its icon in the Dock). DJ HQ notices by itself when Platinum Notes has finished, and goes on.' },
+  waitPnPressing: 'DJ HQ is pressing <b>Start Processing</b> in Platinum Notes for you…',
+  waitPnPressed: { one: 'DJ HQ pressed <b>Start Processing</b> in Platinum Notes for {total} file. It notices by itself when Platinum Notes has finished, and goes on.', other: 'DJ HQ pressed <b>Start Processing</b> in Platinum Notes for {total} files. It notices by itself when Platinum Notes has finished, and goes on.' },
+  waitMik: { one: 'Mixed In Key is analysing {total} file in the background. DJ HQ notices by itself when it has its key, and goes on.', other: 'Mixed In Key is analysing {total} files in the background. DJ HQ notices by itself when they have their keys, and goes on.' },
   waitDone: '{done} of {total} done.',
-  waitHelp: 'Finished there, but DJ HQ hasn’t noticed? <b>Mark as done</b> goes on with the next step. <b>Skip this step</b> goes on without it.',
+  waitNotAllowed: 'macOS didn’t let DJ HQ press the button: Settings → Do everything shows what to allow.',
+  waitNoRun: 'DJ HQ pressed Start Processing, but no run began: look at Platinum Notes, a message there may be waiting for you.',
+  waitHelp: 'There is nothing to press here. <b>Mark as done</b> goes on at once, without waiting for the rest; <b>Skip this step</b> goes on without it.',
   markDone: 'Mark as done',
   skipStep: 'Skip this step',
   cancelRun: 'Cancel the run…',
@@ -134,7 +139,19 @@ const DA_TEXT = {
   stOn: 'Show the Do everything button',
   stOnHelp: 'On Downloads and on Prepare for player. Configure… finds the apps and files it needs and switches it on.',
   stClose: 'Close Platinum Notes and Mixed In Key when their step is done',
-  stCloseHelp: 'Only when DJ HQ opened them. An app that was open already is left alone.',
+  stCloseHelp: 'Only when DJ HQ opened them, and Platinum Notes only once it has finished. An app that was open already is left alone.',
+  stPress: 'Press Start Processing in Platinum Notes for me',
+  stPressHelp: 'When DJ HQ opens Platinum Notes with the files, it brings it to the front and presses its Start Processing button, and nothing else. If that can’t be done, you press it yourself, as without this.',
+  stPressOn: 'DJ HQ presses Start Processing for you',
+  stPressOff: 'You press Start Processing yourself',
+  axChecking: 'Checking whether macOS lets DJ HQ press buttons in other apps…',
+  axGranted: 'macOS lets DJ HQ press the button.',
+  axMissing: '<b>macOS doesn’t let DJ HQ press buttons in other apps yet.</b> Allow it in System Settings → Privacy & Security → <b>Accessibility</b>: switch DJ HQ on there. Until then you press Start Processing yourself.',
+  axAutomation: '<b>macOS doesn’t let DJ HQ ask System Events yet.</b> Allow it in System Settings → Privacy & Security → <b>Automation</b>: under DJ HQ, switch System Events on. Until then you press Start Processing yourself.',
+  axUnknown: 'DJ HQ couldn’t check whether macOS lets it press the button. If it can’t, you press Start Processing yourself.',
+  axAllow: 'Allow…',
+  axRecheck: 'Check again',
+  axProbeHint: 'Asks macOS for real. The first time, it may ask whether DJ HQ may control System Events: allow it.',
   stOnMsg: 'Do everything is on',
   stOffMsg: 'Do everything is off',
   stCloseOn: 'The apps are closed after their step',
@@ -261,7 +278,8 @@ const DA_TEXT = {
     app_wrong: 'That isn’t {app}.',
     platform_unsupported: 'Do everything works on macOS and Windows only.',
     app_open_failed: '{app} couldn’t be opened with the files: {error}',
-    app_still_open: '{app} didn’t close (a dialog may be open there). Close it yourself when you’re ready.',
+    app_still_open: '{app} didn’t close (a dialog may be open there), so DJ HQ left it open. Close it yourself when you’re ready.',
+    app_still_processing: '{app} may still be processing, so DJ HQ left it open. Close it yourself once it has finished.',
     app_left_open: '{app} was already open, so DJ HQ left it open.',
     pn_app_invalid: 'Platinum Notes can’t be used: {error}',
     mik_app_invalid: 'Mixed In Key can’t be used: {error}',
@@ -273,6 +291,11 @@ const DA_TEXT = {
     already_processed: 'Platinum Notes has processed it before.',
     pn_unsupported_format: 'Platinum Notes doesn’t take this file type.',
     pn_file_failed: 'Platinum Notes reports it couldn’t process this file.',
+    pn_left_as_is: 'Platinum Notes left this file as it is: it has most likely processed it before. DJ HQ can’t read its mark in this file type.',
+    retagged: { one: 'The artist, title or genre of {n} file got lost in Platinum Notes and Mixed In Key; DJ HQ wrote them again.', other: 'The artist, title or genre of {n} files got lost in Platinum Notes and Mixed In Key; DJ HQ wrote them again.' },
+    retag_failed: 'Couldn’t write the tags again after Platinum Notes and Mixed In Key ({file}): {error}. Write tags on Prepare for player can do it later.',
+    retag_failed_all: 'Couldn’t write the tags again after Platinum Notes and Mixed In Key: {error}. Write tags on Prepare for player can do it later.',
+    pn_no_mark: 'Platinum Notes reports it processed this file, but the file doesn’t carry its mark. Check that it is set to “Replace original files”.',
     mik_unsupported_format: 'Mixed In Key doesn’t take this file type.',
     has_key: 'Already has a key.',
     marked_done: 'Marked as done by you.',
@@ -292,7 +315,7 @@ const DA_TEXT = {
     rb_xml_in_use: 'Another program had the rekordbox XML file open, so nothing was written. Try again in a moment.',
     rb_added: 'Added to the rekordbox XML.',
     rb_updated: 'Its key in the rekordbox XML was updated ({from} → {to}).',
-    rb_listed: 'Already in the rekordbox XML; added to the {playlist} playlist.',
+    rb_listed: 'Already in the rekordbox XML; it is in the {playlist} playlist.',
     interrupted: 'DJ HQ was closed while this run was going. Resume it, or clear it.',
     cancelled: 'Cancelled. Files already moved or tagged stay that way.',
     job_failed: 'The run stopped: {error}',
@@ -508,6 +531,8 @@ async function daLoadPreview() {
   const R = DA.run; if (!R) return;
   R.phase = 'preview'; R.preview = null; R.err = '';
   daPaintRun();
+  // the preview promises the press only when macOS is known to allow it
+  if (daCfg().press_start && DA.ax === undefined) daAxCheck(false);
   try {
     // with the library files that wait as well, so the dialog can offer them
     const p = await api('/api/do-all/start', { preview: true, include_pending: true });
@@ -613,7 +638,7 @@ function daPreviewHtml(R) {
   const plan = [
     n.moves.length ? li('folderIn', daT('pvMove', { n: n.moves.length, dir }) + (n.ups ? ' ' + daT('pvUpgrades', { n: n.ups }) : '')) : li('folderIn', daT('pvMoveNone')),
     n.total ? li('tag', daT('pvTag', { n: n.total })) : '',
-    n.total ? li('sparkles', n.pn ? daT('pvPn', { n: n.pn }) : daT('pvPnNone')) : '',
+    n.total ? li('sparkles', n.pn ? daT(daCfg().press_start && !daWin() && DA.ax && DA.ax.state === 'granted' ? 'pvPnAuto' : 'pvPn', { n: n.pn }) : daT('pvPnNone')) : '',
     n.total ? li('music', n.mik ? daT('pvMik', { n: n.mik }) : daT('pvMikNone')) : '',
     n.total ? li('upload', daT('pvXml', { file: xml })) : '',
   ].join('');
@@ -679,9 +704,12 @@ function daJobHtml(R) {
     if (cur && rec.state === 'waiting' && rec.wait && j.status === 'waiting') {
       const v = rec.wait.vars || {}, total = v.total || 0;
       const say = rec.wait.code === 'pn_press_start' ? daFill(DA_TEXT.waitPn, { n: total, total })
+        : rec.wait.code === 'pn_pressing' ? daT('waitPnPressing')
+        : rec.wait.code === 'pn_processing' ? daFill(DA_TEXT.waitPnPressed, { n: total, total })
         : rec.wait.code === 'mik_analysing' ? daFill(DA_TEXT.waitMik, { n: total, total }) : esc(rec.wait.text || '');
+      const why = rec.wait.code !== 'pn_press_start' ? '' : rec.pressed === 'not_allowed' ? daT('waitNotAllowed') : rec.pressed === 'not_found' && rec.clicked ? daT('waitNoRun') : '';
       more = `<div class="da-now">
-          <p>${say} <span class="da-prog">${daT('waitDone', { done: v.done || 0, total })}</span></p>
+          <p>${say} <span class="da-prog">${daT('waitDone', { done: v.done || 0, total })}</span></p>${why ? `<p class="da-small">${why}</p>` : ''}
           <p class="da-small">${daT('waitHelp')}</p>
           <div class="da-now-acts">
             <button class="btn btn-sm btn-primary" data-k="done" onclick="daControl('mark_done','${s}')" ${R.busy ? 'disabled' : ''}>${icon('check')}${daT('markDone')}</button>
@@ -752,7 +780,7 @@ function daReportHtml(j) {
     `<p>${daT('repNoKeyHelp')}</p><ul class="da-ul">${r.no_key.map(f => `<li>${esc(f.label)}</li>`).join('')}</ul>`);
   if ((r.key_from_db || []).length) out += sec(daFill(DA_TEXT.repFromDb, { n: r.key_from_db.length }),
     `<p>${daT('repFromDbHelp')}</p><ul class="da-ul">${r.key_from_db.map(f => `<li>${esc(f.label)} <span class="faint">· ${esc(f.key || '')}</span></li>`).join('')}</ul>`);
-  const notes = (j.messages || []).filter(m => ['app_still_open', 'app_left_open', 'mik_db_unavailable'].includes(m.code));
+  const notes = (j.messages || []).filter(m => ['app_still_open', 'app_still_processing', 'app_left_open', 'mik_db_unavailable', 'retagged', 'retag_failed', 'retag_failed_all'].includes(m.code));
   if (notes.length) out += sec(daT('repMessages'), `<ul class="da-ul">${notes.map(m => `<li>${daCode(m.code, m.vars, m.text)}</li>`).join('')}</ul>`);
   if ((r.rekordbox_steps || []).length) out += sec(daT('repRb'),
     `<ol class="steps">${r.rekordbox_steps.map(m => `<li>${daCode(m.code, m.vars || { playlist: 'DJ HQ' }, m.text)}</li>`).join('')}</ol>`);
@@ -770,13 +798,14 @@ function daConfigure(start) {
   modal((dlg, done) => {
     DA.wiz = { dlg, done, i: Math.max(0, DA_WZ.indexOf(start)), det: null, detecting: false, detErr: '',
                draft: { pn_app: c.pn_app || '', mik_app: c.mik_app || '', mik_db: c.mik_db || '', rb_xml: c.rb_xml || '' },
-               typing: {}, typed: {}, err: {}, confirm: !!c.pn_replace_confirmed, close: c.close_apps !== false, busy: false, html: '',
+               typing: {}, typed: {}, err: {}, confirm: !!c.pn_replace_confirmed, close: c.close_apps !== false, press: !!c.press_start, busy: false, html: '',
                // fields the user chose to leave empty: never filled in again by a detection (the
                // database step was passed with "Don't use it" when setup got as far as the XML)
                cleared: { mik_db: !c.mik_db && !!(c.rb_xml || c.on) } };
     if (!DATA.can_pick) DA_FIELDS.forEach(f => { DA.wiz.typing[f] = true; });
     daWizPaint();
     daDetect();
+    if (c.press_start) daAxCheck(false);
   }, { wide: true }).then(() => { DA.wiz = null; render(); });
 }
 
@@ -888,6 +917,7 @@ async function daWizClear(f) {
 }
 function daWizConfirm(on) { if (DA.wiz) { DA.wiz.confirm = !!on; daWizPaint(); } }
 function daWizClose(on) { if (DA.wiz) { DA.wiz.close = !!on; } }
+function daWizPress(on) { if (DA.wiz) { DA.wiz.press = !!on; daWizPaint(); if (on && !DA.ax) daAxCheck(false); } }
 
 async function daWizGo(i) {
   const W = DA.wiz; if (!W || W.busy) return;
@@ -903,7 +933,7 @@ async function daWizFinish() {
   if (DA.wiz !== W) return;
   W.busy = true; daWizPaint();
   try {
-    DATA = await api('/api/settings', { do_all: { on: true, close_apps: W.close, pn_replace_confirmed: W.confirm } });
+    DATA = await api('/api/settings', { do_all: { on: true, close_apps: W.close, press_start: W.press && !daWin(), pn_replace_confirmed: W.confirm } });
     W.busy = false;
     W.done(true);
     const reason = daReason();
@@ -1032,6 +1062,8 @@ function daWizSummary(W) {
     <div class="da-sum">${rows}</div>
     <label class="st-switch"><input type="checkbox" ${W.close ? 'checked' : ''} onchange="daWizClose(this.checked)"><span class="st-track" aria-hidden="true"></span>
       <span class="st-lbl"><b>${daT('stClose')}</b><span>${daT('stCloseHelp')}</span></span></label>
+    ${daWin() ? '' : `<label class="st-switch"><input type="checkbox" ${W.press ? 'checked' : ''} onchange="daWizPress(this.checked)"><span class="st-track" aria-hidden="true"></span>
+      <span class="st-lbl"><b>${daT('stPress')}</b><span>${daT('stPressHelp')}</span></span></label>${W.press ? daAxHtml() : ''}`}
     <div class="da-how-box"><b>${daT('wzRbHead')}</b><ol class="steps">${['rb_untick_key', 'rb_refresh', 'rb_import'].map(c => `<li>${daCode(c, { playlist: 'DJ HQ' })}</li>`).join('')}</ol></div>`;
 }
 
@@ -1072,6 +1104,11 @@ function daSettingsCard() {
        <span class="st-track" aria-hidden="true"></span>
        <span class="st-lbl"><b>${daT('stClose')}</b><span>${daT('stCloseHelp')}</span></span>
      </label>
+     ${daWin() ? '' : `<label class="st-switch">
+       <input type="checkbox" ${c.press_start ? 'checked' : ''} onchange="daTogglePress(this)">
+       <span class="st-track" aria-hidden="true"></span>
+       <span class="st-lbl"><b>${daT('stPress')}</b><span>${daT('stPressHelp')}</span></span>
+     </label>${c.press_start ? daAxHtml() : ''}`}
      <button class="btn btn-sm${c.on && !S.do_all_ready ? ' btn-primary' : ''}" onclick="daConfigure()">${icon('settings')}${daT('configure')}</button>`);
 }
 async function daToggle(el) {
@@ -1080,6 +1117,41 @@ async function daToggle(el) {
   if (!ok) { el.checked = !on; return; }
   if (on && !daSet().do_all_ready) daConfigure();   // nothing to run with yet: set it up now
   if (on) daBoot();
+}
+async function daTogglePress(el) {
+  const on = !!el.checked;
+  const ok = await stSave({ do_all: { press_start: on } }, on ? daT('stPressOn') : daT('stPressOff'));
+  if (!ok) { el.checked = !on; return; }
+  if (on) daAxCheck(false);
+}
+
+/* ---------- Press Start for me: may DJ HQ press buttons in other apps (macOS) ---------- */
+/** DA.ax: undefined (not asked), 'checking', or the server's { state } */
+function daAxHtml() {
+  const ax = DA.ax;
+  if (ax === undefined) { setTimeout(() => daAxCheck(false), 0); return ''; }
+  if (ax === 'checking') return `<div class="da-wait">${spin()}<span>${daT('axChecking')}</span></div>`;
+  const recheck = `<button class="btn btn-sm" onclick="daAxCheck(false)">${icon('refresh')}${daT('axRecheck')}</button>`;
+  const allow = `<button class="btn btn-sm btn-primary" onclick="daAxCheck(true)">${icon('settings')}${daT('axAllow')}</button>`;
+  if (ax.state === 'granted') return noteHtml(daT('axGranted'), `<button class="btn btn-sm" onclick="daAxCheck(true)" title="${esc(DA_TEXT.axProbeHint)}">${icon('refresh')}${daT('axRecheck')}</button>`, 'green');
+  if (ax.state === 'missing') return noteHtml(daT('axMissing'), allow + recheck, 'amber', 'alert');
+  if (ax.state === 'automation') return noteHtml(daT('axAutomation'), allow + recheck, 'amber', 'alert');
+  if (ax.state === 'unsupported') return '';
+  return noteHtml(daT('axUnknown'), recheck, 'plain');
+}
+/** ask the server (prompt: let macOS ask the user, or open the list in System Settings) */
+async function daAxCheck(prompt) {
+  if (DA.ax === 'checking') return;
+  DA.ax = 'checking';
+  daAxRepaint();
+  try { DA.ax = await api('/api/do-all/access', { prompt: !!prompt }); }
+  catch { DA.ax = { state: 'unknown' }; }
+  daAxRepaint();
+}
+function daAxRepaint() {
+  if (DA.wiz) daWizPaint();
+  else if (DA.run) daPaintRun();
+  else render();
 }
 async function daToggleClose(el) {
   const on = !!el.checked;

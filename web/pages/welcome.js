@@ -97,6 +97,7 @@ PAGES.welcome = {
         <button type="submit" class="btn btn-primary btn-lg btn-block wl-submit" id="wl-submit">${icon('link')}Connect library</button>
         <div class="wl-or"><span>or</span></div>
         <button type="button" class="btn btn-block wl-tour" onclick="startTour()">${icon('sparkles')}Take a one-minute tour first</button>
+        ${typeof cfWelcomeLink === 'function' ? cfWelcomeLink() : ''}
       </form>
       <div class="features">
         ${wlFeat('download', 'Find what’s missing', 'Missing tracks with their free download or shop links')}

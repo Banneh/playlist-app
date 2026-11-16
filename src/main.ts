@@ -2,7 +2,7 @@
  *  and opens the UI in a window. External links open in the default browser.
  *  The Discover page embeds soundcloud.com in a WebContentsView that keeps its
  *  own session (persist:soundcloud), so the user signs in once and stays in. */
-import { app, BrowserWindow, dialog, nativeTheme, session, shell, WebContentsView } from "electron";
+import { app, BrowserWindow, dialog, nativeTheme, session, shell, systemPreferences, WebContentsView } from "electron";
 import * as path from "path";
 import * as core from "./core";
 import { PickKind, ScRect, ScView, startServer } from "./server";
@@ -337,6 +337,7 @@ const PICK_TEXT: Record<PickKind, string> = {
   mik_app: "Choose Mixed In Key",
   mik_db: "Choose Mixed In Key’s database",
   rb_xml: "Choose the rekordbox XML file rekordbox imports from",
+  config: "Choose the DJ HQ configuration file to import",
 };
 async function pickFile(kind: PickKind): Promise<string | null> {
   const mac = process.platform === "darwin", winOs = process.platform === "win32";
@@ -349,6 +350,9 @@ async function pickFile(kind: PickKind): Promise<string | null> {
     opt.filters = [{ name: "Mixed In Key database", extensions: mac ? ["mikdb"] : ["db"] }, { name: "All files", extensions: ["*"] }];
     opt.defaultPath = mac ? path.join(home, "Library", "Application Support", "Mixedinkey")
       : path.join(process.env.LOCALAPPDATA || home, "Mixed In Key", "Mixed In Key");
+  } else if (kind === "config") {
+    opt.filters = [{ name: "DJ HQ configuration", extensions: ["json"] }, { name: "All files", extensions: ["*"] }];
+    opt.defaultPath = app.getPath("documents");
   } else {
     opt.filters = [{ name: "rekordbox XML", extensions: ["xml"] }];
     opt.defaultPath = path.join(home, "Documents");
@@ -358,6 +362,28 @@ async function pickFile(kind: PickKind): Promise<string | null> {
   let p = r.filePaths[0];
   if (mac) { const i = p.indexOf(".app/"); if (i >= 0) p = p.slice(0, i + 4); }
   return p;
+}
+
+/** Export configuration: a save dialog (Documents by default), then the file written whole. */
+async function saveFile(defaultName: string, text: string): Promise<string | null> {
+  const opt: Electron.SaveDialogOptions = { title: "Save the DJ HQ configuration", defaultPath: path.join(app.getPath("documents"), defaultName),
+    filters: [{ name: "DJ HQ configuration", extensions: ["json"] }] };
+  const r = win ? await dialog.showSaveDialog(win, opt) : await dialog.showSaveDialog(opt);
+  if (r.canceled || !r.filePath) return null;
+  core.writeFileAtomic(r.filePath, text);
+  return r.filePath;
+}
+
+/** Do everything's "Press Start for me" needs DJ HQ in Privacy & Security → Accessibility.
+ *  macOS shows its own prompt only once; after that the list itself is opened. */
+let axAsked = false;
+function axTrusted(prompt: boolean): boolean {
+  if (process.platform !== "darwin") return false;
+  const trusted = systemPreferences.isTrustedAccessibilityClient(false);
+  if (trusted || !prompt) return trusted;
+  if (!axAsked) { axAsked = true; return systemPreferences.isTrustedAccessibilityClient(true); }
+  shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility");
+  return false;
 }
 
 app.whenReady().then(async () => {
@@ -372,6 +398,8 @@ app.whenReady().then(async () => {
       return r.canceled ? null : r.filePaths[0];
     },
     pickFile,
+    saveFile,
+    ...(process.platform === "darwin" ? { axTrusted } : {}),
     reveal: (p) => shell.showItemInFolder(p),
     packaged: app.isPackaged,
     sc,

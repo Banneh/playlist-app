@@ -6,6 +6,7 @@ import * as fs from "fs";
 import * as http from "http";
 import * as path from "path";
 import * as core from "./core";
+import * as config from "./config";
 import * as pipeline from "./pipeline";
 import { platformApps } from "./extapps";
 
@@ -16,15 +17,21 @@ export interface ServerOpts {
   /** choose one file: an app (pn_app / mik_app: the .app bundle on macOS, the .exe on
    *  Windows), Mixed In Key's database (mik_db) or a rekordbox XML (rb_xml) (Electron only) */
   pickFile?: (kind: PickKind) => Promise<string | null>;
+  /** ask where to save a file (a save dialog) and write `text` there; null when cancelled (Electron only) */
+  saveFile?: (defaultName: string, text: string) => Promise<string | null>;
   /** show a file in the OS file manager (Electron only) */
   reveal?: (p: string) => void;
+  /** macOS desktop app: is it trusted for Accessibility (Do everything's "Press Start for me").
+   *  prompt: ask macOS to ask the user, or open the list in System Settings (Electron only) */
+  axTrusted?: (prompt: boolean) => boolean;
   /** true inside the packaged desktop app (enables the download link in update notices) */
   packaged?: boolean;
   /** the embedded SoundCloud view behind the Discover page (Electron only) */
   sc?: ScView;
 }
 
-export type PickKind = "pn_app" | "mik_app" | "mik_db" | "rb_xml";
+/** config: a configuration file to import (asked for by the import route itself, not /api/pick-file) */
+export type PickKind = "pn_app" | "mik_app" | "mik_db" | "rb_xml" | "config";
 const PICK_KINDS: PickKind[] = ["pn_app", "mik_app", "mik_db", "rb_xml"];
 
 /** An error as JSON: the message, plus its stable code (and vars) when it has one. */
@@ -74,7 +81,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
   // "Do everything": a job that runs outside the queue and only queues its file
   // operations. DJHQ_FAKE_APPS (tests) swaps the outside apps for stand-ins; the
   // packaged app never does.
-  pipeline.init({ apps: platformApps(!opts.packaged), enqueue, dataDir: opts.dataDir,
+  pipeline.init({ apps: platformApps(!opts.packaged), enqueue, dataDir: opts.dataDir, axTrusted: opts.axTrusted,
                   pollMs: opts.packaged ? 3000 : Math.max(200, Number(process.env.DJHQ_PIPE_POLL_MS) || 3000) });
 
   // UI preferences (theme, "tour seen", dismissed update) live next to state.json: the
@@ -83,6 +90,10 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
   const readPrefs = (): Record<string, unknown> => {
     try { return JSON.parse(fs.readFileSync(prefsPath, "utf8")); } catch { return {}; }
   };
+  // the configuration file saved last (Show in folder may reveal it, nothing else the request names)
+  let savedConfig = "";
+  // the export can carry a private playlist link: only this computer's own pages may download it
+  const localHost = (req: http.IncomingMessage) => /^(127\.0\.0\.1|localhost)(:\d+)?$/i.test(String(req.headers.host || ""));
   const webDir = path.join(__dirname, "..", "web");
   const indexPath = path.join(webDir, "index.html");
   const MIME: Record<string, string> = {
@@ -184,6 +195,16 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         return void core.buildView().then(json, (e) => json({ error: e.message }, 500));
       if (req.url === "/api/prefs") return json(readPrefs());
       if (req.url === "/api/do-all/status") return json(pipeline.status());   // never builds the view
+      if ((req.url || "").startsWith("/api/config/export?") || req.url === "/api/config/export") {   // headless: the file as a download
+        if (!localHost(req)) return send(403, "text/plain", "forbidden");
+        const q = new URL(req.url || "", "http://x").searchParams;
+        return void enqueue(async () => JSON.stringify(config.buildExport({ leaveLinksOut: q.get("leave_links_out") === "1", theme: readPrefs().theme }), null, 2))
+          .then((text) => {
+            res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Content-Length": Buffer.byteLength(text),
+              "Content-Disposition": `attachment; filename="${config.exportFileName()}"`, "Cache-Control": "no-store" });
+            res.end(text);
+          }, (e) => json(errBody(e), 500));
+      }
       if ((req.url || "").startsWith("/api/file?")) {   // stream a local audio file for the in-app preview
         const q = new URL(req.url || "", "http://x").searchParams;
         const p = path.resolve(String(q.get("path") || ""));
@@ -248,6 +269,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/do-all/detect":  return direct(() => pipeline.detect());
           case "/api/do-all/start":   return direct(() => pipeline.start(data));
           case "/api/do-all/control": return direct(() => pipeline.controlJob(data));
+          case "/api/do-all/access":  return direct(() => pipeline.accessibility(data));
           case "/api/override": return route(() => core.setOverride(data));
           case "/api/edit":     return route(() => core.setEdit(data));
           case "/api/assign":   return route(() => core.setAssign(data));
@@ -260,10 +282,36 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/inbox-find":     return route(() => core.inboxFind(data));
           case "/api/inbox-move-all": return route(() => core.inboxMoveAll());
           case "/api/export-xml":     return route(() => core.exportRekordboxXml());
+          // configuration export / import (see config.ts)
+          case "/api/config/export-info": return route(async () => ({ ...config.exportInfo(), can_save: !!opts.saveFile }));
+          case "/api/config/export": {   // {leave_links_out}: a save dialog; headless answers {unsupported} and the page downloads GET /api/config/export
+            if (!opts.saveFile) return json({ unsupported: true });
+            const save = opts.saveFile;
+            return void enqueue(async () => JSON.stringify(config.buildExport({ leaveLinksOut: !!data.leave_links_out, theme: readPrefs().theme }), null, 2))
+              .then((text) => save(config.exportFileName(), text))
+              .then((p) => { if (p) savedConfig = path.resolve(p); json(p ? { path: p } : { canceled: true }); }, (e) => json(errBody(e), 500));
+          }
+          case "/api/config/import/plan": {   // {text} (headless: the file's contents) or {pick: true} (a file dialog); nothing is written
+            if (data.pick) {
+              if (!opts.pickFile) return json({ unsupported: true });
+              return void opts.pickFile("config").then((p) => {
+                if (!p) return json({ canceled: true });
+                const st = fs.statSync(p);
+                if (st.size > 64 * 1024 * 1024) throw core.appError("config_too_big", "this file is far too big to be a DJ HQ configuration");
+                return json({ ...config.plan(fs.readFileSync(p, "utf8")), file_name: path.basename(p) });
+              }).catch((e) => json(errBody(e), 500));
+            }
+            return direct(async () => config.plan(String(data.text ?? "")));
+          }
+          case "/api/config/import/probe": return direct(async () => config.probe(data));
+          case "/api/config/import/apply": return route(() => {
+            const j = pipeline.status();   // a run that is going works on the current library's files
+            return config.apply(data, { jobActive: !!j.active || ["running", "waiting"].includes(j.job?.status) });
+          });
           case "/api/reveal": {
             if (!opts.reveal) return json({ unsupported: true });
             const p = path.resolve(String(data.path || ""));
-            if (p !== core.rekordboxXmlPath()) return json({ error: "can only reveal the exported file" }, 400);
+            if (p !== core.rekordboxXmlPath() && !(savedConfig && p === savedConfig)) return json({ error: "can only reveal the exported file" }, 400);
             opts.reveal(p);
             return json({ ok: true });
           }

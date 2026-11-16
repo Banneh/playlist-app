@@ -17,6 +17,15 @@ import { execFile, spawn } from "child_process";
 export type AppId = "pn" | "mik";
 export interface AppCandidate { path: string; version: string; }
 export type QuitResult = "closed" | "busy" | "failed";
+/** Pressing Platinum Notes' Start button for the user: "pressed"; "not_found" (no button
+ *  named exactly START PROCESSING in time); "not_allowed" (DJ HQ lacks Accessibility, or
+ *  may not send Apple Events to System Events); "failed" (anything else); "stopped" (told
+ *  to stop before it clicked: the run was cancelled, the step ended) */
+export type PressResult = "pressed" | "not_found" | "not_allowed" | "failed" | "stopped";
+/** May DJ HQ press buttons in another app: "granted"; "missing" (no Accessibility);
+ *  "automation" (Accessibility is there, but System Events may not be asked);
+ *  "unknown" (the check itself failed) */
+export type UiAccess = "granted" | "missing" | "automation" | "unknown";
 /** "replace": Platinum Notes overwrites the originals (keeps its own backup), the only
  *  verified mode; "other": it writes copies somewhere; "unknown": can't be read here. */
 export type PnMode = "replace" | "other" | "unknown";
@@ -34,8 +43,20 @@ export interface ExtApps {
   isRunning(app: AppId, appPath: string): Promise<boolean | null>;
   /** hand the files to the app (starting it when it isn't running) */
   openWithFiles(app: AppId, appPath: string, files: string[]): Promise<void>;
-  /** ask the app to quit; "busy" = still running afterwards (a dialog is up) */
+  /** ask the app to quit; "busy" = still running afterwards (a dialog is up). Never call
+   *  it on Platinum Notes while it processes: it then asks "really quit?" and goes on. */
   quit(app: AppId, appPath: string): Promise<QuitResult>;
+  /** macOS only: bring Platinum Notes to the front and press its START PROCESSING
+   *  button once every file is in its list, trying for up to `ms` (absent where that
+   *  can't be done). quiet: only when it has a window already, and without bringing it
+   *  to the front. stop: asked before every try and while one runs; true ends it
+   *  without a click */
+  pressStart?(appPath: string, files: string[], opts: { ms: number; quiet?: boolean; stop?: () => boolean }): Promise<PressResult>;
+  /** macOS only: may this process press buttons in other apps (Accessibility, and
+   *  Apple Events to System Events); asking System Events may show macOS' consent prompt */
+  uiAccess?(): Promise<UiAccess>;
+  /** macOS only: open System Settings at the Accessibility (or Automation) list */
+  openPrivacy?(pane: "accessibility" | "automation"): Promise<void>;
   readPnOutputMode(): Promise<PnMode>;
   /** Mixed In Key's collection database(s), newest first */
   findMikDb(): Promise<string[]>;
@@ -54,10 +75,10 @@ export interface ExtApps {
 
 // ---------------- shared helpers ----------------
 
-function run(cmd: string, args: string[], timeoutMs: number): Promise<{ code: number; stdout: string; stderr: string }> {
+function run(cmd: string, args: string[], timeoutMs: number, signal?: AbortSignal): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
     try {
-      execFile(cmd, args, { timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
+      execFile(cmd, args, { timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024, windowsHide: true, signal }, (err, stdout, stderr) => {
         let code = 0;
         if (err) code = typeof (err as any).code === "number" ? (err as any).code : 1;
         resolve({ code, stdout: String(stdout), stderr: String(stderr) });
@@ -276,10 +297,11 @@ const darwin: ExtApps = {
 
   async openWithFiles(app, appPath, files) {
     // `open -a <bundle path>` hands the files over through the app's open-documents
-    // handler (both apps implement application:openFiles:), launching it if needed.
-    // UNVERIFIED against the real apps: whether they queue the files this way.
-    // Mixed In Key analyses in the background (-g: it doesn't take the focus; verified in the
-    // supervised test); Platinum Notes comes to the front, where the user presses Start
+    // handler, launching it if needed; both apps queue every file (verified with
+    // Platinum Notes 10.5 and Mixed In Key 11.2.6). Mixed In Key analyses in the
+    // background (-g: it doesn't take the focus). Platinum Notes opens in front: started
+    // with -g it has no window at all until it is activated, and the user (or
+    // pressStart) has to press Start there.
     const bg = app === "mik" ? ["-g"] : [];
     for (let i = 0; i < files.length; i += 200) {
       const r = await run("/usr/bin/open", [...bg, "-a", appPath, ...files.slice(i, i + 200)], 30000);
@@ -289,10 +311,11 @@ const darwin: ExtApps = {
 
   async quit(app, appPath) {
     if ((await this.isRunning(app, appPath)) === false) return "closed";
-    // UNVERIFIED: NSRunningApplication.terminate through JXA is a polite quit request
-    // (like Quit in the menu). Whether macOS asks for Automation consent for it from a
-    // non-sandboxed app is untested. Time-boxed; never escalated to a forced quit: an app
-    // with a dialog up (still processing, unsaved changes, an update) simply stays open.
+    // NSRunningApplication.terminate through JXA is a polite quit request (like Quit in
+    // the menu); no Automation consent is involved. Both apps quit within 1-3 s when idle
+    // (verified). Its "true" proves nothing: Platinum Notes asked while it processes
+    // answers with a "still processing, really quit?" dialog and goes on, so the process
+    // list decides, time-boxed. Never escalated to a forced quit.
     const js = `ObjC.import("AppKit");var a=$.NSRunningApplication.runningApplicationsWithBundleIdentifier(${JSON.stringify(BUNDLE[app])});`
       + `var n=0;for(var i=0;i<a.count;i++){var x=a.objectAtIndex(i);`
       + `if(x.bundleURL&&x.bundleURL.path.js.toLowerCase()===${JSON.stringify(bundleKey(appPath))}){x.terminate;n++;}}n;`;
@@ -368,7 +391,121 @@ const darwin: ExtApps = {
   },
 
   accepts(app) { return ACCEPTS[app]; },
+
+  async pressStart(appPath, files, opts) {
+    // Only a button named exactly START PROCESSING is ever pressed (the same button is
+    // named CANCEL PROCESSING while it runs), and only once every file sent shows in the
+    // window, so a click while the files are still arriving doesn't start a run without
+    // them. Platinum Notes makes its window only when it is activated, and macOS refuses
+    // that while the screen is locked (seen in the live test): then there is nothing to
+    // press until the user brings it up.
+    // A stop (Cancel, Skip, Mark as done) is checked before each try and, while one runs,
+    // every 200 ms: the try is killed then, before it gets to the click.
+    const names = files.map((f) => path.basename(f));
+    const until = Date.now() + opts.ms;
+    const stop = opts.stop || (() => false);
+    let last: PressResult = "not_found";
+    for (;;) {
+      if (stop()) return "stopped";
+      const ac = new AbortController();
+      const watch = setInterval(() => { if (stop()) ac.abort(); }, 200);
+      const r = await run("/usr/bin/osascript", ["-e", PRESS_SCRIPT, BUNDLE.pn, START_BUTTON, opts.quiet ? "quiet" : "front", ...names], 20000, ac.signal)
+        .finally(() => clearInterval(watch));
+      const out = r.stdout.trim();
+      if (ac.signal.aborted && out !== "pressed") return "stopped";
+      if (r.code === 0 && out === "pressed") return "pressed";
+      if (r.code !== 0) {
+        if (uiDenied(r.stderr)) return "not_allowed";
+        last = "failed";
+      } else last = "not_found";   // no window yet, no button, or files still arriving
+      if (Date.now() >= until || !(await macPids("pn", appPath))?.length) return last;
+      await sleep(1500);
+      if (stop()) return "stopped";
+    }
+  },
+
+  async uiAccess() {
+    // reading another app's windows needs Accessibility, and asking System Events needs
+    // its Automation consent: one harmless read tells both apart
+    const r = await run("/usr/bin/osascript", ["-e", 'tell application "System Events" to count windows of (first process whose frontmost is true)'], 20000);
+    if (r.code === 0) return "granted";
+    return uiDenied(r.stderr) || "unknown";
+  },
+
+  async openPrivacy(pane) {
+    await run("/usr/bin/open", ["x-apple.systempreferences:com.apple.preference.security?Privacy_" + (pane === "automation" ? "Automation" : "Accessibility")], 10000);
+  },
 };
+
+/** The name Platinum Notes 10's start button has (upper case) while nothing is processing. */
+const START_BUTTON = "START PROCESSING";
+/** argv: bundle id, the button's exact name, "front" or "quiet" (only with a window
+ *  already there, left where it is: the button is pressed through Accessibility, which
+ *  needs no focus), then the file names that must be listed. The button sits deep in
+ *  the window, so the whole window is searched by name. A file counts as listed when an
+ *  element's name or value is its file name or stem. */
+const PRESS_SCRIPT = `on run argv
+  set bid to item 1 of argv
+  set want to item 2 of argv
+  set quiet to (item 3 of argv) is "quiet"
+  set wanted to {}
+  repeat with i from 4 to (count of argv)
+    set end of wanted to item i of argv
+  end repeat
+  tell application "System Events"
+    set p to (first process whose bundle identifier is bid)
+    if quiet and (count of windows of p) is 0 then return "no window"
+    if not quiet then
+      set frontmost of p to true
+      delay 0.5
+    end if
+    tell p
+      repeat with w in windows
+        set c to entire contents of w
+        set btn to missing value
+        set seen to {}
+        repeat with e in c
+          set nm to ""
+          try
+            set nm to name of e as text
+          end try
+          if nm is want and btn is missing value then
+            try
+              if role of e is "AXButton" then set btn to contents of e
+            end try
+          end if
+          if nm is not "" and nm is not "missing value" then set end of seen to nm
+          try
+            set v to value of e
+            if class of v is text then set end of seen to v
+          end try
+        end repeat
+        if btn is not missing value then
+          repeat with f in wanted
+            set fname to f as text
+            set stem to fname
+            set AppleScript's text item delimiters to "."
+            if (count of text items of fname) > 1 then set stem to (text items 1 thru -2 of fname) as text
+            set AppleScript's text item delimiters to ""
+            if seen does not contain fname and seen does not contain stem then return "waiting"
+          end repeat
+          click btn
+          return "pressed"
+        end if
+      end repeat
+      return "not found"
+    end tell
+  end tell
+end run`;
+
+/** What an osascript error says about the permissions: "missing" (not allowed assistive
+ *  access: -1719, -25211), "automation" (may not send Apple Events to System Events:
+ *  -1743), null for anything else. */
+function uiDenied(stderr: string): "missing" | "automation" | null {
+  if (/-1743\b|not authori[sz]ed to send apple events/i.test(stderr)) return "automation";
+  if (/-1719\b|-25211\b|assistive access/i.test(stderr)) return "missing";
+  return null;
+}
 
 /** rekordbox's "Imported Library" (Preferences > Advanced > Database > rekordbox xml) */
 function bridgeXml(settingsFile: string): string | null {

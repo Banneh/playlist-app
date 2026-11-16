@@ -1,0 +1,25 @@
+/* Move or back up your setup (pages/config.js): the export and import dialogs. Tokens and
+   components come from app.css; the import's progress header reuses the work-through one
+   (wt-*) and its lists and check rows the Do everything ones (da-ul, da-check, da-wait). */
+
+.cf-body .cf-p { font-size: 13.5px; color: var(--text-2); line-height: 1.5; }
+.cf-body .cf-p + .cf-p, .cf-body .cf-p + .cf-pick, .cf-body .cf-pick + .cf-p { margin-top: 10px; }
+.cf-notes:not(:empty) { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.cf-check .cf-hint { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; }
+.cf-pick { display: flex; }
+.cf-pick .field { flex: 1; }
+.cf-libs { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.cf-lib { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-md); }
+.cf-lib + .cf-lib { margin-top: 0; }
+.cf-body > .cf-lib { margin-top: 12px; }
+.cf-lib h4 { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.cf-lib h4 .ic { width: 16px; height: 16px; flex-shrink: 0; color: var(--accent-text); }
+.cf-folder { margin-top: 12px; }
+.cf-fhead { font-size: 12.5px; margin-bottom: 6px; overflow-wrap: anywhere; }
+.cf-was { font: 12px/1.4 var(--mono); }
+.cf-count { display: flex; align-items: flex-start; gap: 6px; margin-top: 6px; font-size: 12.5px; color: var(--text-2); }
+.cf-count .ic { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; }
+.cf-count.cf-good .ic { color: var(--green); }
+.cf-count.cf-warn .ic { color: var(--amber); }
+.cf-count.cf-bad, .cf-count.cf-bad .ic { color: var(--red); }
+.wl-import { margin-top: 8px; height: 40px; }
