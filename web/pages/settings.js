@@ -4,15 +4,10 @@
    DATA.backup_bytes, writes through POST /api/settings; folder and link changes go through
    POST /api/library. */
 
-const ST_INTERVALS = [[5, 'Every 5 minutes'], [15, 'Every 15 minutes'], [30, 'Every 30 minutes'], [60, 'Every hour'], [120, 'Every 2 hours']];
+/* refresh intervals in minutes; texts under settings.interval.label.<minutes> / .saved.<minutes> */
+const ST_INTERVALS = [5, 15, 30, 60, 120];
 
-function stBytes(n) {
-  n = Number(n) || 0;
-  if (n < 1024) return n + ' B';
-  if (n < 1024 * 1024) return (n / 1024).toFixed(0) + ' KB';
-  if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(n < 10 * 1024 * 1024 ? 1 : 0) + ' MB';
-  return (n / 1024 / 1024 / 1024).toFixed(1) + ' GB';
-}
+function stBytes(n) { return I18N.bytes(n); }
 
 /* one card: icon · heading · text · controls */
 function stCard(ico, color, title, text, controls) {
@@ -23,111 +18,119 @@ function stCard(ico, color, title, text, controls) {
 }
 
 PAGES.settings = {
-  title: () => 'Settings',
-  sub: () => 'How DJ HQ works on this computer.',
+  title: () => t('settings.title'),
+  sub: () => th('settings.sub'),
   search: false,
   body: () => {
     const S = DATA.settings || {};
     const lib = (DATA.libraries || []).find(l => l.id === DATA.active) || {};
-    const libName = esc(lib.name || DATA.playlist || 'Library');
+    const libName = esc(lib.name || DATA.playlist || t('settings.lib.fallbackName'));
     const isLikes = /\/likes\/?$/.test(DATA.playlist_url || '');
 
     const dirs = lib.dirs || (lib.dir ? [lib.dir] : []);
     const folderRows = dirs.map((d, i) => `<div class="st-path-row">
-         <div class="path" title="${esc(d)}">${icon('folder')}<span>${esc(shortPath(d))}</span>${i === 0 && dirs.length > 1 ? tag('main', 'outline', '', 'New downloads are moved into this folder') : ''}</div>
-         ${i > 0 ? `<button class="btn btn-sm" onclick="stRemoveFolder(${JSON.stringify(d).replace(/"/g, '&quot;')})" title="Stop scanning this folder (the files stay where they are)">${icon('x')}Remove</button>` : ''}
+         <div class="path" title="${esc(d)}">${icon('folder')}<span>${esc(shortPath(d))}</span>${i === 0 && dirs.length > 1 ? tag(t('settings.lib.mainTag'), 'outline', '', t('settings.lib.mainHint')) : ''}</div>
+         ${i > 0 ? `<button class="btn btn-sm" onclick="stRemoveFolder(${JSON.stringify(d).replace(/"/g, '&quot;')})" title="${esc(t('settings.lib.removeFolderHint'))}">${icon('x')}${esc(t('common.remove'))}</button>` : ''}
        </div>`).join('');
-    const library = stCard('folder', '', `Library <span class="st-name">${libName}</span>`,
-      'The music folder' + (dirs.length > 1 ? 's' : '') + ' and the SoundCloud ' + (isLikes ? 'Likes page' : 'playlist') + ' this library keeps in sync. '
-        + 'A library can span several folders; files in any of them count as yours. New downloads go into the main one.',
+    const libText = 'settings.lib.' + (dirs.length > 1 ? 'textMany' : 'textOne') + (isLikes ? 'Likes' : '');
+    const library = stCard('folder', '', th('settings.lib.title', { name: I18N.raw(`<span class="st-name">${libName}</span>`) }),
+      th(libText),
       `${folderRows}
        <div class="fieldrow st-inboxrow">
-         <input class="input" id="st-folder" placeholder="Add another folder to this library…" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')stAddFolder()">
-         ${DATA.can_pick ? `<button class="btn" onclick="stBrowseFolder()">${icon('folder')}Browse…</button>` : ''}
-         <button class="btn" onclick="stAddFolder()">${icon('plus')}Add folder</button>
+         <input class="input" id="st-folder" placeholder="${esc(t('settings.lib.addFolderPh'))}" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')stAddFolder()">
+         ${DATA.can_pick ? `<button class="btn" onclick="stBrowseFolder()">${icon('folder')}${esc(t('common.browse'))}</button>` : ''}
+         <button class="btn" onclick="stAddFolder()">${icon('plus')}${esc(t('settings.lib.addFolder'))}</button>
        </div>
        <label class="st-switch">
          <input type="checkbox" id="st-sub" ${lib.subfolders ? 'checked' : ''} onchange="stToggleSubfolders(this)">
          <span class="st-track" aria-hidden="true"></span>
-         <span class="st-lbl"><b>Include subfolders</b>
-           <span>Also look inside the folders within each library folder. Off, only files directly in a library folder count. Files in subfolders show up as <i>subfolder/file</i>.</span></span>
+         <span class="st-lbl"><b>${esc(t('common.subfolders'))}</b>
+           <span>${th('settings.lib.subfoldersHint')}</span></span>
        </label>
-       ${DATA.playlist_url ? `<button class="btn btn-sm" onclick="scOpen(DATA.playlist_url)">${icon(scInApp() ? 'cloud' : 'external')}${isLikes ? 'Open your Likes on SoundCloud' : 'Open playlist on SoundCloud'}</button>` : ''}
-       <button class="btn btn-sm" onclick="stChangeLink()" title="Point this library at another SoundCloud link, e.g. the share link of the playlist once it is private">${icon('link')}Change link…</button>
-       <button class="btn btn-sm" onclick="uiAddLibrary()">${icon('plus')}Add another library…</button>
-       <button class="btn btn-sm btn-danger" onclick="removeLibrary()">${icon('trash')}Remove this library…</button>`);
+       ${DATA.playlist_url ? `<button class="btn btn-sm" onclick="scOpen(DATA.playlist_url)">${icon(scInApp() ? 'cloud' : 'external')}${esc(t(isLikes ? 'common.openLikesSc' : 'common.openPlaylistSc'))}</button>` : ''}
+       <button class="btn btn-sm" onclick="stChangeLink()" title="${esc(t('settings.lib.changeLinkHint'))}">${icon('link')}${esc(t('common.changeLink'))}</button>
+       <button class="btn btn-sm" onclick="uiAddLibrary()">${icon('plus')}${esc(t('common.addAnotherLibrary'))}</button>
+       <button class="btn btn-sm btn-danger" onclick="removeLibrary()">${icon('trash')}${esc(t('common.removeThisLibrary'))}</button>`);
 
     const inboxShown = esc(shortPath(S.inbox_dir || S.inbox_default || '~/Downloads'));
-    const downloads = stCard('inbox', 'blue', 'Downloads',
-      'DJ HQ watches this folder for fresh downloads that match a track in the playlist.',
+    const downloads = stCard('inbox', 'blue', esc(t('settings.inbox.title')),
+      th('settings.inbox.text'),
       `<div class="st-path-row">
-         <div class="path" title="${esc(S.inbox_dir || '')}">${icon('folder')}<span>${inboxShown}</span>${S.inbox_custom ? '' : tag('default', 'outline')}</div>
-         ${S.inbox_custom ? `<button class="btn btn-sm" onclick="stResetInbox()" title="Back to ${esc(shortPath(S.inbox_default || '~/Downloads'))}">${icon('undo')}Use the default folder</button>` : ''}
+         <div class="path" title="${esc(S.inbox_dir || '')}">${icon('folder')}<span>${inboxShown}</span>${S.inbox_custom ? '' : tag(t('common.defaultTag'), 'outline')}</div>
+         ${S.inbox_custom ? `<button class="btn btn-sm" onclick="stResetInbox()" title="${esc(t('settings.inbox.resetHint', { dir: shortPath(S.inbox_default || '~/Downloads') }))}">${icon('undo')}${esc(t('settings.inbox.reset'))}</button>` : ''}
        </div>
        <div class="fieldrow st-inboxrow">
-         <input class="input" id="st-inbox" placeholder="Type another folder…" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')stSaveInbox()">
-         ${DATA.can_pick ? `<button class="btn" onclick="stBrowseInbox()">${icon('folder')}Browse…</button>` : ''}
-         <button class="btn" onclick="stSaveInbox()">${icon('check')}Save</button>
+         <input class="input" id="st-inbox" placeholder="${esc(t('settings.inbox.folderPh'))}" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')stSaveInbox()">
+         ${DATA.can_pick ? `<button class="btn" onclick="stBrowseInbox()">${icon('folder')}${esc(t('common.browse'))}</button>` : ''}
+         <button class="btn" onclick="stSaveInbox()">${icon('check')}${esc(t('common.save'))}</button>
        </div>
        <label class="st-switch">
          <input type="checkbox" id="st-auto" ${S.auto_move ? 'checked' : ''} onchange="stToggleAuto(this)">
          <span class="st-track" aria-hidden="true"></span>
-         <span class="st-lbl"><b>Move exact matches into the library automatically</b>
-           <span>Only a file whose name matches a playlist track exactly and whose length matches is moved. Files you already have are never replaced. The Downloads page shows what moved.</span></span>
+         <span class="st-lbl"><b>${esc(t('common.autoMove'))}</b>
+           <span>${th('settings.inbox.autoMoveHint')}</span></span>
        </label>`);
 
-    const refresh = stCard('refresh', '', 'Checking the playlist',
-      'How often DJ HQ looks at SoundCloud for changes while the window is open. Refresh in the top right checks right away.',
-      `<div class="select-wrap st-select"><select id="st-interval" aria-label="Refresh interval" onchange="stSetInterval(this.value)">${
-        ST_INTERVALS.map(([v, l]) => `<option value="${v}"${(S.refresh_min || 15) === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>`);
+    const refresh = stCard('refresh', '', esc(t('settings.refresh.title')),
+      th('settings.refresh.text'),
+      `<div class="select-wrap st-select"><select id="st-interval" aria-label="${esc(t('settings.refresh.label'))}" onchange="stSetInterval(this.value)">${
+        ST_INTERVALS.map(v => `<option value="${v}"${(S.refresh_min || 15) === v ? ' selected' : ''}>${esc(t('settings.interval.label.' + v))}</option>`).join('')}</select></div>`);
 
-    const appearance = stCard('sun', 'amber', 'Appearance', 'Light, dark, or whatever your computer is using.',
-      `<div class="seg" role="radiogroup" aria-label="Appearance">
-         <button class="${THEME === 'system' ? 'on' : ''}" onclick="stTheme('system')">${icon('monitor')}System</button>
-         <button class="${THEME === 'light' ? 'on' : ''}" onclick="stTheme('light')">${icon('sun')}Light</button>
-         <button class="${THEME === 'dark' ? 'on' : ''}" onclick="stTheme('dark')">${icon('moon')}Dark</button>
+    const appearance = stCard('sun', 'amber', esc(t('common.theme.title')), th('common.theme.text'),
+      `<div class="seg" role="radiogroup" aria-label="${esc(t('common.theme.title'))}">
+         <button class="${THEME === 'system' ? 'on' : ''}" onclick="stTheme('system')">${icon('monitor')}${esc(t('common.theme.system'))}</button>
+         <button class="${THEME === 'light' ? 'on' : ''}" onclick="stTheme('light')">${icon('sun')}${esc(t('common.theme.light'))}</button>
+         <button class="${THEME === 'dark' ? 'on' : ''}" onclick="stTheme('dark')">${icon('moon')}${esc(t('common.theme.dark'))}</button>
        </div>`);
 
-    const account = !APP.sc ? '' : stCard('cloud', 'blue', 'SoundCloud account',
+    /* ---- language (core i18n block: keep it as it is) ---- */
+    const langBtn = (v, label) => `<button role="radio" aria-checked="${I18N.pref === v}" class="${I18N.pref === v ? 'on' : ''}" onclick="stLang('${v}')">${esc(label)}</button>`;
+    const language = stCard('languages', 'blue', esc(t('common.lang.title')), th('settings.lang.text'),
+      `<div class="seg" role="radiogroup" aria-label="${esc(t('common.lang.title'))}">
+         ${langBtn('auto', t('common.lang.auto'))}${langBtn('en', t('common.lang.en'))}${langBtn('pl', t('common.lang.pl'))}
+       </div>${I18N.pref === 'auto' ? `<span class="faint">${esc(t('settings.lang.autoNow', { lang: t('settings.lang.name.' + I18N.lang) }))}</span>` : ''}`);
+    /* ---- end of the language block ---- */
+
+    const account = !APP.sc ? '' : stCard('cloud', 'blue', esc(t('settings.account.title')),
       SC.signed_in && SC.me
-        ? 'The Discover page is signed in, so tracks can be added to ' + (SC.can && SC.can.likes ? 'your Likes' : 'the playlist') + ' with one click.'
-        : 'Sign in on the Discover page to add tracks straight from the SoundCloud player. The session stays on this computer only.',
+        ? th(SC.can && SC.can.likes ? 'settings.account.textLikes' : 'settings.account.textPlaylist')
+        : th('settings.account.textSignedOut'),
       SC.signed_in && SC.me
-        ? `<div class="st-account">${SC.me.avatar ? `<img class="st-avatar" src="${esc(SC.me.avatar)}" alt="">` : `<span class="st-avatar ph">${icon('cloud')}</span>`}<b>${esc(SC.me.username)}</b>${SC.can && !SC.can.ok ? tag('Can’t add here', 'warn', 'alert', SC.can.why || '') : tag('Connected', 'ok', 'check')}</div>
-           <button class="btn btn-sm" onclick="scSignOut()">${icon('cloudOff')}Sign out…</button>
-           <button class="btn btn-sm" onclick="go('likes')">${icon('heart')}Your Likes</button>
+        ? `<div class="st-account">${SC.me.avatar ? `<img class="st-avatar" src="${esc(SC.me.avatar)}" alt="">` : `<span class="st-avatar ph">${icon('cloud')}</span>`}<b>${esc(SC.me.username)}</b>${SC.can && !SC.can.ok ? tag(t('settings.account.cantAdd'), 'warn', 'alert', scCanWhy()) : tag(t('settings.account.connected'), 'ok', 'check')}</div>
+           <button class="btn btn-sm" onclick="scSignOut()">${icon('cloudOff')}${esc(t('settings.account.signOut'))}</button>
+           <button class="btn btn-sm" onclick="go('likes')">${icon('heart')}${esc(t('settings.account.likes'))}</button>
            ${SC.can && SC.can.likes ? '' : `<label class="st-switch">
              <input type="checkbox" id="st-likeadd" ${S.like_on_add ? 'checked' : ''} onchange="stToggleLikeOnAdd(this)">
              <span class="st-track" aria-hidden="true"></span>
-             <span class="st-lbl"><b>Also like tracks you add to the playlist</b>
-               <span>Adding from the Discover bar (or Not in playlist) likes the track on SoundCloud as well, so your Likes keep a record of everything you picked.</span></span>
+             <span class="st-lbl"><b>${esc(t('settings.account.likeOnAdd'))}</b>
+               <span>${th('settings.account.likeOnAddHint')}</span></span>
            </label>`}`
-        : `<button class="btn btn-sm btn-primary" onclick="dcOpen('https://soundcloud.com/signin')">${icon('cloud')}Sign in on Discover</button>`);
+        : `<button class="btn btn-sm btn-primary" onclick="dcOpen('https://soundcloud.com/signin')">${icon('cloud')}${esc(t('common.signInDiscover'))}</button>`);
 
-    const links = !APP.sc ? '' : stCard('play', '', 'Opening tracks',
-      'Where a track goes when you click its cover, Open playlist on SoundCloud, or a search: the Discover page inside DJ HQ, or your browser.',
-      `<div class="seg" role="radiogroup" aria-label="Open SoundCloud links">
-         <button class="${S.sc_open !== 'browser' ? 'on' : ''}" onclick="stScOpen('discover')">${icon('cloud')}On Discover</button>
-         <button class="${S.sc_open === 'browser' ? 'on' : ''}" onclick="stScOpen('browser')">${icon('external')}In your browser</button>
+    const links = !APP.sc ? '' : stCard('play', '', esc(t('settings.links.title')),
+      th('settings.links.text'),
+      `<div class="seg" role="radiogroup" aria-label="${esc(t('settings.links.label'))}">
+         <button class="${S.sc_open !== 'browser' ? 'on' : ''}" onclick="stScOpen('discover')">${icon('cloud')}${esc(t('settings.links.discover'))}</button>
+         <button class="${S.sc_open === 'browser' ? 'on' : ''}" onclick="stScOpen('browser')">${icon('external')}${esc(t('settings.links.browser'))}</button>
        </div>`);
 
     const bytes = DATA.backup_bytes || 0;
-    const backups = stCard('history', 'green', 'Backups',
-      'Before a file is converted, the untouched original is kept here, together with MP3s that a lossless download replaced. That is what Restore originals copies back.',
+    const backups = stCard('history', 'green', esc(t('settings.backups.title')),
+      th('settings.backups.text'),
       `<div class="st-size">${stBytes(bytes)}</div>
-       <button class="btn btn-sm" onclick="stCleanBackups()" ${bytes ? '' : 'disabled'} title="${bytes ? 'Delete every backup of this library' : 'There is nothing to clean up'}">${icon('trash')}Clean up backups…</button>`);
+       <button class="btn btn-sm" onclick="stCleanBackups()" ${bytes ? '' : 'disabled'} title="${esc(t(bytes ? 'settings.backups.cleanHint' : 'settings.backups.nothingHint'))}">${icon('trash')}${esc(t('settings.backups.clean'))}</button>`);
 
     const about = stCard('info', '', `DJ HQ ${esc(APP.version || '')}`,
-      'Keeps your music folder in sync with a SoundCloud playlist and gets your tracks ready for rekordbox.',
-      `<button class="btn btn-sm" onclick="checkForUpdates({ manual: true })">${icon('refresh')}Check for updates</button>
-       <button class="btn btn-sm" onclick="startTour()">${icon('sparkles')}Show me around</button>
-       <div class="st-path-row st-wide"><span class="faint">Data folder</span><div class="path" title="${esc(S.data_dir || '')}">${icon('folder')}<span>${esc(shortPath(S.data_dir || ''))}</span></div></div>
-       <div class="st-path-row st-wide"><button class="btn btn-sm" onclick="stRawExport()" title="For support, or to go back to an older DJ HQ. Contains your private playlist links.">${icon('download')}Export raw data (JSON)</button><span class="faint" style="flex-shrink: 1; min-width: 0">For support, or to go back to an older DJ HQ. Contains your private playlist links.</span></div>`);
+      th('settings.about.text'),
+      `<button class="btn btn-sm" onclick="checkForUpdates({ manual: true })">${icon('refresh')}${esc(t('settings.about.checkUpdates'))}</button>
+       <button class="btn btn-sm" onclick="startTour()" title="${esc(t('common.showMeAroundHint'))}">${icon('sparkles')}${esc(t('common.showMeAround'))}</button>
+       <div class="st-path-row st-wide"><span class="faint">${esc(t('settings.about.dataFolder'))}</span><div class="path" title="${esc(S.data_dir || '')}">${icon('folder')}<span>${esc(shortPath(S.data_dir || ''))}</span></div></div>
+       <div class="st-path-row st-wide"><button class="btn btn-sm" onclick="stRawExport()" title="${esc(t('settings.about.rawHint'))}">${icon('download')}${esc(t('settings.about.rawExport'))}</button><span class="faint" style="flex-shrink: 1; min-width: 0">${th('settings.about.rawHint')}</span></div>`);
 
     const doAll = typeof daSettingsCard === 'function' ? daSettingsCard() : '';   // pages/doall.js
     const config = typeof cfSettingsCard === 'function' ? cfSettingsCard() : '';  // pages/config.js: export / import
 
-    return `<div class="st-list">${library}${account}${links}${downloads}${doAll}${refresh}${appearance}${backups}${config}${about}</div>`;
+    return `<div class="st-list">${library}${account}${links}${downloads}${doAll}${refresh}${appearance}${language}${backups}${config}${about}</div>`;
   },
 };
 
@@ -139,7 +142,7 @@ async function stLibrary(body, msg) {
     if (msg) toast(msg);
     return true;
   } catch (e) {
-    toast('Couldn’t change the library: ' + e.message, true);
+    toast(t('common.libraryChangeFailed', { msg: errText(e) }), true);
     return false;
   }
 }
@@ -147,48 +150,48 @@ async function stAddFolder() {
   const el = $('#st-folder');
   const p = (el && el.value || '').trim();
   if (!p) { if (el) el.focus(); return; }
-  await stLibrary({ op: 'add_folder', dir: p }, 'Now also scanning ' + shortPath(p));
+  await stLibrary({ op: 'add_folder', dir: p }, t('settings.toast.scanningToo', { dir: shortPath(p) }));
 }
 async function stBrowseFolder() {
   try {
     const r = await api('/api/pick-folder', {});
-    if (r.path) await stLibrary({ op: 'add_folder', dir: r.path }, 'Now also scanning ' + shortPath(r.path));
-  } catch (e) { toast('Couldn’t open the folder picker: ' + e.message, true); }
+    if (r.path) await stLibrary({ op: 'add_folder', dir: r.path }, t('settings.toast.scanningToo', { dir: shortPath(r.path) }));
+  } catch (e) { toast(t('common.pickerFailed', { msg: errText(e) }), true); }
 }
 async function stRemoveFolder(dir) {
   const ok = await uiConfirm({
-    title: `Remove ${esc(shortPath(dir))} from the library?`,
-    body: '<p>DJ HQ stops scanning this folder. The files in it stay exactly where they are; tracks matched to them show as missing again.</p>',
-    ok: 'Remove folder', danger: true, icon: 'x',
+    title: t('settings.removeFolder.title', { dir: shortPath(dir) }),
+    body: `<p>${th('settings.removeFolder.body')}</p>`,
+    ok: t('settings.removeFolder.ok'), danger: true, icon: 'x',
   });
   if (!ok) return;
-  await stLibrary({ op: 'remove_folder', dir }, 'Folder removed from the library');
+  await stLibrary({ op: 'remove_folder', dir }, t('settings.toast.folderRemoved'));
 }
 async function stToggleSubfolders(el) {
   const on = !!el.checked;
-  const ok = await stLibrary({ op: 'subfolders', on }, on ? 'Subfolders are scanned too' : 'Only the library folders themselves are scanned');
+  const ok = await stLibrary({ op: 'subfolders', on }, t(on ? 'settings.toast.subfoldersOn' : 'settings.toast.subfoldersOff'));
   if (!ok) { el.checked = !on; render(); }
 }
 /* the library's SoundCloud link: the new one is fetched first, the old one stays if that fails */
 function stChangeLink() {
   const lib = (DATA.libraries || []).find(l => l.id === DATA.active) || {};
   return dialog({
-    title: 'Change the SoundCloud link',
-    sub: 'Made the playlist private? Paste the link from Share on SoundCloud. Matches, edits and everything else in the library stay as they are; if the new link misses tracks the library has, you are asked first.',
+    title: th('settings.link.title'),
+    sub: th('settings.link.sub'),
     body: `<div class="wl-form" id="cl-form"><div class="field">
-        <label for="cl-url">SoundCloud link</label>
+        <label for="cl-url">${th('settings.link.label')}</label>
         <input id="cl-url" class="input" value="${esc(lib.url || '')}" spellcheck="false" autocomplete="off" autocapitalize="off">
-        <div class="hint">A public playlist link, or a private playlist’s share link: https://soundcloud.com/you/sets/your-playlist/s-…</div>
+        <div class="hint">${th('settings.link.hint')}</div>
         <div class="wl-err" id="cl-url-err" hidden></div>
       </div></div>`,
-    foot: `<span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn btn-primary" data-a="ok">${icon('link')}Use this link</button>`,
+    foot: `<span class="spacer"></span><button class="btn" data-close>${esc(t('common.cancel'))}</button><button class="btn btn-primary" data-a="ok">${icon('link')}${esc(t('settings.link.use'))}</button>`,
     open(dlg, done) {
       const form = dlg.querySelector('#cl-form'), input = form.querySelector('#cl-url');
       input.oninput = () => wlClear(form, 'cl', 'url');
       const submit = () => {
         const v = input.value.trim();
-        if (!v) return wlError(form, 'cl', 'url', 'Paste the link to your SoundCloud playlist.');
-        if (!wlLooksLikeSoundCloud(v)) return wlError(form, 'cl', 'url', 'That doesn’t look like a SoundCloud link. It should start with https://soundcloud.com/');
+        if (!v) return wlError(form, 'cl', 'url', t('settings.link.empty'));
+        if (!wlLooksLikeSoundCloud(v)) return wlError(form, 'cl', 'url', t('settings.link.notSoundCloud'));
         done(v);
       };
       dlg.querySelector('[data-a=ok]').onclick = submit;
@@ -198,28 +201,30 @@ function stChangeLink() {
   }).then(url => { if (url) stSetLink(url); });
 }
 async function stSetLink(url, confirm) {
-  toast('Fetching the playlist from the new link…');
+  toast(t('settings.link.fetching'));
   try {
     const res = await api('/api/library', { op: 'set_url', url, confirm: !!confirm });
     if (res.confirm) {   // the new link misses tracks the library had: nothing changed yet
       const c = res.confirm, gone = c.had - c.same;
       const ok = await uiConfirm({
-        title: `${plural(gone, 'track')} of ${c.had} aren’t in the new link`,
-        body: `<p>The new link shows ${plural(c.of, 'track')}, ${c.same} of them already in this library${c.unreadable ? `, and ${plural(c.unreadable, 'track')} could not be read` : ''}.`
-          + ` ${c.same < c.had / 2 ? 'It looks like a different playlist. ' : ''}If you use it, the ${plural(gone, 'track')} that aren’t in it leave the library, with their matches; changing the link back won’t bring the matches back.</p>`,
-        ok: 'Use this link anyway', danger: true, icon: 'link',
+        title: tn('settings.link.confirm.title', gone, { had: I18N.num(c.had) }),
+        body: `<p>${tnh('settings.link.confirm.shows', c.of, { same: I18N.num(c.same) })}`
+          + `${c.unreadable ? ' ' + tnh('settings.link.confirm.unreadable', c.unreadable) : ''}`
+          + ` ${c.same < c.had / 2 ? th('settings.link.confirm.different') + ' ' : ''}${tnh('settings.link.confirm.leave', gone)}</p>`,
+        ok: t('settings.link.confirm.ok'), danger: true, icon: 'link',
       });
-      return ok ? stSetLink(url, true) : toast('Link not changed');
+      return ok ? stSetLink(url, true) : toast(t('settings.link.notChanged'));
     }
     DATA = res;
     LAST_OK = Date.now(); LAST_ERR = '';
     render();
-    const r = DATA.fetch_report || {}, unread = unreadableNote(r);
-    setStatus('Playlist checked ' + fmtTime(LAST_OK) + unread);
-    if (!r.had) return toast('Link changed' + unread);
-    toast(`Link changed · ${r.same} of ${plural(r.of, 'track')} were in the playlist before` + unread);
+    const r = DATA.fetch_report || {}, at = LAST_OK;
+    setStatus(() => t('settings.link.checked', { time: fmtTime(at), unread: unreadableNote(r) }));
+    const unread = unreadableNote(r);
+    if (!r.had) return toast(t('settings.link.changed', { unread }));
+    toast(tn('settings.link.changedCount', r.of, { same: I18N.num(r.same), unread }));
   } catch (e) {
-    toast('Couldn’t change the link, the library keeps the old one: ' + e.message, true);
+    toast(t('settings.link.failed', { msg: errText(e) }), true);
   }
 }
 async function stSave(patch, msg) {
@@ -229,7 +234,7 @@ async function stSave(patch, msg) {
     if (msg) toast(msg);
     return true;
   } catch (e) {
-    toast('Couldn’t save: ' + e.message, true);
+    toast(t('common.saveFailed', { msg: errText(e) }), true);
     render();
     return false;
   }
@@ -238,38 +243,39 @@ async function stSaveInbox() {
   const el = $('#st-inbox');
   const p = (el && el.value || '').trim();
   if (!p) { if (el) el.focus(); return; }
-  await stSave({ inbox_dir: p }, 'Watching ' + shortPath(p) + ' for downloads');
+  await stSave({ inbox_dir: p }, t('common.watchingDownloads', { dir: shortPath(p) }));
   if (typeof loadInbox === 'function') loadInbox({ quiet: true });
 }
 async function stBrowseInbox() {
   try {
     const r = await api('/api/pick-folder', {});
-    if (r.path) { await stSave({ inbox_dir: r.path }, 'Watching ' + shortPath(r.path) + ' for downloads'); if (typeof loadInbox === 'function') loadInbox({ quiet: true }); }
-  } catch (e) { toast('Couldn’t open the folder picker: ' + e.message, true); }
+    if (r.path) { await stSave({ inbox_dir: r.path }, t('common.watchingDownloads', { dir: shortPath(r.path) })); if (typeof loadInbox === 'function') loadInbox({ quiet: true }); }
+  } catch (e) { toast(t('common.pickerFailed', { msg: errText(e) }), true); }
 }
 async function stResetInbox() {
-  await stSave({ inbox_dir: '' }, 'Back to the default Downloads folder');
+  await stSave({ inbox_dir: '' }, t('settings.toast.inboxReset'));
   if (typeof loadInbox === 'function') loadInbox({ quiet: true });
 }
 function stScOpen(v) {
-  stSave({ sc_open: v }, v === 'browser' ? 'SoundCloud links open in your browser' : 'SoundCloud links open on Discover');
+  stSave({ sc_open: v }, t(v === 'browser' ? 'settings.toast.openBrowser' : 'settings.toast.openDiscover'));
 }
 async function stToggleLikeOnAdd(el) {
   const on = !!el.checked;
-  const ok = await stSave({ like_on_add: on }, on ? 'Tracks you add are liked as well' : 'Adding no longer likes the track');
+  const ok = await stSave({ like_on_add: on }, t(on ? 'settings.toast.likeOnAddOn' : 'settings.toast.likeOnAddOff'));
   if (!ok) { el.checked = !on; render(); }
 }
 async function stToggleAuto(el) {
   const on = !!el.checked;
-  const ok = await stSave({ auto_move: on }, on ? 'Exact matches will be moved in automatically' : 'Downloads wait for you again');
+  const ok = await stSave({ auto_move: on }, t(on ? 'settings.toast.autoMoveOn' : 'settings.toast.autoMoveOff'));
   if (ok && on && typeof loadInbox === 'function') loadInbox({ quiet: true });
 }
 function stSetInterval(v) {
   const n = Number(v);
-  const label = (ST_INTERVALS.find(([k]) => k === n) || [])[1] || '';
-  stSave({ refresh_min: n }, label ? 'Checking the playlist ' + label.replace(/^Every/, 'every') : 'Saved');
+  stSave({ refresh_min: n }, ST_INTERVALS.includes(n) ? t('settings.interval.saved.' + n) : t('common.saved'));
 }
 function stTheme(v) { setTheme(v); render(); }
+/** Settings → Language: 'auto' | 'en' | 'pl' (core i18n block) */
+function stLang(v) { setLang(v); }
 /** Export raw data (JSON): the saved data (not the preferences), as the state.json of DJ HQ 1.7 and older.
    The desktop app asks where to save it; headless, the server sends it as a download. */
 async function stRawExport() {
@@ -280,24 +286,24 @@ async function stRawExport() {
       const a = document.createElement('a');
       a.href = '/api/state/raw'; a.download = 'state.json';
       document.body.appendChild(a); a.click(); a.remove();
-      return toast('Downloading state.json');
+      return toast(t('settings.toast.rawDownloading'));
     }
-    toast('Saved to ' + shortPath(r.path));
-  } catch (e) { toast('Couldn’t export the raw data: ' + e.message, true); }
+    toast(t('settings.toast.rawSaved', { path: shortPath(r.path) }));
+  } catch (e) { toast(t('settings.toast.rawFailed', { msg: errText(e) }), true); }
 }
 async function stCleanBackups() {
   const bytes = DATA.backup_bytes || 0;
   const ok = await uiConfirm({
-    title: 'Delete the backups?',
-    body: `<p>This frees <b>${esc(stBytes(bytes))}</b> by deleting the backed-up originals of converted files and the MP3s that lossless downloads replaced.</p>
-           <p>Afterwards <b>Restore originals</b> won’t be able to bring those files back. The files in your music folder are not touched.</p>`,
-    ok: 'Delete backups', danger: true, icon: 'trash',
+    title: t('settings.cleanBackups.title'),
+    body: `<p>${th('settings.cleanBackups.body1', { size: stBytes(bytes) })}</p>
+           <p>${th('settings.cleanBackups.body2')}</p>`,
+    ok: t('settings.cleanBackups.ok'), danger: true, icon: 'trash',
   });
   if (!ok) return;
   try {
     DATA = await api('/api/clean-backups', {});
     const r = DATA.clean_report || {};
     render();
-    toast(`Freed ${stBytes(r.freed_bytes || bytes)}`);
-  } catch (e) { toast('Couldn’t clean up: ' + e.message, true); }
+    toast(t('settings.toast.freed', { size: stBytes(r.freed_bytes || bytes) }));
+  } catch (e) { toast(t('settings.toast.cleanFailed', { msg: errText(e) }), true); }
 }

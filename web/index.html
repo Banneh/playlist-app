@@ -37,7 +37,7 @@
       <div class="lib-top">
         <div class="mosaic" id="mosaic"></div>
         <div class="lib-name" id="lib-name">
-          <select id="lib" aria-label="Library"></select>
+          <select id="lib" aria-label="Library" data-i18n-aria-label="app.lib.select"></select>
           <div class="sub" id="lib-sub"></div>
         </div>
       </div>
@@ -49,13 +49,13 @@
 
     <div class="sb-foot">
       <div class="sb-update" id="sb-update" hidden></div>
-      <div class="sb-status" id="sb-status"><span class="dot"></span><span class="trunc">Checking the playlist…</span></div>
+      <div class="sb-status" id="sb-status"><span class="dot"></span><span class="trunc" data-i18n="app.status.checking">Checking the playlist…</span></div>
       <div class="sb-row">
-        <button class="btn btn-ghost btn-sm" id="btn-addlib" title="Add a music folder + playlist"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg><span class="lbl">Add library</span></button>
-        <button class="btn btn-ghost btn-sm btn-icon" id="btn-libmenu" title="Library options"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+        <button class="btn btn-ghost btn-sm" id="btn-addlib" title="Add a music folder + playlist" data-i18n-title="app.lib.addHint"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg><span class="lbl" data-i18n="app.lib.add">Add library</span></button>
+        <button class="btn btn-ghost btn-sm btn-icon" id="btn-libmenu" title="Library options" data-i18n-title="app.lib.options"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
         <span class="spacer"></span>
-        <button class="btn btn-ghost btn-sm btn-icon" id="btn-settings" title="Settings"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
-        <button class="btn btn-ghost btn-sm btn-icon" id="btn-theme" title="Appearance"></button>
+        <button class="btn btn-ghost btn-sm btn-icon" id="btn-settings" title="Settings" data-i18n-title="app.head.settings"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        <button class="btn btn-ghost btn-sm btn-icon" id="btn-theme" title="Appearance" data-i18n-title="common.theme.title"></button>
       </div>
     </div>
   </aside>
@@ -67,8 +67,8 @@
         <div class="ph-actions">
           <span id="ph-actions" style="display:contents"></span>
           <div class="search"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input type="search" id="q" placeholder="Search artist or title…" spellcheck="false" autocomplete="off"><kbd>/</kbd></div>
-          <button class="btn btn-primary" id="btn-refresh" title="Fetch the playlist from SoundCloud again and rescan the music folder (also happens automatically every 15 minutes)"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>Refresh</button>
-          <button class="btn btn-ghost btn-icon" id="btn-guide" title="Guide to this page (?)" aria-label="Guide to this page" hidden><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></button>
+          <button class="btn btn-primary" id="btn-refresh" title="Fetch the playlist from SoundCloud again and rescan the music folder (also happens automatically every 15 minutes)" data-i18n-title="app.head.refreshHint"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg><span data-i18n="common.refresh">Refresh</span></button>
+          <button class="btn btn-ghost btn-icon" id="btn-guide" title="Guide to this page (?)" aria-label="Guide to this page" data-i18n-title="app.head.guideHint" data-i18n-aria-label="app.head.guide" hidden><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></button>
         </div>
       </div>
       <div class="ph-tools" id="ph-tools" hidden></div>
@@ -80,6 +80,50 @@
 <div class="player" id="player" hidden></div>
 <div class="toast" id="toast"></div>
 
+<script src="i18n.js"></script>
+<!-- dictionaries: English first (the fallback), then Polish; each file is one I18N.add() call -->
+<script src="lang/en/common.js"></script>
+<script src="lang/en/err.js"></script>
+<script src="lang/en/app.js"></script>
+<script src="lang/en/player.js"></script>
+<script src="lang/en/welcome.js"></script>
+<script src="lang/en/setup.js"></script>
+<script src="lang/en/tags.js"></script>
+<script src="lang/en/playlist.js"></script>
+<script src="lang/en/likes.js"></script>
+<script src="lang/en/inbox.js"></script>
+<script src="lang/en/extras.js"></script>
+<script src="lang/en/workthrough.js"></script>
+<script src="lang/en/names.js"></script>
+<script src="lang/en/prepare.js"></script>
+<script src="lang/en/doall.js"></script>
+<script src="lang/en/settings.js"></script>
+<script src="lang/en/config.js"></script>
+<script src="lang/en/discover.js"></script>
+<script src="lang/en/guide.js"></script>
+<script src="lang/en/tour.js"></script>
+<script src="lang/en/demo.js"></script>
+<script src="lang/pl/common.js"></script>
+<script src="lang/pl/err.js"></script>
+<script src="lang/pl/app.js"></script>
+<script src="lang/pl/player.js"></script>
+<script src="lang/pl/welcome.js"></script>
+<script src="lang/pl/setup.js"></script>
+<script src="lang/pl/tags.js"></script>
+<script src="lang/pl/playlist.js"></script>
+<script src="lang/pl/likes.js"></script>
+<script src="lang/pl/inbox.js"></script>
+<script src="lang/pl/extras.js"></script>
+<script src="lang/pl/workthrough.js"></script>
+<script src="lang/pl/names.js"></script>
+<script src="lang/pl/prepare.js"></script>
+<script src="lang/pl/doall.js"></script>
+<script src="lang/pl/settings.js"></script>
+<script src="lang/pl/config.js"></script>
+<script src="lang/pl/discover.js"></script>
+<script src="lang/pl/guide.js"></script>
+<script src="lang/pl/tour.js"></script>
+<script src="lang/pl/demo.js"></script>
 <script src="app.js"></script>
 <script src="pages/playlist.js"></script>
 <script src="pages/extras.js"></script>

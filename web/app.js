@@ -27,20 +27,20 @@ let EDIT_ID = null;       // track id (or 'x<i>' for a local file) with the inli
 let PREV = null;          // { page, top }: the page before this one and where it was scrolled to
 let INBOX = null;         // last /api/inbox result (pages/inbox.js)
 let INFLIGHT = 0;         // API calls in progress
-let LAST_OK = 0, LAST_ERR = '', RETRY = null;
+let LAST_OK = 0, LAST_ERR = '', RETRY = null;   // LAST_ERR: the last refresh error ('' or an Error from api())
+let BOOT_ERR = null;      // /api/state failed at launch (the load-error screen)
 const refreshMs = () => ((DATA && DATA.settings && DATA.settings.refresh_min) || 15) * 60 * 1000;   // Settings → refresh interval
 const PAGES = {};
 
 /* ---------- tiny helpers ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const plural = (n, one, many) => `${n} ${n === 1 ? one : (many || one + 's')}`;
 const scSearch = q => 'https://soundcloud.com/search?q=' + encodeURIComponent(String(q || '').trim());
-const fmtTime = ms => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-const fmtDate = ms => new Date(ms).toLocaleDateString([], { day: 'numeric', month: 'short' });
+const fmtTime = ms => I18N.time(ms);   // in the app's language (i18n.js)
+const fmtDate = ms => I18N.date(ms);
 const fmtSecs = s => Math.floor(s / 60) + ':' + String(Math.round(s) % 60).padStart(2, '0');
 const shortPath = p => String(p || '').replace(/^\/Users\/[^/]+/, '~').replace(/^\/home\/[^/]+/, '~').replace(/^C:\\Users\\[^\\]+/i, '~');
-const durDiff = d => d === 0 ? 'same length' : (d > 0 ? '+' : '') + d + ' s';
+const durDiff = d => d === 0 ? t('common.sameLength') : (d > 0 ? '+' : '') + d + ' s';
 const spin = (text) => `<span class="spin"></span>${text ? ' ' + esc(text) : ''}`;
 
 /* ---------- icons (lucide, 16px) ---------- */
@@ -97,6 +97,7 @@ const PATHS = {
   skipFwd: '<polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/>',
   lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   wand: '<path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/>',
+  languages: '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
   settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
 };
 /** icon('download') → inline SVG; icon('download', 'ic-sm') adds classes */
@@ -118,11 +119,11 @@ const emptyHtml = ({ ico = 'music', kind = '', title = '', text = '', acts = '' 
 function toast(msg, isErr) {
   const pg = PAGES[PAGE];
   if (pg && pg.toast && pg.toast(msg, isErr)) return;
-  const t = $('#toast');
-  t.innerHTML = `${icon(isErr ? 'alert' : 'checkCircle')}<span>${esc(msg)}</span>`;
-  t.classList.toggle('err', !!isErr); t.classList.add('show');
-  clearTimeout(t._h);
-  t._h = setTimeout(() => t.classList.remove('show'), isErr ? 5000 : 2600);
+  const el = $('#toast');
+  el.innerHTML = `${icon(isErr ? 'alert' : 'checkCircle')}<span>${esc(msg)}</span>`;
+  el.classList.toggle('err', !!isErr); el.classList.add('show');
+  clearTimeout(el._h);
+  el._h = setTimeout(() => el.classList.remove('show'), isErr ? 5000 : 2600);
 }
 
 /* ---------- API ---------- */
@@ -141,8 +142,9 @@ async function api(path, body) {
     }
     if (j.reavailable && j.reavailable.length) {
       const names = j.reavailable;
-      setTimeout(() => toast('Back in Missing — a link appeared: ' + names.slice(0, 2).join(', ')
-        + (names.length > 2 ? ' and ' + (names.length - 2) + ' more' : '')), 2400);
+      setTimeout(() => toast(names.length > 2
+        ? t('app.status.reavailableMore', { names: names.slice(0, 2).join(', '), n: I18N.num(names.length - 2) })
+        : t('app.status.reavailable', { names: names.join(', ') })), 2400);
     }
     return j;
   } finally { INFLIGHT--; }
@@ -150,15 +152,28 @@ async function api(path, body) {
 const busy = () => INFLIGHT > 0 || EDIT_ID !== null || !!document.querySelector('.overlay') || (typeof TOUR !== 'undefined' && !!TOUR);
 
 /* ---------- playlist refresh: on launch, every 15 min while visible, on demand ---------- */
+/** the sidebar's status line; give a function (() => t(…)) to have it follow a language change (sayStatus) */
+let STATUS_FN = null;
 function setStatus(text, isErr) {
+  STATUS_FN = typeof text === 'function' ? { fn: text, isErr } : null;
+  drawStatus(typeof text === 'function' ? text() : text, isErr);
+}
+function drawStatus(text, isErr) {
   const u = $('#sb-status'); if (!u) return;
   u.innerHTML = `<span class="dot"></span><span class="trunc" title="${esc(text)}">${esc(text)}</span>`;
   u.classList.toggle('err', !!isErr);
 }
+/** say the last status again, in the current language */
+function sayStatus() { if (STATUS_FN) drawStatus(STATUS_FN.fn(), STATUS_FN.isErr); }
 /** " · 3 tracks could not be read" after a fetch that SoundCloud didn't fully answer (view.fetch_report) */
 function unreadableNote(r) {
   const n = r && r.unreadable || 0;
-  return n ? ` · ${plural(n, 'track')} could not be read` : '';
+  return n ? ' · ' + tn('app.status.unreadable', n) : '';
+}
+/** "Playlist checked 14:07" (+ the unreadable note), redrawn in the current language */
+function setCheckedStatus(report) {
+  const at = LAST_OK;
+  setStatus(() => t('app.status.checked', { time: fmtTime(at) }) + unreadableNote(report));
 }
 async function refreshPlaylist({ manual = false } = {}) {
   if (!DATA || !(DATA.libraries || []).length) return;
@@ -170,31 +185,32 @@ async function refreshPlaylist({ manual = false } = {}) {
     }
   }
   if (DATA.link_missing) {   // imported without its link: nothing to fetch; a manual refresh still rescans the folders
-    setStatus(SAFETY_TEXT.linkMissingStatus);
-    if (manual) { try { DATA = await api('/api/rescan', {}); render(); toast(SAFETY_TEXT.rescanned); } catch (e) { toast('Error: ' + e.message, true); } }
+    setStatus(() => t('app.safety.linkMissingStatus'));
+    if (manual) { try { DATA = await api('/api/rescan', {}); render(); toast(t('app.safety.rescanned')); } catch (e) { toast(t('common.error', { msg: errText(e) }), true); } }
     return;
   }
-  const before = DATA.ready ? new Set(DATA.tracks.map(t => t.id)) : null;
+  const before = DATA.ready ? new Set(DATA.tracks.map(tr => tr.id)) : null;
   try {
     const fresh = await api('/api/refresh', {});
     DATA = fresh; LAST_OK = Date.now(); LAST_ERR = '';
     if (manual || !busy()) render();
     if (typeof loadInbox === 'function') loadInbox();     // new downloads may have landed meanwhile
     const unread = unreadableNote(fresh.fetch_report);
-    setStatus('Playlist checked ' + fmtTime(LAST_OK) + unread);
+    setCheckedStatus(fresh.fetch_report);
     let diff = '';
     if (before && fresh.ready) {
-      const now = new Set(fresh.tracks.map(t => t.id));
-      const added = fresh.tracks.filter(t => !before.has(t.id)).length;
+      const now = new Set(fresh.tracks.map(tr => tr.id));
+      const added = fresh.tracks.filter(tr => !before.has(tr.id)).length;
       const removed = [...before].filter(id => !now.has(id)).length;
-      if (added || removed) diff = `${added} new, ${removed} removed`;
+      if (added || removed) diff = t('app.status.diff', { added: I18N.num(added), removed: I18N.num(removed) });
     }
-    if (manual) toast('Playlist and folder refreshed' + (diff ? ' · ' + diff : '') + unread);
-    else if (diff) toast('Playlist updated: ' + diff);
+    if (manual) toast((diff ? t('app.status.refreshedDiff', { diff }) : t('app.status.refreshed')) + unread);
+    else if (diff) toast(t('app.status.updated', { diff }));
   } catch (e) {
-    LAST_ERR = e.message;
-    setStatus((LAST_OK ? 'Checked ' + fmtTime(LAST_OK) + ' · ' : '') + 'update failed: ' + e.message, true);
-    if (manual) toast('Couldn’t fetch the playlist: ' + e.message, true);
+    LAST_ERR = e;
+    const at = LAST_OK;
+    setStatus(() => at ? t('app.status.failedAfter', { time: fmtTime(at), msg: errText(e) }) : t('app.status.failed', { msg: errText(e) }), true);
+    if (manual) toast(t('app.status.fetchFailed', { msg: errText(e) }), true);
     if (!DATA.ready) render();   // the no-data state shows the reason
   }
 }
@@ -271,10 +287,10 @@ function dialog({ title, sub, body = '', foot = '', wide = false, open }) {
     open && open(dlg, done);
   }, { wide });
 }
-function uiConfirm({ title, body, ok = 'OK', danger = false, icon: ico }) {
+function uiConfirm({ title, body, ok = t('common.ok'), danger = false, icon: ico }) {
   return dialog({
     title: esc(title), body,
-    foot: `<span class="spacer"></span><button class="btn" data-close>Cancel</button>
+    foot: `<span class="spacer"></span><button class="btn" data-close>${esc(t('common.cancel'))}</button>
            <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-a="ok">${ico ? icon(ico) : ''}${esc(ok)}</button>`,
     open(dlg, done) {
       const okb = dlg.querySelector('[data-a=ok]');
@@ -311,20 +327,42 @@ function setTheme(v) {
   applyTheme(); renderSidebarFoot();
 }
 
+/* ---------- language ----------
+   PREFS.lang: 'auto' (the computer's language; also when absent) | 'en' | 'pl'. See i18n.js. */
+function setLang(v) {
+  setPref('lang', v);
+  I18N.set(v);
+  applyLang(true);
+}
+/** put the current language on the page: <html lang>, the static texts, and with redraw everything drawn by code */
+function applyLang(redraw) {
+  document.documentElement.lang = I18N.lang;
+  I18N.applyDom();
+  if (!redraw) return;
+  closeMenu();
+  if (typeof closeGuide === 'function') closeGuide(true);
+  render();
+  renderSidebarFoot();
+  const u = $('#sb-update');
+  renderUpdate(!!u && !u.hidden);   // a box shown on purpose (Check for updates) stays
+  sayStatus();
+  if (typeof plRender === 'function') { if (typeof PLAYER !== 'undefined') PLAYER.ui = {}; plRender(); }   // the bar redraws only what changed: forget it all
+}
+
 /* ---------- navigation ---------- */
-const NAV = [
-  { sec: 'Playlist' },
-  { id: 'all', label: 'All tracks', icon: 'listMusic', count: () => DATA.tracks.length },
-  { id: 'missing', label: 'Missing', icon: 'download', count: () => DATA.missing, kind: () => DATA.missing ? '' : 'soft' },
-  { id: 'have', label: 'Have', icon: 'checkCircle', count: () => DATA.have },
-  { id: 'discover', label: 'Discover', icon: 'cloud', count: () => '', when: () => !!APP.sc },
-  { id: 'likes', label: 'Your Likes', icon: 'heart', count: () => typeof LIKES !== 'undefined' && LIKES && LIKES.tracks ? LIKES.missing : '', hideZero: true, when: () => !!APP.sc },
-  { sec: 'Library' },
-  { id: 'new', label: 'New', icon: 'sparkles', count: () => DATA.new_count, kind: () => DATA.new_count ? 'accent' : '' },
-  { id: 'inbox', label: 'Downloads', icon: 'inbox', count: () => INBOX ? INBOX.items.length : '', kind: () => INBOX && INBOX.items.length ? 'accent' : '', hideZero: true },
-  { id: 'extras', label: 'Not in playlist', icon: 'folder', count: () => DATA.extras.length },
-  { sec: 'Player' },
-  { id: 'prepare', label: 'Prepare for player', icon: 'disc', count: () => (DATA.untagged || 0) + (DATA.incompatible || 0), kind: () => 'soft', hideZero: true },
+const NAV = [   // labels are keys (app.nav.*), looked up when the sidebar is drawn
+  { sec: 'app.nav.secPlaylist' },
+  { id: 'all', label: 'app.nav.all', icon: 'listMusic', count: () => DATA.tracks.length },
+  { id: 'missing', label: 'app.nav.missing', icon: 'download', count: () => DATA.missing, kind: () => DATA.missing ? '' : 'soft' },
+  { id: 'have', label: 'app.nav.have', icon: 'checkCircle', count: () => DATA.have },
+  { id: 'discover', label: 'app.nav.discover', icon: 'cloud', count: () => '', when: () => !!APP.sc },
+  { id: 'likes', label: 'app.nav.likes', icon: 'heart', count: () => typeof LIKES !== 'undefined' && LIKES && LIKES.tracks ? LIKES.missing : '', hideZero: true, when: () => !!APP.sc },
+  { sec: 'app.nav.secLibrary' },
+  { id: 'new', label: 'app.nav.new', icon: 'sparkles', count: () => DATA.new_count, kind: () => DATA.new_count ? 'accent' : '' },
+  { id: 'inbox', label: 'app.nav.inbox', icon: 'inbox', count: () => INBOX ? INBOX.items.length : '', kind: () => INBOX && INBOX.items.length ? 'accent' : '', hideZero: true },
+  { id: 'extras', label: 'app.nav.extras', icon: 'folder', count: () => DATA.extras.length },
+  { sec: 'app.nav.secPlayer' },
+  { id: 'prepare', label: 'app.nav.prepare', icon: 'disc', count: () => (DATA.untagged || 0) + (DATA.incompatible || 0), kind: () => 'soft', hideZero: true },
 ];
 function go(page) {
   if (!PAGES[page]) return;
@@ -347,37 +385,14 @@ function go(page) {
    A library folder that isn't there right now (view.folders_away) and saved data that
    couldn't be used at launch (view.state_problem). Shown on top of every page, the welcome
    screen included: a state file moved aside leaves the app with no libraries. */
-const SAFETY_TEXT = {
-  folderMissing: '<b>This library’s folder isn’t available:</b> {dir}. Plug in the drive, let the cloud folder sync, or put the folder back where it was. Until then its tracks show as missing, and your matches and “new” marks are kept.',
-  folderUnreadable: '<b>DJ HQ isn’t allowed to read this library’s folder:</b> {dir}. Allow access to it (on a Mac: System Settings → Privacy & Security → Files and Folders), then look again. Your matches and “new” marks are kept meanwhile.',
-  folderEmpty: '<b>This library’s folder lists no audio files:</b> {dir}. A cloud folder may not have synced yet. Your matches and “new” marks are kept until the files are back.',
-  folderWaiting: '<b>This library is waiting for its music files:</b> {dir}. It was imported before the music was copied here. Copy the files into the folder; every match is kept and follows its file as it arrives. Once the copy is complete, say so, and matches whose file still isn’t there are dropped.',
-  filesReady: 'The copy is complete',
-  filesReadyHint: 'Drop the matches whose file still isn’t in the folder',
-  filesReadyTitle: 'Is the music copy complete?',
-  filesReadyBody: '<p>Matches of files that still aren’t in the library’s folders are dropped, as for any file that is gone. Files that arrive later are matched again by DJ HQ, or by you.</p>',
-  filesReadyOk: 'Yes, it’s complete',
-  filesReadyDone: 'The library is complete',
-  linkMissing: '<b>This library has no SoundCloud link yet.</b> It was imported without it, so the playlist isn’t checked for changes. Everything else works with the track list from the file.',
-  changeLink: 'Change link…',
-  linkMissingStatus: 'No SoundCloud link yet · use Change link… in Settings',
-  rescanned: 'Folders rescanned · this library has no SoundCloud link yet',
-  lookAgain: 'Look again',
-  lookAgainHint: 'Scan the library’s folders again',
-  stateMoved: '<b>DJ HQ couldn’t read its saved data, so it started fresh.</b> The old file is kept untouched at {file}.',
-  stateKept: '<b>DJ HQ couldn’t read its saved data.</b> The file is left untouched at {file} and nothing is saved over it, so changes made now are lost when you quit.',
-  stateNewer: '<b>This data was saved by a newer version of DJ HQ.</b> Nothing is saved from this version, so changes made now are lost when you quit. Update DJ HQ to carry on.',
-  stateImportFailed: '<b>DJ HQ couldn’t move its saved data into its new database.</b> Nothing was changed: the data is still at {file}. Changes made now are lost when you quit.',
-  stateStoreFailed: '<b>DJ HQ can’t save to its database at {file}, so nothing is saved.</b> Changes made now are lost when you quit. Check that the data folder and the file can be written to, then start DJ HQ again.',
-  stateDbReplaced: '<b>DJ HQ couldn’t read its database,</b> so it moved it to {file} and loaded the state.json it found in the data folder instead (now kept as {from}). That file may be older than your last changes.',
-  stateJsonIgnored: '<b>A state.json in the data folder is not used:</b> {file}. It was saved after DJ HQ moved its data into its database (djhq.db), for example by an older DJ HQ, and DJ HQ keeps using the database. To use the file instead: quit DJ HQ, move djhq.db out of the data folder and start DJ HQ again. To keep things as they are, move the file out of the data folder.',
-};
-/** view.state_problem.code -> its SAFETY_TEXT key */
-const STATE_PROBLEM_TEXT = { state_unreadable: 'stateMoved', state_unreadable_kept: 'stateKept', state_newer: 'stateNewer',
+/** view.state_problem.code -> its key under app.safety */
+const STATE_PROBLEM_TEXT = {
+  state_unreadable: 'stateMoved', state_unreadable_kept: 'stateKept', state_newer: 'stateNewer',
   state_import_failed: 'stateImportFailed', state_store_failed: 'stateStoreFailed', state_db_replaced: 'stateDbReplaced',
-  state_json_ignored: 'stateJsonIgnored' };
-/** SAFETY_TEXT[key] with {name} filled in (values are escaped and shown in bold) */
-const safetyText = (key, vals = {}) => SAFETY_TEXT[key].replace(/\{(\w+)\}/g, (_, k) => `<b>${esc(vals[k])}</b>`);
+  state_json_ignored: 'stateJsonIgnored',
+};
+/** an app.safety text as html (the values are escaped; the dictionary shows them in bold) */
+const safetyText = (key, vals = {}) => th('app.safety.' + key, vals);
 function safetyNotesHtml() {
   if (!DATA) return '';
   let out = '';
@@ -385,19 +400,19 @@ function safetyNotesHtml() {
   // a state.json that isn't used loses nothing by itself: amber, not red
   if (sp) out += noteHtml(safetyText(STATE_PROBLEM_TEXT[sp.code] || 'stateMoved', { file: sp.file, from: sp.from }), '', sp.code === 'state_json_ignored' ? 'amber' : 'red', 'alert');
   if (DATA.link_missing && (DATA.libraries || []).length)
-    out += noteHtml(SAFETY_TEXT.linkMissing, typeof stChangeLink === 'function' ? `<button class="btn btn-sm" onclick="stChangeLink()">${icon('link')}${esc(SAFETY_TEXT.changeLink)}</button>` : '', 'amber', 'link');
+    out += noteHtml(safetyText('linkMissing'), typeof stChangeLink === 'function' ? `<button class="btn btn-sm" onclick="stChangeLink()">${icon('link')}${esc(t('common.changeLink'))}</button>` : '', 'amber', 'link');
   for (const a of DATA.folders_away || []) {
     const key = a.why === 'unreadable' ? 'folderUnreadable' : a.why === 'empty' ? 'folderEmpty' : a.why === 'waiting' ? 'folderWaiting' : 'folderMissing';
     out += noteHtml(safetyText(key, { dir: shortPath(a.dir) }),
-      `<button class="btn btn-sm" onclick="rescanFolder()" title="${esc(SAFETY_TEXT.lookAgainHint)}">${icon('refresh')}${esc(SAFETY_TEXT.lookAgain)}</button>`
-      + (a.why === 'waiting' ? `<button class="btn btn-sm" onclick="filesReady()" title="${esc(SAFETY_TEXT.filesReadyHint)}">${icon('check')}${esc(SAFETY_TEXT.filesReady)}</button>` : ''), 'amber', 'alert');
+      `<button class="btn btn-sm" onclick="rescanFolder()" title="${esc(t('app.safety.lookAgainHint'))}">${icon('refresh')}${esc(t('app.safety.lookAgain'))}</button>`
+      + (a.why === 'waiting' ? `<button class="btn btn-sm" onclick="filesReady()" title="${esc(t('app.safety.filesReadyHint'))}">${icon('check')}${esc(t('app.safety.filesReady'))}</button>` : ''), 'amber', 'alert');
   }
   return out ? `<div class="safety-notes">${out}</div>` : '';
 }
 
 /* ---------- render ---------- */
 function render() {
-  if (!DATA) return;
+  if (!DATA) { if (BOOT_ERR) $('#welcome').innerHTML = PAGES.welcome.loadError(BOOT_ERR); return; }
   closeMenu();
   const noLibs = !(DATA.libraries || []).length;
   const setup = !noLibs && typeof SETUP !== 'undefined' && SETUP && !!PAGES.setup;   // "Before we start", right after the first library
@@ -414,11 +429,11 @@ function render() {
   const search = $('#q');
   search.hidden = page.search === false || !DATA.ready;
   search.parentElement.hidden = search.hidden;   // the wrapper carries the icon and the "/" hint
-  search.placeholder = typeof page.search === 'string' ? page.search : 'Search artist or title…';
+  search.placeholder = typeof page.search === 'string' ? page.search : t('app.head.search');
   const guideBtn = $('#btn-guide');
   if (guideBtn) guideBtn.hidden = !DATA.ready || typeof GUIDES === 'undefined' || !GUIDES[PAGE];
   if (!DATA.ready) {   // library exists, playlist never fetched (or fetch failed on first run)
-    $('#ph-title').innerHTML = `<h2>${esc(page.title())}</h2><div class="sub">${LAST_ERR ? 'Couldn’t fetch the playlist: <b>' + esc(LAST_ERR) + '</b>' : 'No playlist data yet'}</div>`;
+    $('#ph-title').innerHTML = `<h2>${esc(page.title())}</h2><div class="sub">${LAST_ERR ? th('app.head.fetchFailed', { msg: errText(LAST_ERR) }) : esc(t('app.head.noData'))}</div>`;
     $('#ph-actions').innerHTML = ''; $('#ph-tools').hidden = true; $('#ph-tools').innerHTML = '';
     $('#page-body').innerHTML = safetyNotesHtml() + PAGES.welcome.noData();
     page.onHide && page.onHide();
@@ -444,27 +459,28 @@ function renderSidebar() {
   const sel = $('#lib');
   sel.innerHTML = libs.map(l => `<option value="${esc(l.id)}" ${l.id === DATA.active ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
   $('#lib-name').classList.toggle('single', libs.length < 2);
-  sel.title = libs.length > 1 ? 'Switch library' : (libs[0] ? libs[0].name : '');
-  const arts = DATA.ready ? [...new Set(DATA.tracks.map(t => t.art).filter(Boolean))].slice(0, 4) : [];
+  sel.title = libs.length > 1 ? t('app.lib.switch') : (libs[0] ? libs[0].name : '');
+  const arts = DATA.ready ? [...new Set(DATA.tracks.map(tr => tr.art).filter(Boolean))].slice(0, 4) : [];
   $('#mosaic').className = 'mosaic' + (arts.length < 4 ? ' one' : '');
   $('#mosaic').innerHTML = arts.length >= 4 ? arts.map(a => `<img src="${esc(a)}" alt="">`).join('')
     : arts.length ? `<img src="${esc(arts[0])}" alt="">` : `<span class="ph">${icon('music')}</span>`;
   const n = DATA.ready ? DATA.tracks.length : 0, have = DATA.ready ? DATA.have : 0;
   const pct = Math.round(100 * have / (n || 1));
-  $('#lib-sub').textContent = DATA.ready ? `${have} of ${n} in your folder` : 'Playlist not fetched yet';
+  $('#lib-sub').textContent = DATA.ready ? t('app.lib.haveOf', { have: I18N.num(have), n: I18N.num(n) }) : t('app.lib.notFetched');
   $('#lib-bar').style.width = pct + '%';
   $('#lib-pct').textContent = DATA.ready ? pct + '%' : '';
   const active = libs.find(l => l.id === DATA.active);
   const dirs = active ? (active.dirs || [active.dir]) : [];
-  $('#lib-dir').textContent = active ? shortPath(active.dir) + (dirs.length > 1 ? ` + ${dirs.length - 1} more` : '') : '';
-  $('#lib-dir').title = dirs.join('\n') + (active && active.subfolders ? '\n(including subfolders)' : '');
+  $('#lib-dir').textContent = !active ? '' : dirs.length > 1 ? t('app.lib.dirMore', { dir: shortPath(active.dir), n: I18N.num(dirs.length - 1) }) : shortPath(active.dir);
+  $('#lib-dir').title = dirs.join('\n') + (active && active.subfolders ? '\n' + t('app.lib.withSubfolders') : '');
 
   $('#nav').innerHTML = NAV.map(it => {
-    if (it.sec) return `<div class="nav-sec">${esc(it.sec)}</div>`;
+    if (it.sec) return `<div class="nav-sec">${esc(t(it.sec))}</div>`;
     if (it.when && !it.when()) return '';
     const c = DATA.ready ? it.count() : '';
     const show = c !== '' && c !== undefined && !(it.hideZero && !c);
-    return `<button class="nav-item${PAGE === it.id ? ' on' : ''}" data-page="${it.id}" onclick="go('${it.id}')" title="${esc(it.label)}${show ? ' · ' + c : ''}">${icon(it.icon)}<span class="lbl">${esc(it.label)}</span>${
+    const label = t(it.label);
+    return `<button class="nav-item${PAGE === it.id ? ' on' : ''}" data-page="${it.id}" onclick="go('${it.id}')" title="${esc(label)}${show ? ' · ' + c : ''}">${icon(it.icon)}<span class="lbl">${esc(label)}</span>${
       show ? badge(c, it.kind ? it.kind() : '') : ''}</button>`;
   }).join('');
   renderSidebarFoot();
@@ -472,20 +488,20 @@ function renderSidebar() {
 function renderSidebarFoot() {
   const b = $('#btn-theme'); if (!b) return;
   b.innerHTML = icon(THEME === 'light' ? 'sun' : THEME === 'dark' ? 'moon' : 'monitor');
-  b.title = 'Appearance: ' + (THEME === 'system' ? 'follows the system' : THEME);
+  b.title = t(THEME === 'light' ? 'app.theme.btnLight' : THEME === 'dark' ? 'app.theme.btnDark' : 'app.theme.btnSystem');
 }
 function themeMenu(anchor) {
   showMenu(anchor, [
-    { label: 'Appearance', header: true },
-    { label: 'Follow the system', icon: 'monitor', checked: THEME === 'system', onclick: () => setTheme('system') },
-    { label: 'Light', icon: 'sun', checked: THEME === 'light', onclick: () => setTheme('light') },
-    { label: 'Dark', icon: 'moon', checked: THEME === 'dark', onclick: () => setTheme('dark') },
+    { label: t('common.theme.title'), header: true },
+    { label: t('app.theme.followSystem'), icon: 'monitor', checked: THEME === 'system', onclick: () => setTheme('system') },
+    { label: t('common.theme.light'), icon: 'sun', checked: THEME === 'light', onclick: () => setTheme('light') },
+    { label: t('common.theme.dark'), icon: 'moon', checked: THEME === 'dark', onclick: () => setTheme('dark') },
   ]);
 }
 
 /* ---------- library actions (shared by sidebar + onboarding) ---------- */
 async function addLibrary(dir, url) {
-  toast('Adding library — fetching the playlist…');
+  toast(t('app.lib.adding'));
   try {
     DATA = await api('/api/library', { op: 'add', dir, url });
     LAST_OK = Date.now(); LAST_ERR = ''; PAGE = 'missing';
@@ -495,13 +511,13 @@ async function addLibrary(dir, url) {
     if (first) { SETUP = true; setPref('setupPending', true); }
     render();
     const unread = unreadableNote(DATA.fetch_report);
-    setStatus('Playlist checked ' + fmtTime(LAST_OK) + unread);
+    setCheckedStatus(DATA.fetch_report);
     if (!first && typeof maybeStartTour === 'function') setTimeout(maybeStartTour, 400);
     if (typeof loadInbox === 'function') loadInbox();
-    if (!first || unread) toast((first ? 'Library connected' : 'Library added') + unread);
+    if (!first || unread) toast(t(first ? 'app.lib.connected' : 'app.lib.added') + unread);
     return true;
   } catch (e) {
-    toast('Couldn’t add the library: ' + e.message, true);
+    toast(t('app.lib.addFailed', { msg: errText(e) }), true);
     try { DATA = await api('/api/state'); } catch {}
     render();
     return false;
@@ -510,13 +526,13 @@ async function addLibrary(dir, url) {
 async function removeLibrary() {
   const lib = (DATA.libraries || []).find(l => l.id === DATA.active);
   const ok = await uiConfirm({
-    title: `Remove “${lib ? lib.name : 'this library'}”?`,
-    body: '<p>The library is removed from DJ HQ only. Your music files stay exactly where they are.</p>',
-    ok: 'Remove', danger: true, icon: 'trash',
+    title: lib ? t('app.lib.removeTitle', { name: lib.name }) : t('app.lib.removeTitleAnon'),
+    body: `<p>${th('app.lib.removeBody')}</p>`,
+    ok: t('common.remove'), danger: true, icon: 'trash',
   });
   if (!ok) return;
-  try { DATA = await api('/api/library', { op: 'remove', id: DATA.active }); render(); toast('Library removed'); }
-  catch (e) { toast('Error: ' + e.message, true); }
+  try { DATA = await api('/api/library', { op: 'remove', id: DATA.active }); render(); toast(t('app.lib.removed')); }
+  catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
 }
 /** The Downloads list depends on which tracks you have: after a match, a status change
  *  or a found file, look at the downloads folder again (quietly, in the background). */
@@ -525,29 +541,29 @@ function inboxChanged() {
 }
 /** an imported library that waited for its music: the user says the copy is complete */
 async function filesReady() {
-  const ok = await uiConfirm({ title: SAFETY_TEXT.filesReadyTitle, body: SAFETY_TEXT.filesReadyBody, ok: SAFETY_TEXT.filesReadyOk, icon: 'check' });
+  const ok = await uiConfirm({ title: t('app.safety.filesReadyTitle'), body: `<p>${th('app.safety.filesReadyBody')}</p>`, ok: t('app.safety.filesReadyOk'), icon: 'check' });
   if (!ok) return;
-  try { DATA = await api('/api/library', { op: 'files_ready' }); render(); toast(SAFETY_TEXT.filesReadyDone); }
-  catch (e) { toast('Error: ' + e.message, true); }
+  try { DATA = await api('/api/library', { op: 'files_ready' }); render(); toast(t('app.safety.filesReadyDone')); }
+  catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
 }
 async function rescanFolder() {
-  try { DATA = await api('/api/rescan', {}); render(); toast('Folders rescanned'); }
-  catch (e) { toast('Error: ' + e.message, true); }
+  try { DATA = await api('/api/rescan', {}); render(); toast(t('app.lib.rescanned')); }
+  catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
 }
 function libraryMenu(anchor) {
   showMenu(anchor, [
     { label: APP.version ? 'DJ HQ ' + APP.version : 'DJ HQ', header: true },
-    { label: 'Open playlist on SoundCloud', icon: typeof scInApp === 'function' && scInApp() ? 'cloud' : 'external', disabled: !DATA.playlist_url, onclick: () => scOpen(DATA.playlist_url) },
-    ...(APP.sc ? [{ label: 'Discover: listen and add', icon: 'cloud', onclick: () => go('discover') }] : []),
-    { label: 'Rescan music folders', icon: 'folder', onclick: rescanFolder },
-    { label: 'Export rekordbox XML…', icon: 'upload', onclick: () => typeof exportXml === 'function' ? exportXml() : go('prepare') },
+    { label: t('common.openPlaylistSc'), icon: typeof scInApp === 'function' && scInApp() ? 'cloud' : 'external', disabled: !DATA.playlist_url, onclick: () => scOpen(DATA.playlist_url) },
+    ...(APP.sc ? [{ label: t('app.libMenu.discover'), icon: 'cloud', onclick: () => go('discover') }] : []),
+    { label: t('app.libMenu.rescan'), icon: 'folder', onclick: rescanFolder },
+    { label: t('app.libMenu.exportXml'), icon: 'upload', onclick: () => typeof exportXml === 'function' ? exportXml() : go('prepare') },
     '-',
-    { label: 'Show me around', icon: 'sparkles', hint: 'A one-minute tour of the app', onclick: () => typeof startTour === 'function' && startTour() },
-    { label: 'Check for updates…', icon: 'refresh', hint: APP.version ? 'This is DJ HQ ' + APP.version : '', onclick: () => checkForUpdates({ manual: true }) },
-    { label: 'Settings…', icon: 'settings', onclick: () => go('settings') },
+    { label: t('common.showMeAround'), icon: 'sparkles', hint: t('common.showMeAroundHint'), onclick: () => typeof startTour === 'function' && startTour() },
+    { label: t('app.libMenu.checkUpdates'), icon: 'refresh', hint: APP.version ? t('app.libMenu.thisVersion', { version: APP.version }) : '', onclick: () => checkForUpdates({ manual: true }) },
+    { label: t('app.libMenu.settings'), icon: 'settings', onclick: () => go('settings') },
     '-',
-    { label: 'Add another library…', icon: 'plus', onclick: () => typeof uiAddLibrary === 'function' && uiAddLibrary() },
-    { label: 'Remove this library…', icon: 'trash', danger: true, onclick: removeLibrary },
+    { label: t('common.addAnotherLibrary'), icon: 'plus', onclick: () => typeof uiAddLibrary === 'function' && uiAddLibrary() },
+    { label: t('common.removeThisLibrary'), icon: 'trash', danger: true, onclick: removeLibrary },
   ]);
 }
 
@@ -571,22 +587,22 @@ function assetPattern() {
 async function checkForUpdates({ manual = false } = {}) {
   try {
     const r = await fetch(RELEASES_API, { headers: { Accept: 'application/vnd.github+json' } });
-    if (!r.ok) throw new Error('GitHub answered ' + r.status);
+    if (!r.ok) throw new Error(t('app.update.ghStatus', { status: r.status }));
     const rel = await r.json();
     const latest = String(rel.tag_name || '').replace(/^v/, '');
-    if (!latest) throw new Error('no release found');
+    if (!latest) throw new Error(t('app.update.noRelease'));
     if (!APP.version || !verNewer(latest, APP.version)) {
       UPDATE = null; renderUpdate();
-      if (manual) toast(`You’re up to date — DJ HQ ${APP.version || latest}`);
+      if (manual) toast(t('app.update.upToDate', { version: APP.version || latest }));
       return;
     }
     const want = assetPattern();
     const asset = want && (rel.assets || []).find(a => want.test(a.name));
     UPDATE = { version: latest, url: asset ? asset.browser_download_url : rel.html_url, page: rel.html_url, asset: asset ? asset.name : '' };
     renderUpdate(manual);
-    if (manual) toast(`DJ HQ ${latest} is available`);
+    if (manual) toast(t('app.update.available', { version: latest }));
   } catch (e) {
-    if (manual) toast('Couldn’t check for updates: ' + e.message, true);
+    if (manual) toast(t('app.update.failed', { msg: errText(e) }), true);
   }
 }
 function renderUpdate(force) {
@@ -595,10 +611,10 @@ function renderUpdate(force) {
   if (!UPDATE || (!force && dismissed === UPDATE.version)) { box.hidden = true; return; }
   const direct = APP.packaged && UPDATE.asset;
   box.hidden = false;
-  box.innerHTML = `<div class="row1">${icon('sparkles')}<b>DJ HQ ${esc(UPDATE.version)} is out</b>
-      <button class="btn btn-ghost btn-sm btn-icon" title="Not now" onclick="dismissUpdate()">${icon('x')}</button></div>
-    <div class="sub">${direct ? 'Download it and install it over this version. Your library and settings stay.' : 'See what changed and grab the new version on GitHub.'}</div>
-    <a class="btn btn-primary btn-sm btn-block" href="${esc(UPDATE.url)}" target="_blank" rel="noopener" title="${esc(UPDATE.asset || UPDATE.page)}">${icon('download')}${direct ? 'Download ' + esc(UPDATE.version) : 'Open release page'}</a>`;
+  box.innerHTML = `<div class="row1">${icon('sparkles')}${th('app.update.isOut', { version: UPDATE.version })}
+      <button class="btn btn-ghost btn-sm btn-icon" title="${esc(t('common.notNow'))}" onclick="dismissUpdate()">${icon('x')}</button></div>
+    <div class="sub">${th(direct ? 'app.update.directText' : 'app.update.pageText')}</div>
+    <a class="btn btn-primary btn-sm btn-block" href="${esc(UPDATE.url)}" target="_blank" rel="noopener" title="${esc(UPDATE.asset || UPDATE.page)}">${icon('download')}${direct ? esc(t('app.update.download', { version: UPDATE.version })) : esc(t('app.update.openPage'))}</a>`;
 }
 function dismissUpdate() {
   if (UPDATE) setPref(UPD_KEY, UPDATE.version);
@@ -608,27 +624,30 @@ function dismissUpdate() {
 /* ---------- global actions: refresh button, search, keyboard ---------- */
 async function manualRefresh() {
   const b = $('#btn-refresh'), old = b.innerHTML;
-  b.disabled = true; b.innerHTML = spin('Refreshing…');
+  b.disabled = true; b.innerHTML = spin(t('app.head.refreshing'));
   await refreshPlaylist({ manual: true });
   b.disabled = false; b.innerHTML = old;
+  I18N.applyDom(b);   // the language may have changed while it ran
 }
 function copyText(text, msg) {
-  if (!text) return toast('Nothing to copy');
-  if (typeof navigator === 'undefined' || !navigator.clipboard) return toast('Clipboard not available here', true);
-  navigator.clipboard.writeText(text).then(() => toast(msg || 'Copied'), e => toast('Copy failed: ' + e.message, true));
+  if (!text) return toast(t('app.copy.nothing'));
+  if (typeof navigator === 'undefined' || !navigator.clipboard) return toast(t('app.copy.noClipboard'), true);
+  navigator.clipboard.writeText(text).then(() => toast(msg || t('common.copied')), e => toast(t('app.copy.failed', { msg: errText(e) }), true));
 }
 
 /* ---------- boot ---------- */
 async function boot() {
   applyTheme();
   await loadPrefs();
+  I18N.init(PREFS.lang); applyLang(false);
+  setStatus(() => t('app.status.checking'));
   if (PREFS.theme && PREFS.theme !== THEME) { THEME = PREFS.theme; try { localStorage.setItem(THEME_KEY, THEME); } catch {} applyTheme(); }
   if (/[?&]titlebar=inset/.test(location.search)) document.documentElement.classList.add('mac-inset');
   $('#q').oninput = e => { Q = e.target.value; renderTop(); };
   $('#btn-refresh').onclick = manualRefresh;
   $('#lib').onchange = async e => {
     try { DATA = await api('/api/library', { op: 'select', id: e.target.value }); EDIT_ID = null; render(); if (typeof loadInbox === 'function') loadInbox(); }
-    catch (err) { toast('Error: ' + err.message, true); }
+    catch (err) { toast(t('common.error', { msg: errText(err) }), true); }
   };
   $('#btn-libmenu').onclick = e => { e.stopPropagation(); libraryMenu(e.currentTarget); };
   $('#btn-addlib').onclick = () => typeof uiAddLibrary === 'function' && uiAddLibrary();
@@ -662,8 +681,9 @@ async function boot() {
       if (!document.hidden && Date.now() - LAST_OK > refreshMs()) refreshPlaylist();
     });
   } catch (e) {
-    toast('Error: ' + e.message, true);
+    toast(t('common.error', { msg: errText(e) }), true);
+    BOOT_ERR = e;
     $('#app').hidden = true; $('#welcome').hidden = false;
-    $('#welcome').innerHTML = PAGES.welcome.loadError(e.message);
+    $('#welcome').innerHTML = PAGES.welcome.loadError(e);
   }
 }

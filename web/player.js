@@ -33,7 +33,7 @@ const plIsPlaying = path => !!path && PLAYER.path === path && !!PLAYER.audio && 
 function playBtn(path, label, sub) {
   if (!path) return '';
   const on = plIsPlaying(path);
-  return `<span class="btn btn-ghost btn-sm btn-icon play-btn${on ? ' is-playing' : ''}" role="button" tabindex="0" title="${on ? 'Pause' : 'Preview'}"
+  return `<span class="btn btn-ghost btn-sm btn-icon play-btn${on ? ' is-playing' : ''}" role="button" tabindex="0" title="${esc(t(on ? 'common.pause' : 'player.preview'))}"
     data-play="${esc(path)}" data-label="${esc(label || '')}" data-sub="${esc(sub || '')}"
     onclick="event.stopPropagation();playFromBtn(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();playFromBtn(this)}">${
     on ? plIcon('pause') : icon('play')}</span>`;
@@ -43,21 +43,23 @@ function playFromBtn(el) { playFile(el.dataset.play, el.dataset.label, el.datase
 function plEnsure() {
   if (PLAYER.audio) return PLAYER.audio;
   const box = $('#player');
+  // static titles carry data-i18n-*: applyLang() puts them in the new language
+  const at = (attr, key) => `${attr}="${esc(t(key))}" data-i18n-${attr}="${key}"`;
   box.innerHTML = `<div class="pl-inner">
-      <button class="btn btn-ghost btn-sm btn-icon pl-sc" id="pl-prev" title="Previous track (P)">${icon('skipBack')}</button>
-      <button class="btn btn-primary btn-icon pl-toggle" id="pl-toggle" title="Play / pause (Space)">${icon('play')}</button>
-      <button class="btn btn-ghost btn-sm btn-icon pl-sc" id="pl-next" title="Next track (N)">${icon('skipFwd')}</button>
+      <button class="btn btn-ghost btn-sm btn-icon pl-sc" id="pl-prev" ${at('title', 'player.prev')}>${icon('skipBack')}</button>
+      <button class="btn btn-primary btn-icon pl-toggle" id="pl-toggle" title="${esc(t('player.toggle'))}">${icon('play')}</button>
+      <button class="btn btn-ghost btn-sm btn-icon pl-sc" id="pl-next" ${at('title', 'player.next')}>${icon('skipFwd')}</button>
       <span class="pl-art" id="pl-art"></span>
       <div class="pl-meta" id="pl-meta">
         <div class="pl-title"><span id="pl-title"></span><span class="dc-eq" id="pl-eq" aria-hidden="true" hidden><i></i><i></i><i></i></span></div>
         <div class="pl-sub trunc" id="pl-sub"></div>
       </div>
       <span class="pl-time tnum" id="pl-cur">0:00</span>
-      <div class="pl-bar" id="pl-bar" role="slider" aria-label="Seek" aria-valuemin="0" title="Click or drag to seek (← → jump 10 s)"><div class="pl-track"><i id="pl-fill"></i></div><b id="pl-knob"></b></div>
+      <div class="pl-bar" id="pl-bar" role="slider" ${at('aria-label', 'player.seek')} aria-valuemin="0" ${at('title', 'player.seekHint')}><div class="pl-track"><i id="pl-fill"></i></div><b id="pl-knob"></b></div>
       <span class="pl-time tnum" id="pl-dur">0:00</span>
       <div class="pl-acts" id="pl-acts"></div>
-      <button class="btn btn-ghost btn-sm btn-icon pl-file" id="pl-mute" title="Mute">${plIcon('volume')}</button>
-      <button class="btn btn-ghost btn-sm btn-icon" id="pl-close" title="Close">${icon('x')}</button>
+      <button class="btn btn-ghost btn-sm btn-icon pl-file" id="pl-mute" title="${esc(t('player.mute'))}">${plIcon('volume')}</button>
+      <button class="btn btn-ghost btn-sm btn-icon" id="pl-close" ${at('title', 'common.close')}>${icon('x')}</button>
     </div>`;
   const a = document.createElement('audio');
   a.preload = 'metadata';
@@ -70,7 +72,7 @@ function plEnsure() {
   a.addEventListener('ended', () => { a.currentTime = 0; plSync(); });
   a.addEventListener('error', () => {
     if (!PLAYER.path) return;
-    toast('Can’t preview this file format', true);
+    toast(t('player.cantPreview'), true);
     stopPlayer();
   });
   const isSc = () => !PLAYER.path;
@@ -80,7 +82,7 @@ function plEnsure() {
   box.querySelector('#pl-next').onclick = blur(() => dcPlayer('next'));
   box.querySelector('#pl-close').onclick = () => isSc() ? scBarClose() : stopPlayer();
   box.querySelector('#pl-meta').onclick = () => { if (isSc()) go('discover'); };
-  box.querySelector('#pl-mute').onclick = () => { a.muted = !a.muted; box.querySelector('#pl-mute').innerHTML = plIcon(a.muted ? 'muted' : 'volume'); box.querySelector('#pl-mute').title = a.muted ? 'Unmute' : 'Mute'; };
+  box.querySelector('#pl-mute').onclick = () => { a.muted = !a.muted; plMute(); };
   // the seek line: a click jumps there, a drag follows the pointer and seeks when it is let go
   const bar = box.querySelector('#pl-bar');
   const frac = e => { const r = bar.getBoundingClientRect(); return r.width > 0 ? Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) : 0; };
@@ -105,6 +107,12 @@ function plEnsure() {
   return a;
 }
 
+/** the mute button shows the state of the file player */
+function plMute() {
+  const b = $('#pl-mute'), a = PLAYER.audio; if (!b || !a) return;
+  b.innerHTML = plIcon(a.muted ? 'muted' : 'volume');
+  b.title = t(a.muted ? 'player.unmute' : 'player.mute');
+}
 /** what the bar shows: the file that is loaded, else SoundCloud's track (null: no bar).
  *  { src: 'file' | 'sc', title, tip, sub (html), art, playing, loading, at, of (seconds), acts (html) } */
 function plModel() {
@@ -138,12 +146,13 @@ function plRender() {
   const put = (k, v, fn) => { if (PLAYER.ui[k] !== v) { PLAYER.ui[k] = v; fn(v); } };
   put('src', m.src, v => { box.dataset.src = v; });
   put('toggle', m.loading ? 'load' : m.playing ? 'pause' : 'play', v => {
-    const t = $('#pl-toggle');
-    t.innerHTML = v === 'load' ? '<span class="spin"></span>' : v === 'pause' ? plIcon('pause') : icon('play');
-    t.title = v === 'load' ? 'Starting…' : v === 'pause' ? 'Pause (Space)' : 'Play (Space)';
+    const b = $('#pl-toggle');
+    b.innerHTML = v === 'load' ? '<span class="spin"></span>' : v === 'pause' ? plIcon('pause') : icon('play');
+    b.title = t(v === 'load' ? 'common.starting' : v === 'pause' ? 'player.pauseSpace' : 'player.playSpace');
   });
+  put('mute', I18N.lang, plMute);   // PLAYER.ui is cleared on a language change
   put('title', m.title, v => { $('#pl-title').textContent = v; });
-  put('tip', m.src === 'sc' ? 'Open on Discover' : m.tip || '', v => { $('#pl-meta').title = v; });
+  put('tip', m.src === 'sc' ? t('common.openOnDiscover') : m.tip || '', v => { $('#pl-meta').title = v; });
   put('eq', m.src === 'sc' && m.playing, v => { $('#pl-eq').hidden = !v; });
   put('sub', m.sub, v => { $('#pl-sub').innerHTML = v; });
   put('art', m.src + '|' + m.art, () => {
@@ -196,7 +205,7 @@ function plPaint(model) {
   const bar = $('#pl-bar');
   bar.classList.toggle('off', !(of > 0) || !!m.loading);
   bar.setAttribute('aria-valuemax', Math.round(of)); bar.setAttribute('aria-valuenow', Math.round(at));
-  bar.setAttribute('aria-valuetext', plTime(at) + ' of ' + plTime(of));
+  bar.setAttribute('aria-valuetext', t('player.valueText', { at: plTime(at), of: plTime(of) }));
 }
 /** keep the bar and every play button in step with what plays */
 function plSync() {
@@ -206,7 +215,7 @@ function plSync() {
     const on = playing && el.dataset.play === PLAYER.path;
     el.classList.toggle('is-playing', on);
     el.innerHTML = on ? plIcon('pause') : icon('play');
-    el.title = on ? 'Pause' : 'Preview';
+    el.title = t(on ? 'common.pause' : 'player.preview');
   });
 }
 /* keys for a file in the bar: Space plays / pauses, ← → jump 10 s (SoundCloud's keys are in pages/discover.js) */

@@ -48,7 +48,16 @@
       "identity": null,
       "extendInfo": {
         "NSAppleEventsUsageDescription": "DJ HQ asks System Events to press Start Processing in Platinum Notes for you, when you switch that on in Do everything."
-      }
+      },
+      "extraResources": [
+        {
+          "from": "scripts/mac-l10n",
+          "to": ".",
+          "filter": [
+            "**/InfoPlist.strings"
+          ]
+        }
+      ]
     },
     "dmg": {
       "writeUpdateInfo": false

@@ -1,0 +1,195 @@
+/* DJ HQ strings: guide, Polish. Owner: job E. */
+I18N.add('pl', 'guide', {
+  kicker: 'Przewodnik',
+  ariaLabel: 'Przewodnik: {title}',
+  close: 'Zamknij (Esc)',
+  tourHint: 'Minutowe oprowadzanie po całej aplikacji, na przykładowych danych',
+  manual: 'Pełna instrukcja',
+  manualHint: 'Pełna instrukcja w serwisie GitHub',
+  manualUrl: 'https://github.com/Banneh/playlist-app/blob/main/README.pl.md',
+
+  all: {
+    title: 'Wszystkie utwory',
+    lead: 'Cała playlista w jej kolejności, bez względu na stan poszczególnych utworów. Strony Brakujące i Mam dzielą tę samą listę na dwie części.',
+    s1: {
+      h: 'Co pokazuje wiersz',
+      i1: { name: 'Okładka', text: 'Kliknij ją, żeby otworzyć utwór na SoundCloud.' },
+      i2: { name: 'Tytuł i wykonawca', text: 'Odczytane z tytułu na SoundCloud: wykonawca przed myślnikiem, tytuł po nim, bez „Premiere:”, numerów katalogowych na początku i „Free DL”. Gdy nazwa wgrywającego stoi po prawej stronie myślnika, obie części są zamieniane. „wgrywający: …” oznacza, że wgrywający nie jest wykonawcą. <b>Edytowane</b> oznacza, że zmieniono je ręcznie; tagi biorą twoje wartości.' },
+      i3: { name: 'Sprawdź nazwę', text: 'Nic nie potwierdza, po której stronie myślnika jest wykonawca, albo tytuł podzielono na znaku „|” lub na luźnym myślniku. Kliknij oznaczenie, żeby przejrzeć te nazwy po kolei.' },
+      i4: { name: 'Wiersz pliku', text: 'Plik z twojego folderu dopasowany do utworu, z małym oznaczeniem, gdy wciąż wymaga tagów, trzeba go przekonwertować na twój odtwarzacz, jest plikiem MP3 albo można go podmienić na bezstratny. Przycisk odtwarzania włącza odsłuch; kliknięcie nazwy dopasowuje inny plik.' },
+      i5: { name: 'Status', text: 'Mam, Brak albo N/D. Kliknij, żeby ustawić status ręcznie albo wrócić do automatycznego.' },
+      i6: { name: 'Zdobądź', text: '<b>Kup</b> otwiera sklep, <b>Za darmo</b> bramkę pobierania. Przycisk Kup jest pierwszy, bo sklepy sprzedają pliki bezstratne. Najedź na przycisk, żeby zobaczyć, dokąd prowadzi.' },
+      i7: { name: 'Menu ⋯', text: 'Ręczne dopasowanie pliku lokalnego, edycja wykonawcy i tytułu albo zamiana ich miejscami, otwarcie utworu na SoundCloud i kopiowanie jego linków.' },
+    },
+    s2: {
+      h: 'Warto wiedzieć',
+      t1: 'Naciśnij <kbd>/</kbd>, żeby szukać po wykonawcy, tytule albo nazwie pliku. Wyszukiwanie filtruje listę, na której jesteś.',
+      t2: 'Żółta informacja nad listą oznacza, że pliki wciąż wymagają tagów; <b>Zapisz tagi</b> naprawia je od razu w tym miejscu.',
+      t3: 'Liczniki na pasku bocznym aktualizują się na bieżąco: Mam plus Brakujące to zawsze Wszystkie utwory.',
+    },
+  },
+
+  missing: {
+    title: 'Brakujące',
+    lead: 'Każdy utwór z playlisty, którego jeszcze nie ma w twoim folderze, z najszybszym sposobem, żeby go zdobyć. Tu dzieje się większość pracy.',
+    s1: {
+      h: 'Jak zdobyć utwór',
+      i1: { name: 'Za darmo', text: 'Darmowe pobieranie: bramka w stylu Hypeddit, plik udostępniony na Dysku Google albo w Dropboksie, albo przycisk pobierania samego SoundCloud. Często plik MP3.' },
+      i2: { name: 'Kup', text: 'Sklep: Bandcamp, Beatport, Juno, Traxsource i podobne. Gdy utwór ma oba linki, ten jest pierwszy, bo sklepy sprzedają pliki bezstratne. Najedź na przycisk, żeby zobaczyć, dokąd prowadzi.' },
+      i3: { name: 'Przejdź po kolei', text: 'Jeden utwór naraz: okładka, linki i obserwowanie folderu Pobrane. Otwórz link, pobierz plik, a gdy się pojawi, DJ HQ zaproponuje <b>Przenieś do biblioteki</b> i przejdzie dalej. Enter otwiera link, strzałki przechodzą między utworami, N odkłada utwór jako niedostępny, Esc zamyka.' },
+      i4: { name: 'Kopiuj linki', text: 'Kopiuje do schowka każdy utwór widoczny na ekranie jako „Wykonawca – Tytuł ⇥ link”, po jednym w wierszu. Przydaje się na zakupy w przeglądarce.' },
+    },
+    s2: {
+      h: 'Zawężanie listy',
+      i1: { name: 'Filtry', text: '<b>Za darmo</b>, <b>Kup</b> i <b>Bez linku</b> zawężają listę. Bez linku to utwory, których trzeba poszukać gdzie indziej. <b>Nazwa do sprawdzenia</b> pokazuje utwory, w których wykonawca i tytuł mogą być zamienione miejscami.' },
+      i2: { name: 'Teraz niedostępne', text: 'W menu statusu <b>Teraz niedostępny na SoundCloud</b> odkłada utwór do osobnej sekcji na dole. Wraca sam, gdy tylko pojawi się dla niego link.' },
+      i3: { name: 'Status ustawiony ręcznie', text: '<b>Mam</b> albo <b>Brak</b> ustawione w menu statusu ma pierwszeństwo przed dopasowaniem pliku; <b>Przywróć ustawienie automatyczne</b> to cofa. Przydaje się, gdy masz utwór pod inną nazwą albo chcesz któryś pominąć.' },
+    },
+    s3: {
+      h: 'Warto wiedzieć',
+      t1: 'Pobrane pliki pojawiają się na stronie <b>Pobrane</b>; stamtąd przenosi się je do biblioteki. Nazwy plików się nie zmieniają.',
+      t2: 'Masz już ten utwór pod inną nazwą? Użyj <b>⋯ → Dopasuj do pliku lokalnego…</b>, zamiast pobierać go jeszcze raz.',
+      t3: 'Utwór bez linku też warto otworzyć kliknięciem w okładkę: SoundCloud czasem podaje sklep w opisie.',
+    },
+  },
+
+  have: {
+    title: 'Mam',
+    lead: 'Utwory z playlisty dopasowane do pliku w twoim folderze. Każdy wiersz pokazuje plik i to, czego jeszcze potrzebuje, zanim trafi do kabiny DJ-a.',
+    s1: {
+      h: 'Oznaczenia pliku',
+      i1: { name: 'Wymaga tagów', text: 'Wykonawcy i tytułu w pliku brakuje albo różnią się od pokazanej nazwy, na przykład po zamianie lub edycji. <b>Zapisz tagi</b> naprawia wszystkie naraz.' },
+      i2: { name: 'Do konwersji · 24 bity, 88,2 kHz …', text: 'Odtwarzacz wybrany na stronie Przygotuj na odtwarzacz nie odtworzy pliku w tej postaci. <b>Konwertuj</b> na tamtej stronie zamienia go na taki, który odtworzy, w tym samym miejscu.' },
+      i3: { name: 'MP3', text: 'Plik stratny. Do słuchania wystarczy, ale do grania z pamięci USB lepsza jest wersja bezstratna, jeśli istnieje.' },
+      i4: { name: 'Dostępny bezstratny', text: 'Masz plik MP3, a link do sklepu prowadzi do wersji bezstratnej. Kup ją, a pobrany plik zaproponuje <b>Podmień na bezstratny</b>; stary plik MP3 zostaje w kopiach zapasowych.' },
+      i5: { name: 'Dopasowany ręcznie · 97% dopasowania', text: 'Sposób dopasowania pliku. Procent mówi, jak dobrze nazwa i długość pliku pasują do pozycji na playliście; wszystko poniżej 100% warto sprawdzić.' },
+    },
+    s2: {
+      h: 'Poprawianie dopasowania',
+      i1: { name: 'Kliknij nazwę pliku', text: 'Otwiera okno dopasowania: najpierw najbardziej prawdopodobne pliki, a pliki zajęte już przez inny utwór są oznaczone. <b>Bez pliku</b> mówi, że utworu w ogóle nie ma w twoim folderze; <b>Dopasuj automatycznie</b> pozwala DJ HQ zdecydować jeszcze raz.' },
+      i2: { name: 'Odsłuch', text: 'Przycisk odtwarzania przed plikiem odtwarza go w aplikacji, zarówno na liście, jak i w oknie dopasowania, więc niepewne dopasowanie można sprawdzić na słuch.' },
+    },
+    s3: {
+      h: 'Filtry',
+      t1: '<b>Dostępny bezstratny</b>, <b>Wymaga tagów</b> i <b>Do konwersji</b> pokazują tylko takie utwory. Liczniki na kartach strony Przygotuj na odtwarzacz otwierają te same filtry.',
+      t2: '<b>Nazwa do sprawdzenia</b> pokazuje utwory, w których wykonawca i tytuł mogą być zamienione miejscami. Popraw je przed <b>Zapisz tagi</b>, żeby do plików trafiły właściwe nazwy.',
+      t3: 'Plik, który wymaga tego samego, ale nie jest na playliście, jest wymieniony pod listą, z linkiem do strony Spoza playlisty.',
+    },
+  },
+
+  new: {
+    title: 'Nowe',
+    lead: 'Co się zmieniło od ostatniego kliknięcia <b>Oznacz wszystko jako przejrzane</b>. Traktuj to jako listę zadań: zapisanie tagów, konwersja i import do rekordbox.',
+    s1: {
+      h: 'Dwa rodzaje nowości',
+      i1: { name: 'Nowy', text: 'Utwór dodano do playlisty od ostatniego oznaczenia. Najedź na oznaczenie, żeby zobaczyć datę.' },
+      i2: { name: 'Nowy plik', text: 'Plik do utworu pojawił się w twoim folderze od ostatniego oznaczenia: pobrany, przeniesiony ze strony Pobrane albo skopiowany tam ręcznie.' },
+      i3: { name: 'Oznacz wszystko jako przejrzane', text: 'Czyści listę. Zmieniają się tylko oznaczenia nowości, nic w twoim folderze ani na playliście.' },
+    },
+    s2: {
+      h: 'Warto wiedzieć',
+      t1: 'Licznik przy Nowe na pasku bocznym obejmuje oba rodzaje.',
+      t2: 'Gdy odświeżanie znajdzie dodane albo usunięte utwory, krótka informacja mówi, ile ich jest.',
+      t3: 'Utwór, do którego przyszedł plik, jednocześnie znika ze strony Brakujące i pojawia się na stronie Mam.',
+    },
+  },
+
+  inbox: {
+    title: 'Pobrane',
+    lead: 'DJ HQ obserwuje twój folder Pobrane. Pliki audio w nim są porównywane z playlistą tak samo jak twoja biblioteka, a te, które pasują do utworu, pojawiają się tutaj.',
+    s1: {
+      h: 'Przenoszenie plików',
+      i1: { name: 'Wiersz', text: 'Do którego utworu należy plik, czy jego długość zgadza się z pozycją na playliście i czy jest to plik MP3.' },
+      i2: { name: 'Przenieś do biblioteki', text: 'Przenosi plik do folderu głównego biblioteki, bez zmiany nazwy, i łączy go z utworem. Utwór znika ze strony Brakujące i pojawia się na stronie Mam.' },
+      i3: { name: 'Podmień na bezstratny', text: 'Bezstratny plik do utworu, który był tylko w MP3. Stary plik MP3 trafia do folderu kopii zapasowych, nie do kosza.' },
+      i4: { name: 'Archiwa zip', text: 'Zakupy z Bandcamp przychodzą jako archiwa zip. DJ HQ zagląda do środka, wypisuje utwory z playlisty (z oznaczeniem „z Album.zip”) i rozpakowuje tylko je. Archiwum zostaje na swoim miejscu.' },
+      i5: { name: 'Przenieś wszystkie', text: 'Cała lista naraz, po informacji, ile z tych plików to podmiany na bezstratne.' },
+    },
+    s2: {
+      h: 'Spoza playlisty',
+      i1: { name: 'Znajdź na SoundCloud', text: 'Dla pobranego pliku, który nie pasuje do żadnego utworu: wyszukaj go, wybierz właściwy wynik, a plik zostanie przeniesiony i dopasowany do tego utworu. Zaznacz pole, a utwór w tym samym kroku trafi też na playlistę na SoundCloud.' },
+      i2: { name: 'Przenieś', text: 'Przenosi taki plik bez zmian do twojej biblioteki. Pojawia się na stronie Spoza playlisty, gdzie można go później znaleźć i dodać.' },
+    },
+    s3: {
+      h: 'Warto wiedzieć',
+      t1: 'Niedokończone pobieranie jest pomijane. Poczekaj, aż się skończy, i kliknij <b>Przeskanuj ponownie</b>.',
+      t2: 'Pliki, które są już w twojej bibliotece pod tą samą nazwą, są policzone na górze, ale nie są wypisane.',
+      t3: 'Gdy w Ustawieniach jest włączone <b>Automatycznie przenoś dokładne dopasowania do biblioteki</b>, pobrany plik, którego nazwa i długość dokładnie pasują do utworu, sam trafia do biblioteki w ciągu minuty. Przybliżone dopasowania i podmiany na bezstratne zawsze czekają na twoje kliknięcie.',
+      t4: 'Pliki pobierają się gdzie indziej? Zmień obserwowany folder w Ustawieniach.',
+      t5: 'Gdy w Ustawieniach jest włączone <b>Zrób wszystko</b>, jego przycisk jest obok <b>Przeskanuj ponownie</b>: przenosi te pliki do biblioteki i prowadzi je dalej przez tagi, Platinum Notes, Mixed In Key i twój plik XML rekordbox. Szczegóły są w Przewodniku na stronie Przygotuj na odtwarzacz.',
+    },
+  },
+
+  extras: {
+    title: 'Spoza playlisty',
+    lead: 'Pliki w twoim folderze, które nie pasują do niczego na playliście. Chodzi o to, żeby trafiły na playlistę, a playlista pozostała jedyną listą, która zawsze się zgadza.',
+    s1: {
+      h: 'Szukanie na SoundCloud',
+      i1: { name: 'Znajdź wszystkie', text: 'Szuka na SoundCloud wszystkich plików naraz. Pewne dopasowania są od razu przyjmowane, reszta czeka na twój wybór.' },
+      i2: { name: 'Znajdź na SoundCloud', text: 'Wyniki z długością i stopniem dopasowania. Wynik, który już jest na playliście, jest oznaczony, a jego wybór łączy plik z tym utworem. Nic nie pasuje? Skróć wyszukiwany tekst, na przykład usuń część z remiksem.' },
+      i3: { name: 'Dodaj do playlisty', text: 'Gdy utwór zostanie znaleziony, ten przycisk otwiera go na SoundCloud, żeby dodać go tam do playlisty. Przy następnym odświeżeniu plik zostanie dopasowany do utworu i zniknie z tej listy.' },
+      i4: { name: 'Edytuj wykonawcę / tytuł', text: 'DJ HQ odczytuje je z nazwy pliku, a ta nie zawsze się zgadza. Najpierw popraw je w menu ⋯ albo zamień miejscami dla pliku nazwanego „Tytuł - Wykonawca”; wyszukiwanie i tagi biorą twoje wartości.' },
+    },
+    s2: {
+      h: 'Warto wiedzieć',
+      t1: 'Te pliki też mogą wymagać tagów albo konwersji. <b>Zapisz tagi</b> i <b>Konwertuj</b> na stronie Przygotuj na odtwarzacz obejmują także je.',
+      t2: '<b>⋯ → Usuń to dopasowanie</b> usuwa błędny wybór, żeby można było szukać jeszcze raz.',
+      t3: 'Przycisk odtwarzania przed plikiem włącza odsłuch, co się przydaje, gdy nazwa pliku nic nie mówi.',
+    },
+  },
+
+  prepare: {
+    title: 'Przygotuj na odtwarzacz',
+    lead: 'Przygotuj dopasowane pliki dla rekordbox i odtwarzaczy w klubie. Najpierw wybierz swój odtwarzacz; wszystko poniżej dostosowuje się do tego, co on odtwarza.',
+    s1: {
+      h: 'Kroki',
+      i1: { name: 'Docelowy odtwarzacz', text: 'XDJ-700 i XDJ-1000 przyjmują tylko 16-bitowe pliki WAV 44,1 albo 48 kHz. CDJ-2000NXS2, XDJ-XZ i CDJ-3000 odtwarzają też 24 bity, 96 kHz i FLAC. Nie masz pewności? Wybierz najbardziej wymagający: co on przyjmie, zagra wszędzie.' },
+      i2: { name: 'Sprawdź nazwy', text: 'Przechodzi po kolei przez wykonawcę i tytuł: tytuł na SoundCloud, wgrywający, co DJ HQ z tego odczytał i dlaczego nie ma pewności. <b>Zostaw</b> (Enter), <b>Zamień</b> (S) albo <b>Edytuj</b> (E); strzałki pomijają i cofają. <b>Do sprawdzenia</b> to te wątpliwe; <b>Wszystkie nazwy</b> przechodzi przez całą bibliotekę. Twoje wybory są zapamiętywane, a <b>Zapisz tagi</b> z nich korzysta.' },
+      i3: { name: 'Zapisz tagi', text: 'Zapisuje wykonawcę i tytuł w każdym pliku, w którym ich brakuje albo różnią się od nazw tutaj, tak jak rekordbox naprawdę je odczytuje (z plikami WAV jest wybredny). Gatunkiem staje się nazwa playlisty. Używane są tytuły edytowane, zamienione albo zostawione w oknie <b>Sprawdź nazwy</b>. Tonacja z Mixed In Key i znacznik Platinum Notes zostają w pliku.' },
+      i4: { name: 'Konwertuj', text: 'Zamienia pliki, których twój odtwarzacz nie odtworzy, na takie, które odtworzy, w tym samym miejscu: ta sama nazwa pliku, ta sama długość, więc rekordbox zachowuje twoje punkty hot cue i siatki beatów. Oryginały są najpierw zapisywane w kopii zapasowej.' },
+      i5: { name: 'Przywróć oryginały', text: 'Przywraca oryginały z kopii zapasowej, kiedy chcesz. <b>Wyczyść kopie zapasowe</b> w Ustawieniach zwalnia miejsce, gdy masz pewność, że nie będą już potrzebne.' },
+      i6: { name: 'Eksportuj XML…', text: 'Zapisuje playlistę rekordbox ze wszystkimi dopasowanymi plikami. W rekordbox: <i>Preferences → Advanced → Database → rekordbox xml</i>, raz wskaż ten plik. Playlista pojawi się w drzewie pod <i>rekordbox xml</i>; kliknij ją prawym przyciskiem i wybierz <b>Import Playlist</b>. Utwory, które już są w twojej kolekcji, zachowują punkty cue i siatki. Ścieżka pliku się nie zmienia, więc eksportuj ponownie przy każdej zmianie playlisty.' },
+      i7: { name: 'Pliki wymagające uwagi', text: 'Dokładnie te pliki, które wciąż wymagają tagów albo konwersji, każdy z przyciskiem odtwarzania. Liczniki na kartach otwierają te same pliki na stronie Mam.' },
+    },
+    s2: {
+      h: 'Zrób wszystko',
+      i1: { name: 'Co robi', text: 'Jedno kliknięcie na cały łańcuch, w tej kolejności: dopasowane pobrane pliki trafiają do twojej biblioteki (dokładnie te, które przeniosłoby <b>Przenieś wszystkie</b> na stronie Pobrane), zapisywane są ich tagi, <b>Platinum Notes</b> wyrównuje ich głośność, <b>Mixed In Key</b> wyznacza tonacje, a utwory razem z tonacjami trafiają do twojego pliku XML rekordbox, na playlistę „DJ HQ”. Resztę rekordbox analizuje sam. Zaznaczenie pola w potwierdzeniu obejmuje też pliki z biblioteki, których Platinum Notes albo Mixed In Key jeszcze nie przetworzyły.' },
+      i2: { name: 'Co jest potrzebne', text: 'Platinum Notes i Mixed In Key na tym komputerze, opcja <b>Replace original files</b> ustawiona w Platinum Notes i plik XML rekordbox, z którego rekordbox importuje utwory. Baza danych Mixed In Key jest opcjonalna: jest czytana tylko dla pliku, który zostanie bez tagu tonacji. Włącz tę funkcję w Ustawieniach; <b>Skonfiguruj…</b> znajduje wszystko, co się da, i pyta o resztę. Do tego czasu przycisk jest wyszarzony i mówi, czego brakuje.' },
+      i3: { name: 'Gdzie są programy', text: 'Na Macu oba są w folderze Aplikacje, jako „Platinum Notes 10” i „Mixed In Key 11” (liczba to wersja). W systemie Windows są zwykle w folderze AppData\\Local\\Programs\\Mixed In Key twojego użytkownika; wpisz %LOCALAPPDATA%\\Programs w pasku adresu okna wyboru pliku albo użyj polecenia <i>Otwórz lokalizację pliku</i> przy pozycji w menu Start. W każdym kroku okna „Skonfiguruj…” jest link <b>Jak to znaleźć?</b> ze szczegółami.' },
+      i4: { name: 'Replace original files', text: 'W Platinum Notes: menu <b>Personalise</b> → <b>Output Location</b> → <b>Replace original files</b>. Wtedy przetworzony plik zajmuje miejsce oryginału, więc biblioteka, tagi i rekordbox dalej wskazują ten sam plik. Platinum Notes najpierw kopiuje każdy oryginał do swojego folderu kopii zapasowych (na Macu zwykle ~/Music/PN Backup), więc nic nie ginie. W każdym innym trybie Zrób wszystko się nie uruchomi.' },
+      i5: { name: 'Plik XML rekordbox', text: 'Użyj pliku ustawionego w rekordbox w <i>Preferences → Advanced → Database → rekordbox xml</i> (Imported Library); inaczej rekordbox nie zobaczy nowych utworów. DJ HQ przed każdą zmianą zapisuje obok niego kopię zapasową, a resztę pliku zostawia bez zmian. Potem w rekordbox: odznacz <b>KEY</b> w <i>Preferences → Analysis → Track Analysis Setting</i> (żeby rekordbox zachował te tonacje), kliknij ikonę odświeżania obok <i>rekordbox xml</i>, otwórz playlistę <b>DJ HQ</b>, zaznacz wszystko, kliknij prawym przyciskiem i wybierz <b>Import To Collection</b>.' },
+      i6: { name: 'Czekanie na programy', text: 'DJ HQ otwiera Platinum Notes z plikami, a ty klikasz tam <b>Start Processing</b> (nie widać okna? kliknij Platinum Notes w Docku). Mixed In Key pracuje w tle. DJ HQ automatycznie zauważa, kiedy każdy program skończy: każdy plik przetworzony przez Platinum Notes ma jego znacznik, a plik gotowy w Mixed In Key ma tag tonacji. W DJ HQ nie trzeba niczego klikać; <b>Oznacz jako zrobione</b> (od razu dalej) i <b>Pomiń ten krok</b> (dalej bez niego) są na wyjątkowe sytuacje. Nic nie czeka z limitem czasu.' },
+      i7: { name: 'Klikaj za mnie Start Processing', text: 'Na Macu w Ustawieniach → Zrób wszystko możesz włączyć klikanie <b>Start Processing</b> w Platinum Notes za ciebie: DJ HQ wysuwa jego okno na wierzch i klika ten jeden przycisk, gdy wszystkie pliki są już na liście, nic poza tym. macOS musi na to pozwolić w <i>Prywatność i ochrona → Dostępność</i> (a gdy zapyta, także na sterowanie System Events przez DJ HQ); ustawienie pokazuje, czy pozwala, i ma przycisk <b>Zezwól…</b>. Po aktualizacji DJ HQ macOS może wymagać ponownej zgody. Gdy DJ HQ nie może go kliknąć, kliknij go samodzielnie.' },
+      i8: { name: 'Zamykanie i anulowanie', text: 'Program otwarty przez DJ HQ jest zamykany po swoim kroku (można to wyłączyć w Ustawieniach), a DJ HQ sprawdza, czy naprawdę się zamknął. Platinum Notes dostaje prośbę o zamknięcie dopiero po zakończeniu przetwarzania; prośba wysłana wcześniej kończy się tylko pytaniem „naprawdę zakończyć?”, a praca trwa dalej, więc po <b>Oznacz jako zrobione</b> w trakcie przetwarzania program pozostaje otwarty. Program, który był już otwarty, zostaje w spokoju; wszystko, co pozostało otwarte, jest wymienione w raporcie. Przebieg trwa dalej po zamknięciu jego okna; pokazuje to przycisk. <b>Anuluj</b> zatrzymuje pracę między plikami, więc żaden plik nie zostaje w połowie przeniesiony ani z niedokończonym zapisem tagów.' },
+    },
+    s3: {
+      h: 'Warto wiedzieć',
+      t1: 'Konwersja idzie plik po pliku i przy dużych plikach WAV może chwilę potrwać. W tym czasie można normalnie korzystać z okna.',
+      t2: 'Pliki ze strony Spoza playlisty też dostają tagi i są konwertowane; nie trafiają tylko na playlistę rekordbox.',
+    },
+  },
+
+  settings: {
+    title: 'Ustawienia',
+    lead: 'Jak DJ HQ działa na tym komputerze. Każda zmiana zapisuje się od razu.',
+    s1: {
+      h: 'Karty',
+      i1: { name: 'Biblioteka', text: 'Foldery i playlista, które ta biblioteka utrzymuje w zgodzie. <b>Dodaj folder</b> dodaje kolejny folder; pierwszy pozostaje folderem głównym, do którego trafiają pobrane pliki. <b>Uwzględnij podfoldery</b> skanuje też foldery wewnątrz każdego z nich. <b>Zmień link…</b> kieruje bibliotekę na inny link SoundCloud, na przykład link udostępniania playlisty, którą ustawiono jako prywatną; dopasowania i zmienione nazwy zostają. <b>Usuń tę bibliotekę…</b> usuwa ją tylko z DJ HQ; pliki zostają.' },
+      i2: { name: 'Pobrane', text: 'Który folder jest obserwowany pod kątem nowych pobranych plików i czy dokładne dopasowania są automatycznie przenoszone do biblioteki.' },
+      i3: { name: 'Zrób wszystko', text: 'Pokazuje albo ukrywa przycisk Zrób wszystko, wypisuje programy i pliki, których używa, z ich stanem, czy Platinum Notes i Mixed In Key są zamykane po swoim kroku i, na Macu, czy DJ HQ klika za ciebie Start Processing w Platinum Notes (i czy macOS na to pozwala). <b>Skonfiguruj…</b> ponownie otwiera konfigurację. Przewodnik na stronie Przygotuj na odtwarzacz objaśnia cały łańcuch.' },
+      i4: { name: 'Sprawdzanie playlisty', text: 'Jak często DJ HQ sprawdza na SoundCloud zmiany, gdy okno jest otwarte. <b>Odśwież</b> w prawym górnym rogu sprawdza od razu i przy okazji ponownie skanuje foldery.' },
+      i5: { name: 'Wygląd', text: 'Jasny, ciemny albo taki, jakiego używa twój komputer.' },
+      i6: { name: 'Język', text: 'English albo Polski. <b>Automatycznie</b> oznacza język twojego komputera: polski w polskim systemie, angielski w każdym innym. Aplikacja przełącza się od razu, bez ponownego uruchamiania.' },
+      i7: { name: 'Kopie zapasowe', text: 'Nietknięte oryginały przekonwertowanych plików i pliki MP3 zastąpione przez pobrane pliki bezstratne. <b>Wyczyść</b> je usuwa; potem Przywróć oryginały nie odzyska już tych plików.' },
+      i8: { name: 'Przenoszenie i kopia konfiguracji', text: '<b>Eksportuj konfigurację…</b> zapisuje twoje biblioteki, dopasowania, zmienione nazwy, oznaczenia i ustawienia w jednym pliku; <b>Importuj konfigurację…</b> wczytuje go na innym komputerze, na komputerze z Windows albo znowu tutaj. Przy imporcie pokazujesz DJ HQ, gdzie na tym komputerze jest muzyka każdej biblioteki, a DJ HQ liczy znalezione pliki, zanim cokolwiek zmieni. W pliku nie ma muzyki, oryginałów z kopii zapasowej, logowania do SoundCloud ani konfiguracji Zrób wszystko. Link do prywatnej playlisty można pominąć w pliku; potem wklej go ponownie przez <b>Zmień link…</b>.' },
+      i9: { name: 'Informacje', text: 'Wersja, ręczne sprawdzanie aktualizacji, oprowadzanie i miejsce, w którym DJ HQ trzyma swoje dane. <b>Eksportuj surowe dane (JSON)</b> zapisuje w jednym pliku dane zgromadzone przez DJ HQ (wszystko poza ustawieniami wyglądu), na potrzeby pomocy albo powrotu do starszej wersji DJ HQ; zawiera linki do twoich prywatnych playlist.' },
+    },
+    s2: {
+      h: 'Warto wiedzieć',
+      t1: 'Inna playlista z własnym folderem? <b>Dodaj kolejną bibliotekę…</b> je połączy; między bibliotekami przełączasz się, klikając nazwę na górze paska bocznego.',
+      t2: 'Folder danych przechowuje dopasowania, zmienione nazwy i kopie zapasowe. Usunięcie aplikacji go nie rusza. Trzymaj go na dysku tego komputera, nie w folderze w chmurze.',
+      t3: 'Import zastępuje biblioteki na tym komputerze. Wcześniejsze dane są najpierw zapisywane w folderze <i>backups</i> wewnątrz folderu danych.',
+      t4: 'Import zrobiony, zanim skopiowano muzykę? Biblioteka czeka na swoje pliki i zachowuje wszystkie dopasowania, dopóki nie klikniesz <b>Kopiowanie zakończone</b>.',
+    },
+  },
+});

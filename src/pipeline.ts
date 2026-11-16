@@ -229,6 +229,12 @@ const sleep = (ms: number) => new Promise<void>((resolve) => {
 });
 const wake = () => { if (wakeFn) wakeFn(); };
 const errText = (e: any) => String(e?.message || e);
+/** an error as the {error} of a message: its english text, plus its code and vars when it has one,
+ *  so the ui can say the inner reason in its language too (not when it is the message's own code) */
+function errVars(e: any, outer?: string): Record<string, unknown> {
+  const code = typeof e?.code === "string" && /^[a-z][a-z0-9_]*$/.test(e.code) && e.code !== outer ? e.code : "";
+  return { error: errText(e), ...(code ? { error_code: code, ...(e.vars ? { error_vars: e.vars } : {}) } : {}) };
+}
 
 /** Items whose turn it is at this step: not done there yet, and fine in every step before. */
 function eligible(s: FileStep): Item[] {
@@ -373,7 +379,7 @@ function xmlBlocker(file: string): Msg | null {
   try { checkXmlFile(file); return null; }
   catch (e: any) {
     const code = typeof e?.code === "string" && /^rb_xml_[a-z_]+$/.test(e.code) ? e.code : "rb_xml_failed";
-    return msg(code, { error: errText(e), path: file });
+    return msg(code, { ...errVars(e, code), path: file });
   }
 }
 
@@ -555,8 +561,8 @@ async function drive(): Promise<void> {
     job.status = "failed";
     try {
       const st = job.step ? stepRec(job.step) : null;
-      if (st) { st.state = "failed"; st.error = msg("job_failed", { error: errText(e) }); }
-      say("job_failed", { error: errText(e) });
+      if (st) { st.state = "failed"; st.error = msg("job_failed", errVars(e)); }
+      say("job_failed", errVars(e));
       buildReport();
     } catch (e2: any) { console.error("Do everything: " + errText(e2)); }
   } finally {
@@ -601,7 +607,7 @@ async function stepMove(st: StepRec): Promise<void> {
       const src = path.join(core.getSettings().inbox_dir, it.source.zip || name);
       const pinned = it.track_id != null && core.STATE.assigned[String(it.track_id)] === name;
       if (fs.existsSync(dst) && (it.source.zip ? pinned : !fs.existsSync(src))) { it.key = name; it.path = dst; setItem(it, "move", "ok"); }
-      else setItem(it, "move", "failed", "move_failed", { file: name, error: errText(e) });
+      else setItem(it, "move", "failed", "move_failed", { file: name, ...errVars(e) });
     }
     save();
   }
@@ -629,7 +635,7 @@ async function stepTag(st: StepRec): Promise<void> {
       setItem(it, "tag", "ok");
     } catch (e: any) {
       if (libChanged(e)) { setItem(it, "tag", "pending"); return failStep(st, "library_changed"); }
-      setItem(it, "tag", "failed", "tag_failed", { error: errText(e) });
+      setItem(it, "tag", "failed", "tag_failed", errVars(e));
     }
     save();
   }
@@ -684,8 +690,12 @@ async function stepApp(app: AppId, st: StepRec): Promise<void> {
   const a = DEPS.apps;
   const set = core.doAllStatus().do_all;
   const appPath = app === "pn" ? set.pn_app : set.mik_app;
-  const v = await a.validate(app, appPath).catch((e) => ({ ok: false, code: errText(e) }));
-  if (!v.ok) return failStep(st, app + "_app_invalid", { error: fill(v.code || "app_wrong", { path: appPath, app: APP_NAME[app] }) });
+  const v: { ok: boolean; code?: string; err?: any } = await a.validate(app, appPath).catch((e) => ({ ok: false, err: e }));
+  if (!v.ok && v.err) return failStep(st, app + "_app_invalid", errVars(v.err));
+  if (!v.ok) {
+    const code = v.code || "app_wrong", vars = { path: appPath, app: APP_NAME[app] };
+    return failStep(st, app + "_app_invalid", { error: fill(code, vars), error_code: code, error_vars: vars });
+  }
   if (app === "pn") {
     const mode = await a.readPnOutputMode().catch(() => "unknown" as PnMode);
     await DEPS.enqueue(async () => core.setPnMode(mode));
@@ -782,7 +792,7 @@ async function waitForApp(app: AppId, st: StepRec, appPath: string, batch: Item[
       await a.openWithFiles(app, appPath, part.map((it) => it.path!));
     } catch (e: any) {
       save();
-      return failStep(st, "app_open_failed", { app: APP_NAME[app], error: errText(e) });
+      return failStep(st, "app_open_failed", { app: APP_NAME[app], ...errVars(e, "app_open_failed") });
     }
     // recorded per delivered batch: a later batch that fails leaves these as they are
     if (probe === false) st.launched = true;
@@ -937,9 +947,9 @@ async function retagAfterApps(): Promise<void> {
       if (control.cancel) return;
       if (f.tagged) continue;
       try { await inLib(() => core.tagFile(f.key, f.artist, f.title, f.genre)); n++; }
-      catch (e: any) { say("retag_failed", { file: f.key, error: errText(e) }); }
+      catch (e: any) { say("retag_failed", { file: f.key, ...errVars(e) }); }
     }
-  } catch (e: any) { say("retag_failed_all", { error: errText(e) }); }
+  } catch (e: any) { say("retag_failed_all", errVars(e)); }
   if (n) say("retagged", { n });
   save();
 }
@@ -959,7 +969,7 @@ async function keysAfterMik(batch: Item[]): Promise<void> {
   let found = new Map<string, string>();
   if (db) {
     try { found = (await DEPS.apps.readMikKeys(db, noKey.map((i) => i.path!))) || new Map(); }
-    catch (e: any) { say("mik_db_unavailable", { error: errText(e) }); }
+    catch (e: any) { say("mik_db_unavailable", errVars(e, "mik_db_unavailable")); }
   }
   for (const it of noKey) {
     const k = found.get(it.path!);
@@ -993,8 +1003,8 @@ async function stepXml(st: StepRec): Promise<void> {
   } catch (e: any) {
     if (libChanged(e)) { for (const it of todo) if (it.steps.xml.state === "running") setItem(it, "xml", "pending"); return failStep(st, "library_changed"); }
     const code = typeof e?.code === "string" && /^rb_xml_[a-z_]+$/.test(e.code) ? e.code : "rb_xml_failed";
-    for (const it of todo) if (it.steps.xml.state === "running") setItem(it, "xml", "failed", code, { error: errText(e), path: file });
-    return failStep(st, code, { error: errText(e), path: file });
+    for (const it of todo) if (it.steps.xml.state === "running") setItem(it, "xml", "failed", code, { ...errVars(e, code), path: file });
+    return failStep(st, code, { ...errVars(e, code), path: file });
   }
   const byPath = new Map<string, { code: string; vars?: Record<string, unknown> }>();
   for (const x of w.added) byPath.set(x.path, { code: "rb_added" });

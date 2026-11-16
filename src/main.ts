@@ -2,10 +2,11 @@
  *  and opens the UI in a window. External links open in the default browser.
  *  The Discover page embeds soundcloud.com in a WebContentsView that keeps its
  *  own session (persist:soundcloud), so the user signs in once and stays in. */
-import { app, BrowserWindow, dialog, nativeTheme, session, shell, systemPreferences, WebContentsView } from "electron";
+import { app, BrowserWindow, dialog, Menu, nativeTheme, session, shell, systemPreferences, WebContentsView } from "electron";
 import * as path from "path";
 import * as core from "./core";
 import { IN_USE_TEXT, PickKind, ScRect, ScView, startServer } from "./server";
+import { Lang, mainLang, mt } from "./lang";
 
 // Packaged app keeps its data (djhq.db) in the OS user-data dir; running from source uses
 // the project folder (same place the Python version kept state.json). Keep it on a local
@@ -21,6 +22,51 @@ if (singleLock && !app.requestSingleInstanceLock()) app.exit(0);
 else if (singleLock) app.on("second-instance", () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
 
 let win: BrowserWindow | null = null;
+
+/** the system language, as the page gets it too (navigator.language may only be the app's locale) */
+const sysLocale = () => app.getPreferredSystemLanguages()[0] || app.getLocale();
+/** the language for a dialog opened now: Settings → Language, or the system's (asked each time,
+ *  so a change in Settings needs no restart) */
+function uiLang(): Lang {
+  let pref: unknown;
+  try { pref = core.getPrefs().lang; } catch { pref = undefined; }
+  return mainLang(pref, sysLocale());
+}
+
+/** The application menu in the app's language (Electron's default one is English only):
+ *  role items with our own labels, rebuilt when Settings → Language changes. */
+let menuLang: Lang | null = null;
+function buildMenu() {
+  const lang = uiLang();
+  if (lang === menuLang) return;
+  menuLang = lang;
+  const m = (key: Parameters<typeof mt>[1]) => mt(lang, key);
+  const mac = process.platform === "darwin";
+  const tpl: Electron.MenuItemConstructorOptions[] = [
+    ...(mac ? [{ label: "DJ HQ", submenu: [
+      { role: "about", label: m("menu.about") }, { type: "separator" },
+      { role: "hide", label: m("menu.hide") }, { role: "hideOthers", label: m("menu.hideOthers") }, { role: "unhide", label: m("menu.unhide") },
+      { type: "separator" }, { role: "quit", label: m("menu.quit") },
+    ] } as Electron.MenuItemConstructorOptions] : []),
+    { label: m("menu.file"), submenu: [mac ? { role: "close", label: m("menu.close") } : { role: "quit", label: m("menu.quit") }] },
+    { label: m("menu.edit"), submenu: [
+      { role: "undo", label: m("menu.undo") }, { role: "redo", label: m("menu.redo") }, { type: "separator" },
+      { role: "cut", label: m("menu.cut") }, { role: "copy", label: m("menu.copy") }, { role: "paste", label: m("menu.paste") },
+      { role: "selectAll", label: m("menu.selectAll") },
+    ] },
+    { label: m("menu.view"), submenu: [
+      { role: "reload", label: m("menu.reload") }, { role: "toggleDevTools", label: m("menu.devTools") }, { type: "separator" },
+      { role: "resetZoom", label: m("menu.resetZoom") }, { role: "zoomIn", label: m("menu.zoomIn") }, { role: "zoomOut", label: m("menu.zoomOut") },
+      { type: "separator" }, { role: "togglefullscreen", label: m("menu.fullScreen") },
+    ] },
+    { label: m("menu.window"), submenu: [
+      { role: "minimize", label: m("menu.minimize") },
+      ...(mac ? [{ role: "zoom", label: m("menu.zoom") }, { type: "separator" }, { role: "front", label: m("menu.front") }] as Electron.MenuItemConstructorOptions[]
+              : [{ role: "close", label: m("menu.close") }] as Electron.MenuItemConstructorOptions[]),
+    ] },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(tpl));
+}
 
 // ---------------- embedded SoundCloud ----------------
 const SC_PARTITION = "persist:soundcloud";
@@ -52,7 +98,7 @@ function scEnsure(): WebContentsView {
   // in the same session; links out of SoundCloud (shops, download gates) go to the default browser
   wc.setWindowOpenHandler(({ url }) => {
     if (!url || url === "about:blank" || inView(url))
-      return { action: "allow", overrideBrowserWindowOptions: { width: 520, height: 720, autoHideMenuBar: true, title: "Sign in",
+      return { action: "allow", overrideBrowserWindowOptions: { width: 520, height: 720, autoHideMenuBar: true, title: mt(uiLang(), "signIn"),
                webPreferences: { partition: SC_PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true } } };
     shell.openExternal(url);
     return { action: "deny" };
@@ -302,7 +348,7 @@ const sc: ScView = {
   },
   async api(method, url, headers, body) {
     const wc = scEnsure().webContents;
-    if (SC_CAPTCHA_URL.test(wc.getURL())) throw new Error(core.SC_CAPTCHA);   // on the check itself: don't navigate away from it
+    if (SC_CAPTCHA_URL.test(wc.getURL())) throw core.scCaptchaError();   // on the check itself: don't navigate away from it
     // the page must be a loaded soundcloud.com page (the user may add from Not in playlist before ever opening Discover)
     // (the page's document is enough for a fetch: its load event can be many seconds later, see scEval)
     const onSc = /^https:\/\/(www\.|m\.)?soundcloud\.com\//.test(wc.getURL());
@@ -315,7 +361,7 @@ const sc: ScView = {
       });
     }
     // the bot check is up: the request would only be refused again (or wait for the check)
-    if (await scCaptcha()) throw new Error(core.SC_CAPTCHA);
+    if (await scCaptcha()) throw core.scCaptchaError();
     const code = `(async () => {
       try {
         const r = await fetch(${JSON.stringify(url)}, { method: ${JSON.stringify(method)}, headers: ${JSON.stringify(headers)},
@@ -339,29 +385,24 @@ const sc: ScView = {
 /** The file pickers of the "Do everything" setup. On macOS an app is a folder (a
  *  bundle) that the open panel shows as one item when "app" is the only extension;
  *  a path inside a bundle is cut back to the bundle. */
-const PICK_TEXT: Record<PickKind, string> = {
-  pn_app: "Choose Platinum Notes",
-  mik_app: "Choose Mixed In Key",
-  mik_db: "Choose Mixed In Key’s database",
-  rb_xml: "Choose the rekordbox XML file rekordbox imports from",
-  config: "Choose the DJ HQ configuration file to import",
-};
+const PICK_TEXT = { pn_app: "pick.pn_app", mik_app: "pick.mik_app", mik_db: "pick.mik_db", rb_xml: "pick.rb_xml", config: "pick.config" } as const satisfies Record<PickKind, string>;
 async function pickFile(kind: PickKind): Promise<string | null> {
   const mac = process.platform === "darwin", winOs = process.platform === "win32";
   const home = app.getPath("home");
-  const opt: Electron.OpenDialogOptions = { title: PICK_TEXT[kind], properties: ["openFile"] };
+  const lang = uiLang();
+  const opt: Electron.OpenDialogOptions = { title: mt(lang, PICK_TEXT[kind]), properties: ["openFile"] };
   if (kind === "pn_app" || kind === "mik_app") {
-    opt.filters = [{ name: "Apps", extensions: [mac ? "app" : winOs ? "exe" : "*"] }];
+    opt.filters = [{ name: mt(lang, "filter.apps"), extensions: [mac ? "app" : winOs ? "exe" : "*"] }];
     opt.defaultPath = mac ? "/Applications" : winOs ? path.join(process.env.LOCALAPPDATA || home, "Programs") : home;
   } else if (kind === "mik_db") {
-    opt.filters = [{ name: "Mixed In Key database", extensions: mac ? ["mikdb"] : ["db"] }, { name: "All files", extensions: ["*"] }];
+    opt.filters = [{ name: mt(lang, "filter.mikDb"), extensions: mac ? ["mikdb"] : ["db"] }, { name: mt(lang, "filter.allFiles"), extensions: ["*"] }];
     opt.defaultPath = mac ? path.join(home, "Library", "Application Support", "Mixedinkey")
       : path.join(process.env.LOCALAPPDATA || home, "Mixed In Key", "Mixed In Key");
   } else if (kind === "config") {
-    opt.filters = [{ name: "DJ HQ configuration", extensions: ["json"] }, { name: "All files", extensions: ["*"] }];
+    opt.filters = [{ name: mt(lang, "filter.config"), extensions: ["json"] }, { name: mt(lang, "filter.allFiles"), extensions: ["*"] }];
     opt.defaultPath = app.getPath("documents");
   } else {
-    opt.filters = [{ name: "rekordbox XML", extensions: ["xml"] }];
+    opt.filters = [{ name: mt(lang, "filter.rbXml"), extensions: ["xml"] }];
     opt.defaultPath = path.join(home, "Documents");
   }
   const r = win ? await dialog.showOpenDialog(win, opt) : await dialog.showOpenDialog(opt);
@@ -373,10 +414,10 @@ async function pickFile(kind: PickKind): Promise<string | null> {
 
 /** Export configuration (or the raw data): a save dialog (Documents by default), then the file written whole. */
 async function saveFile(defaultName: string, text: string, kind: "config" | "raw" = "config"): Promise<string | null> {
-  const raw = kind === "raw";
-  const opt: Electron.SaveDialogOptions = { title: raw ? "Save DJ HQ’s raw data" : "Save the DJ HQ configuration",
+  const raw = kind === "raw", lang = uiLang();
+  const opt: Electron.SaveDialogOptions = { title: mt(lang, raw ? "save.raw" : "save.config"),
     defaultPath: path.join(app.getPath("documents"), defaultName),
-    filters: [{ name: raw ? "DJ HQ raw data" : "DJ HQ configuration", extensions: ["json"] }] };
+    filters: [{ name: mt(lang, raw ? "filter.raw" : "filter.config"), extensions: ["json"] }] };
   const r = win ? await dialog.showSaveDialog(win, opt) : await dialog.showSaveDialog(opt);
   if (r.canceled || !r.filePath) return null;
   core.writeFileAtomic(r.filePath, text);
@@ -403,7 +444,7 @@ app.whenReady().then(async () => {
       port: Number(process.env.DJHQ_PORT || 0),
       pickFolder: async () => {
         const r = await dialog.showOpenDialog(win!, {
-          title: "Choose your music folder",
+          title: mt(uiLang(), "pick.musicFolder"),
           properties: ["openDirectory"],
         });
         return r.canceled ? null : r.filePaths[0];
@@ -414,15 +455,19 @@ app.whenReady().then(async () => {
       reveal: (p) => shell.showItemInFolder(p),
       packaged: app.isPackaged,
       sc,
+      prefsChanged: buildMenu,
     });
   } catch (e: any) {
     if (e?.code !== "db_in_use") throw e;
     console.error("DJ HQ is already open. " + IN_USE_TEXT(dataDir));
-    dialog.showErrorBox("DJ HQ is already open", IN_USE_TEXT(dataDir));
+    // the database is held by the other window, so its Settings → Language can't be read here
+    const lang = mainLang(undefined, sysLocale());
+    dialog.showErrorBox(mt(lang, "inUse.title"), mt(lang, "inUse.body", { dir: dataDir }));
     app.exit(1);
     return;
   }
   const port = (server.address() as any).port;
+  buildMenu();
 
   const mac = process.platform === "darwin";
   win = new BrowserWindow({
@@ -439,7 +484,9 @@ app.whenReady().then(async () => {
     shell.openExternal(url);
     return { action: "deny" };
   });
-  win.loadURL(`http://127.0.0.1:${port}/${mac ? "?titlebar=inset" : ""}`);
+  // the page follows the system language (Settings → Language: Automatic); navigator.language may only be the app's locale
+  const q = new URLSearchParams({ ...(mac ? { titlebar: "inset" } : {}), syslang: sysLocale() });
+  win.loadURL(`http://127.0.0.1:${port}/?${q}`);
   win.on("closed", () => { win = null; scShown = false; scView = null; });
 });
 

@@ -1,0 +1,135 @@
+/* DJ HQ strings: playlist, English (the source). Owner: job B.
+   The Missing, Have, All tracks and New pages, the status menu and the file-match dialog. */
+I18N.add('en', 'playlist', {
+  status: {
+    have: 'Have — the file is in my folder',
+    missing: 'Missing — still need to get it',
+    na: 'Not available on SoundCloud now',
+    naHint: 'Hidden from Missing until a download or shop link appears',
+    autoHint: 'Let the file match decide',
+  },
+  menu: {
+    match: 'Match to a local file…',
+  },
+  resetTip: 'Back to the SoundCloud values',
+  resetDone: 'Back to the SoundCloud values',
+  assign: {
+    title: 'Match to a local file',
+    sub: '<b>{name}</b> · {dur} on SoundCloud. Likely files are listed first.',
+    filter: 'Filter files…',
+    auto: 'Auto-match',
+    autoTip: 'Forget the pinned choice and auto-match again',
+    none: 'No file',
+    noneTip: 'Mark this track as having no local file',
+    current: 'Current match',
+    matchedTo: 'Matched to #{num} {title}',
+    unmatched: 'Unmatched',
+    shorter: 'Try a shorter filter.',
+    autoDone: 'Back to auto-matching',
+    noneDone: 'Marked as having no local file',
+    fileDone: 'File matched to this track',
+  },
+  copiedLinks: {
+    one: 'Copied {n} link',
+    other: 'Copied {n} links',
+  },
+  tagNote: {
+    one: 'Artist and title tags are missing or out of date in <b>{n} file</b> in your folder. rekordbox shows what is in the file.',
+    other: 'Artist and title tags are missing or out of date in <b>{n} files</b> in your folder. rekordbox shows what is in the file.',
+  },
+  tagNoteTip: 'Write artist / title into these files',
+  showThem: 'Show them',
+  showThemTip: 'List the files that need tags',
+  missing: {
+    workThrough: 'Work through',
+    workThroughTip: 'Go through the missing tracks one by one: open the link, catch the download, move it in',
+    toGet: {
+      one: '{n} track still to get',
+      other: '{n} tracks still to get',
+    },
+    withLink: '<b>{n}</b> with a download or shop link',
+    na: {
+      one: '{n} not available right now',
+      other: '{n} not available right now',
+    },
+    allHere: 'Every track in the playlist is in your folder',
+    chip: {
+      free: 'Free download',
+      buy: 'Buy',
+      none: 'No link',
+      names: 'Check name',
+    },
+    copy: {
+      one: 'Copy {n} link',
+      other: 'Copy {n} links',
+    },
+    copyTip: 'Copy “Artist – Title ⇥ link” for every track shown, one per line (shop link first when there is one)',
+    noNamesLeft: 'No names left to check here.',
+    nothingTitle: 'Nothing missing',
+    nothingText: 'Every track in the playlist is in your music folder.',
+    naSection: 'Not available right now',
+    naHint: '· back in Missing automatically when a link appears',
+  },
+  have: {
+    matched: {
+      one: '{n} track matched to files in your folder',
+      other: '{n} tracks matched to files in your folder',
+    },
+    upgrades: '<b>{n}</b> could be upgraded to lossless',
+    chip: {
+      convert: 'Needs convert',
+    },
+    strayTags: {
+      one: '{n} more file needs tags but isn’t in the playlist.',
+      other: '{n} more files need tags but aren’t in the playlist.',
+    },
+    strayConvert: {
+      one: '{n} more file needs converting but isn’t in the playlist.',
+      other: '{n} more files need converting but aren’t in the playlist.',
+    },
+    names: {
+      one: '{n} name to check in the library, including tracks you don’t have yet.',
+      other: '{n} names to check in the library, including tracks you don’t have yet.',
+    },
+    taggedTitle: 'All matched files are tagged',
+    taggedText: 'rekordbox shows the right artist and title for every one.',
+    playsTitle: 'Everything plays on this player',
+    playsText: 'No matched file needs converting for the player picked on Prepare for player.',
+    noUpgradesTitle: 'No upgrades waiting',
+    noUpgradesText: 'None of your MP3s has a shop link that sells a lossless version.',
+    noNamesText: 'Every matched track has an artist and title that something confirms, or that you decided.',
+    noneTitle: 'No matched files yet',
+    noneText: 'Files in your music folder that match a playlist track show up here.',
+  },
+  all: {
+    sub: {
+      one: '{n} track in “{playlist}”',
+      other: '{n} tracks in “{playlist}”',
+    },
+    subNoName: {
+      one: '{n} track in the playlist',
+      other: '{n} tracks in the playlist',
+    },
+    have: '{n} have',
+    missing: '{n} missing',
+    na: '{n} not available',
+  },
+  new: {
+    nothing: 'Nothing new since you last marked everything as seen',
+    tracksAdded: {
+      one: '{n} track added to the playlist',
+      other: '{n} tracks added to the playlist',
+    },
+    filesArrived: {
+      one: '{n} file arrived in your folder',
+      other: '{n} files arrived in your folder',
+    },
+    since: '{what} since {date}',
+    sinceStart: '{what} since tracking began',
+    markSeen: 'Mark all as seen',
+    markSeenTip: 'Clear the New list',
+    markedSeen: 'Marked all as seen',
+    upToDate: 'You’re up to date',
+    upToDateText: 'Tracks added to the playlist and files that arrive in your folder show up here.',
+  },
+});

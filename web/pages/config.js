@@ -8,158 +8,35 @@
    POST /api/config/import/plan (reads and checks the file, writes nothing, answers a single-use
    plan id), /probe (counts the files found in a folder, changes nothing) and /apply.
 
-   Every user-visible string is in CF_TEXT, whole sentences with {placeholders}; counts are
-   { one, other } pairs. Server error codes are translated through CF_TEXT.code, with the
-   server's English text as the fallback. Nothing here runs during the tour's sample data.
+   Every user-visible string is in lang/<en|pl>/config.js (config.*), whole sentences with
+   {placeholders}; counts are plural keys. Server error codes are translated through config.code.*
+   (then err.*), with the server's English text as the fallback. Nothing here runs during the tour's sample data.
    Globals: cfSettingsCard(), cfExport(), cfImport(), cfWelcomeLink(). */
 
-const CF_TEXT = {
-  cardTitle: 'Move or back up your setup',
-  cardText: 'Save your libraries, matches, edits and settings to one file, and load it on another computer, on the Windows PC, or here again. The music files, the backed-up originals and the SoundCloud sign-in are not in the file.',
-  exportBtn: 'Export configuration…',
-  importBtn: 'Import configuration…',
-  welcomeLink: 'Import a configuration',
-  welcomeHint: 'Set up DJ HQ from a file saved on another computer',
-  cancel: 'Cancel',
-  close: 'Close',
-  back: 'Back',
-  next: 'Next',
-
-  // export
-  exTitle: 'Export configuration',
-  exSub: 'One file with everything DJ HQ knows about your libraries. Save it to a USB stick or a cloud folder to take it along.',
-  exIn: 'In the file: each library’s SoundCloud link and track list, its matches (by hand and automatic), names you edited, Have / Missing / not available marks, what’s new, and your settings.',
-  exOut: 'Not in the file: the music files, the backed-up originals, the SoundCloud sign-in, and this computer’s Downloads folder and Do everything setup (they are looked up again on the other computer).',
-  exPrivate: { one: '<b>{names} is linked with a private share link.</b> Anyone who gets the file can open that playlist.', other: '<b>{names} are linked with private share links.</b> Anyone who gets the file can open those playlists.' },
-  exPrivateTracks: { one: 'One track in the list is private and carries its own share link.', other: '{n} tracks in the list are private and carry their own share links.' },
-  exLeaveOut: 'Leave the links out',
-  exLeaveOutHint: 'On the other computer, use Change link… in Settings to paste the link again. Matches and everything else come along anyway.',
-  exAway: 'The folder {dir} isn’t available right now, so the list of its files is left out. Matches to its files are still in the file.',
-  exLinkMissing: '{name} has no SoundCloud link yet; it is exported without one.',
-  exSave: 'Save…',
-  exDownload: 'Download',
-  exWorking: 'Saving…',
-  exSaved: 'Configuration saved to {file}',
-  exDownloaded: 'Configuration downloaded as {file}',
-  exShow: 'Show in folder',
-  exFailed: 'Couldn’t export the configuration: {error}',
-
-  // import
-  imTitle: 'Import configuration',
-  imSteps: ['The file', 'What’s in it', 'Music folders', 'Confirm', 'Done'],
-  imStep: 'Step {i} of {n}',
-  imFileSub: 'Choose a configuration file that DJ HQ saved with Export configuration (“DJ HQ config … .djhq.json”).',
-  imChoose: 'Choose the file…',
-  imPick: 'Configuration file',
-  imPickHint: 'Nothing changes until the last step.',
-  imReading: 'Reading the file…',
-  imFrom: 'Saved by DJ HQ {version} on {platform}, {date}.',
-  imLibrary: '{name}',
-  imTracks: { one: '{n} track in the playlist', other: '{n} tracks in the playlist' },
-  imNotFetched: 'The playlist was never fetched on the other computer.',
-  imPins: { one: '{n} matched file ({hand} by hand, {other} found by DJ HQ)', other: '{n} matched files ({hand} by hand, {other} found by DJ HQ)' },
-  imEdits: { one: '{n} edited name', other: '{n} edited names' },
-  imOverrides: { one: '{n} Have / Missing mark', other: '{n} Have / Missing marks' },
-  imNa: { one: '{n} track marked not available', other: '{n} tracks marked not available' },
-  imFound: { one: '{n} local file found on SoundCloud', other: '{n} local files found on SoundCloud' },
-  imLinkMissing: 'Its SoundCloud link was left out: paste it with Change link… in Settings afterwards.',
-  imLinkPrivate: 'It is linked with a private share link.',
-  imDropped: 'Left out when the file was saved, because they were not in any library folder: {what}.',
-  imDroppedEdits: { one: '{n} edited name', other: '{n} edited names' },
-  imDroppedFound: { one: '{n} found track', other: '{n} found tracks' },
-  imDroppedPins: { one: '{n} match of a track no longer in the playlist', other: '{n} matches of tracks no longer in the playlist' },
-  imNoteIgnored: 'A setting this version of DJ HQ doesn’t know was skipped.',
-  imMachine: 'The other computer’s Downloads folder and Do everything setup are not used: they belong to that computer.',
-  imReplaces: { one: 'Importing replaces the library on this computer: {names}.', other: 'Importing replaces the {n} libraries on this computer: {names}.' },
-  imReplacesMore: 'A copy of the current data is kept first.',
-  imFolderSub: 'Where is each library’s music on this computer? DJ HQ looks for the files by name; nothing is changed yet.',
-  imWas: 'On the other computer: {path}',
-  imWasPlatform: 'On {platform}: {path}',
-  imMainFolder: 'Main folder',
-  imExtraFolder: 'Extra folder',
-  imFolderPh: 'Choose or type the folder…',
-  imBrowse: 'Browse…',
-  imCheck: 'Check',
-  imSkip: 'Leave this folder out',
-  imSkipped: 'Left out: its matches are not imported.',
-  imChecking: 'Looking at the folder…',
-  imCount: 'Found {found} of {total} matched files.',
-  imCountKnown: 'Found {found} of {total} files the library had.',
-  imCountNone: 'The library had no matched files in this folder.',
-  imSub: 'Some are in folders inside it; Include subfolders will be switched on.',
-  imAmbiguous: { one: '{n} file name appears more than once, so it can’t be matched.', other: '{n} file names appear more than once, so they can’t be matched.' },
-  imZero: 'None of the library’s files are here. Is it the right folder? If the music hasn’t been copied yet, you can still import and copy it later.',
-  imNeedFolder: 'Choose the folder for {name}.',
-  imConfirmSub: 'This is what happens when you import.',
-  imWillLib: '<b>{name}</b> in {dir}',
-  imWillPins: { one: '{n} match comes along.', other: '{n} matches come along.' },
-  imWillDrop: { one: '{n} match is dropped: its file isn’t in the folder.', other: '{n} matches are dropped: their files aren’t in the folder.' },
-  imWillSub: 'Include subfolders is switched on.',
-  imNoFiles: 'Import {name} without its files for now',
-  imNoFilesHint: 'Copy the music into the folder afterwards. Until you say the copy is complete, DJ HQ keeps every match and points it at the files as they arrive.',
-  imReplaceOk: 'Replace the libraries on this computer',
-  imReplaceHint: 'Their matches, edits and marks are replaced by the ones in the file. A copy of the current data is saved first, in the backups folder of DJ HQ’s data folder.',
-  imMachineOpt: 'Also use the other computer’s Downloads folder and Do everything setup',
-  imMachineHint: 'Only paths that exist on this computer are used. Handy when you bring a backup back to the same computer.',
-  imFirstScan: 'The first look at the folders reads every music file once. In a cloud folder whose files are kept online only, that downloads them.',
-  imGo: 'Import',
-  imWorking: 'Importing…',
-  imDone: 'Configuration imported.',
-  imDoneLib: '<b>{name}</b>: {pins} in {dir}.',
-  imDonePins: { one: '{n} match', other: '{n} matches' },
-  imDoneWaiting: '<b>{name}</b> waits for its music in {dir}. Copy the files there; the matches follow them.',
-  imDoneBackup: 'The data from before is saved in {file}.',
-  imDoneLink: 'A library has no SoundCloud link yet: open Settings and use Change link… to paste it.',
-  imDoneDoAll: 'Do everything’s apps and the rekordbox XML are not part of the file: open Settings → Do everything → Configure… to find them on this computer.',
-  imFailed: 'Couldn’t import: {error}',
-  imPlatform: { darwin: 'a Mac', win32: 'Windows', linux: 'Linux' },
-
-  // what the server's codes mean, in the user's words
-  code: {
-    config_not_json: 'This file can’t be read as a DJ HQ configuration. It may not be one, or it was cut off while copying.',
-    config_not_djhq: 'This file isn’t a DJ HQ configuration.',
-    config_newer: 'This configuration was saved by a newer DJ HQ ({app_version}). Update DJ HQ on this computer, then import it.',
-    config_invalid: 'This configuration file is damaged or wasn’t written by DJ HQ ({what}). Nothing was changed.',
-    config_too_big: 'This file is far too big to be a DJ HQ configuration.',
-    config_plan_gone: 'Choose the file again: the import was started too long ago, or it is already done.',
-    confirm_replace: 'Confirm that the libraries on this computer may be replaced.',
-    no_files_found: 'None of the files of {lib} are in the folder chosen for it. Choose the right folder, or confirm importing it without its files.',
-    folder_none: 'Choose a folder.',
-    folder_not_found: 'That folder isn’t there.',
-    folder_unreadable: 'DJ HQ isn’t allowed to read that folder.',
-    folder_root: 'Choose a folder on the drive, not the whole drive.',
-    folder_twice: '{dir} is chosen twice, or sits inside another library folder. Each folder can belong to one place only.',
-    job_active: 'A Do everything run is going. Wait for it to finish, or cancel it, before importing.',
-    config_backup_failed: 'DJ HQ couldn’t save a copy of the current data first, so nothing was changed ({error}). Check that DJ HQ’s data folder has space and can be written to, then import again.',
-    config_view_failed: 'The imported data couldn’t be shown, so the data from before is back in place ({error}).',
-    store_blocked: 'DJ HQ can’t save right now (see the notice at the top), so nothing was imported.',
-    link_missing: 'This library has no SoundCloud link yet. Use Change link… in Settings.',
-  },
-};
-
-/* ---------- strings ---------- */
-function cfFill(s, vars) {
-  if (s && typeof s === 'object' && !Array.isArray(s)) s = vars && vars.n === 1 ? s.one : s.other;
-  return String(s == null ? '' : s).replace(/\{(\w+)\}/g, (_, k) => vars && vars[k] != null ? esc(vars[k]) : '');
+/* ---------- strings (lang/<en|pl>/config.js) ---------- */
+/** a config.* string as safe html; a plural key takes its form from vars.n */
+function cfFill(key, vars) {
+  const k = 'config.' + key, v = Object.assign({}, vars);
+  if (typeof I18N.lookup(k) === 'object') { const n = Number(v.n) || 0; delete v.n; return tnh(k, n, v); }
+  return th(k, v);
 }
-const cfT = (key, vars) => cfFill(CF_TEXT[key], vars);
+const cfT = (key, vars) => cfFill(key, vars);
 /** like cfT, for values that are html already */
-const cfHtml = (key, html, n) => { let s = CF_TEXT[key]; if (s && typeof s === 'object') s = n === 1 ? s.one : s.other;
-  return String(s).replace(/\{(\w+)\}/g, (_, k) => html && html[k] != null ? html[k] : ''); };
-const cfErr = e => e && e.code && CF_TEXT.code[e.code] ? cfFill(CF_TEXT.code[e.code], { ...(e.vars || {}), dir: e.vars && e.vars.dir ? shortPath(e.vars.dir) : '' }) : esc(e && e.message || String(e));
-const cfPlain = html => { const d = document.createElement('div'); d.innerHTML = html; return d.textContent; };
+const cfHtml = (key, html) => { const v = {}; for (const k in html || {}) v[k] = I18N.raw(html[k]); return cfFill(key, v); };
+/** a server error (src/config.ts codes first) as safe html */
+const cfErr = e => errHtml(e, 'config');
 const cfDemo = () => typeof TOUR !== 'undefined' && !!TOUR && !!TOUR.demo;
-const cfPlatform = p => CF_TEXT.imPlatform[p] || p || '';
-const cfNames = list => list.map(n => `“${n}”`).join(', ');
+const cfPlatform = p => p && I18N.has('config.imPlatform.' + p) ? t('config.imPlatform.' + p) : p || '';
+const cfNames = list => I18N.list(list.map(n => t('config.quoted', { name: n })));
 
 /* ---------- the Settings card and the welcome link ---------- */
 function cfSettingsCard() {
-  return stCard('copy', 'blue', esc(CF_TEXT.cardTitle), esc(CF_TEXT.cardText),
-    `<button class="btn btn-sm" onclick="cfExport()">${icon('upload')}${esc(CF_TEXT.exportBtn)}</button>
-     <button class="btn btn-sm" onclick="cfImport()">${icon('download')}${esc(CF_TEXT.importBtn)}</button>`);
+  return stCard('copy', 'blue', cfT('cardTitle'), cfT('cardText'),
+    `<button class="btn btn-sm" onclick="cfExport()">${icon('upload')}${cfT('exportBtn')}</button>
+     <button class="btn btn-sm" onclick="cfImport()">${icon('download')}${cfT('importBtn')}</button>`);
 }
 function cfWelcomeLink() {
-  return `<button type="button" class="btn btn-block wl-import" onclick="cfImport()" title="${esc(CF_TEXT.welcomeHint)}">${icon('download')}${esc(CF_TEXT.welcomeLink)}…</button>`;
+  return `<button type="button" class="btn btn-block wl-import" onclick="cfImport()" title="${esc(t('config.welcomeHint'))}">${icon('download')}${cfT('welcomeLink')}</button>`;
 }
 
 /* ---------- export ---------- */
@@ -167,13 +44,13 @@ async function cfExport() {
   if (cfDemo()) return;
   let info;
   try { info = await api('/api/config/export-info', {}); }
-  catch (e) { return toast(cfPlain(cfT('exFailed', { error: cfPlain(cfErr(e)) })), true); }
+  catch (e) { return toast(t('config.exFailed', { error: errText(e, 'config') }), true); }
   const priv = info.libraries.filter(l => l.private_link).map(l => l.name);
   const privTracks = info.libraries.reduce((n, l) => n + (l.private_tracks || 0), 0);
   const away = info.libraries.flatMap(l => l.folders_away || []);
   const noLink = info.libraries.filter(l => l.link_missing).map(l => l.name);
   const notes = [
-    ...(priv.length || privTracks ? [noteHtml((priv.length ? cfFill(CF_TEXT.exPrivate, { n: priv.length, names: cfNames(priv) }) : '')
+    ...(priv.length || privTracks ? [noteHtml((priv.length ? cfT('exPrivate', { n: priv.length, names: cfNames(priv) }) : '')
         + (privTracks ? ' ' + cfT('exPrivateTracks', { n: privTracks }) : ''), '', 'amber', 'lock')] : []),
     ...away.map(d => noteHtml(cfT('exAway', { dir: shortPath(d) }), '', 'amber')),
     ...noLink.map(n => noteHtml(cfT('exLinkMissing', { name: n }), '', 'plain')),
@@ -183,7 +60,7 @@ async function cfExport() {
     title: cfT('exTitle'), sub: cfT('exSub'), wide: false,
     body: `<p class="cf-p">${cfT('exIn')}</p><p class="cf-p faint">${cfT('exOut')}</p>${notes ? `<div class="cf-notes">${notes}</div>` : ''}${leave}
            <div id="cf-ex-res"></div>`,
-    foot: `<span class="spacer"></span><button class="btn" data-close>${cfT('cancel')}</button>
+    foot: `<span class="spacer"></span><button class="btn" data-close>${th('common.cancel')}</button>
            <button class="btn btn-primary" data-a="ok">${icon(info.can_save ? 'upload' : 'download')}${cfT(info.can_save ? 'exSave' : 'exDownload')}</button>`,
     open(dlg, done) {
       const okb = dlg.querySelector('[data-a=ok]');
@@ -196,20 +73,20 @@ async function cfExport() {
           a.download = info.file_name;
           document.body.appendChild(a); a.click(); a.remove();
           done(true);
-          return toast(cfPlain(cfT('exDownloaded', { file: info.file_name })));
+          return toast(t('config.exDownloaded', { file: info.file_name }));
         }
-        const old = okb.innerHTML; okb.disabled = true; okb.innerHTML = spin(cfT('exWorking'));
+        const old = okb.innerHTML; okb.disabled = true; okb.innerHTML = spin(t('config.exWorking'));
         try {
           const r = await api('/api/config/export', { leave_links_out: leaveOut });
           okb.disabled = false; okb.innerHTML = old;
           if (r.canceled) return;
           if (r.unsupported) { info.can_save = false; return okb.onclick(); }
           done(true);
-          toast(cfPlain(cfT('exSaved', { file: shortPath(r.path) })));
+          toast(t('config.exSaved', { file: shortPath(r.path) }));
           if (DATA && DATA.can_reveal) cfSavedNote(r.path);
         } catch (e) {
           okb.disabled = false; okb.innerHTML = old;
-          dlg.querySelector('#cf-ex-res').innerHTML = noteHtml(cfT('exFailed', { error: cfPlain(cfErr(e)) }), '', 'red', 'alert');
+          dlg.querySelector('#cf-ex-res').innerHTML = noteHtml(cfT('exFailed', { error: errText(e, 'config') }), '', 'red', 'alert');
         }
       };
     },
@@ -220,7 +97,7 @@ function cfSavedNote(p) {
   return dialog({
     title: cfT('exTitle'),
     body: noteHtml(cfT('exSaved', { file: shortPath(p) }), '', 'green'),
-    foot: `<span class="spacer"></span><button class="btn" data-a="show">${icon('folder')}${cfT('exShow')}</button><button class="btn btn-primary" data-close>${cfT('close')}</button>`,
+    foot: `<span class="spacer"></span><button class="btn" data-a="show">${icon('folder')}${th('common.showInFolder')}</button><button class="btn btn-primary" data-close>${th('common.close')}</button>`,
     open(dlg, done) {
       dlg.querySelector('[data-a=show]').onclick = () => { api('/api/reveal', { path: p }).catch(() => {}); done(true); };
     },
@@ -258,19 +135,19 @@ function cfPaint() {
   if (typed.length) setTimeout(() => typed.forEach(([l, f, v]) => { if (CF.imp === R && String(R.dirs[l][f] || '').trim() === v) cfProbe(l, f, v); }), 0);
   const n = CF_STEPS.length, step = CF_STEPS[R.i];
   const head = `<div class="dlg-head">
-      <div class="wt-top"><span class="wt-step">${cfT('imStep', { i: R.i + 1, n })}</span><span class="wt-bar"><i style="width:${Math.round(100 * (R.i + 1) / n)}%"></i></span></div>
-      <h3>${cfT('imTitle')}</h3><div class="sub">${esc(CF_TEXT.imSteps[R.i])}</div>
+      <div class="wt-top"><span class="wt-step">${th('common.stepOf', { i: R.i + 1, n })}</span><span class="wt-bar"><i style="width:${Math.round(100 * (R.i + 1) / n)}%"></i></span></div>
+      <h3>${cfT('imTitle')}</h3><div class="sub">${th('config.imSteps.' + step)}</div>
     </div>`;
   const body = step === 'file' ? cfFileHtml(R) : step === 'summary' ? cfSummaryHtml(R) : step === 'folders' ? cfFoldersHtml(R) : step === 'confirm' ? cfConfirmHtml(R) : cfDoneHtml(R);
   const err = R.err ? noteHtml(R.err, '', 'red', 'alert') : '';
   let acts = '';
-  if (step === 'done') acts = `<span class="spacer"></span><button class="btn btn-primary" data-k="primary" data-close>${cfT('close')}</button>`;
+  if (step === 'done') acts = `<span class="spacer"></span><button class="btn btn-primary" data-k="primary" data-close>${th('common.close')}</button>`;
   else {
-    const back = R.i > 0 ? `<button class="btn" onclick="cfGo(${R.i - 1})" ${R.busy ? 'disabled' : ''}>${cfT('back')}</button>` : '';
+    const back = R.i > 0 ? `<button class="btn" onclick="cfGo(${R.i - 1})" ${R.busy ? 'disabled' : ''}>${th('common.back')}</button>` : '';
     const primary = step === 'file' ? '' : step === 'confirm'
       ? `<button class="btn btn-primary" data-k="primary" onclick="cfApply()" ${R.busy || !cfCanApply(R) ? 'disabled' : ''}>${R.busy ? spin() : icon('download')}${cfT(R.busy ? 'imWorking' : 'imGo')}</button>`
-      : `<button class="btn btn-primary" data-k="primary" onclick="cfGo(${R.i + 1})" ${R.busy || (step === 'folders' && !cfFoldersReady(R)) ? 'disabled' : ''}>${cfT('next')}</button>`;
-    acts = `${back}<span class="spacer"></span><button class="btn" data-close>${cfT('cancel')}</button>${primary}`;
+      : `<button class="btn btn-primary" data-k="primary" onclick="cfGo(${R.i + 1})" ${R.busy || (step === 'folders' && !cfFoldersReady(R)) ? 'disabled' : ''}>${th('common.next')}</button>`;
+    acts = `${back}<span class="spacer"></span><button class="btn" data-close>${th('common.cancel')}</button>${primary}`;
   }
   const html = head + `<div class="dlg-body cf-body">${err}${body}</div><div class="dlg-foot">${acts}</div>`;
   if (html === R.html) return;
@@ -332,7 +209,7 @@ function cfReadFile(file) {
       R.busy = false; cfPlanned(r, file.name);
     } catch (e) { if (CF.imp === R) { R.busy = false; R.err = cfErr(e); cfPaint(); } }
   };
-  rd.onerror = () => { if (CF.imp === R) { R.busy = false; R.err = esc(String(rd.error || 'read error')); cfPaint(); } };
+  rd.onerror = () => { if (CF.imp === R) { R.busy = false; R.err = esc(String(rd.error || t('config.readError'))); cfPaint(); } };
   rd.readAsText(file);
 }
 function cfPlanned(sum, fileName) {
@@ -349,7 +226,7 @@ function cfPlanned(sum, fileName) {
 /* step 2: what's in it */
 function cfSummaryHtml(R) {
   const s = R.sum, f = s.file;
-  const date = f.exported_at ? new Date(f.exported_at).toLocaleString([], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  const date = f.exported_at && !isNaN(new Date(f.exported_at)) ? I18N.dateTime(new Date(f.exported_at).getTime()) : '';
   const libs = s.libraries.map(l => {
     const lines = [
       l.fetched ? cfT('imTracks', { n: l.tracks }) : cfT('imNotFetched'),
@@ -365,7 +242,7 @@ function cfSummaryHtml(R) {
   const d = s.dropped || {};
   const dropped = [d.edits ? cfT('imDroppedEdits', { n: d.edits }) : '', d.found ? cfT('imDroppedFound', { n: d.found }) : '', d.pins ? cfT('imDroppedPins', { n: d.pins }) : ''].filter(Boolean);
   const notes = [
-    dropped.length ? noteHtml(cfHtml('imDropped', { what: dropped.join(', ') }), '', 'plain') : '',
+    dropped.length ? noteHtml(cfHtml('imDropped', { what: I18N.list(dropped) }), '', 'plain') : '',
     (s.notes || []).length ? noteHtml(cfT('imNoteIgnored'), '', 'plain') : '',
     s.machine.inbox_dir || s.machine.do_all ? noteHtml(cfT('imMachine'), '', 'plain') : '',
     s.replaces.length ? noteHtml(cfT('imReplaces', { n: s.replaces.length, names: cfNames(s.replaces.map(r => r.name)) }) + ' ' + cfT('imReplacesMore'), '', 'amber') : '',
@@ -388,8 +265,8 @@ function cfFolderRow(R, l, f) {
   return `<div class="cf-folder">
     <div class="cf-fhead"><b>${cfT(f.main ? 'imMainFolder' : 'imExtraFolder')}</b> <span class="faint cf-was" title="${esc(f.hint)}">${was}</span></div>
     <div class="fieldrow">
-      <input class="input" data-dir="${li}:${fi}" value="${esc(R.dirs[li][fi] || '')}" placeholder="${esc(CF_TEXT.imFolderPh)}" spellcheck="false" autocomplete="off">
-      ${DATA && DATA.can_pick ? `<button class="btn" onclick="cfBrowse(${li},${fi})">${icon('folder')}${cfT('imBrowse')}</button>` : ''}
+      <input class="input" data-dir="${li}:${fi}" value="${esc(R.dirs[li][fi] || '')}" placeholder="${esc(t('config.imFolderPh'))}" spellcheck="false" autocomplete="off">
+      ${DATA && DATA.can_pick ? `<button class="btn" onclick="cfBrowse(${li},${fi})">${icon('folder')}${th('common.browse')}</button>` : ''}
       <button class="btn" onclick="cfProbeInput(${li},${fi})">${cfT('imCheck')}</button>
     </div>
     ${cfCountHtml(R.probes[li][fi], f)}${skip}
@@ -397,12 +274,12 @@ function cfFolderRow(R, l, f) {
 }
 function cfCountHtml(p, f) {
   if (!p) return '';
-  if (p.busy) return `<p class="cf-count">${spin(cfT('imChecking'))}</p>`;
-  if (p.problem) return `<p class="cf-count cf-bad">${icon('alert')}${esc(cfPlain(cfFill(CF_TEXT.code[p.problem] || p.problem)))}</p>`;
+  if (p.busy) return `<p class="cf-count">${spin(t('config.imChecking'))}</p>`;
+  if (p.problem) return `<p class="cf-count cf-bad">${icon('alert')}${errHtml({ code: p.problem, text: p.problem }, 'config')}</p>`;
   if (p.error) return `<p class="cf-count cf-bad">${icon('alert')}${p.error}</p>`;
   const lines = [];
-  if (p.pins.total) lines.push(cfT('imCount', { found: p.pins.found, total: p.pins.total }));
-  if (p.known.total) lines.push(cfT('imCountKnown', { found: p.known.found, total: p.known.total }));
+  if (p.pins.total) lines.push(cfT('imCount', { found: I18N.num(p.pins.found), n: p.pins.total }));
+  if (p.known.total) lines.push(cfT('imCountKnown', { found: I18N.num(p.known.found), n: p.known.total }));
   if (!p.pins.total && !p.known.total) lines.push(cfT('imCountNone'));
   if (p.needs_subfolders) lines.push(cfT('imSub'));
   if (p.ambiguous) lines.push(cfT('imAmbiguous', { n: p.ambiguous }));
@@ -506,7 +383,7 @@ async function cfApply() {
     });
     if (CF.imp !== R) {   // the dialog was closed meanwhile: the import still happened
       delete view.import_report; DATA = view; cfAfterImport();
-      return toast(cfPlain(cfT('imDone')));
+      return toast(t('config.imDone'));
     }
     R.result = view.import_report || {};
     delete view.import_report;
@@ -514,7 +391,7 @@ async function cfApply() {
     R.busy = false; R.i = CF_STEPS.indexOf('done');
     cfPaint();
   } catch (e) {
-    if (CF.imp !== R) return toast(cfPlain(cfT('imFailed', { error: cfPlain(cfErr(e)) })), true);
+    if (CF.imp !== R) return toast(t('config.imFailed', { error: errText(e, 'config') }), true);
     R.busy = false;
     // a plan that is used up or too old: back to the start
     if (e.code === 'config_plan_gone') { R.i = 0; R.sum = null; }

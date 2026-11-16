@@ -8,27 +8,10 @@
 
 let NC = null;   // { scope, keys, i, dlg, done, editing, busy, onKey }
 
-/** why the artist / title came out the way they did (row.name_why), one sentence each */
-const NAME_WHY = {
-  'name-left': 'The uploader’s name is on the left of the dash, so that is the artist.',
-  'name-right': 'The uploader’s name was on the right of the dash, so artist and title were swapped.',
-  'remixer': 'The uploader is only named in the remix part, so the left side is taken as the artist.',
-  'known-left': 'The left side is an artist other tracks in this library confirm.',
-  'known-right': 'The right side is an artist other tracks in this library confirm, but the order was kept. It may be the wrong way round.',
-  'no-signal': 'Nothing confirms which side of the dash is the artist. It may be the wrong way round.',
-  'pipe': 'Split at a “|”, which is sometimes a label or premiere divider rather than artist | title.',
-  'loose-dash': 'Split at a dash with no space before it. Check that the split is in the right place.',
-  'fragment': 'One side of the dash was empty or only a remix in brackets, so the title was put back together.',
-  'remix-only': 'The right side is the uploader’s remix, not an artist, so it went into the title.',
-  'mix-only': 'The right side only names a kind of remix, so it went into the title. The artist is the uploader, which may not be right.',
-  'pub': 'No dash in the title: the artist is the one SoundCloud lists for the track.',
-  'uploader': 'No dash in the title: the artist is the uploader’s name.',
-  'file-name': 'Taken from the file name: artist before the dash, title after it.',
-  'no-dash': 'The file name has no dash, so there is no artist yet.',
-};
-const ncWhy = r => NAME_WHY[r.name_why] || '';
+/** why the artist / title came out the way they did (row.name_why), one sentence each: names.why.<code> */
+const ncWhy = r => r.name_why && I18N.has('names.why.' + r.name_why) ? t('names.why.' + r.name_why) : '';
 /** the tooltip of a clickable "Check name" tag */
-const ncTip = r => ncWhy(r) ? '{why} Click to check it.'.replace('{why}', ncWhy(r)) : 'Click to check this name.';
+const ncTip = r => ncWhy(r) ? t('names.tip', { why: ncWhy(r) }) : t('names.tipPlain');
 
 /* ---------- the list ---------- */
 const ncTracks = () => DATA.tracks || [];
@@ -96,7 +79,7 @@ async function ncSave(body, advance = true) {
     if (advance) ncGoto(nc.i + 1); else { nc.editing = false; ncRender(); }
   } catch (e) {
     nc.busy = false;
-    toast('Error: ' + e.message, true);
+    toast(t('common.error', { msg: errText(e) }), true);
   }
 }
 /** Keep: confirm the derived name as it is (stored as a confirmation, not a hand edit) */
@@ -115,9 +98,9 @@ function ncEdit() {
   ncRender();
 }
 function ncSaveEdit() {
-  const a = NC && NC.dlg.querySelector('#nc-artist'), t = NC && NC.dlg.querySelector('#nc-title');
-  if (!a || !t) return;
-  const artist = a.value.trim(), title = t.value.trim();
+  const a = NC && NC.dlg.querySelector('#nc-artist'), ti = NC && NC.dlg.querySelector('#nc-title');
+  if (!a || !ti) return;
+  const artist = a.value.trim(), title = ti.value.trim();
   if (!artist && !title) return ncReset();
   ncSave({ artist, title });
 }
@@ -127,10 +110,10 @@ function ncReset() { ncSave({ artist: '', title: '' }, false); }
 
 /* ---------- rendering ---------- */
 function ncState(r) {
-  if (r.edited) return tag('Edited', 'outline', 'pencil', 'Artist / title set by hand');
-  if (r.name_ok) return tag('Kept as is', 'ok', 'check', 'You confirmed this name');
-  if (r.check_name) return tag('Check name', 'warn', 'alert');
-  return tag('Looks right', 'outline', 'check');
+  if (r.edited) return tag(t('tags.edited'), 'outline', 'pencil', t('names.editedTip'));
+  if (r.name_ok) return tag(t('names.kept'), 'ok', 'check', t('names.keptTip'));
+  if (r.check_name) return tag(t('tags.checkName'), 'warn', 'alert');
+  return tag(t('names.looksRight'), 'outline', 'check');
 }
 function ncRender() {
   if (!NC) return;
@@ -143,47 +126,47 @@ function ncRender() {
   const nCheck = ncList('check').length, nAll = ncTracks().length + ncExtras().length;
   const decided = NC.keys.filter(it => { const x = ncRow(it); return x.edited || x.name_ok; }).length;
   const head = `<div class="dlg-head">
-      <div class="wt-top"><span class="wt-step">${r ? `${NC.i + 1} of ${n}` : 'All done'}${decided ? ` · ${plural(decided, 'name')} decided` : ''}</span>
+      <div class="wt-top"><span class="wt-step">${esc(r ? t('common.iOfN', { i: I18N.num(NC.i + 1), n: I18N.num(n) }) : t('tags.allDone'))}${decided ? ' · ' + esc(tn('names.decided', decided)) : ''}</span>
         <span class="wt-bar"><i style="width:${n ? Math.round(100 * Math.min(NC.i, n) / n) : 100}%"></i></span></div>
-      <div class="nc-headrow"><h3>Check names</h3>
-        <div class="seg" role="radiogroup" aria-label="Which names">
-          <button role="radio" aria-checked="${NC.scope === 'check'}" class="${NC.scope === 'check' ? 'on' : ''}" data-scope="check">Names to check <span class="n">${nCheck}</span></button>
-          <button role="radio" aria-checked="${NC.scope === 'all'}" class="${NC.scope === 'all' ? 'on' : ''}" data-scope="all">All names <span class="n">${nAll}</span></button>
+      <div class="nc-headrow"><h3>${th('names.title')}</h3>
+        <div class="seg" role="radiogroup" aria-label="${esc(t('names.which'))}">
+          <button role="radio" aria-checked="${NC.scope === 'check'}" class="${NC.scope === 'check' ? 'on' : ''}" data-scope="check">${esc(t('names.scopeCheck'))} <span class="n">${nCheck}</span></button>
+          <button role="radio" aria-checked="${NC.scope === 'all'}" class="${NC.scope === 'all' ? 'on' : ''}" data-scope="all">${esc(t('names.scopeAll'))} <span class="n">${nAll}</span></button>
         </div></div>
-      <div class="sub">Artist and title as DJ HQ reads them. Keep them, swap the two or type the right ones: the tags and the rekordbox export use your choice.</div>
+      <div class="sub">${th('names.sub')}</div>
     </div>`;
   const wire = () => {
     dlg.querySelectorAll('[data-scope]').forEach(b => b.onclick = () => ncScope(b.dataset.scope));
     dlg.querySelector('[data-a=done]').onclick = () => done(true);
   };
   if (!r) {
-    dlg.innerHTML = head + `<div class="dlg-body">${emptyHtml({
-      ico: 'checkCircle', kind: 'green', title: n ? 'That’s the end of the list' : 'No names to check',
-      text: n ? 'Use Back to revisit a name, or Done to go back to the list.'
-              : 'Every name has something that confirms it, or you decided it already. <b>All names</b> goes through every track one by one.' })}</div>
-      <div class="dlg-foot">${n ? `<button class="btn" onclick="ncBack()">Back</button>` : ''}<span class="spacer"></span><button class="btn btn-primary" data-a="done">Done</button></div>`;
+    dlg.innerHTML = head + `<div class="dlg-body">${emptyHtml(n
+      ? emptyOf('checkCircle', 'tags.endOfList', 'names.endText', 'green')
+      : emptyOf('checkCircle', 'names.none', 'names.noneText', 'green'))}</div>
+      <div class="dlg-foot">${n ? `<button class="btn" onclick="ncBack()">${esc(t('common.back'))}</button>` : ''}<span class="spacer"></span><button class="btn btn-primary" data-a="done">${esc(t('common.done'))}</button></div>`;
     wire();
     return;
   }
   const isTrack = NC.keys[NC.i].k === 't';
   const src = isTrack
-    ? `<div class="nc-src"><span class="nc-lbl">On SoundCloud</span><span class="nc-val" title="${esc(r.sc_title)}">${esc(r.sc_title)}</span></div>
-       <div class="nc-src"><span class="nc-lbl">Uploaded by</span><span class="nc-val">${esc(r.user)}</span></div>`
-    : `<div class="nc-src"><span class="nc-lbl">File</span><span class="nc-val" title="${esc(r.name)}">${esc(r.name)}</span></div>`;
+    ? `<div class="nc-src"><span class="nc-lbl">${esc(t('tags.onSoundCloud'))}</span><span class="nc-val" title="${esc(r.sc_title)}">${esc(r.sc_title)}</span></div>
+       <div class="nc-src"><span class="nc-lbl">${esc(t('names.uploadedBy'))}</span><span class="nc-val">${esc(r.user)}</span></div>`
+    : `<div class="nc-src"><span class="nc-lbl">${esc(t('common.file'))}</span><span class="nc-val" title="${esc(r.name)}">${esc(r.name)}</span></div>`;
+  const lArtist = esc(t('common.artist')), lTitle = esc(t('common.title'));
   const name = NC.editing
     ? `<div class="editform nc-edit">
-         <input id="nc-artist" value="${esc(r.artist)}" placeholder="Artist" aria-label="Artist">
-         <input id="nc-title" value="${esc(r.title)}" placeholder="Title" aria-label="Title">
-         <div class="acts"><button class="btn btn-sm btn-primary" id="nc-save">${icon('check')}Save</button>
-           <button class="btn btn-sm btn-ghost" id="nc-cancel">Cancel</button></div>
+         <input id="nc-artist" value="${esc(r.artist)}" placeholder="${lArtist}" aria-label="${lArtist}">
+         <input id="nc-title" value="${esc(r.title)}" placeholder="${lTitle}" aria-label="${lTitle}">
+         <div class="acts"><button class="btn btn-sm btn-primary" id="nc-save">${icon('check')}${esc(t('common.save'))}</button>
+           <button class="btn btn-sm btn-ghost" id="nc-cancel">${esc(t('common.cancel'))}</button></div>
        </div>`
     : `<div class="nc-name">
-         <div class="nc-row"><span class="nc-lbl">Artist</span><span class="nc-big">${r.artist ? esc(r.artist) : '<span class="faint">none</span>'}</span></div>
-         <div class="nc-row"><span class="nc-lbl">Title</span><span class="nc-big">${esc(r.title)}</span></div>
+         <div class="nc-row"><span class="nc-lbl">${lArtist}</span><span class="nc-big">${r.artist ? esc(r.artist) : `<span class="faint">${esc(t('names.noArtist'))}</span>`}</span></div>
+         <div class="nc-row"><span class="nc-lbl">${lTitle}</span><span class="nc-big">${esc(r.title)}</span></div>
        </div>`;
-  const art = isTrack ? `<button class="wt-art nc-art${r.art ? '' : ' none'}" onclick="window.open('${esc(r.url)}','_blank','noopener')" title="Open on SoundCloud">${
+  const art = isTrack ? `<button class="wt-art nc-art${r.art ? '' : ' none'}" onclick="window.open('${esc(r.url)}','_blank','noopener')" title="${esc(t('common.openOnSoundCloud'))}">${
       r.art ? `<img src="${esc(r.art)}" alt="" onerror="this.parentNode.classList.add('none');this.remove()">` : icon('music')}</button>` : '';
-  const why = r.edited ? 'You set this name by hand; it wins over what DJ HQ reads.' : ncWhy(r);
+  const why = r.edited ? t('names.byHand') : ncWhy(r);
   dlg.innerHTML = head + `
     <div class="dlg-body">
       <div class="wt-card">
@@ -192,25 +175,25 @@ function ncRender() {
           ${src}
           ${name}
           <div class="nc-why">${ncState(r)}<span>${esc(why)}</span></div>
-          ${r.edited || r.name_ok ? `<button class="btn btn-sm btn-ghost nc-reset" onclick="ncReset()" title="Forget your choice for this name">${icon('undo')}Back to automatic</button>` : ''}
+          ${r.edited || r.name_ok ? `<button class="btn btn-sm btn-ghost nc-reset" onclick="ncReset()" title="${esc(t('names.resetTip'))}">${icon('undo')}${esc(t('tags.backToAuto'))}</button>` : ''}
         </div>
       </div>
-      <div class="wt-keys">Enter keeps it · S swaps · E edits · → skip · ← back · Esc closes</div>
+      <div class="wt-keys">${th('names.keys')}</div>
     </div>
     <div class="dlg-foot">
-      <button class="btn" onclick="ncBack()" ${NC.i ? '' : 'disabled'}>Back</button>
-      <button class="btn btn-ghost" onclick="ncNext()">Skip</button>
+      <button class="btn" onclick="ncBack()" ${NC.i ? '' : 'disabled'}>${esc(t('common.back'))}</button>
+      <button class="btn btn-ghost" onclick="ncNext()">${esc(t('common.skip'))}</button>
       <span class="spacer"></span>
-      <button class="btn" onclick="ncEdit()" ${NC.editing ? 'disabled' : ''}>${icon('pencil')}Edit</button>
-      <button class="btn" onclick="ncSwap()" ${NC.editing || !r.artist ? 'disabled' : ''} title="Artist becomes the title and the other way round">${icon('swap')}Swap</button>
-      <button class="btn btn-primary" onclick="ncKeep()" ${NC.editing ? 'disabled' : ''} title="The name is right as it is">${icon('check')}Keep</button>
-      <button class="btn" data-a="done">Done</button>
+      <button class="btn" onclick="ncEdit()" ${NC.editing ? 'disabled' : ''}>${icon('pencil')}${esc(t('common.edit'))}</button>
+      <button class="btn" onclick="ncSwap()" ${NC.editing || !r.artist ? 'disabled' : ''} title="${esc(t('names.swapTip'))}">${icon('swap')}${esc(t('names.swap'))}</button>
+      <button class="btn btn-primary" onclick="ncKeep()" ${NC.editing ? 'disabled' : ''} title="${esc(t('names.keepTip'))}">${icon('check')}${esc(t('names.keep'))}</button>
+      <button class="btn" data-a="done">${esc(t('common.done'))}</button>
     </div>`;
   wire();
   if (NC.editing) {
-    const a = dlg.querySelector('#nc-artist'), t = dlg.querySelector('#nc-title');
+    const a = dlg.querySelector('#nc-artist'), ti = dlg.querySelector('#nc-title');
     const onKey = e => { if (e.key === 'Enter') { e.preventDefault(); ncSaveEdit(); } };
-    a.onkeydown = onKey; t.onkeydown = onKey;
+    a.onkeydown = onKey; ti.onkeydown = onKey;
     dlg.querySelector('#nc-save').onclick = ncSaveEdit;
     dlg.querySelector('#nc-cancel').onclick = ncCancelEdit;
     a.focus(); a.select();

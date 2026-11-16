@@ -22,14 +22,16 @@ const DEMO_DEVICES = [
   { id: 'nxs2', label: 'CDJ-2000NXS2 / XDJ-XZ' },
   { id: 'cdj-3000', label: 'CDJ-3000' },
 ];
-const DEMO_LIB = { id: 'demo', name: 'Sample library', dir: '/Users/you/Music/Sample', dirs: ['/Users/you/Music/Sample'], subfolders: false };
+// name: demo.library, filled in by demoView() (the language can change between tours)
+const DEMO_LIB = { id: 'demo', dir: '/Users/you/Music/Sample', dirs: ['/Users/you/Music/Sample'], subfolders: false };
 const DEMO_HOME = '/Users/you';
 const DEMO_DATA_DIR = DEMO_HOME + '/Library/Application Support/DJ HQ';
 
-const freeLink = (slug, title = 'FREE DOWNLOAD') =>
-  ({ url: 'https://hypeddit.com/sample/' + slug, kind: 'free', label: 'Free DL', title, host: 'hypeddit.com', fmt: null });
-const buyLink = (artist, slug, fmt = 'WAV', title = 'Buy the WAV') =>
-  ({ url: `https://${artist}.bandcamp.com/track/${slug}`, kind: 'buy', label: 'Buy', title, host: artist + '.bandcamp.com', fmt });
+// link titles are what the uploader wrote, made up like the rest: keys in demo.link.*
+const freeLink = (slug, title = 'demo.link.freeDownload') =>
+  ({ url: 'https://hypeddit.com/sample/' + slug, kind: 'free', label: 'Free DL', title: t(title), host: 'hypeddit.com', fmt: null });
+const buyLink = (artist, slug, fmt = 'WAV', title = 'demo.link.buyWav') =>
+  ({ url: `https://${artist}.bandcamp.com/track/${slug}`, kind: 'buy', label: 'Buy', title: t(title), host: artist + '.bandcamp.com', fmt });
 
 /** A full fake /api/state view with eight tracks in every state the app knows. */
 function demoView() {
@@ -51,14 +53,14 @@ function demoView() {
       have: true, file: 'Aurelia Kane - Glasshouse.wav', score: 1, tagged: false,
       acquired: now - 1 * day, is_new_file: true, links: [freeLink('glasshouse')] }),
     base(3, 900003, 'Velour Static', 'Sirens Over Lisbon (Club Edit)', '7:05', 'VS', 198, {
-      links: [buyLink('velourstatic', 'sirens-over-lisbon'), freeLink('sirens-over-lisbon', 'free dl <3')] }),
+      links: [buyLink('velourstatic', 'sirens-over-lisbon'), freeLink('sirens-over-lisbon', 'demo.link.freeDl')] }),
     base(4, 900004, 'Kessler & Monroe', 'Half Light', '6:10', 'KM', 28, {
       have: true, file: 'Kessler & Monroe - Half Light.wav', score: 0.97, tagged: true, incompat: '24-bit' }),
     base(5, 900005, 'Oriel', 'Tidal (Original Mix)', '5:54', 'OR', 160, {
-      links: [{ url: 'https://toneden.io/sample/tidal', kind: 'free', label: 'Free DL', title: 'Free download', host: 'toneden.io', fmt: 'WAV' }] }),
+      links: [{ url: 'https://toneden.io/sample/tidal', kind: 'free', label: 'Free DL', title: t('demo.link.freeDownloadPlain'), host: 'toneden.io', fmt: 'WAV' }] }),
     base(6, 900006, 'Luma District', 'Northern Sky', '6:27', 'LD', 210, {
       have: true, file: 'Luma District - Northern Sky.mp3', score: 1, tagged: true, lossy: true, upgrade: true,
-      links: [buyLink('lumadistrict', 'northern-sky', 'lossless', 'Buy lossless')] }),
+      links: [buyLink('lumadistrict', 'northern-sky', 'lossless', 'demo.link.buyLossless')] }),
     // uploaded by a label as "Title - Artist": nothing says which side is the artist
     base(7, 900007, 'Paper Lanterns', 'Faye Idris', '4:48', 'FI', 345, {
       user: 'Lantern Records', name_conf: 'low', name_why: 'no-signal', check_name: true }),
@@ -72,29 +74,30 @@ function demoView() {
       edited: false, tagged: false, name_conf: 'high', name_why: 'file-name', name_ok: false, check_name: false, found: null },
   ];
   const local_files = [
-    ...tracks.filter(t => t.file).map(t => ({ name: t.file, dur: t.dur })),
+    ...tracks.filter(x => x.file).map(x => ({ name: x.file, dur: x.dur })),
     ...extras.map(f => ({ name: f.name, dur: f.dur })),
   ];
-  const have = tracks.filter(t => t.have).length;
+  const have = tracks.filter(x => x.have).length;
+  const playlist = t('demo.playlist');
   return {
-    libraries: [DEMO_LIB], active: DEMO_LIB.id,
+    libraries: [{ ...DEMO_LIB, name: t('demo.library') }], active: DEMO_LIB.id,
     device: 'xdj-700', devices: DEMO_DEVICES,
     backups: 0, backup_dir: DEMO_DATA_DIR + '/originals/demo', can_pick: false, can_reveal: false,
-    ready: true, playlist: 'Sample playlist', playlist_url: 'https://soundcloud.com/sample/sets/sample-playlist',
-    genre: 'Sample playlist',
+    ready: true, playlist, playlist_url: 'https://soundcloud.com/sample/sets/sample-playlist',
+    genre: playlist,
     tracks, extras, local_files,
     have,
-    missing: tracks.filter(t => !t.have && !t.na).length,
-    na_count: tracks.filter(t => t.na).length,
-    upgrades: tracks.filter(t => t.upgrade).length,
+    missing: tracks.filter(x => !x.have && !x.na).length,
+    na_count: tracks.filter(x => x.na).length,
+    upgrades: tracks.filter(x => x.upgrade).length,
     reavailable: [],
-    new_count: tracks.filter(t => t.is_new || t.is_new_file).length,
-    new_tracks: tracks.filter(t => t.is_new).length,
-    new_files: tracks.filter(t => t.is_new_file).length,
+    new_count: tracks.filter(x => x.is_new || x.is_new_file).length,
+    new_tracks: tracks.filter(x => x.is_new).length,
+    new_files: tracks.filter(x => x.is_new_file).length,
     seen_mark: now - 3 * day,
-    name_checks: tracks.filter(t => t.check_name).length + extras.filter(f => f.check_name).length,
-    untagged: tracks.filter(t => t.tagged === false).length + extras.filter(f => f.tagged === false).length,
-    incompatible: tracks.filter(t => t.file && t.incompat).length + extras.filter(f => f.incompat).length,
+    name_checks: tracks.filter(x => x.check_name).length + extras.filter(f => f.check_name).length,
+    untagged: tracks.filter(x => x.tagged === false).length + extras.filter(f => f.tagged === false).length,
+    incompatible: tracks.filter(x => x.file && x.incompat).length + extras.filter(f => f.incompat).length,
     local_count: local_files.length,
     settings: { inbox_dir: DEMO_HOME + '/Downloads', inbox_default: DEMO_HOME + '/Downloads', inbox_custom: false,
                 auto_move: false, refresh_min: 15, data_dir: DEMO_DATA_DIR,

@@ -203,6 +203,7 @@ export function buildExport(opts: { leaveLinksOut?: boolean; theme?: unknown }):
 
 const fail = (code: string, text: string, vars?: Record<string, unknown>) => core.appError(code, text, vars);
 const invalid = (what: string) => fail("config_invalid", `this configuration file is damaged or not one DJ HQ wrote (${what})`, { what });
+const outside = (what: string) => fail("config_path_outside", `this configuration file is damaged or not one DJ HQ wrote (${what}: a file name that points outside the library folder)`, { what });
 
 const isObj = (v: any) => !!v && typeof v === "object" && !Array.isArray(v);
 const isStr = (v: any) => typeof v === "string";
@@ -302,7 +303,7 @@ export function readConfig(text: string): { doc: any; libs: LibRec[]; notes: str
     if (l.files !== undefined) {
       if (!isObj(l.files)) throw invalid(w + ".files");
       for (const [k, f] of Object.entries<any>(l.files)) {
-        if (!relKeyOk(k)) throw invalid(`${w}.files (a file name that points outside the library folder)`);
+        if (!relKeyOk(k)) throw outside(w + ".files");
         if (!isObj(f)) throw invalid(`${w}.files`);
         files[k] = { ...(f.edit !== undefined ? { edit: checkEdit(f.edit, `${w}.files edit`) } : {}),
                      ...(f.found !== undefined ? { found: checkFound(f.found, `${w}.files found`) } : {}) };
@@ -311,7 +312,7 @@ export function readConfig(text: string): { doc: any; libs: LibRec[]; notes: str
     let file_names: string[] | null = null;
     if (l.file_names !== undefined && l.file_names !== null) {
       if (!Array.isArray(l.file_names) || l.file_names.length > 500000) throw invalid(w + ".file_names");
-      for (const k of l.file_names) if (!relKeyOk(k)) throw invalid(`${w}.file_names (a file name that points outside the library folder)`);
+      for (const k of l.file_names) if (!relKeyOk(k)) throw outside(w + ".file_names");
       file_names = l.file_names;
     }
     for (const k of ["seen_mark"]) if (l[k] !== undefined && !isNum(l[k])) throw invalid(`${w}.${k}`);

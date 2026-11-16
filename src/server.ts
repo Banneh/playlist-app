@@ -29,6 +29,8 @@ export interface ServerOpts {
   packaged?: boolean;
   /** the embedded SoundCloud view behind the Discover page (Electron only) */
   sc?: ScView;
+  /** called after the page saved its prefs (Electron: the menu follows Settings → Language) */
+  prefsChanged?: () => void;
 }
 
 /** config: a configuration file to import (asked for by the import route itself, not /api/pick-file) */
@@ -37,7 +39,8 @@ const PICK_KINDS: PickKind[] = ["pn_app", "mik_app", "mik_db", "rb_xml"];
 
 /** An error as JSON: the message, plus its stable code (and vars) when it has one. */
 const errBody = (e: any) => ({ error: String(e?.message || e),
-  ...(typeof e?.code === "string" && /^[a-z][a-z0-9_]*$/.test(e.code) ? { code: e.code } : {}),
+  ...(typeof e?.code === "string" && /^[a-z][a-z0-9_]*$/.test(e.code) ? { code: e.code }
+      : String(e?.message || e) === core.SC_CAPTCHA ? { code: "sc_captcha" } : {}),
   ...(e?.vars && typeof e.vars === "object" ? { vars: e.vars } : {}) });
 
 export interface ScRect { x: number; y: number; width: number; height: number; }
@@ -117,24 +120,24 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         else if (data.action === "home") sc.navigate("https://soundcloud.com/discover");
         else if (data.action === "playlist") { const l = core.activeLib(); if (l) sc.navigate(l.url); }
         else if (typeof data.url === "string" && /^https:\/\/(www\.|m\.)?soundcloud\.com\//.test(data.url)) {
-          if (data.play && await sc.captcha()) throw new Error(core.SC_CAPTCHA);   // the track would never start: say why at once
+          if (data.play && await sc.captcha()) throw core.scCaptchaError();   // the track would never start: say why at once
           sc.navigate(data.url, !!data.play);
         }
         return { ok: true };
       }
       case "player": {   // {action: toggle|pause|next|prev|seek|seekto, n?}: the player keys and the bar's seek line
         const a = String(data.action || "");
-        if (!/^(toggle|pause|next|prev|seek|seekto)$/.test(a)) throw new Error("unknown player action");
+        if (!/^(toggle|pause|next|prev|seek|seekto)$/.test(a)) throw core.appError("bad_request", "unknown player action");
         const n = Number(data.n) || 0;
         return sc.player(a, a === "seekto" ? Math.max(0, Math.min(86400, n)) : Math.max(-600, Math.min(600, n)));
       }
       case "signout": await sc.signOut(); return { ok: true };
       case "status": {
         const token = await sc.token();
-        let me: core.ScUser | null = null, can: { ok: boolean; why?: string; likes: boolean } | null = null;
+        let me: core.ScUser | null = null, can: core.ScCan | null = null;
         if (token) {
           try { me = await core.scMe(token); } catch { me = null; }   // a stale cookie: treat as signed out
-          if (me) { try { can = await core.scCanWrite(token); } catch (e: any) { can = { ok: false, why: e.message, likes: false }; } }
+          if (me) { try { can = await core.scCanWrite(token); } catch (e: any) { const it = core.errItem("", e); can = { ok: false, why: it.text, why_code: it.code, why_vars: it.vars, likes: false }; } }
         }
         let now: any = null;
         try { now = await sc.nowPlaying(); } catch {}
@@ -157,16 +160,16 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
       case "add": case "remove":
         return enqueue(async () => {   // the token is read right before the write, so a sign-out in the view is respected
           const token = await sc.token();
-          if (!token) throw new Error("sign in to SoundCloud on the Discover page first");
-          if (await sc.captcha()) throw new Error(core.SC_CAPTCHA);
+          if (!token) throw core.appError("sc_sign_in_first", "sign in to SoundCloud on the Discover page first");
+          if (await sc.captcha()) throw core.scCaptchaError();
           const like = action === "add" && ("like" in data ? !!data.like : !!core.getSettings().like_on_add);
           return core.scSetInPlaylist(token, String(data.url || ""), action === "add", like);
         });
       case "like":   // {url, on}
         return enqueue(async () => {
           const token = await sc.token();
-          if (!token) throw new Error("sign in to SoundCloud on the Discover page first");
-          if (await sc.captcha()) throw new Error(core.SC_CAPTCHA);
+          if (!token) throw core.appError("sc_sign_in_first", "sign in to SoundCloud on the Discover page first");
+          if (await sc.captcha()) throw core.scCaptchaError();
           return core.scSetLiked(token, String(data.url || ""), !!data.on);
         });
       case "likes": {   // {force?}: the Your Likes page (not a view)
@@ -174,7 +177,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         if (!token) return { signed_in: false };
         return enqueue(() => core.scLikesCheck(token, !!data.force));
       }
-      default: throw new Error("unknown SoundCloud action");
+      default: throw core.appError("bad_request", "unknown SoundCloud action");
     }
   }
 
@@ -190,7 +193,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
       if (req.url === "/" || req.url === "/index.html" || (req.url || "").startsWith("/?"))
         return send(200, "text/html; charset=utf-8", fs.readFileSync(indexPath));
       if (req.url === "/api/state")
-        return void core.buildView().then(json, (e) => json({ error: e.message }, 500));
+        return void core.buildView().then(json, (e) => json(errBody(e), 500));
       if (req.url === "/api/prefs") return json(readPrefs());
       if (req.url === "/api/do-all/status") return json(pipeline.status());   // never builds the view
       if (req.url === "/api/state/raw") {   // the saved data as state.json of DJ HQ 1.7 and older (support, going back)
@@ -253,10 +256,13 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           enqueue(fn).then(json, (e) => json(errBody(e), 500));
         const direct = (fn: () => Promise<any>) => void fn().then(json, (e) => json(errBody(e), 500));
         if (req.url === "/api/prefs") {   // not queued: must not wait behind a long tag/convert run
-          try { return json(core.setPrefs(data && typeof data === "object" && !Array.isArray(data) ? data : {})); }
-          catch (e: any) { return json({ error: e.message }, 500); }
+          let saved: any;
+          try { saved = core.setPrefs(data && typeof data === "object" && !Array.isArray(data) ? data : {}); }
+          catch (e: any) { return json(errBody(e), 500); }
+          try { opts.prefsChanged?.(); } catch {}
+          return json(saved);
         }
-        if ((req.url || "").startsWith("/api/sc/")) return void scRoute(req.url!.slice(8), data).then(json, (e) => json({ error: e.message }, 500));
+        if ((req.url || "").startsWith("/api/sc/")) return void scRoute(req.url!.slice(8), data).then(json, (e) => json(errBody(e), 500));
         switch (req.url) {
           case "/api/refresh":  return route(() => core.refresh());
           case "/api/rescan":   return route(() => core.buildView());
@@ -323,7 +329,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/reveal": {
             if (!opts.reveal) return json({ unsupported: true });
             const p = path.resolve(String(data.path || ""));
-            if (p !== core.rekordboxXmlPath() && !(savedConfig && p === savedConfig)) return json({ error: "can only reveal the exported file" }, 400);
+            if (p !== core.rekordboxXmlPath() && !(savedConfig && p === savedConfig)) return json({ error: "can only reveal the exported file", code: "reveal_not_exported" }, 400);
             opts.reveal(p);
             return json({ ok: true });
           }
@@ -336,7 +342,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/pick-folder":
             if (!opts.pickFolder) return json({ path: null, unsupported: true });
             return void opts.pickFolder()
-              .then((p) => json({ path: p }), (e) => json({ error: e.message }, 500));
+              .then((p) => json({ path: p }), (e) => json(errBody(e), 500));
           default:
             return send(404, "text/plain", "not found");
         }

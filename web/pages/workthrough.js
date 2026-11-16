@@ -9,10 +9,10 @@ const wtStillMissing = t => t && !t.have && !t.na;
 
 function openWorkThrough() {
   if (WT) return;
-  let rows = (PAGE === 'missing' && Array.isArray(LAST_ROWS) ? LAST_ROWS : []).filter(t => t.links && t.links.length);
-  if (!rows.length) rows = (DATA.tracks || []).filter(t => !t.have && !t.na && t.links && t.links.length);
+  let rows = (PAGE === 'missing' && Array.isArray(LAST_ROWS) ? LAST_ROWS : []).filter(r => r.links && r.links.length);
+  if (!rows.length) rows = (DATA.tracks || []).filter(r => !r.have && !r.na && r.links && r.links.length);
   modal((dlg, done) => {
-    WT = { ids: rows.map(t => t.id), i: 0, dlg, done, timer: null, found: null, moved: 0, opened: false, busy: false };
+    WT = { ids: rows.map(r => r.id), i: 0, dlg, done, timer: null, found: null, moved: 0, opened: false, busy: false };
     WT.onKey = e => {
       if (!WT || /^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || '')) return;
       const onControl = /^(BUTTON|A)$/.test((document.activeElement && document.activeElement.tagName) || '') && dlg.contains(document.activeElement);
@@ -52,34 +52,34 @@ function wtNext() { if (WT) wtGoto(WT.i + 1); }
 function wtBack() { if (WT && WT.i > 0) wtGoto(WT.i - 1); }
 
 function wtOpenLink() {
-  const t = wtCurrent(); if (!t || !t.links.length) return;
-  window.open(t.links[0].url, '_blank', 'noopener');
+  const tr = wtCurrent(); if (!tr || !tr.links.length) return;
+  window.open(tr.links[0].url, '_blank', 'noopener');
   WT.opened = true;
   wtStatus();
 }
 
 async function wtNotAvailable() {
-  const t = wtCurrent(); if (!t || WT.busy) return;
+  const tr = wtCurrent(); if (!tr || WT.busy) return;
   WT.busy = true;
-  try { DATA = await api('/api/override', { id: t.id, status: 'na' }); toast('Parked as not available — it comes back when a link appears'); inboxChanged(); }
-  catch (e) { toast('Error: ' + e.message, true); }
+  try { DATA = await api('/api/override', { id: tr.id, status: 'na' }); toast(t('workthrough.parked')); inboxChanged(); }
+  catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
   WT.busy = false;
   WT.found = null; WT.opened = false;
   wtRender(); wtPoll();   // the track dropped out of the list, so the next one is already in place
 }
 
 async function wtMove(it) {
-  const t = wtCurrent(); if (!t || WT.busy) return;
+  const tr = wtCurrent(); if (!tr || WT.busy) return;
   WT.busy = true;
-  const b = WT.dlg.querySelector('#wt-move'); if (b) { b.disabled = true; b.innerHTML = spin('Moving…'); }
+  const b = WT.dlg.querySelector('#wt-move'); if (b) { b.disabled = true; b.innerHTML = spin(t('common.moving')); }
   try {
     const body = { file: it.name, id: it.id }; if (it.zip) body.zip = it.zip;
     DATA = await api('/api/inbox-move', body);
     WT.moved++;
-    toast(`Moved into your library: ${it.name}`);
+    toast(t('common.movedIn', { name: it.name }));
     WT.busy = false;
-    wtAdvanceAfter('Moved into your library');
-  } catch (e) { WT.busy = false; toast('Couldn’t move the file: ' + e.message, true); wtStatus(); }
+    wtAdvanceAfter(t('tags.movedIn'));
+  } catch (e) { WT.busy = false; toast(t('common.moveFailed', { msg: errText(e) }), true); wtStatus(); }
 }
 
 /* shows a short confirmation, then moves on to the next track */
@@ -92,17 +92,17 @@ function wtAdvanceAfter(text) {
 /* ---------- watching the downloads folder ---------- */
 async function wtPoll() {
   if (!WT || WT.busy) return;
-  const t = wtCurrent(); if (!t) return;
+  const tr = wtCurrent(); if (!tr) return;
   let r;
   try { r = await api('/api/inbox', {}); } catch { return; }
-  if (!WT || WT.busy || wtCurrent() !== t) return;
+  if (!WT || WT.busy || wtCurrent() !== tr) return;
   if (r.moved && r.moved.length) {   // auto-move (Settings) already put files in: is ours among them?
     try { DATA = await api('/api/state'); } catch {}
     if (!WT) return;
-    const now = wtTrack(t.id);
-    if (now && now.have) { WT.moved++; wtAdvanceAfter('Moved into your library'); return; }
+    const now = wtTrack(tr.id);
+    if (now && now.have) { WT.moved++; wtAdvanceAfter(t('tags.movedIn')); return; }
   }
-  const hit = (r.items || []).find(it => it.id === t.id);
+  const hit = (r.items || []).find(it => it.id === tr.id);
   const changed = !!hit !== !!WT.found || (hit && WT.found && hit.name !== WT.found.name);
   WT.found = hit || null;
   if (changed) wtStatus();
@@ -112,44 +112,44 @@ async function wtPoll() {
 function wtRender() {
   if (!WT) return;
   const dlg = WT.dlg, done = WT.done;
-  const t = wtCurrent();
+  const tr = wtCurrent();
   const n = WT.ids.length;
   const head = `<div class="dlg-head">
-      <div class="wt-top"><span class="wt-step">${t ? `${WT.i + 1} of ${n}` : 'All done'}${WT.moved ? ` · ${plural(WT.moved, 'file')} moved` : ''}</span>
+      <div class="wt-top"><span class="wt-step">${esc(tr ? t('common.iOfN', { i: I18N.num(WT.i + 1), n: I18N.num(n) }) : t('tags.allDone'))}${WT.moved ? ' · ' + esc(tn('workthrough.moved', WT.moved)) : ''}</span>
         <span class="wt-bar"><i style="width:${n ? Math.round(100 * Math.min(WT.i, n) / n) : 100}%"></i></span></div>
-      <h3>Work through Missing</h3>
-      <div class="sub">Open the link, grab the file in your browser. DJ HQ watches your Downloads folder and moves it in when it lands.</div>
+      <h3>${th('workthrough.title')}</h3>
+      <div class="sub">${th('workthrough.sub')}</div>
     </div>`;
-  if (!t) {
-    dlg.innerHTML = head + `<div class="dlg-body">${emptyHtml({
-      ico: 'checkCircle', kind: 'green', title: WT.ids.length ? 'That’s the end of the list' : 'Nothing to work through',
-      text: WT.ids.length ? 'Use Back to revisit a track, or Done to go back to the list.' : 'Every missing track with a download or shop link has been handled.' })}</div>
-      <div class="dlg-foot">${WT.ids.length ? `<button class="btn" onclick="wtBack()">${icon('chevronRight')}Back</button>` : ''}<span class="spacer"></span><button class="btn btn-primary" data-a="done">Done</button></div>`;
+  if (!tr) {
+    dlg.innerHTML = head + `<div class="dlg-body">${emptyHtml(WT.ids.length
+      ? emptyOf('checkCircle', 'tags.endOfList', 'workthrough.endText', 'green')
+      : emptyOf('checkCircle', 'workthrough.nothingTitle', 'workthrough.nothingText', 'green'))}</div>
+      <div class="dlg-foot">${WT.ids.length ? `<button class="btn" onclick="wtBack()">${icon('chevronRight')}${esc(t('common.back'))}</button>` : ''}<span class="spacer"></span><button class="btn btn-primary" data-a="done">${esc(t('common.done'))}</button></div>`;
     dlg.querySelector('[data-a=done]').onclick = () => done(true);
     return;
   }
   dlg.innerHTML = head + `
     <div class="dlg-body">
       <div class="wt-card">
-        <button class="wt-art${t.art ? '' : ' none'}" onclick="window.open('${esc(t.url)}','_blank','noopener')" title="Open on SoundCloud">${
-          t.art ? `<img src="${esc(t.art)}" alt="" onerror="this.parentNode.classList.add('none');this.remove()">` : icon('music')}</button>
+        <button class="wt-art${tr.art ? '' : ' none'}" onclick="window.open('${esc(tr.url)}','_blank','noopener')" title="${esc(t('common.openOnSoundCloud'))}">${
+          tr.art ? `<img src="${esc(tr.art)}" alt="" onerror="this.parentNode.classList.add('none');this.remove()">` : icon('music')}</button>
         <div class="wt-info">
-          <div class="wt-title" title="${esc(t.title)}">${esc(t.title)}</div>
-          <div class="wt-sub">${esc(t.artist)}${t.user && t.user !== t.artist ? ` <span class="faint">· via ${esc(t.user)}</span>` : ''} <span class="faint">· ${esc(t.dur)}</span></div>
-          <div class="wt-links">${linkBtn(t, 'buy')}${linkBtn(t, 'free')}
-            <a class="btn btn-sm btn-ghost" href="${esc(t.url)}" target="_blank" rel="noopener">${icon('external')}SoundCloud</a></div>
+          <div class="wt-title" title="${esc(tr.title)}">${esc(tr.title)}</div>
+          <div class="wt-sub">${esc(tr.artist)}${tr.user && tr.user !== tr.artist ? ` <span class="faint">${esc(t('tags.via', { user: tr.user }))}</span>` : ''} <span class="faint">· ${esc(tr.dur)}</span></div>
+          <div class="wt-links">${linkBtn(tr, 'buy')}${linkBtn(tr, 'free')}
+            <a class="btn btn-sm btn-ghost" href="${esc(tr.url)}" target="_blank" rel="noopener">${icon('external')}SoundCloud</a></div>
           <div class="wt-status" id="wt-status"></div>
         </div>
       </div>
-      <div class="wt-keys">Enter opens the link · → next · ← back · N not available · Esc closes</div>
+      <div class="wt-keys">${th('workthrough.keys')}</div>
     </div>
     <div class="dlg-foot">
-      <button class="btn btn-ghost" onclick="wtNotAvailable()" title="Park this track until a link appears">${icon('cloudOff')}Not available</button>
-      <button class="btn btn-ghost" onclick="wtNext()">Skip</button>
+      <button class="btn btn-ghost" onclick="wtNotAvailable()" title="${esc(t('workthrough.notAvailableTip'))}">${icon('cloudOff')}${esc(t('workthrough.notAvailable'))}</button>
+      <button class="btn btn-ghost" onclick="wtNext()">${esc(t('common.skip'))}</button>
       <span class="spacer"></span>
-      <button class="btn" onclick="wtBack()" ${WT.i ? '' : 'disabled'}>Back</button>
-      <button class="btn btn-primary" onclick="wtOpenLink()" title="${esc(t.links[0].host)}">${icon(t.links[0].kind === 'free' ? 'download' : 'bag')}Open link</button>
-      <button class="btn" data-a="done">Done</button>
+      <button class="btn" onclick="wtBack()" ${WT.i ? '' : 'disabled'}>${esc(t('common.back'))}</button>
+      <button class="btn btn-primary" onclick="wtOpenLink()" title="${esc(tr.links[0].host)}">${icon(tr.links[0].kind === 'free' ? 'download' : 'bag')}${esc(t('workthrough.openLink'))}</button>
+      <button class="btn" data-a="done">${esc(t('common.done'))}</button>
     </div>`;
   dlg.querySelector('[data-a=done]').onclick = () => done(true);
   wtStatus();
@@ -161,10 +161,10 @@ function wtStatus() {
   const it = WT.found;
   if (it) {
     const pct = Math.round(it.score * 100);
-    st.innerHTML = `<div class="note note-green wt-found">${icon('inbox')}<div class="txt"><b>Download found:</b> ${esc(it.name)}
-        <span class="wt-meta">${pct >= 100 ? 'Exact match' : pct + '% match'} · ${esc(durDiff(it.dur_diff))}${it.lossy ? ' · MP3' : ''}${it.zip ? ' · inside ' + esc(it.zip) : ''}</span></div>
-      <div class="acts"><button class="btn btn-sm btn-green" id="wt-move" onclick="wtMove(WT.found)">${icon('folderIn')}${it.action === 'upgrade' ? 'Upgrade' : 'Move into library'}</button></div></div>`;
+    st.innerHTML = `<div class="note note-green wt-found">${icon('inbox')}<div class="txt">${th('workthrough.found', { name: it.name })}
+        <span class="wt-meta">${esc(pct >= 100 ? t('tags.exactMatch') : t('tags.pctMatch', { pct }))} · ${esc(durDiff(it.dur_diff))}${it.lossy ? ' · MP3' : ''}${it.zip ? ' · ' + esc(t('workthrough.inside', { zip: it.zip })) : ''}</span></div>
+      <div class="acts"><button class="btn btn-sm btn-green" id="wt-move" onclick="wtMove(WT.found)">${icon('folderIn')}${esc(t(it.action === 'upgrade' ? 'tags.upgrade' : 'tags.moveIn'))}</button></div></div>`;
     return;
   }
-  st.innerHTML = `<div class="wt-watch"><span class="spin"></span>${WT.opened ? 'Link opened in your browser · watching your Downloads folder for the file…' : 'Watching your Downloads folder for this track…'}</div>`;
+  st.innerHTML = `<div class="wt-watch"><span class="spin"></span>${th(WT.opened ? 'workthrough.watchingOpened' : 'workthrough.watching')}</div>`;
 }

@@ -387,7 +387,7 @@ export function buildId3v23(artist: string, title: string, genre: string, keep: 
   if (genre) frames.push(textFrame("TCON", genre));
   for (const f of keep) frames.push(frame(f.id, f.data));
   const body = Buffer.concat(frames);
-  if (body.length >= 1 << 28) throw new Error("tag too large");
+  if (body.length >= 1 << 28) throw Object.assign(new Error("tag too large"), { code: "tag_too_large" });
   return Buffer.concat([
     Buffer.from("ID3", "latin1"),
     Buffer.from([0x03, 0x00, 0x00]),
@@ -443,7 +443,7 @@ export function appendChunks(p: string, chunks: Chunk[]): void {
   const fd = fs.openSync(p, "r+");
   try {
     const magic = readAt(fd, 0, 4).toString("latin1");
-    if (magic !== "RIFF" && magic !== "FORM") throw new Error("not a WAV/AIFF file");
+    if (magic !== "RIFF" && magic !== "FORM") throw Object.assign(new Error("not a WAV/AIFF file"), { code: "not_wav_aiff" });
     const be = magic === "FORM";
     let size = fs.fstatSync(fd).size;
     const parts: Buffer[] = size % 2 ? [Buffer.from([0])] : [];
@@ -455,7 +455,7 @@ export function appendChunks(p: string, chunks: Chunk[]): void {
       if (c.data.length % 2) parts.push(Buffer.from([0]));
     }
     const add = Buffer.concat(parts);
-    if (size + add.length - 8 > 0xffffffff) throw new Error("file too large for its format (4 GB)");
+    if (size + add.length - 8 > 0xffffffff) throw Object.assign(new Error("file too large for its format (4 GB)"), { code: "file_too_large" });
     fs.writeSync(fd, add, 0, add.length, size);
     size += add.length;
     const head = Buffer.alloc(4);

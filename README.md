@@ -1,5 +1,7 @@
 # DJ HQ
 
+**English** · [Polski](README.pl.md)
+
 **Keep your music folder in sync with a SoundCloud playlist, and get your tracks ready for rekordbox and the club.**
 
 **[Download page →](https://banneh.github.io/dj-hq-site/)** picks the right installer for your computer and walks you through the first start.
@@ -13,6 +15,9 @@ rekordbox and Pioneer players are happy, and hands you a rekordbox playlist when
 you're done. SoundCloud itself lives inside the app on the **Discover** page,
 so you can listen and add what you hear to the playlist with one click.
 Everything runs on your computer; nothing is uploaded anywhere.
+
+The app speaks English and Polish: it follows your system language, and
+**Settings → Language** changes it.
 
 ## Contents
 
@@ -43,6 +48,7 @@ Everything runs on your computer; nothing is uploaded anywhere.
   - [Run from source](#run-from-source)
   - [Headless mode](#headless-mode)
   - [Project layout](#project-layout)
+  - [Languages](#languages)
   - [HTTP API](#http-api)
   - [Releases](#releases)
   - [Out of scope](#out-of-scope)
@@ -171,7 +177,7 @@ anything, since those tracks leave the library with their matches.
 The first time, a **Before we start** screen asks for the basics: which folder
 your downloads land in and whether exact matches may be moved into the library
 on their own, which player you play on, whether the folders inside your music
-folder count too, and light or dark. Every one of them has a sensible default,
+folder count too, light or dark, and the language. Every one of them has a sensible default,
 so **Let's go** is a fine answer; all of it lives in Settings afterwards.
 
 You land on the **Missing** list, and the sidebar shows how much of the
@@ -619,10 +625,16 @@ out, and the switch that likes every track you add), where tracks open
 for moving exact matches automatically, Do everything (the switch, the apps
 and files it uses with their state, closing the apps after their step, and
 **Configure…**), how often the playlist is checked,
-appearance, backups (how much space the originals of converted files and
+appearance, language, backups (how much space the originals of converted files and
 replaced MP3s take, with a **Clean up** button once you're sure you won't need
 them), moving or backing up your setup (**Export configuration…** and
 **Import configuration…**), and updates.
+
+**Language.** DJ HQ comes in English and Polish. On **Automatic** it follows
+your computer's language: Polish on a Polish system, English on any other.
+**English** or **Polski** fixes it. The switch takes effect at once, without a
+restart, and covers the Guide, the tour and the file dialogs too. Track,
+artist and file names, and messages from SoundCloud itself, stay as they are.
 
 ### More than one folder
 
@@ -661,7 +673,7 @@ Windows PC, or on this one again as a backup.
 
 Not in the file: the music itself, the backed-up originals (so *Restore
 originals* has nothing to restore on the new computer), the SoundCloud
-sign-in, and this computer's paths: the Downloads folder and the Do everything
+sign-in, the language setting, and this computer's paths: the Downloads folder and the Do everything
 setup are looked up again there (Settings → Do everything → **Configure…**).
 Files are recorded by their name inside the library folder, never by a full
 path, so a Mac file imports on Windows and the other way round.
@@ -886,6 +898,9 @@ npm run dist        # build installers locally into release/
 | `src/rbxml.ts` | merges tracks and keys into the user's rekordbox XML without rewriting the rest of it |
 | `scripts/afterPack.js` | ad-hoc signs the macOS app after packaging |
 | `scripts/screenshots.js` | regenerates the README screenshots from sample data (`npm run screens`) |
+| `web/i18n.js` | the translation runtime: `t()` / `th()` / `tn()`, plural forms, number and date formats, the language choice |
+| `web/lang/en/` · `web/lang/pl/` | every UI text, one file per area, in English (the source) and Polish |
+| `src/lang.ts` | the few texts the Electron shell shows itself (file dialogs, the sign-in window), in English and Polish |
 
 The UI is plain HTML, CSS and JavaScript with no build step. File-mutating
 requests are queued and run one at a time. A Do everything run is not one of
@@ -904,6 +919,46 @@ The screenshots in this README come from `npm run screens`: it builds a
 throw-away home folder with a sample library (real audio files, made-up
 artists), runs the app against it and captures every screen, so nobody's
 actual collection ends up in the pictures.
+
+### Languages
+
+DJ HQ is written in English; Polish is a full translation. With **Automatic**
+(the default) the app follows the system language: Polish on a Polish system,
+English on anything else. **Settings → Language** (and the "Before we start"
+screen) can fix it to English or Polski; the choice is a preference like the
+theme and takes effect without a restart. In the desktop app the system
+language comes from Electron (`?syslang=` in the page URL); in headless mode it
+is the browser's. `?lang=en` or `?lang=pl` in the URL forces a language for one
+page load without saving it.
+
+Every text lives in `web/lang/<language>/<area>.js`, one `I18N.add(lang, area,
+{…})` call per file: `common`, `err` (the server's error codes), `app`,
+`player`, `welcome`, `setup`, `tags`, `playlist`, `likes`, `inbox`, `extras`,
+`workthrough`, `names`, `prepare`, `doall`, `settings`, `config`, `discover`,
+`guide`, `tour` and `demo`. Strings are plain text with `{placeholders}` and,
+where needed, `<b>`, `<i>`, `<kbd>` and `<br>` (nothing else is let through).
+A plural is an object of forms (`one`/`other` in English, `one`/`few`/`many`
+in Polish). The server keeps answering in English with a `code`; the UI
+translates by that code and falls back to the English text.
+
+To add a language:
+
+1. Copy `web/lang/en/` to `web/lang/<code>/`, change `'en'` to the new code in
+   the first line of each of the 21 files, and translate the values (keys,
+   `{placeholders}` and the allowed tags stay as they are).
+2. Add the 21 `<script src="lang/<code>/…">` tags to `web/index.html`, after
+   the English ones.
+3. Add the code to `LANGS`, the system-locale rule (`fromLocale`) and
+   `normPref` in `web/i18n.js`, and a button for it next to English / Polski in
+   `web/pages/settings.js`, `web/pages/setup.js` and the welcome screen's
+   menu (`web/pages/welcome.js`), with its name in `common.lang`.
+4. Add its texts to `src/lang.ts` and its rule to `mainLang` there.
+5. Optionally translate this README as `README.<code>.md` and point
+   `guide.manualUrl` at it.
+
+Names of tracks, artists, files and folders, messages from SoundCloud or the
+operating system, and the menu names of Platinum Notes and rekordbox are never
+translated.
 
 ### HTTP API
 

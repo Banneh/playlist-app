@@ -153,6 +153,16 @@ export interface DoAll {
 export const appError = (code: string, text: string, vars?: Record<string, unknown>) =>
   Object.assign(new Error(text), { code, ...(vars ? { vars } : {}) });
 
+/** One entry of a per-file error list (view.*.error_items, next to the plain `errors` strings):
+ *  the file, the error's code and vars when it has them, its English text, and `named` when the
+ *  text names the file itself (the UI then shows it alone, else "name: text"). */
+export interface ErrorItem { name: string; code?: string; vars?: Record<string, unknown>; text: string; named?: boolean; }
+export const errItem = (name: string, e: any): ErrorItem => {
+  const text = String(e?.message || e);
+  return { name, text, ...(typeof e?.code === "string" && /^[a-z][a-z0-9_]*$/.test(e.code) ? { code: e.code } : {}),
+           ...(e?.vars && typeof e.vars === "object" ? { vars: e.vars } : {}), ...(text.startsWith(name + ":") ? { named: true } : {}) };
+};
+
 let DATA_DIR = "";
 let CAN_PICK = false;
 let CAN_REVEAL = false;
@@ -391,7 +401,7 @@ export async function setSettings(data: any): Promise<any> {
     const d = String(data.inbox_dir || "").trim();
     if (!d) delete STATE.inbox_dir;
     else {
-      if (!fs.existsSync(d) || !fs.statSync(d).isDirectory()) throw new Error("that folder doesn't exist");
+      if (!fs.existsSync(d) || !fs.statSync(d).isDirectory()) throw appError("folder_not_found", "that folder doesn't exist", { dir: d });
       STATE.inbox_dir = path.resolve(d);
     }
   }
@@ -401,7 +411,7 @@ export async function setSettings(data: any): Promise<any> {
   if ("do_all" in data) patchDoAll(data.do_all);
   if ("refresh_min" in data) {
     const n = Number(data.refresh_min);
-    if (!REFRESH_CHOICES.includes(n)) throw new Error("refresh interval must be one of " + REFRESH_CHOICES.join(", ") + " minutes");
+    if (!REFRESH_CHOICES.includes(n)) throw appError("bad_request", "refresh interval must be one of " + REFRESH_CHOICES.join(", ") + " minutes");
     s.refresh_min = n;
   }
   saveState();
@@ -468,16 +478,18 @@ function libPath(lib: Library, key: string): string {
 
 function requireLib(): Library {
   const lib = activeLib();
-  if (!lib) throw new Error("add a library first (＋ button in the header)");
+  if (!lib) throw appError("no_library", "add a library first (＋ button in the header)");
   return lib;
 }
 
 // ---------------- soundcloud ----------------
 
 async function httpGet(url: string): Promise<string> {
-  const r = await fetch(url, { headers: { "User-Agent": UA } });
+  let r: Response;
+  try { r = await fetch(url, { headers: { "User-Agent": UA } }); }
+  catch (e: any) { throw appError("sc_offline", String(e?.message || e), { error: String(e?.cause?.code || e?.message || e) }); }   // no connection
   if (!r.ok) {
-    const e: any = new Error(`HTTP ${r.status} fetching ${noSecret(url.split("?")[0])}`);
+    const e: any = appError("http_status", `HTTP ${r.status} fetching ${noSecret(url.split("?")[0])}`, { status: r.status, url: noSecret(url.split("?")[0]) });
     e.status = r.status;
     throw e;
   }
@@ -489,7 +501,7 @@ async function scrapeClientId(html: string): Promise<string> {
     const m = (await httpGet(u)).match(/client_id[=:]"([A-Za-z0-9]{20,})"/);
     if (m) return m[1];
   }
-  throw new Error("could not scrape a SoundCloud client_id");
+  throw appError("sc_unreachable", "could not scrape a SoundCloud client_id");
 }
 
 /** A pasted SoundCloud link as the library keeps it: https://soundcloud.com/<path>, no query
@@ -588,11 +600,11 @@ async function readPlaylist(rawUrl: string, prev: Playlist | null): Promise<{ pl
   const page = html || (() => httpGet(SC_DISCOVER));
   let ids: number[], title: string, plId = 0, secret: string | null = null;
   if (likes) {
-    if (!m) throw new Error("could not read the likes page (is the profile public?)");
+    if (!m) throw appError("likes_unreadable", "could not read the likes page (is the profile public?)");
     const user = hyd.find((i: any) => i.hydratable === "user")?.data;
-    if (!user || typeof user.id !== "number") throw new Error("no SoundCloud user found at this URL");
+    if (!user || typeof user.id !== "number") throw appError("sc_no_user", "no SoundCloud user found at this URL");
     ids = await withClientId(html, () => fetchLikeIds(user.id));
-    if (!ids.length) throw new Error("no public likes found (are your likes public?)");
+    if (!ids.length) throw appError("likes_none_public", "no public likes found (are your likes public?)");
     title = `${user.username || likes}'s likes`;
   } else {
     let pl = hyd.find((i: any) => i.hydratable === "playlist")?.data;
@@ -601,12 +613,12 @@ async function readPlaylist(rawUrl: string, prev: Playlist | null): Promise<{ pl
       pl = await withClientId(page, async () =>
         JSON.parse(await httpGet(`https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(url)}&client_id=${STATE.client_id}`)))
         .catch((e: any) => { if (![401, 403, 404].includes(e.status)) throw e; return null; });   // offline, 429, 5xx: say so
-      if (pl && pl.kind !== "playlist") throw new Error("no playlist found at this URL");
+      if (pl && pl.kind !== "playlist") throw appError("sc_no_playlist", "no playlist found at this URL");
       if (!pl || !Array.isArray(pl.tracks)) {
         if (pageErr && pageErr.status !== 404) throw pageErr;   // SoundCloud trouble (a 503, a bot block), not a private playlist
-        throw new Error(scSecret(url)
-          ? "could not read the playlist from this share link (was the link reset on SoundCloud?)"
-          : "could not read the playlist. It may be private: on SoundCloud, open Share on the playlist and paste that link here");
+        throw scSecret(url)
+          ? appError("sc_share_link_unreadable", "could not read the playlist from this share link (was the link reset on SoundCloud?)")
+          : appError("sc_playlist_private", "could not read the playlist. It may be private: on SoundCloud, open Share on the playlist and paste that link here");
       }
     }
     ids = pl.tracks.map((t: any) => t.id);
@@ -676,6 +688,7 @@ export type ScTransport = (method: string, url: string, headers: Record<string, 
 let scTransport: ScTransport | null = null;
 /** what every SoundCloud action says while the bot check is up in the view (see main.ts) */
 export const SC_CAPTCHA = "SoundCloud wants to check you are human — open Discover and solve the check there first";
+export const scCaptchaError = () => appError("sc_captcha", SC_CAPTCHA);
 /** a 403's body is DataDome's challenge: {"url":"https://geo.captcha-delivery.com/captcha/?…"} */
 export const scCaptchaBody = (txt: string) => /captcha-delivery\.com/i.test(String(txt || ""));
 export function setScTransport(t: ScTransport | null): void { scTransport = t; }
@@ -704,9 +717,11 @@ async function scFetch(method: string, pathAndQuery: string, token?: string | nu
     let status: number, txt: string;
     if (token && scTransport) {
       ({ status, body: txt } = await scTransport(method, url, headers, payload));
-      if (status === 0) throw new Error("SoundCloud page could not send the request: " + txt);
+      if (status === 0) throw appError("sc_page_failed", "SoundCloud page could not send the request: " + txt, { error: txt });
     } else {
-      const r = await fetch(url, { method, headers: { ...headers, "User-Agent": UA, ...SC_ORIGIN }, body: payload });
+      let r: Response;
+      try { r = await fetch(url, { method, headers: { ...headers, "User-Agent": UA, ...SC_ORIGIN }, body: payload }); }
+      catch (e: any) { throw appError("sc_offline", String(e?.message || e), { error: String(e?.cause?.code || e?.message || e) }); }
       status = r.status; txt = await r.text();
     }
     if (status >= 200 && status < 300) return txt ? JSON.parse(txt) : {};
@@ -714,11 +729,11 @@ async function scFetch(method: string, pathAndQuery: string, token?: string | nu
     const where = `${method} ${pathAndQuery.split("?")[0]}`;
     const detail = txt.replace(/\s+/g, " ").trim().slice(0, 160);
     console.error(`soundcloud ${status} on ${where}: ${txt.slice(0, 600)}`);
-    if (status === 401) throw new Error("SoundCloud signed you out — sign in again on the Discover page");
-    if (status === 403 && token && scTransport && scCaptchaBody(txt)) throw new Error(SC_CAPTCHA);   // refused in the view: solvable there
-    if (status === 403) throw new Error(`SoundCloud refused this (403 on ${where})${detail ? ": " + detail : ""}`);
-    if (status === 404) throw new Error(`SoundCloud could not find that (${where})`);
-    throw new Error(`SoundCloud answered ${status} on ${where}${detail ? ": " + detail : ""}`);
+    if (status === 401) throw appError("sc_signed_out", "SoundCloud signed you out — sign in again on the Discover page");
+    if (status === 403 && token && scTransport && scCaptchaBody(txt)) throw scCaptchaError();   // refused in the view: solvable there
+    if (status === 403) throw appError(detail ? "sc_refused_detail" : "sc_refused", `SoundCloud refused this (403 on ${where})${detail ? ": " + detail : ""}`, { where, detail });
+    if (status === 404) throw appError("sc_not_found", `SoundCloud could not find that (${where})`, { where });
+    throw appError(detail ? "sc_status_detail" : "sc_status", `SoundCloud answered ${status} on ${where}${detail ? ": " + detail : ""}`, { status, where, detail });
   }
 }
 
@@ -728,7 +743,7 @@ export async function scMe(token: string): Promise<ScUser> {
   const hit = meCache.get(token);
   if (hit) return hit;
   const u = await scFetch("GET", "me", token);
-  if (!u || typeof u.id !== "number") throw new Error("not signed in");
+  if (!u || typeof u.id !== "number") throw appError("not_signed_in", "not signed in");
   const me: ScUser = { id: u.id, username: u.username || u.permalink || "", permalink: u.permalink || "", avatar: u.avatar_url || "" };
   meCache.clear(); meCache.set(token, me);
   return me;
@@ -758,21 +773,27 @@ export async function scNow(url: string): Promise<ScNow | null> {
 
 /** Whether the signed-in user may add to the active library's playlist / likes:
  *  { ok: true } or { ok: false, why }. */
-export async function scCanWrite(token: string): Promise<{ ok: boolean; why?: string; likes: boolean }> {
+export interface ScCan { ok: boolean; likes: boolean; why?: string; why_code?: string; why_vars?: Record<string, unknown>; }
+/** the reason as the UI translates it: why (English), why_code and why_vars */
+const cannot = (likes: boolean, code: string, why: string, vars?: Record<string, unknown>): ScCan =>
+  ({ ok: false, likes, why, why_code: code, ...(vars ? { why_vars: vars } : {}) });
+export async function scCanWrite(token: string): Promise<ScCan> {
   const lib = activeLib();
-  if (!lib) return { ok: false, why: "no library", likes: false };
+  if (!lib) return cannot(false, "no_library", "no library");
   const me = await scMe(token);
-  if (!lib.url) return { ok: false, likes: false, why: "This library has no SoundCloud link yet; set it with Change link… in Settings." };
+  if (!lib.url) return cannot(false, "can_no_link", "This library has no SoundCloud link yet; set it with Change link… in Settings.");
   const likes = likesUser(lib.url);
   if (likes) {
     if (likes.toLowerCase() !== me.permalink.toLowerCase())
-      return { ok: false, likes: true, why: `This library follows ${likes}'s likes, but you are signed in as ${me.username}.` };
+      return cannot(true, "can_other_likes", `This library follows ${likes}'s likes, but you are signed in as ${me.username}.`, { likes, me: me.username });
     return { ok: true, likes: true };
   }
   const pl = await scResolve(lib.url);
-  if (!pl || pl.kind !== "playlist") return { ok: false, likes: false, why: "The library's playlist could not be found on SoundCloud." };
+  if (!pl || pl.kind !== "playlist") return cannot(false, "can_playlist_gone", "The library's playlist could not be found on SoundCloud.");
   if (pl.user_id !== me.id)
-    return { ok: false, likes: false, why: `This playlist belongs to ${pl.user?.username || "someone else"}; you can only add to your own playlists.` };
+    return pl.user?.username
+      ? cannot(false, "can_not_owner", `This playlist belongs to ${pl.user.username}; you can only add to your own playlists.`, { owner: pl.user.username })
+      : cannot(false, "can_not_owner_anon", "This playlist belongs to someone else; you can only add to your own playlists.");
   return { ok: true, likes: false };
 }
 
@@ -781,11 +802,11 @@ export async function scCanWrite(token: string): Promise<{ ok: boolean; why?: st
  *  reconciles with SoundCloud. */
 export async function scSetInPlaylist(token: string, url: string, add: boolean, alsoLike = false): Promise<any> {
   const lib = requireLib();
-  if (!lib.playlist) throw new Error("fetch the playlist first");
+  if (!lib.playlist) throw appError("playlist_not_fetched", "fetch the playlist first");
   const can = await scCanWrite(token);
-  if (!can.ok) throw new Error(can.why || "cannot write to this playlist");
+  if (!can.ok) throw appError(can.why_code || "bad_request", can.why || "cannot write to this playlist", can.why_vars);
   const t = await scResolve(url);
-  if (!t || t.kind !== "track") throw new Error("that is not a SoundCloud track");
+  if (!t || t.kind !== "track") throw appError("not_a_track", "that is not a SoundCloud track");
   const tid = Number(t.id);
   const me = await scMe(token);
   const have = lib.playlist.tracks.some((x) => x.id === tid);
@@ -800,8 +821,8 @@ export async function scSetInPlaylist(token: string, url: string, add: boolean, 
     // tracks the read can't see (private ones) would be missing from the list we send, and
     // SoundCloud would drop them from the playlist: rather not write at all
     if (typeof pl.track_count === "number" && ids.length < pl.track_count)
-      throw new Error(`SoundCloud showed DJ HQ only ${ids.length} of the playlist's ${pl.track_count} tracks, so it was left unchanged `
-        + "(saving would remove the ones it can't see). Add or remove the track on SoundCloud instead.");
+      throw appError("sc_partial_playlist", `SoundCloud showed DJ HQ only ${ids.length} of the playlist's ${pl.track_count} tracks, so it was left unchanged `
+        + "(saving would remove the ones it can't see). Add or remove the track on SoundCloud instead.", { seen: ids.length, total: pl.track_count, n: pl.track_count });
     const next = add ? (ids.includes(tid) ? ids : [...ids, tid]) : ids.filter((n) => n !== tid);
     if (next.length !== ids.length)   // the web player's own shape: plain ids, whole list
       await scFetch("PUT", `playlists/${pl.id}`, token, { playlist: { tracks: next } });
@@ -820,7 +841,7 @@ export async function scSetInPlaylist(token: string, url: string, add: boolean, 
   view.sc_result = { id: tid, added: add, title: t.title || "", user: t.user?.username || "" };
   if (add && alsoLike && !can.likes) {   // "also like what I add": a failure here must not undo the add
     try { await setLiked(token, me, tid, true); view.sc_result.liked = true; }
-    catch (e: any) { view.sc_result.liked = false; view.sc_result.like_error = e.message; }
+    catch (e: any) { const it = errItem("", e); view.sc_result.liked = false; view.sc_result.like_error = e.message; view.sc_result.like_error_code = it.code; view.sc_result.like_error_vars = it.vars; }
   }
   return view;
 }
@@ -897,7 +918,7 @@ export async function scSetLiked(token: string, url: string, on: boolean): Promi
     return view;
   }
   const t = await scResolve(url);
-  if (!t || t.kind !== "track") throw new Error("that is not a SoundCloud track");
+  if (!t || t.kind !== "track") throw appError("not_a_track", "that is not a SoundCloud track");
   await setLiked(token, me, Number(t.id), on);
   const view = await buildView();
   view.sc_like = { id: Number(t.id), liked: on, title: t.title || "", user: t.user?.username || "" };
@@ -1429,6 +1450,8 @@ export interface BuyLink {
   url: string; kind: "free" | "buy"; label: string; title: string; host: string;
   /** format the link text or shop makes certain: "WAV", "AIFF", "FLAC", "lossless", "MP3" */
   fmt: string | null;
+  /** SoundCloud's own download button (its title is the english "Download on SoundCloud"; the ui says it in its language) */
+  sc_dl?: boolean;
 }
 
 const FMT_WORDS: [RegExp, string][] = [
@@ -1455,9 +1478,10 @@ function linkRank(l: BuyLink): number {
  *  first: shops sell lossless files, free downloads are often MP3. */
 export function trackLinks(t: PlTrack): BuyLink[] {
   const out: BuyLink[] = [];
-  const add = (url: string, kind: "free" | "buy", title: string, host: string) => {
+  const add = (url: string, kind: "free" | "buy", title: string, host: string, scDl = false) => {
     if (out.some((o) => o.url === url)) return;
     const l: BuyLink = { url, kind, label: kind === "free" ? "Free DL" : "Buy", title, host, fmt: fmtHint(title, host) };
+    if (scDl) l.sc_dl = true;
     const i = out.findIndex((o) => o.kind === kind);
     if (i < 0) out.push(l);
     else if (linkRank(l) > linkRank(out[i])) out[i] = l;
@@ -1479,7 +1503,7 @@ export function trackLinks(t: PlTrack): BuyLink[] {
     const ctx = words(line) || words(prev);
     add(url, kind, ctx.slice(0, 80), host);
   }
-  if (t.sc_dl && t.url) add(t.url, "free", "Download on SoundCloud", "soundcloud.com");
+  if (t.sc_dl && t.url) add(t.url, "free", "Download on SoundCloud", "soundcloud.com", true);
   return out.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "buy" ? -1 : 1));
 }
 
@@ -1540,7 +1564,7 @@ async function writeTags(p: string, artist: string, title: string, genre: string
   const ext = path.extname(p).toLowerCase();
   const own = ext === ".wav" || (ID3_EXT.includes(ext) && id3Version(p) >= 3); // DJ HQ writes the ID3 tag
   const md5 = await audioMd5(p);
-  if (!md5) throw new Error("could not checksum audio");
+  if (!md5) throw appError("checksum_failed", "could not checksum audio");
   const tmp = p + ".tmp" + ext;
   const args = ["-y", "-v", "error", "-i", p];
   if (ext === ".wav") {
@@ -1560,12 +1584,12 @@ async function writeTags(p: string, artist: string, title: string, genre: string
   args.push(tmp);
   const r = await run(FFMPEG, args, 300000);
   try {
-    if (r.code !== 0) throw new Error("ffmpeg: " + r.stderr.slice(0, 200));
+    if (r.code !== 0) throw appError("ffmpeg_failed", "ffmpeg: " + r.stderr.slice(0, 200), { error: r.stderr.slice(0, 200) });
     if (own && ext === ".mp3") prependTag(tmp, mergedTag(p, artist, title, genre));
     else if (own)
       appendChunks(tmp, [{ id: ext === ".wav" ? "id3 " : "ID3 ", data: mergedTag(p, artist, title, genre) },
                          ...carriedChunks(p, true, true)]);
-    if ((await audioMd5(tmp)) !== md5) throw new Error("audio data would change, left untouched");
+    if ((await audioMd5(tmp)) !== md5) throw appError("audio_would_change", "audio data would change, left untouched");
   } catch (e) {
     if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
     throw e;
@@ -1892,7 +1916,7 @@ export async function tagAll(): Promise<any> {
   let view = await buildView();
   const genre = view.genre || "Trance";
   let done = 0;
-  const errors: string[] = [];
+  const errors: string[] = [], error_items: ErrorItem[] = [];
   const todo: [string, string, string][] = [];
   for (const r of view.tracks || [])
     if (r.file && r.tagged === false) todo.push([r.file, r.artist, r.title]);
@@ -1904,10 +1928,11 @@ export async function tagAll(): Promise<any> {
       done++;
     } catch (e: any) {
       errors.push(`${fname}: ${e.message}`);
+      error_items.push(errItem(fname, e));
     }
   }
   view = await buildView();
-  view.tag_report = { done, errors };
+  view.tag_report = { done, errors, error_items };
   return view;
 }
 
@@ -1959,14 +1984,15 @@ export async function convertAll(): Promise<any> {
   const dev = DEVICES[devKey];
   const bdir = backupDir(lib);
   let done = 0;
-  const errors: string[] = [];
+  const errors: string[] = [], error_items: ErrorItem[] = [];
   for (const f of await scanLocal(lib)) {
     if (!compatReason(f.fmt, devKey)) continue;
     const [codec, sr, bits] = f.fmt;
     const ext = path.extname(f.name).toLowerCase();
     if (!codec.startsWith("pcm") || ![".wav", ".aiff", ".aif"].includes(ext)) {
-      errors.push(`${f.name}: ${codec || "unknown"} needs a manual convert (extension ` +
-                  "would change and rekordbox would lose cues)");
+      const msg = `${codec || "unknown"} needs a manual convert (extension would change and rekordbox would lose cues)`;
+      errors.push(`${f.name}: ${msg}`);
+      error_items.push(errItem(f.name, codec ? appError("convert_manual", msg, { codec }) : appError("convert_manual_unknown", msg)));
       continue;
     }
     const tmp = f.path + ".tmp" + ext;
@@ -1984,9 +2010,9 @@ export async function convertAll(): Promise<any> {
       if (!isAiff) args.push(...metaArgs(artist, title, genre)); // RIFF INFO, as writeTags
       args.push(tmp);
       const r = await run(FFMPEG, args, 600000);
-      if (r.code !== 0) throw new Error("ffmpeg: " + r.stderr.slice(0, 200));
+      if (r.code !== 0) throw appError("ffmpeg_failed", "ffmpeg: " + r.stderr.slice(0, 200), { error: r.stderr.slice(0, 200) });
       if (Math.abs((await probeDuration(tmp)) - f.dur) > 0.5)
-        throw new Error("duration changed after convert, aborted");
+        throw appError("duration_changed", "duration changed after convert, aborted");
       // The ID3 tag (rekordbox reads it) keeps every frame: key, energy, comments.
       // Platinum Notes' marker (PLTN chunk, or GEOB frame) is kept too: its processing
       // is in the samples and survives a change of bit depth or rate, and without the
@@ -2001,11 +2027,12 @@ export async function convertAll(): Promise<any> {
     } catch (e: any) {
       if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
       errors.push(`${f.name}: ${e.message}`);
+      error_items.push(errItem(f.name, e));
     }
   }
   saveState();
   const view = await buildView();
-  view.convert_report = { done, errors, backup_dir: bdir };
+  view.convert_report = { done, errors, error_items, backup_dir: bdir };
   return view;
 }
 
@@ -2013,17 +2040,18 @@ export async function restoreAll(): Promise<any> {
   // Copy backed-up originals back into the library folder (backups are kept).
   const lib = requireLib();
   let done = 0;
-  const errors: string[] = [];
+  const errors: string[] = [], error_items: ErrorItem[] = [];
   for (const [key, src, dst] of restorable(lib)) {
     try {
       copyPreservingTimes(src, dst);
       done++;
     } catch (e: any) {
       errors.push(`${key}: ${e.message}`);
+      error_items.push(errItem(key, e));
     }
   }
   const view = await buildView();
-  view.restore_report = { done, errors };
+  view.restore_report = { done, errors, error_items };
   return view;
 }
 
@@ -2055,8 +2083,8 @@ const insideDir = (inner: string, outer: string) => {
 /** A folder given by the user (typed or picked): "~" expanded, must exist. */
 function userDir(raw: any): string {
   const d = String(raw || "").trim().replace(/^~(?=$|\/)/, os.homedir());
-  if (!d) throw new Error("no folder given");
-  if (!fs.existsSync(d) || !fs.statSync(d).isDirectory()) throw new Error(`folder not found: ${d}`);
+  if (!d) throw appError("no_folder", "no folder given");
+  if (!fs.existsSync(d) || !fs.statSync(d).isDirectory()) throw appError("folder_not_found", `folder not found: ${d}`, { dir: d });
   return path.resolve(d);
 }
 
@@ -2072,15 +2100,15 @@ export async function libraryOp(data: any): Promise<any> {
   const libs = STATE.libraries;
   const target = (): Library => {
     const lib = data.id ? libs.find((l) => l.id === data.id) : activeLib();
-    if (!lib) throw new Error("library not found");
+    if (!lib) throw appError("library_not_found", "library not found");
     return lib;
   };
   if (op === "add") {
     const d = userDir(data.dir);
     const url = await expandScUrl(data.url);
-    if (!url.startsWith("http")) throw new Error("please give a full SoundCloud playlist or likes URL");
+    if (!url.startsWith("http")) throw appError("url_not_full", "please give a full SoundCloud playlist or likes URL");
     if (libs.some((l) => libDirs(l).some((x) => sameDir(x, d))))
-      throw new Error("this folder is already a library");
+      throw appError("folder_is_library", "this folder is already a library");
     const nid = "lib" + (Math.max(0, ...libs
       .filter((l) => /^lib\d+$/.test(l.id)).map((l) => parseInt(l.id.slice(3), 10))) + 1);
     const lib: Library = { id: nid, dir: d, url, playlist: null };
@@ -2096,11 +2124,11 @@ export async function libraryOp(data: any): Promise<any> {
     // track id or file stays as it is, and refresh's merge keeps the first-seen times.
     const lib = target();
     const url = await expandScUrl(data.url);
-    if (!url.startsWith("http")) throw new Error("please give a full SoundCloud playlist or likes URL");
+    if (!url.startsWith("http")) throw appError("url_not_full", "please give a full SoundCloud playlist or likes URL");
     // (a library imported without its link has none to compare with: the track check below still guards it)
     if (lib.url && !!likesUser(url) !== !!likesUser(lib.url))
-      throw new Error(likesUser(lib.url) ? "this library follows a Likes page; add a new library for a playlist"
-                                         : "this library follows a playlist; add a new library for a Likes page");
+      throw likesUser(lib.url) ? appError("link_is_likes", "this library follows a Likes page; add a new library for a playlist")
+                               : appError("link_is_playlist", "this library follows a playlist; add a new library for a Likes page");
     const r = await readPlaylist(url, lib.playlist);
     const before = new Set((lib.playlist?.tracks || []).map((t) => t.id));
     const same = r.playlist.tracks.filter((t) => before.has(t.id)).length;
@@ -2117,28 +2145,28 @@ export async function libraryOp(data: any): Promise<any> {
   } else if (op === "select") {
     if (libs.some((l) => l.id === data.id)) STATE.active = data.id;
   } else if (op === "remove") {
-    if (libs.length <= 1) throw new Error("cannot remove the last library");
+    if (libs.length <= 1) throw appError("last_library", "cannot remove the last library");
     STATE.libraries = libs.filter((l) => l.id !== data.id);
     if (STATE.active === data.id) STATE.active = STATE.libraries[0].id;
   } else if (op === "add_folder") {
     const lib = target();
     const d = userDir(data.dir);
     for (const x of libDirs(lib)) {
-      if (sameDir(x, d)) throw new Error("this folder is already part of the library");
-      if (insideDir(d, x)) throw new Error(`${d} is inside ${x}, which is already part of the library — turn on "Include subfolders" instead`);
-      if (insideDir(x, d)) throw new Error(`${x} is inside ${d}; a library folder cannot contain another one`);
+      if (sameDir(x, d)) throw appError("folder_in_library", "this folder is already part of the library");
+      if (insideDir(d, x)) throw appError("folder_inside", `${d} is inside ${x}, which is already part of the library — turn on "Include subfolders" instead`, { dir: d, parent: x });
+      if (insideDir(x, d)) throw appError("folder_contains", `${x} is inside ${d}; a library folder cannot contain another one`, { dir: d, child: x });
     }
     for (const other of libs)
       if (other !== lib && libDirs(other).some((x) => sameDir(x, d)))
-        throw new Error(`this folder already belongs to the library “${libName(other)}”`);
+        throw appError("folder_other_library", `this folder already belongs to the library “${libName(other)}”`, { name: libName(other) });
     lib.dirs = [...(lib.dirs || []), d];
   } else if (op === "remove_folder") {
     const lib = target();
     const d = String(data.dir || "");
-    if (sameDir(lib.dir, d)) throw new Error("the main folder cannot be removed; remove the library instead");
+    if (sameDir(lib.dir, d)) throw appError("main_folder_fixed", "the main folder cannot be removed; remove the library instead");
     const before = (lib.dirs || []).length;
     lib.dirs = (lib.dirs || []).filter((x) => !sameDir(x, d));
-    if (lib.dirs.length === before) throw new Error("that folder is not part of the library");
+    if (lib.dirs.length === before) throw appError("folder_not_in_library", "that folder is not part of the library");
     if (!lib.dirs.length) delete lib.dirs;
     for (const k of Object.keys(STATE.dur_cache)) if (k.startsWith(d + path.sep)) delete STATE.dur_cache[k];
   } else if (op === "subfolders") {
@@ -2149,7 +2177,7 @@ export async function libraryOp(data: any): Promise<any> {
     // pins whose file still isn't there are dropped with the next view, as for any other library
     delete target().files_pending;
   } else {
-    throw new Error("unknown library op");
+    throw appError("bad_request", "unknown library op");
   }
   saveState();
   return buildView();
@@ -2274,7 +2302,7 @@ function confident(c: Candidate[]): boolean {
 export async function findTrack(data: any): Promise<any> {
   const lib = requireLib();
   const f = (await scanLocal(lib)).find((x) => x.name === data.file);
-  if (!f) throw new Error("file not found in the library folder");
+  if (!f) throw appError("file_not_found", "file not found in the library folder");
   const q = String(data.q || "").trim() || extraQuery(f);
   return { q, candidates: await searchCandidates(lib, f, q) };
 }
@@ -2300,7 +2328,7 @@ export async function findAll(): Promise<any> {
   let view = await buildView();
   const fmap = new Map((await scanLocal(lib)).map((f) => [f.name, f]));
   let found = 0, in_playlist = 0, unsure = 0, none = 0;
-  const errors: string[] = [];
+  const errors: string[] = [], error_items: ErrorItem[] = [];
   for (const e of view.extras || []) {
     if (e.found) continue;
     const f = fmap.get(e.name);
@@ -2316,11 +2344,12 @@ export async function findAll(): Promise<any> {
       else unsure++;
     } catch (err: any) {
       errors.push(`${f.name}: ${err.message}`);
+      error_items.push(errItem(f.name, err));
     }
   }
   saveState();
   view = await buildView();
-  view.find_report = { found, in_playlist, unsure, none, errors };
+  view.find_report = { found, in_playlist, unsure, none, errors, error_items };
   return view;
 }
 
@@ -2402,8 +2431,8 @@ function zipMatchNames(base: string): string[] {
   if (parts.length >= 3) { names.add(parts[0] + " - " + parts.slice(2).join(" - ")); names.add(parts.slice(2).join(" - ")); }
   return [...names];
 }
-async function scanInboxZips(dir: string): Promise<{ files: InboxFile[]; errors: string[] }> {
-  const files: InboxFile[] = [], errors: string[] = [];
+async function scanInboxZips(dir: string): Promise<{ files: InboxFile[]; errors: string[]; error_items: ErrorItem[] }> {
+  const files: InboxFile[] = [], errors: string[] = [], error_items: ErrorItem[] = [];
   const cache = STATE.zip_cache || (STATE.zip_cache = {});
   const live = new Set<string>();
   const tmpDir = path.join(DATA_DIR, "tmp");
@@ -2412,7 +2441,7 @@ async function scanInboxZips(dir: string): Promise<{ files: InboxFile[]; errors:
     const zp = path.join(dir, f);
     let entries: ZipEntry[];
     try { entries = listEntries(zp).filter(zipEntryAudio); }
-    catch (e: any) { errors.push(`${f}: ${e.message}`); continue; }
+    catch (e: any) { errors.push(`${f}: ${e.message}`); error_items.push(errItem(f, e)); continue; }
     for (const e of entries) {
       const key = [zp, e.name, e.size].join(ZIP_SEP);
       live.add(key);
@@ -2423,7 +2452,7 @@ async function scanInboxZips(dir: string): Promise<{ files: InboxFile[]; errors:
           extractEntry(zp, e, tmp);
           const pr = await probe(tmp);
           cache[key] = [pr.dur, pr.fmt, pr.tags];
-        } catch (err: any) { errors.push(`${f}: ${err.message}`); continue; }   // extractEntry names the entry itself
+        } catch (err: any) { errors.push(`${f}: ${err.message}`); error_items.push(errItem(f, err)); continue; }   // extractEntry names the entry itself
         finally { try { fs.unlinkSync(tmp); } catch {} }
       }
       const [dur, fmt, tags] = cache[key];
@@ -2434,7 +2463,7 @@ async function scanInboxZips(dir: string): Promise<{ files: InboxFile[]; errors:
   let changed = false;
   for (const k of Object.keys(cache)) if (!live.has(k) && k.startsWith(dir + path.sep)) { delete cache[k]; changed = true; }
   if (changed) saveState();
-  return { files, errors };
+  return { files, errors, error_items };
 }
 
 function bestTrackNames(names: string[], dur: number, tracks: PlTrack[]): [PlTrack | null, number] {
@@ -2454,23 +2483,25 @@ function bestTrackNames(names: string[], dur: number, tracks: PlTrack[]): [PlTra
  *  library matcher does. With the auto-move setting on, exact matches of tracks
  *  you don't have yet are moved straight away and listed in `moved`. */
 /** every audio file in the downloads folder, loose or inside a zip */
-async function scanInbox(dir: string): Promise<{ files: InboxFile[]; errors: string[] }> {
+async function scanInbox(dir: string): Promise<{ files: InboxFile[]; errors: string[]; error_items: ErrorItem[] }> {
   const plain: InboxFile[] = (await scanFolder(dir)).map((f) => ({ ...f, matchNames: [f.name] }));
   const zips = await scanInboxZips(dir);
-  return { files: [...plain, ...zips.files], errors: zips.errors };
+  return { files: [...plain, ...zips.files], errors: zips.errors, error_items: zips.error_items };
 }
 
 export async function inboxView(opts: { auto?: boolean } = {}): Promise<any> {
   const lib = requireLib();
   const dir = inboxDir();
   const base = { dir, exists: fs.existsSync(dir), items: [] as any[], unmatched: [] as any[], others: 0, already: 0,
-                 moved: [] as string[], move_errors: [] as string[], zip_errors: [] as string[] };
+                 moved: [] as string[], move_errors: [] as string[], zip_errors: [] as string[],
+                 move_error_items: [] as ErrorItem[], zip_error_items: [] as ErrorItem[] };
   if (!base.exists || !lib.playlist) return base;
   const view = await buildView();
   const rows = new Map<number, any>(view.tracks.map((r: any) => [r.id, r]));
   const libNames = new Set((await scanLocal(lib)).map((f) => f.base));
   const scan = await scanInbox(dir);
   base.zip_errors = scan.errors;
+  base.zip_error_items = scan.error_items;
   for (const f of scan.files) {
     if (libNames.has(f.name)) { base.already++; continue; } // copied in already
     const [t, score] = bestTrackNames(f.matchNames, f.dur, lib.playlist.tracks);
@@ -2498,7 +2529,7 @@ export async function inboxView(opts: { auto?: boolean } = {}): Promise<any> {
       const exact = it.action === "move" && it.score >= 0.999 && Math.abs(it.dur_diff) <= 2 && !movedTracks.has(it.id);
       if (!exact) { keep.push(it); continue; }
       try { await inboxMoveOne({ file: it.name, id: it.id, zip: it.zip }); base.moved.push(it.name); movedTracks.add(it.id); }
-      catch (e: any) { base.move_errors.push(`${it.name}: ${e.message}`); keep.push(it); }
+      catch (e: any) { base.move_errors.push(withName(it.name, e.message)); base.move_error_items.push(errItem(it.name, e)); keep.push(it); }
     }
     base.items = keep;
   }
@@ -2530,21 +2561,21 @@ export async function inboxMoveOne(data: any): Promise<{ key: string; path: stri
   const lib = requireLib();
   const name = path.basename(String(data.file || ""));
   const zip = data.zip ? path.basename(String(data.zip)) : "";
-  if (!name) throw new Error("no file given");
+  if (!name) throw appError("no_file", "no file given");
   const dst = path.join(lib.dir, name);
-  if (fs.existsSync(dst)) throw new Error(`${name}: a file with this name is already in the library`);
+  if (fs.existsSync(dst)) throw appError("name_taken", `${name}: a file with this name is already in the library`, { name });
   const found = data.track && typeof data.track === "object" ? data.track : null;
   const inList = (id: any) => !!lib.playlist?.tracks.some((t) => String(t.id) === String(id));
   // the playlist track the file is for: the one given, or the found track when it is in the playlist already
   const tid = data.id != null && data.id !== "" ? String(data.id) : found && inList(found.id) ? String(found.id) : "";
-  if (data.id != null && data.id !== "" && !inList(tid)) throw new Error("track is not in the playlist");
+  if (data.id != null && data.id !== "" && !inList(tid)) throw appError("track_not_in_playlist", "track is not in the playlist");
   const src = path.join(inboxDir(), zip || name);
-  if (!fs.existsSync(src)) throw new Error(`${zip || name}: no longer in the downloads folder`);
+  if (!fs.existsSync(src)) throw appError("download_gone", `${zip || name}: no longer in the downloads folder`, { name: zip || name });
   // stage the new file first (a failed extraction must not touch the library)
   let staged: string | null = null;
   if (zip) {
     const entry = listEntries(src).filter(zipEntryAudio).find((e) => path.posix.basename(e.name) === name);
-    if (!entry) throw new Error(`${name}: not found inside ${zip}`);
+    if (!entry) throw appError("zip_entry_missing", `${name}: not found inside ${zip}`, { name, zip });
     staged = dst.replace(/(\.[^.]+)$/, ".tmp$1");   // the folder scan ignores *.tmp.<ext>
     extractEntry(src, entry, staged);
   }
@@ -2591,7 +2622,7 @@ export async function inboxFind(data: any): Promise<any> {
   const name = path.basename(String(data.file || ""));
   const zip = data.zip ? path.basename(String(data.zip)) : "";
   const f = (await scanInbox(inboxDir())).files.find((x) => x.name === name && (x.zip || "") === zip);
-  if (!f) throw new Error(`${name}: no longer in the downloads folder`);
+  if (!f) throw appError("download_gone", `${name}: no longer in the downloads folder`, { name });
   const q = String(data.q || "").trim() || extraQuery(f);
   return { q, candidates: await searchCandidates(lib, f, q) };
 }
@@ -2599,13 +2630,13 @@ export async function inboxFind(data: any): Promise<any> {
 export async function inboxMoveAll(): Promise<any> {
   const scan = await inboxView();
   let done = scan.moved.length;   // auto-move may have handled some already
-  const errors: string[] = [...scan.move_errors];
+  const errors: string[] = [...scan.move_errors], error_items: ErrorItem[] = [...scan.move_error_items];
   for (const it of scan.items) {
     try { await inboxMoveOne({ file: it.name, id: it.id, zip: it.zip }); done++; }
-    catch (e: any) { errors.push(withName(it.name, e.message)); }
+    catch (e: any) { errors.push(withName(it.name, e.message)); error_items.push(errItem(it.name, e)); }
   }
   const view = await buildView();
-  view.inbox_report = { done, errors };
+  view.inbox_report = { done, errors, error_items };
   return view;
 }
 

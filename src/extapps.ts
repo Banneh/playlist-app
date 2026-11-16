@@ -151,7 +151,7 @@ async function sqliteRows(db: string, sql: string): Promise<any[]> {
       });
     } finally { conn.close(); }
   }
-  if (process.platform !== "darwin" || !fs.existsSync("/usr/bin/sqlite3")) throw new Error("no SQLite reader in this runtime");
+  if (process.platform !== "darwin" || !fs.existsSync("/usr/bin/sqlite3")) throw Object.assign(new Error("no SQLite reader in this runtime"), { code: "sqlite_unavailable" });
   const r = await run("/usr/bin/sqlite3", ["-readonly", "-json", uri, sql], 60000);
   if (r.code !== 0) throw new Error("sqlite3: " + r.stderr.slice(0, 200));
   const rows = r.stdout.trim() ? JSON.parse(r.stdout) : [];

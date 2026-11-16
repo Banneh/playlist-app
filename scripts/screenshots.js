@@ -159,7 +159,7 @@ app.whenReady().then(async () => {
   });
   const wc = win.webContents;
   wc.setAudioMuted(true);
-  await wc.loadURL(`http://127.0.0.1:${port}/?titlebar=inset`);
+  await wc.loadURL(`http://127.0.0.1:${port}/?titlebar=inset&lang=en`);   // the README screenshots are English
   const js = (code) => wc.executeJavaScript(`(async () => { ${code} })()`, true);
   const shot = async (name, rect) => {
     await sleep(350);
