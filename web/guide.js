@@ -48,6 +48,22 @@ const GUIDES = {
 
 let GUIDE = null;   // the open panel's root element
 
+/* what the Guide says about Do everything, as [page, section, item or tip] (counted from 0): left out
+   while the feature is off (APP.do_all, see pages/doall.js) */
+const GUIDE_DO_ALL = [['inbox', 2, 4], ['prepare', 1, -1], ['settings', 0, 2]];
+/** the entry as shown: without the Do everything parts while that feature is off */
+function guideShown(page, g) {
+  if (APP.do_all) return g;
+  const cut = GUIDE_DO_ALL.filter(c => c[0] === page);
+  if (!cut.length) return g;
+  const sections = g.sections.map((s, i) => {
+    if (cut.some(c => c[1] === i && c[2] < 0)) return null;
+    const keep = (_, j) => !cut.some(c => c[1] === i && c[2] === j);
+    return { h: s.h, items: s.items && s.items.filter(keep), tips: s.tips && s.tips.filter(keep) };
+  }).filter(Boolean);
+  return { icon: g.icon, title: g.title, lead: g.lead, sections };
+}
+
 function guideHtml(g) {
   const item = ([ico, name, text]) => `<div class="g-item"><span class="g-ic">${icon(ico)}</span><div><b>${esc(name)}</b><span>${text}</span></div></div>`;
   const sec = s => `<h4>${esc(s.h)}</h4>${s.items ? s.items.map(item).join('') : `<ul class="g-tips">${s.tips.map(tip => `<li>${tip}</li>`).join('')}</ul>`}`;
@@ -65,7 +81,8 @@ function guideHtml(g) {
 
 /** open the guide for a page (default: the current one) */
 function openGuide(page) {
-  const g = GUIDES[page || PAGE]; if (!g) return;
+  const raw = GUIDES[page || PAGE]; if (!raw) return;
+  const g = guideShown(page || PAGE, raw);
   closeGuide(true);
   closeMenu();
   const ov = document.createElement('div'); ov.className = 'guide-ov';

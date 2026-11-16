@@ -290,6 +290,13 @@ export function getSettings(): any {
   };
 }
 
+/** The feature switch for "Do everything": the button, its Settings card, the wizard, the
+ *  Guide and tour entries and the /api/do-all routes exist only when the environment has
+ *  DJ_HQ_DO_ALL_FEATURE_ENABLED=true (also 1 / yes / on; the lower-case name works too).
+ *  Read once at start: changing it needs a restart. */
+export const DO_ALL_FEATURE = /^(1|true|yes|on)$/i.test(
+  String(process.env.DJ_HQ_DO_ALL_FEATURE_ENABLED ?? process.env.dj_hq_do_all_feature_enabled ?? "").trim());
+
 /** The "Do everything" settings with defaults, and what keeps it from running, as stable
  *  codes. Only cheap existence checks: this runs on every view. */
 export function doAllStatus(): { do_all: Required<Omit<DoAll, "pn_mode" | "pn_mode_at">> & { pn_mode: string | null; pn_mode_at: number | null; switched_off: boolean };

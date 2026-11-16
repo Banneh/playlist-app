@@ -25,7 +25,7 @@ const TOUR_STEPS = () => [
   { id: 'inbox', page: 'inbox', target: '#page-body .tr .ib-act', fallback: '.nav-item[data-page="inbox"]', place: 'left' },
   { id: 'extras', page: 'extras', target: '#page-body .tr .cell .btn', fallback: '.nav-item[data-page="extras"]', place: 'left' },
   { id: 'prepare', page: 'prepare', target: '#page-body .cards', fallback: '.nav-item[data-page="prepare"]', place: 'top' },
-  { id: 'doall', page: 'prepare', target: '#page-body .da-card', fallback: '#page-body .cards', place: 'bottom' },
+  ...(typeof APP !== 'undefined' && APP.do_all ? [{ id: 'doall', page: 'prepare', target: '#page-body .da-card', fallback: '#page-body .cards', place: 'bottom' }] : []),
   { id: 'refresh', page: 'missing', target: '#btn-refresh', place: 'bottom' },
   { id: 'guide', page: 'missing', target: '#btn-guide', fallback: '#btn-refresh', place: 'bottom' },
   { id: 'end', target: '#btn-libmenu', place: 'top' },

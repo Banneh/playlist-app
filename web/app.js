@@ -568,7 +568,7 @@ function libraryMenu(anchor) {
 }
 
 /* ---------- updates: a daily look at the latest GitHub release ---------- */
-let APP = { version: '', platform: '', arch: '', packaged: false };
+let APP = { version: '', platform: '', arch: '', packaged: false, do_all: false };
 let UPDATE = null;   // { version, url, page, asset } once a newer release is known
 const UPD_KEY = 'updateDismissed';
 const RELEASES_API = 'https://api.github.com/repos/Banneh/playlist-app/releases/latest';

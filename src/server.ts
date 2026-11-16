@@ -233,7 +233,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
       if (req.url === "/api/app") {
         let version = "";
         try { version = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || ""; } catch {}
-        return json({ version, platform: process.platform, arch: process.arch, packaged: !!opts.packaged, sc: !!opts.sc });
+        return json({ version, platform: process.platform, arch: process.arch, packaged: !!opts.packaged, sc: !!opts.sc, do_all: core.DO_ALL_FEATURE });
       }
       // static UI assets (web/app.css, web/app.js, web/pages/*.js)
       const rel = decodeURIComponent((req.url || "/").split("?")[0]);
@@ -255,6 +255,8 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         const route = (fn: () => Promise<any>) =>
           enqueue(fn).then(json, (e) => json(errBody(e), 500));
         const direct = (fn: () => Promise<any>) => void fn().then(json, (e) => json(errBody(e), 500));
+        const doAll = (fn: () => Promise<any>) => core.DO_ALL_FEATURE ? direct(fn)
+          : json(errBody(core.appError("do_all_feature_off", "Do everything is not enabled on this computer.")), 500);
         if (req.url === "/api/prefs") {   // not queued: must not wait behind a long tag/convert run
           let saved: any;
           try { saved = core.setPrefs(data && typeof data === "object" && !Array.isArray(data) ? data : {}); }
@@ -277,10 +279,11 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
             return core.setSettings(data);
           });
           // not queued: the job queues its own file operations (see pipeline.ts)
-          case "/api/do-all/detect":  return direct(() => pipeline.detect());
-          case "/api/do-all/start":   return direct(() => pipeline.start(data));
+          // (control stays open with the feature off: a run cut off earlier can still be cancelled)
+          case "/api/do-all/detect":  return doAll(() => pipeline.detect());
+          case "/api/do-all/start":   return doAll(() => pipeline.start(data));
           case "/api/do-all/control": return direct(() => pipeline.controlJob(data));
-          case "/api/do-all/access":  return direct(() => pipeline.accessibility(data));
+          case "/api/do-all/access":  return doAll(() => pipeline.accessibility(data));
           case "/api/override": return route(() => core.setOverride(data));
           case "/api/edit":     return route(() => core.setEdit(data));
           case "/api/assign":   return route(() => core.setAssign(data));

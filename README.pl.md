@@ -493,6 +493,14 @@ z okładką i przyciskiem odtwarzania.
 
 ### Zrób wszystko: Platinum Notes, Mixed In Key i rekordbox za jednym razem
 
+> **Na razie za przełącznikiem funkcji.** Zrób wszystko widać tylko wtedy, gdy
+> DJ HQ startuje ze zmienną środowiskową `DJ_HQ_DO_ALL_FEATURE_ENABLED=true`.
+> Bez niej przycisk, jego karta w Ustawieniach oraz wpisy w Przewodniku
+> i w oprowadzaniu są ukryte. Na Macu, dla aplikacji otwieranych z Findera lub
+> Docka: `launchctl setenv DJ_HQ_DO_ALL_FEATURE_ENABLED true` (działa do
+> wylogowania; LaunchAgent z tym samym poleceniem ustawia ją na stałe).
+> Na Windows: `setx DJ_HQ_DO_ALL_FEATURE_ENABLED true`. Potem uruchom DJ HQ ponownie.
+
 Jeśli przepuszczasz nowe utwory przez [Platinum Notes](https://mixedinkey.com/platinum-notes/)
 i [Mixed In Key](https://mixedinkey.com/), zanim trafią do rekordbox, jeden
 przycisk może zrobić całą rundę:

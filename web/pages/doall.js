@@ -58,6 +58,8 @@ const DA_STEPS = ['move', 'tag', 'pn', 'mik', 'xml'];
 const daDemo = () => typeof TOUR !== 'undefined' && !!TOUR && !!TOUR.demo;
 const daSet = () => (DATA && DATA.settings) || {};
 const daCfg = () => daSet().do_all || {};
+/** the feature switch (DJ_HQ_DO_ALL_FEATURE_ENABLED, read by the server at start): off = nothing of Do everything shows */
+const daFeature = () => !!APP.do_all;
 const daSupported = () => !APP.platform || APP.platform === 'darwin' || APP.platform === 'win32';
 const daJob = () => daDemo() ? null : (DA.status && DA.status.job) || null;
 const daActive = j => !!j && (j.status === 'running' || j.status === 'waiting');
@@ -66,11 +68,12 @@ const daStepRec = (j, id) => (j.steps || []).find(s => s.id === id) || { id, sta
 
 /** what the button shows: off | setup | ready | running | interrupted | failed */
 function daKind() {
+  if (!daFeature()) return 'off';
   const j = daJob();
   if (daActive(j)) return 'running';
   if (j && j.status === 'interrupted') return 'interrupted';
   // never set up: the button shows greyed out with Configure… beside it; off only when the user switched it off
-  if (!daSupported() || (!daCfg().on && daCfg().switched_off)) return 'off';
+  if (!daFeature() || !daSupported() || (!daCfg().on && daCfg().switched_off)) return 'off';
   if (j && j.status === 'failed') return 'failed';
   return daSet().do_all_ready ? 'ready' : 'setup';
 }
@@ -95,6 +98,7 @@ function daRunLabel(j) {
 /* ---------- the button (Downloads header, Prepare card, Downloads note) ---------- */
 /** where: 'header' (Downloads page head) | 'card' (top of Prepare) | 'note' (top of the Downloads list) */
 function daButtonsHtml(where) {
+  if (!daFeature()) return '';
   if (!DA.asked && !daDemo() && daCfg().on) daBoot();
   return `<span class="da-slot" data-where="${esc(where)}">${daSlot(where)}</span>`;
 }
@@ -151,7 +155,7 @@ async function daFetchStatus() {
 }
 /** the first look: a run going (or cut off by a restart) shows on the button */
 function daBoot() {
-  if (DA.asked) return;
+  if (DA.asked || !daFeature()) return;
   DA.asked = true;
   daTick();
 }
@@ -779,7 +783,7 @@ function daModeTag(mode, confirmed) {
 
 /* ---------- Settings: the Do everything card ---------- */
 function daSettingsCard() {
-  if (typeof stCard !== 'function') return '';
+  if (typeof stCard !== 'function' || !daFeature()) return '';
   if (!daSupported()) return stCard('wand', 'green', daT('stTitle'), daT('supported'), '');
   const S = daSet(), c = daCfg();
   const miss = new Set([...(S.do_all_missing || []), ...(S.do_all_optional || [])]);

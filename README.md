@@ -476,6 +476,14 @@ artwork and a play button.
 
 ### Do everything: Platinum Notes, Mixed In Key and rekordbox in one go
 
+> **Behind a feature switch for now.** Do everything only shows when DJ HQ is
+> started with the environment variable `DJ_HQ_DO_ALL_FEATURE_ENABLED=true`.
+> Without it the button, its Settings card, and its Guide and tour entries are
+> hidden. On a Mac, for apps opened from the Finder or Dock:
+> `launchctl setenv DJ_HQ_DO_ALL_FEATURE_ENABLED true` (lasts until you log
+> out; a LaunchAgent that runs the same command makes it stay). On Windows:
+> `setx DJ_HQ_DO_ALL_FEATURE_ENABLED true`. Restart DJ HQ afterwards.
+
 If you run new tracks through [Platinum Notes](https://mixedinkey.com/platinum-notes/)
 and [Mixed In Key](https://mixedinkey.com/) before they go into rekordbox, one
 button can do the whole round:

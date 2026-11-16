@@ -408,7 +408,7 @@ function cfDoneHtml(R) {
     : cfHtml('imDoneLib', { name: esc(l.name), dir: esc(shortPath(l.dir)), pins: cfT('imDonePins', { n: l.pins }) })}</li>`).join('');
   const backup = (r.backups || []).find(p => /state\.json$/.test(p));
   const linkGone = DATA && (DATA.libraries || []).some(l => !l.url);
-  const doAll = DATA && DATA.settings && !DATA.settings.do_all_ready;
+  const doAll = APP.do_all && DATA && DATA.settings && !DATA.settings.do_all_ready;
   return noteHtml(`<b>${cfT('imDone')}</b><ul class="da-ul">${libs}</ul>`, '', 'green')
     + (backup ? `<p class="cf-p faint">${cfT('imDoneBackup', { file: shortPath(backup) })}</p>` : '')
     + (linkGone ? noteHtml(cfT('imDoneLink'), '', 'amber', 'link') : '')
