@@ -58,7 +58,7 @@ async function cfExport() {
   const leave = priv.length || privTracks ? `<label class="da-check cf-check"><input type="checkbox" id="cf-leave"><span><b>${cfT('exLeaveOut')}</b><span class="faint cf-hint">${cfT('exLeaveOutHint')}</span></span></label>` : '';
   return dialog({
     title: cfT('exTitle'), sub: cfT('exSub'), wide: false,
-    body: `<p class="cf-p">${cfT('exIn')}</p><p class="cf-p faint">${cfT('exOut')}</p>${notes ? `<div class="cf-notes">${notes}</div>` : ''}${leave}
+    body: `<p class="cf-p">${cfT('exIn')}</p><p class="cf-p faint">${cfT(APP.do_all ? 'exOut' : 'exOutNoDa')}</p>${notes ? `<div class="cf-notes">${notes}</div>` : ''}${leave}
            <div id="cf-ex-res"></div>`,
     foot: `<span class="spacer"></span><button class="btn" data-close>${th('common.cancel')}</button>
            <button class="btn btn-primary" data-a="ok">${icon(info.can_save ? 'upload' : 'download')}${cfT(info.can_save ? 'exSave' : 'exDownload')}</button>`,
@@ -244,7 +244,7 @@ function cfSummaryHtml(R) {
   const notes = [
     dropped.length ? noteHtml(cfHtml('imDropped', { what: I18N.list(dropped) }), '', 'plain') : '',
     (s.notes || []).length ? noteHtml(cfT('imNoteIgnored'), '', 'plain') : '',
-    s.machine.inbox_dir || s.machine.do_all ? noteHtml(cfT('imMachine'), '', 'plain') : '',
+    s.machine.inbox_dir || (APP.do_all && s.machine.do_all) ? noteHtml(cfT(APP.do_all ? 'imMachine' : 'imMachineNoDa'), '', 'plain') : '',
     s.replaces.length ? noteHtml(cfT('imReplaces', { n: s.replaces.length, names: cfNames(s.replaces.map(r => r.name)) }) + ' ' + cfT('imReplacesMore'), '', 'amber') : '',
   ].join('');
   return `<p class="cf-p">${R.fileName ? `<b>${esc(R.fileName)}</b> · ` : ''}${cfT('imFrom', { version: f.app_version, platform: cfPlatform(f.platform), date })}</p>
@@ -358,8 +358,8 @@ function cfConfirmHtml(R) {
   }).join('');
   const replace = s.replaces.length ? `<label class="da-check cf-check"><input type="checkbox" data-k="replace" ${R.replaceOk ? 'checked' : ''} onchange="cfSetReplace(this.checked)"><span><b>${cfT('imReplaceOk')}</b>
       <span class="faint cf-hint">${cfT('imReplaces', { n: s.replaces.length, names: cfNames(s.replaces.map(r => r.name)) })} ${cfT('imReplaceHint')}</span></span></label>` : '';
-  const machine = s.machine.same_platform && (s.machine.inbox_dir || s.machine.do_all)
-    ? `<label class="da-check cf-check"><input type="checkbox" ${R.machine ? 'checked' : ''} onchange="cfSetMachine(this.checked)"><span>${cfT('imMachineOpt')}<span class="faint cf-hint">${cfT('imMachineHint')}</span></span></label>` : '';
+  const machine = s.machine.same_platform && (s.machine.inbox_dir || (APP.do_all && s.machine.do_all))
+    ? `<label class="da-check cf-check"><input type="checkbox" ${R.machine ? 'checked' : ''} onchange="cfSetMachine(this.checked)"><span>${cfT(APP.do_all ? 'imMachineOpt' : 'imMachineOptNoDa')}<span class="faint cf-hint">${cfT('imMachineHint')}</span></span></label>` : '';
   return `<p class="cf-p">${cfT('imConfirmSub')}</p><div class="cf-libs">${libs}</div>${replace}${machine}<p class="da-small">${cfT('imFirstScan')}</p>`;
 }
 function cfCanApply(R) {

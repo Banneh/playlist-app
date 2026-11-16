@@ -37,7 +37,6 @@ a zmienisz to w **Ustawienia → Język**.
   - [Pobrane: nowe pliki do biblioteki](#pobrane-nowe-pliki-do-biblioteki)
   - [Spoza playlisty: pliki, których SoundCloud nie zna](#spoza-playlisty-pliki-których-soundcloud-nie-zna)
   - [Przygotuj na odtwarzacz: tagi, konwersja i rekordbox](#przygotuj-na-odtwarzacz-tagi-konwersja-i-rekordbox)
-  - [Zrób wszystko: Platinum Notes, Mixed In Key i rekordbox za jednym razem](#zrób-wszystko-platinum-notes-mixed-in-key-i-rekordbox-za-jednym-razem)
   - [Wygląd, wyszukiwanie i pasek boczny](#wygląd-wyszukiwanie-i-pasek-boczny)
   - [Ustawienia](#ustawienia)
   - [Więcej niż jeden folder](#więcej-niż-jeden-folder)
@@ -72,10 +71,6 @@ którego utworu, porównując nazwy i długości. Wszystko inne opiera się na t
 - **Przygotuj na odtwarzacz** zapisuje tagi wykonawcy i tytułu tak, jak czyta
   je rekordbox, konwertuje pliki, których twój odtwarzacz Pioneer nie odtworzy
   (w tym samym miejscu, więc punkty cue przetrwają), i eksportuje playlistę
-  rekordbox.
-- **Zrób wszystko** (opcjonalnie, macOS i Windows) jednym kliknięciem
-  przeprowadza nowe pobrane pliki przez cały łańcuch: do biblioteki, tagi,
-  Platinum Notes, Mixed In Key i razem z tonacjami do twojego pliku XML
   rekordbox.
 - **Discover** to soundcloud.com w aplikacji: zaloguj się tam raz, słuchaj
   tego, co proponuje SoundCloud, i jednym kliknięciem dodawaj do playlisty albo
@@ -411,11 +406,6 @@ utworu, sam trafia do biblioteki w ciągu minuty, a aplikacja o tym informuje.
 Przybliżone dopasowania i podmiany na bezstratne zawsze czekają na twoje
 kliknięcie.
 
-Gdy funkcja [Zrób wszystko](#zrób-wszystko-platinum-notes-mixed-in-key-i-rekordbox-za-jednym-razem)
-jest włączona, jej przycisk stoi obok **Przeskanuj ponownie**: przenosi te
-pliki do biblioteki i prowadzi je dalej przez tagi, Platinum Notes, Mixed In
-Key i twój plik XML rekordbox.
-
 ### Spoza playlisty: pliki, których SoundCloud nie zna
 
 ![Lista Spoza playlisty z przyciskiem Znajdź na SoundCloud przy każdym pliku](docs/screens/not-in-playlist.png)
@@ -454,10 +444,9 @@ biorą twoje wartości.
 2. **Zapisz tagi** zapisuje wykonawcę i tytuł w każdym pliku, w którym ich
    brakuje albo różnią się od nazw pokazywanych przez DJ HQ, tak jak rekordbox
    naprawdę je odczytuje (z plikami WAV jest wybredny). Gatunkiem staje się
-   nazwa playlisty. Cała reszta tagów pliku zostaje: tonacja i energia
-   z Mixed In Key, komentarze, okładka i znacznik, który Platinum Notes
-   zostawia w przetworzonych plikach. Tonacja jest widoczna obok nazwy pliku
-   i trafia do eksportu rekordbox.
+   nazwa playlisty. Cała reszta tagów pliku zostaje: tonacja i energia,
+   komentarze i okładka. Tonacja jest widoczna obok nazwy pliku i trafia do
+   eksportu rekordbox.
 
    Wykonawca i tytuł pochodzą z tytułu na SoundCloud: wykonawca przed
    myślnikiem, tytuł po nim. „Premiere:”, numer katalogowy albo strona winylu
@@ -491,147 +480,6 @@ Lista **Pliki wymagające uwagi** poniżej pokazuje dokładnie te pliki, które
 wciąż wymagają tagów albo konwersji, zanim będą gotowe do kabiny DJ-a, każdy
 z okładką i przyciskiem odtwarzania.
 
-### Zrób wszystko: Platinum Notes, Mixed In Key i rekordbox za jednym razem
-
-> **Na razie za przełącznikiem funkcji.** Zrób wszystko widać tylko wtedy, gdy
-> DJ HQ startuje ze zmienną środowiskową `DJ_HQ_DO_ALL_FEATURE_ENABLED=true`.
-> Bez niej przycisk, jego karta w Ustawieniach oraz wpisy w Przewodniku
-> i w oprowadzaniu są ukryte. Na Macu, dla aplikacji otwieranych z Findera lub
-> Docka: `launchctl setenv DJ_HQ_DO_ALL_FEATURE_ENABLED true` (działa do
-> wylogowania; LaunchAgent z tym samym poleceniem ustawia ją na stałe).
-> Na Windows: `setx DJ_HQ_DO_ALL_FEATURE_ENABLED true`. Potem uruchom DJ HQ ponownie.
-
-Jeśli przepuszczasz nowe utwory przez [Platinum Notes](https://mixedinkey.com/platinum-notes/)
-i [Mixed In Key](https://mixedinkey.com/), zanim trafią do rekordbox, jeden
-przycisk może zrobić całą rundę:
-
-1. **Przeniesienie** dopasowanych pobranych plików do biblioteki: dokładnie
-   tych, które przeniosłoby **Przenieś wszystkie** na stronie Pobrane, nigdy
-   plików, które do niczego nie pasują.
-2. **Zapisanie tagów** tam, gdzie różnią się od nazw w DJ HQ.
-3. **Platinum Notes** otwiera się z plikami. Klikasz tam **Start Processing**
-   (albo DJ HQ robi to za ciebie, zobacz niżej); DJ HQ automatycznie zauważa, kiedy
-   Platinum Notes skończy: każdy przetworzony plik ma znacznik Platinum Notes,
-   a jego dziennik mówi, że przetwarzanie się zakończyło.
-4. **Mixed In Key** otwiera się z plikami w tle i zapisuje w nich tonacje;
-   DJ HQ idzie dalej, gdy tylko każdy plik ma tag tonacji. Plik, który już ma
-   tonację, nie jest wysyłany (dla FLAC i M4A, które nie mają tagu tonacji
-   czytelnego dla DJ HQ, liczy się tonacja w bazie danych Mixed In Key). Mixed
-   In Key zostawia w pliku WAV przetworzonym przez Platinum Notes tylko własne
-   tagi (nazwę pliku jako tytuł i tonację), więc DJ HQ potem ponownie zapisuje
-   wykonawcę, tytuł i gatunek; tonacja, dane Mixed In Key i znacznik Platinum
-   Notes zostają.
-5. Utwory trafiają **do twojego pliku XML rekordbox** razem z tonacjami, na
-   playlistę „DJ HQ”. Resztę (siatkę beatów, przebieg fali) rekordbox
-   analizuje sam. Z Mixed In Key nie są brane punkty cue i nic nie jest
-   konwertowane.
-
-Potem raport: co gdzie trafiło, pliki, które się nie udały, i dlaczego, nazwy
-warte sprawdzenia, pliki bez tonacji i trzy kroki do zrobienia w rekordbox.
-
-**Co jest potrzebne.** Platinum Notes i Mixed In Key zainstalowane na tym
-komputerze, opcja **Replace original files** ustawiona w Platinum Notes i plik
-XML rekordbox, z którego rekordbox importuje utwory. Baza danych Mixed In Key
-jest opcjonalna: DJ HQ czyta ją (nigdy w niej nie zapisuje) tylko dla pliku,
-który wyjdzie z Mixed In Key bez tagu tonacji. W pozostałych przypadkach
-tonacja pochodzi z tagów samego pliku.
-
-**Konfiguracja.** Ustawienia → **Zrób wszystko**: włącz funkcję i kliknij
-**Skonfiguruj…**. Konfiguracja szuka wszystkiego na tym komputerze i pyta
-o resztę, krok po kroku, a każdy krok ma *Jak to znaleźć?*:
-
-- Na Macu programy są w folderze Aplikacje, jako „Platinum Notes 10”
-  i „Mixed In Key 11” (liczba to wersja). Baza danych Mixed In Key to
-  `~/Library/Application Support/Mixedinkey/Collection11.mikdb`.
-- W systemie Windows są zwykle w folderze `AppData\Local\Programs\Mixed In
-  Key` twojego użytkownika, jako `Platinum Notes.exe` i `MixedInKey.exe`.
-  Wpisz `%LOCALAPPDATA%\Programs` w pasku adresu okna wyboru pliku albo użyj
-  polecenia *Otwórz lokalizację pliku* przy pozycji w menu Start. Bazy danych Mixed In Key
-  w Windows nie da się jeszcze odczytać pod kątem tonacji, więc ten krok jest
-  pomijany.
-- **Ustawienie zapisu Platinum Notes.** W Platinum Notes: menu *Personalise* →
-  *Output Location* → **Replace original files**. Wtedy przetworzony plik
-  zajmuje miejsce oryginału, więc biblioteka, tagi i rekordbox dalej wskazują
-  ten sam plik; Platinum Notes najpierw kopiuje każdy oryginał do swojego
-  folderu kopii zapasowych (na Macu zwykle `~/Music/PN Backup`). Każdy inny
-  tryb zapisuje kopie gdzie indziej i Zrób wszystko się nie uruchomi.
-  W systemie Windows DJ HQ nie może odczytać tego ustawienia, więc
-  potwierdzasz je samodzielnie.
-- **Plik XML rekordbox** musi być plikiem ustawionym w rekordbox w
-  *Preferences → Advanced → Database → rekordbox xml* (Imported Library);
-  konfiguracja proponuje ten, którego już używają rekordbox i Mixed In Key.
-  Nie masz jeszcze takiego pliku? W rekordbox *File → Export Collection in xml
-  format*, a potem ustaw go tam. DJ HQ przed każdą zmianą zapisuje obok niego
-  kopię zapasową (`rekordbox.xml.backup-<date>-<time>`), a całą resztę pliku
-  zostawia bajt w bajt bez zmian.
-
-Zakończenie konfiguracji włącza funkcję. Dopóki czegoś brakuje, przycisk jest
-wyszarzony, obok jest napisane, czego brakuje, i jest tam przycisk
-**Skonfiguruj…**.
-
-**Co zostaje do zrobienia ręcznie.** Kliknięcie **Start Processing**
-w Platinum Notes, chyba że włączysz **Klikaj za mnie Start Processing
-w Platinum Notes** (Ustawienia → Zrób wszystko albo ostatni krok okna „Skonfiguruj…”,
-tylko macOS). DJ HQ wysuwa wtedy okno Platinum Notes na wierzch i naciska ten
-jeden przycisk, i to dopiero wtedy, gdy każdy plik jest na jego liście; nigdy
-nie naciska niczego innego. Wymaga to dodania DJ HQ w *Ustawienia systemowe →
-Prywatność i ochrona → Dostępność*, a za pierwszym razem macOS pyta też, czy
-DJ HQ może sterować *System Events*: ustawienie pokazuje, czy jest na to zgoda,
-i ma przycisk **Zezwól…** (po udzieleniu zgody **Sprawdź ponownie** naprawdę
-pyta macOS, co pokazuje pytanie o System Events, jeśli nie padła jeszcze
-odpowiedź). Jeśli przycisku nie da się nacisnąć (brak zgody albo Platinum Notes
-nie ma okna, bo ekran był zablokowany), naciśnij go ręcznie, dokładnie tak jak
-bez tego ustawienia; przebieg mówi, dlaczego. Gdy naciśnięcie nie uruchomi
-przetwarzania w ciągu 15 sekund (bo na przykład Platinum Notes pokazuje jakiś
-komunikat), przebieg prosi o zajrzenie do Platinum Notes, a DJ HQ nie naciska
-ponownie. Anuluj, Pomiń i Oznacz jako zrobione zatrzymują naciśnięcie, które
-jeszcze nie nastąpiło. Ponieważ aplikacja DJ HQ jest podpisana doraźnie (ad hoc, nie
-płatnym certyfikatem Apple), macOS może po aktualizacji zapomnieć zgodę
-w Dostępności: jeśli znowu widać „brak zgody”, wyłącz i włącz DJ HQ na tej
-liście.
-
-DJ HQ automatycznie zauważa, kiedy każdy program skończy, więc zwykle w DJ HQ nie
-trzeba niczego klikać. **Oznacz jako zrobione** (od razu dalej) i **Pomiń ten
-krok** (dalej bez niego) są na wyjątkowe sytuacje; żadne czekanie nie ma
-limitu czasu. Program otwarty przez DJ HQ jest zamykany po swoim kroku
-(przełącznik w Ustawieniach), a DJ HQ sprawdza, czy naprawdę się zamknął.
-Platinum Notes dostaje prośbę o zamknięcie dopiero po zakończeniu
-przetwarzania: prośba wysłana wcześniej skończyłaby się oknem „wciąż
-przetwarzam, naprawdę zakończyć?”, więc po **Oznacz jako zrobione** w trakcie
-przetwarzania program pozostaje otwarty. Program, który był już otwarty,
-zostaje w spokoju; wszystko, co pozostało otwarte, jest wymienione w raporcie.
-
-Przebieg trwa dalej po zamknięciu jego okna: przycisk to pokazuje (*Czeka
-na Platinum Notes*) i otwiera je ponownie. **Anuluj** zatrzymuje pracę między
-dwoma plikami, więc żaden nie zostaje w połowie przeniesiony ani z niedokończonym
-zapisem tagów.
-Jeśli zamkniesz DJ HQ w trakcie przebiegu, przebieg wraca jako
-przerwany, do wznowienia albo wyczyszczenia.
-
-**Potem w rekordbox:**
-
-1. *Preferences → Analysis → Track Analysis Setting*: odznacz **KEY**, żeby
-   rekordbox zachował te tonacje, zamiast zastępować je własnymi.
-2. Kliknij ikonę odświeżania obok *rekordbox xml* na pasku bocznym.
-3. Otwórz *rekordbox xml → Playlists → DJ HQ*, zaznacz wszystkie utwory,
-   kliknij prawym przyciskiem i wybierz **Import To Collection**.
-
-**Ograniczenia.** Platinum Notes musi zastępować oryginalne pliki.
-Przetestowane z Platinum Notes 10.5 i Mixed In Key 11.2.6 na macOS; jeszcze
-nieprzetestowane: import scalonego pliku XML w rekordbox (łącznie z Tonality),
-cała obsługa Windows (szukanie programów, przekazywanie im plików, zamykanie
-ich) oraz własne zgody spakowanej aplikacji na Dostępność i System Events dla
-**Klikaj za mnie Start Processing** (testowane z Terminala, który je miał). Testy na
-żywo używały tylko plików WAV i MP3: M4A, AIFF i FLAC, Platinum Notes otwarte
-już wcześniej albo pokazujące okno przy starcie, jego potwierdzenie
-zastępowania oraz Mixed In Key z wieloma plikami albo z plikiem, którego nie
-umie przeanalizować, są nieprzetestowane; gdy czekanie nie kończy się samo,
-**Oznacz jako zrobione** idzie dalej. Plik M4A, którego Platinum Notes nie
-ruszy, jest zgłaszany jako pozostawiony bez zmian (najpewniej przetworzony
-wcześniej), bo DJ HQ nie umie odczytać jego znacznika w tym formacie. Platinum
-Notes trzyma kopie zapasowe w jednym płaskim folderze, więc dwa oryginały
-o tej samej nazwie z różnych folderów nadpisują tam nawzajem swoje kopie.
-
 ### Wygląd, wyszukiwanie i pasek boczny
 
 ![DJ HQ w trybie ciemnym](docs/screens/missing-dark.png)
@@ -662,9 +510,8 @@ Zębatka na dole paska bocznego. Od góry: biblioteka (jej foldery, playlista,
 usuwanie), konto SoundCloud zalogowane na Discover (wylogowanie i przełącznik,
 który dodaje do polubień każdy dodany utwór), gdzie otwierają się utwory (Discover albo
 przeglądarka), folder Pobrane obserwowany przez DJ HQ i przełącznik
-automatycznego przenoszenia dokładnych dopasowań, Zrób wszystko (przełącznik,
-używane programy i pliki z ich stanem, zamykanie programów po ich kroku
-i **Skonfiguruj…**), jak często sprawdzana jest playlista, wygląd, język,
+automatycznego przenoszenia dokładnych dopasowań, jak często sprawdzana jest
+playlista, wygląd, język,
 kopie zapasowe (ile miejsca zajmują oryginały przekonwertowanych plików
 i zastąpione pliki MP3, z przyciskiem **Wyczyść**, gdy masz pewność, że nie
 będą potrzebne), przenoszenie i kopia konfiguracji (**Eksportuj
@@ -716,8 +563,7 @@ znowu na tym, jako kopię zapasową.
 Czego nie ma w pliku: samej muzyki, oryginałów z kopii zapasowej (więc
 *Przywróć oryginały* nie ma czego przywrócić na nowym komputerze), logowania
 do SoundCloud, ustawienia języka i ścieżek z tego komputera: folder Pobrane
-i konfiguracja Zrób wszystko są tam wyszukiwane od nowa (Ustawienia → Zrób
-wszystko → **Skonfiguruj…**). Pliki są zapisywane pod nazwą wewnątrz folderu
+jest tam wyszukiwany od nowa. Pliki są zapisywane pod nazwą wewnątrz folderu
 biblioteki, nigdy pełną ścieżką, więc plik z Maca da się zaimportować na
 Windows i na odwrót.
 
@@ -793,20 +639,6 @@ nowej bazy danych.
   kaprys rekordbox: import playlisty nie aktualizuje utworów, które już są
   w kolekcji. Kliknij prawym przyciskiem utwory w gałęzi *rekordbox xml*
   i zaimportuj także je.
-- **Zrób wszystko czeka na Platinum Notes, ale tam nic się nie dzieje.** Jego
-  okno mogło się nie pojawić (macOS nie pozwala programowi wysunąć się na
-  wierzch, gdy ekran jest zablokowany): kliknij Platinum Notes w Docku, a potem
-  **Start Processing**. Jeśli Platinum Notes zrobiło kopie `_PN` zamiast
-  zastąpić pliki, nie jest ustawione na *Replace original files*; sprawdź to
-  ustawienie w oknie „Skonfiguruj…”. **Oznacz jako zrobione** i tak idzie dalej.
-- **„Klikaj za mnie Start Processing” nie klika.** Ustawienia → Zrób wszystko
-  pokazują, czy macOS na to pozwala; **Zezwól…** otwiera właściwą listę
-  w Ustawieniach systemowych, a **Sprawdź ponownie** naprawdę pyta macOS (może
-  raz zapytać o System Events). Po aktualizacji DJ HQ wyłącz go tam i włącz
-  ponownie.
-- **Utworów ze Zrób wszystko nie widać w rekordbox.** Plik XML w oknie
-  „Skonfiguruj…” musi być tym z *Preferences → Advanced → Database → rekordbox xml*; potem
-  odśwież *rekordbox xml* i zaimportuj utwory z playlisty *DJ HQ*.
 - **„Nie udało się wczytać biblioteki: operation not permitted” (macOS).** Daj
   aplikacji dostęp do folderu z muzyką w Ustawienia systemowe → Prywatność
   i ochrona → Pliki i foldery.
@@ -823,12 +655,8 @@ bit w bit i sprawdza go przed zastąpieniem pliku; przy jakiejkolwiek
 wątpliwości oryginał zostaje nietknięty. Konwersja najpierw zapisuje oryginał
 w kopii zapasowej, a potem sprawdza długość, i kopie zapasowe nigdy nie są
 usuwane. Przeniesienie pobranego pliku to prawdziwe przeniesienie, a nie
-skopiowanie i zapomnienie. Zrób wszystko to jedyne miejsce, w którym inny
-program zmienia twój dźwięk: Platinum Notes zastępuje każdy plik jego
-przetworzoną wersją, a oryginał trzyma we własnym folderze kopii zapasowych.
-Twój plik XML rekordbox (gdziekolwiek go trzymasz) przed każdą zmianą dostaje
-obok siebie kopię zapasową z datą i godziną. Mimo to rób własne kopie
-zapasowe: to twoja biblioteka.
+skopiowanie i zapomnienie. Mimo to rób własne kopie zapasowe: to twoja
+biblioteka.
 
 **Gdzie co jest.** Aplikacja trzyma dane w systemowym folderze danych
 użytkownika: `~/Library/Application Support/DJ HQ` na macOS
@@ -841,7 +669,6 @@ folderu projektu. W środku:
 | `originals/<library>/` | oryginały zapisane przed konwersją |
 | `originals/<library>/replaced/` | pliki MP3 zastąpione przez pobrane pliki bezstratne |
 | `rekordbox.xml` | ostatni eksport rekordbox |
-| `pipeline.json` | bieżący albo ostatni przebieg Zrób wszystko, żeby przetrwał ponowne uruchomienie |
 | `backups/` | kopie `djhq.db` sprzed każdego importu konfiguracji (ostatnie pięć i wszystkie z ostatniego tygodnia) |
 | `state.json.imported-<time>` | `state.json` z DJ HQ 1.7 lub starszego, taki, jaki był w chwili przeniesienia do `djhq.db` (zachowany, nigdy więcej nie czytany; tak samo `prefs.json`) |
 | `Partitions/` | sesja logowania do SoundCloud dla Discover (Ustawienia → Wyloguj się ją usuwa) |
@@ -861,7 +688,7 @@ OneDrive ani na Dysku Google: klient synchronizacji, który kopiuje bazę danych
 i jej dziennik w różnych chwilach, może ją uszkodzić. Żeby przenieść dane,
 użyj **Eksportuj konfigurację** (zobacz wyżej).
 
-**Powrót do starszej wersji.** DJ HQ 1.8 i nowsze trzymają dane w `djhq.db`;
+**Powrót do starszej wersji.** DJ HQ 2.0 i nowsze trzymają dane w `djhq.db`;
 pierwsze uruchomienie przenosi do niej `state.json` i `prefs.json` i zachowuje
 te pliki jako `state.json.imported-<time>` (obok leży `state.json.README.txt`,
 który mówi to samo). DJ HQ 1.7 i starsze nie czytają `djhq.db` i startują
@@ -875,7 +702,7 @@ obejrzane oprowadzanie): żeby je zachować, zmień nazwę
 `prefs.json.imported-<time>` z powrotem na `prefs.json`.
 
 **Ponowne przejście na nowszą wersję.** Dopóki `djhq.db` zawiera dane,
-DJ HQ 1.8 i nowsze dalej jej używają i nigdy więcej nie czytają `state.json`:
+DJ HQ 2.0 i nowsze dalej jej używają i nigdy więcej nie czytają `state.json`:
 plik zapisany po przeniesieniu (przez starszą wersję DJ HQ albo przywrócony
 surowy eksport) zostaje bez zmian, a informacja mówi, że nie jest używany.
 Żeby zamiast tego pracować dalej na tym pliku: zamknij DJ HQ, przenieś

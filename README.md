@@ -36,7 +36,6 @@ The app speaks English and Polish: it follows your system language, and
   - [Downloads: moving new files into your library](#downloads-moving-new-files-into-your-library)
   - [Not in playlist: files SoundCloud doesn't know about](#not-in-playlist-files-soundcloud-doesnt-know-about)
   - [Prepare for player: tags, conversion and rekordbox](#prepare-for-player-tags-conversion-and-rekordbox)
-  - [Do everything: Platinum Notes, Mixed In Key and rekordbox in one go](#do-everything-platinum-notes-mixed-in-key-and-rekordbox-in-one-go)
   - [Appearance, search and the sidebar](#appearance-search-and-the-sidebar)
   - [Settings](#settings)
   - [More than one folder](#more-than-one-folder)
@@ -77,9 +76,6 @@ Everything else builds on that:
 - **Prepare for player** writes artist and title tags the way rekordbox reads
   them, converts files your Pioneer player can't play (in place, so your cues
   survive), and exports a rekordbox playlist.
-- **Do everything** (optional, macOS and Windows) takes new downloads through
-  the whole chain with one click: into the library, tags, Platinum Notes,
-  Mixed In Key, and with their keys into your rekordbox XML.
 - **Discover** is soundcloud.com inside the app: sign in there once, listen to
   what it suggests, and add or like what you hear with one click. Clicking a
   cover anywhere in DJ HQ plays the track there.
@@ -399,10 +395,6 @@ whose name and length match a track exactly moves into the library on its own
 within a minute, and the app tells you. Fuzzy matches and upgrades always wait
 for your click.
 
-With [Do everything](#do-everything-platinum-notes-mixed-in-key-and-rekordbox-in-one-go)
-switched on, its button sits next to **Rescan**: it moves these files in and
-takes them on through tags, Platinum Notes, Mixed In Key and your rekordbox XML.
-
 ### Not in playlist: files SoundCloud doesn't know about
 
 ![The Not in playlist list, with Find on SoundCloud for each file](docs/screens/not-in-playlist.png)
@@ -440,8 +432,7 @@ values.
    missing or differ from the names DJ HQ shows, in the way rekordbox actually
    reads them (it's picky about WAVs). The genre becomes the playlist name.
    Everything else in the file's tags stays:
-   the key and energy from Mixed In Key, comments, cover art and the mark
-   Platinum Notes leaves on files it has processed. The key shows next to the
+   the key and energy, comments and cover art. The key shows next to the
    file name and goes into the rekordbox export.
 
    Artist and title come from the SoundCloud title: artist before the dash,
@@ -474,133 +465,6 @@ The **Files needing attention** list underneath shows exactly which files still
 need tags or conversion before they're ready for the booth, each with its
 artwork and a play button.
 
-### Do everything: Platinum Notes, Mixed In Key and rekordbox in one go
-
-> **Behind a feature switch for now.** Do everything only shows when DJ HQ is
-> started with the environment variable `DJ_HQ_DO_ALL_FEATURE_ENABLED=true`.
-> Without it the button, its Settings card, and its Guide and tour entries are
-> hidden. On a Mac, for apps opened from the Finder or Dock:
-> `launchctl setenv DJ_HQ_DO_ALL_FEATURE_ENABLED true` (lasts until you log
-> out; a LaunchAgent that runs the same command makes it stay). On Windows:
-> `setx DJ_HQ_DO_ALL_FEATURE_ENABLED true`. Restart DJ HQ afterwards.
-
-If you run new tracks through [Platinum Notes](https://mixedinkey.com/platinum-notes/)
-and [Mixed In Key](https://mixedinkey.com/) before they go into rekordbox, one
-button can do the whole round:
-
-1. **Move** the matched downloads into the library: exactly what **Move all**
-   on Downloads would move, never the files that match nothing.
-2. **Write tags** where they differ from the names in DJ HQ.
-3. **Platinum Notes** opens with the files. You press **Start Processing**
-   there (or DJ HQ presses it for you, see below); DJ HQ notices by itself when
-   Platinum Notes has finished: every processed file carries Platinum Notes'
-   mark, and its run log says the run is over.
-4. **Mixed In Key** opens with the files in the background and writes their
-   keys into them; DJ HQ goes on as soon as every file has a key tag. A file
-   that has a key already isn't sent (for FLAC and M4A, which carry no key tag
-   DJ HQ can read: a key in Mixed In Key's database counts). Mixed In Key leaves a WAV that Platinum Notes
-   processed with only its own tags (the file name as title, the key), so DJ HQ
-   writes the artist, title and genre again afterwards; the key, Mixed In Key's
-   data and Platinum Notes' mark stay.
-5. The tracks go **into your rekordbox XML** with their keys, in a playlist
-   called "DJ HQ". rekordbox analyses the rest (beat grid, waveform) itself.
-   No cue points are taken from Mixed In Key, and nothing is converted.
-
-Then a report: what went where, files that failed and why, names worth a look,
-files without a key, and the three steps left to do in rekordbox.
-
-**What it needs.** Platinum Notes and Mixed In Key installed on this computer,
-Platinum Notes set to **Replace original files**, and the rekordbox XML file
-rekordbox imports from. Mixed In Key's database is optional: DJ HQ reads it
-(never writes it) only for a file that comes out of Mixed In Key without a key
-tag. The key otherwise comes from the file's own tags.
-
-**Setting it up.** Settings → **Do everything**: switch it on and press
-**Configure…**. The setup looks for everything on this computer and asks for
-the rest, one step at a time, each with a *How do I find it?*:
-
-- On a Mac the apps are in Applications, as "Platinum Notes 10" and "Mixed In
-  Key 11" (the number is the version). Mixed In Key's database is
-  `~/Library/Application Support/Mixedinkey/Collection11.mikdb`.
-- On Windows they are usually in your user's
-  `AppData\Local\Programs\Mixed In Key` folder, as `Platinum Notes.exe` and
-  `MixedInKey.exe`. Type `%LOCALAPPDATA%\Programs` into the file window's
-  address bar, or use *Open file location* on the Start menu entry. Mixed In
-  Key's Windows database can't be read for keys yet, so that step is skipped.
-- **Platinum Notes' output.** In Platinum Notes: the *Personalise* menu →
-  *Output Location* → **Replace original files**. The processed file then
-  takes the original's place, so your library, the tags and rekordbox keep
-  pointing at the same file; Platinum Notes copies every original to its
-  backup folder first (on a Mac usually `~/Music/PN Backup`). Any other mode
-  writes copies elsewhere, and Do everything doesn't start. On Windows DJ HQ
-  can't read this setting, so you confirm it yourself.
-- **The rekordbox XML** must be the file set in rekordbox under *Preferences →
-  Advanced → Database → rekordbox xml* (Imported Library); setup suggests the
-  one rekordbox and Mixed In Key already use. No file yet? In rekordbox, *File
-  → Export Collection in xml format*, then set it there. DJ HQ saves a backup
-  next to it (`rekordbox.xml.backup-<date>-<time>`) before every change and
-  leaves everything else in it byte for byte as it was.
-
-Finishing the setup switches the feature on. Until everything is in place the
-button is greyed out with what's missing written next to it, and
-**Configure…** beside it.
-
-**What stays manual.** Pressing **Start Processing** in Platinum Notes,
-unless you switch on **Press Start Processing in Platinum Notes for me** (Settings
-→ Do everything, or the last step of Configure…, macOS only). DJ HQ then brings
-Platinum Notes to the front and presses that one button, and only once every
-file shows in its list; it never presses anything else. That needs DJ HQ in
-*System Settings → Privacy & Security → Accessibility*, and the first time
-macOS also asks whether DJ HQ may control *System Events*: the setting shows
-whether it is allowed, with an **Allow…** button (once allowed, **Check again**
-asks macOS for real, which shows the System Events question if it hasn't been
-answered yet). If the button can't be pressed (no permission, or Platinum Notes
-has no window because the screen was locked) you press it yourself, exactly as
-without the setting; the run says why. When a press starts no run within 15
-seconds (a message in Platinum Notes, say), the run asks you to look at Platinum
-Notes and DJ HQ doesn't press again. Cancel, Skip and Mark as done stop a press
-that hasn't clicked yet. Because DJ HQ is ad-hoc
-signed (not with a paid Apple certificate), macOS may forget the Accessibility
-permission after an update: if it says "not allowed" again, switch DJ HQ off
-and on in that list.
-
-DJ HQ notices by itself when each app has finished, so there is normally nothing
-to press in DJ HQ. **Mark as done** (go on at once) and **Skip this step** (go on
-without it) are there for the odd case; no wait has a time limit. An app DJ HQ
-opened is closed again after its step (a switch in Settings), and DJ HQ checks
-that it really is gone. Platinum Notes is only asked to close once its run is
-over: asked earlier, it would put up a "still processing, really quit?" dialog,
-so after **Mark as done** in the middle of a run it is left open. An app that was
-already open is left alone; anything left open is in the report.
-
-The run goes on when its window is closed: the button shows it (*Waiting for
-Platinum Notes*) and opens it again. **Cancel** stops between two files, so
-none is left half-moved or half-tagged. If DJ HQ is closed during a run, the
-run comes back as interrupted, to resume or clear.
-
-**Afterwards, in rekordbox:**
-
-1. *Preferences → Analysis → Track Analysis Setting*: untick **KEY**, so
-   rekordbox keeps these keys instead of replacing them with its own.
-2. Click the refresh icon next to *rekordbox xml* in the sidebar.
-3. Open *rekordbox xml → Playlists → DJ HQ*, select all its tracks, right-click
-   and choose **Import To Collection**.
-
-**Limits.** Platinum Notes must replace the original files. Tested with
-Platinum Notes 10.5 and Mixed In Key 11.2.6 on macOS; still untested: rekordbox
-importing the merged XML (Tonality included), the whole Windows side (finding the
-apps, handing them files, closing them), and the packaged app's own
-Accessibility and System Events permissions for **Press Start for me** (tested
-from a Terminal that had them). The live runs used WAV and MP3 files only: M4A,
-AIFF and FLAC, Platinum Notes already open or showing a dialog at launch, its
-replace confirmation, and Mixed In Key with many files or one it can't analyse
-are untested; where a wait doesn't end by itself, **Mark as done** goes on.
-An M4A that Platinum Notes leaves untouched is reported as left as it is (most
-likely processed before), since DJ HQ can't read its mark in that format.
-Platinum Notes keeps its backups in one flat
-folder, so two originals with the same file name from different folders
-overwrite each other's backup there.
-
 ### Appearance, search and the sidebar
 
 ![DJ HQ in dark mode](docs/screens/missing-dark.png)
@@ -630,9 +494,7 @@ The gear at the bottom of the sidebar. From top to bottom: the library (its
 folders, playlist, remove), the SoundCloud account signed in on Discover (sign
 out, and the switch that likes every track you add), where tracks open
 (Discover or your browser), the Downloads folder DJ HQ watches and the switch
-for moving exact matches automatically, Do everything (the switch, the apps
-and files it uses with their state, closing the apps after their step, and
-**Configure…**), how often the playlist is checked,
+for moving exact matches automatically, how often the playlist is checked,
 appearance, language, backups (how much space the originals of converted files and
 replaced MP3s take, with a **Clean up** button once you're sure you won't need
 them), moving or backing up your setup (**Export configuration…** and
@@ -681,8 +543,8 @@ Windows PC, or on this one again as a backup.
 
 Not in the file: the music itself, the backed-up originals (so *Restore
 originals* has nothing to restore on the new computer), the SoundCloud
-sign-in, the language setting, and this computer's paths: the Downloads folder and the Do everything
-setup are looked up again there (Settings → Do everything → **Configure…**).
+sign-in, the language setting, and this computer's paths: the Downloads folder
+is looked up again there.
 Files are recorded by their name inside the library folder, never by a full
 path, so a Mac file imports on Windows and the other way round.
 
@@ -752,19 +614,6 @@ them into a new database.
 - **The XML playlist imported but the tracks look unchanged.** A rekordbox
   quirk: importing a playlist doesn't update tracks already in the collection.
   Right-click the tracks inside the *rekordbox xml* node and import those too.
-- **Do everything waits for Platinum Notes, but nothing happens there.** Its
-  window may not have come up (macOS doesn't let an app come to the front while
-  the screen is locked): click Platinum Notes in the Dock, then press **Start
-  Processing**. If Platinum Notes made `_PN` copies instead of replacing the
-  files, it isn't set to *Replace original files*; check the setting in
-  Configure. **Mark as done** goes on regardless.
-- **"Press Start for me" doesn't press it.** Settings → Do everything shows
-  whether macOS allows it; **Allow…** opens the right list in System Settings,
-  and **Check again** asks macOS for real (it may ask about System Events once).
-  After an update of DJ HQ, switch it off and on again there.
-- **Do everything's tracks don't show in rekordbox.** The XML in Configure must
-  be the one under *Preferences → Advanced → Database → rekordbox xml*; then
-  refresh *rekordbox xml* and import the *DJ HQ* playlist's tracks.
 - **"Couldn't load your library: operation not permitted" (macOS).** Give the
   app access to your music folder in System Settings → Privacy & Security →
   Files and Folders.
@@ -779,11 +628,7 @@ them into a new database.
 verify it before replacing the file; on any doubt the original stays untouched.
 Conversions back up the original first and verify the length afterwards, and
 backups are never deleted. Moving a download is a real move, not a
-copy-and-forget. Do everything is the one place where another app rewrites
-your audio: Platinum Notes replaces each file with its processed version and
-keeps the original in its own backup folder. Your rekordbox XML (wherever you
-keep it) gets a timestamped backup next to it before every change. Keep your
-own backups anyway: it's your library.
+copy-and-forget. Keep your own backups anyway: it's your library.
 
 **Where things live.** The app keeps its data in the OS user-data folder,
 `~/Library/Application Support/DJ HQ` on macOS and `%APPDATA%\DJ HQ` on
@@ -795,7 +640,6 @@ Windows. Running from source uses the project folder instead. In there:
 | `originals/<library>/` | originals backed up before a conversion |
 | `originals/<library>/replaced/` | MP3s replaced by a lossless download |
 | `rekordbox.xml` | the last rekordbox export |
-| `pipeline.json` | the current or last Do everything run, so it survives a restart |
 | `backups/` | copies of `djhq.db` from before each configuration import (the last five, and all of the past week) |
 | `state.json.imported-<time>` | the `state.json` of DJ HQ 1.7 or older, as it was when it was moved into `djhq.db` (kept, never read again; `prefs.json` likewise) |
 | `Partitions/` | the SoundCloud sign-in session behind Discover (Settings → Sign out clears it) |
@@ -813,7 +657,7 @@ Google Drive: a sync client that copies the database and its journal at
 different moments can damage it. To move your data, use **Export
 configuration** (see above).
 
-**Going back to an older version.** DJ HQ 1.8 and later keep their data in
+**Going back to an older version.** DJ HQ 2.0 and later keep their data in
 `djhq.db`; the first start moves `state.json` and `prefs.json` into it and
 keeps the files as `state.json.imported-<time>` (a `state.json.README.txt` next
 to them says the same). DJ HQ 1.7 and older don't read `djhq.db` and start
@@ -825,7 +669,7 @@ is the data as it was before the upgrade. The raw export leaves out the
 appearance settings (theme, tour seen): rename `prefs.json.imported-<time>`
 back to `prefs.json` to keep them.
 
-**Coming forward again.** While `djhq.db` holds data, DJ HQ 1.8 and later
+**Coming forward again.** While `djhq.db` holds data, DJ HQ 2.0 and later
 keep using it and never read a `state.json` again: one saved after the move
 (by an older DJ HQ, or a raw export put back) is left as it is, and a notice
 says it isn't used. To carry on with that file instead: quit DJ HQ, move
@@ -888,7 +732,7 @@ npm run dist        # build installers locally into release/
 | `src/store.ts` | the database (`djhq.db`, built-in `node:sqlite`): saving only what changed, the one-time import of `state.json`, damaged and newer databases |
 | `src/server.ts` | the HTTP API and the static UI files |
 | `src/main.ts` | the Electron shell |
-| `src/id3.ts` | ID3v2 tag reader (key, Platinum Notes mark) and v2.3 writer, RIFF/AIFF chunk helpers |
+| `src/id3.ts` | ID3v2 tag reader (key) and v2.3 writer, RIFF/AIFF chunk helpers |
 | `web/app.css` | design tokens and components for the light and dark themes |
 | `web/app.js` | the UI shell: sidebar, routing, menus, dialogs |
 | `web/pages/` | one file per page |
@@ -898,12 +742,8 @@ npm run dist        # build installers locally into release/
 | `web/pages/setup.js` | the "Before we start" screen shown once after the first library |
 | `web/player.js` | the preview player |
 | `src/zip.ts` | minimal zip reader for Bandcamp downloads |
-| `web/pages/doall.js` | Do everything: its button and card, the setup wizard, the run dialog, its Settings card |
 | `src/config.ts` | configuration export and import: the file format, its checks, re-pointing the library folders, the backup before an import |
 | `web/pages/config.js` | the Export / Import configuration dialogs and their Settings card |
-| `src/pipeline.ts` | the Do everything run: move, tag, Platinum Notes, Mixed In Key, rekordbox XML, report |
-| `src/extapps.ts` | Platinum Notes and Mixed In Key per platform: finding them, handing them files, quitting them, their settings and database |
-| `src/rbxml.ts` | merges tracks and keys into the user's rekordbox XML without rewriting the rest of it |
 | `scripts/afterPack.js` | ad-hoc signs the macOS app after packaging |
 | `scripts/screenshots.js` | regenerates the README screenshots from sample data (`npm run screens`) |
 | `web/i18n.js` | the translation runtime: `t()` / `th()` / `tn()`, plural forms, number and date formats, the language choice |
@@ -911,17 +751,8 @@ npm run dist        # build installers locally into release/
 | `src/lang.ts` | the few texts the Electron shell shows itself (file dialogs, the sign-in window), in English and Polish |
 
 The UI is plain HTML, CSS and JavaScript with no build step. File-mutating
-requests are queued and run one at a time. A Do everything run is not one of
-them: it waits for Platinum Notes and Mixed In Key outside the queue and only
-queues its own file operations, one file at a time. Errors meant for the user
+requests are queued and run one at a time. Errors meant for the user
 carry a short `code` next to the English `error` text.
-
-Testing Do everything without the real apps: run the headless server with
-`DJHQ_FAKE_APPS=<path to a JS module>`, a module that exports the `ExtApps`
-methods of `src/extapps.ts`; it stands in for Platinum Notes and Mixed In Key.
-`DJHQ_PIPE_POLL_MS` shortens the wait between checks (default 3000). The
-packaged app ignores both. A fake module without `pressStart` behaves like
-Windows: you press Start yourself.
 
 The screenshots in this README come from `npm run screens`: it builds a
 throw-away home folder with a sample library (real audio files, made-up
@@ -942,7 +773,7 @@ page load without saving it.
 Every text lives in `web/lang/<language>/<area>.js`, one `I18N.add(lang, area,
 {…})` call per file: `common`, `err` (the server's error codes), `app`,
 `player`, `welcome`, `setup`, `tags`, `playlist`, `likes`, `inbox`, `extras`,
-`workthrough`, `names`, `prepare`, `doall`, `settings`, `config`, `discover`,
+`workthrough`, `names`, `prepare`, `settings`, `config`, `discover`,
 `guide`, `tour` and `demo`. Strings are plain text with `{placeholders}` and,
 where needed, `<b>`, `<i>`, `<kbd>` and `<br>` (nothing else is let through).
 A plural is an object of forms (`one`/`other` in English, `one`/`few`/`many`
@@ -952,10 +783,10 @@ translates by that code and falls back to the English text.
 To add a language:
 
 1. Copy `web/lang/en/` to `web/lang/<code>/`, change `'en'` to the new code in
-   the first line of each of the 21 files, and translate the values (keys,
+   the first line of each file, and translate the values (keys,
    `{placeholders}` and the allowed tags stay as they are).
-2. Add the 21 `<script src="lang/<code>/…">` tags to `web/index.html`, after
-   the English ones.
+2. Add a `<script src="lang/<code>/…">` tag for each of them to
+   `web/index.html`, after the English ones.
 3. Add the code to `LANGS`, the system-locale rule (`fromLocale`) and
    `normPref` in `web/i18n.js`, and a button for it next to English / Polski in
    `web/pages/settings.js`, `web/pages/setup.js` and the welcome screen's
@@ -965,7 +796,7 @@ To add a language:
    `guide.manualUrl` at it.
 
 Names of tracks, artists, files and folders, messages from SoundCloud or the
-operating system, and the menu names of Platinum Notes and rekordbox are never
+operating system, and the menu names of rekordbox are never
 translated.
 
 ### HTTP API
@@ -981,13 +812,7 @@ bodies are JSON.
 | `POST /api/rescan` | | rescan the library folders |
 | `POST /api/library` | `{op: "add", dir, url}` · `{op: "select", id}` · `{op: "remove", id}` · `{op: "add_folder", dir}` · `{op: "remove_folder", dir}` · `{op: "subfolders", on}` · `{op: "set_url", url, confirm?}` · `{op: "files_ready"}` | manage libraries, their folders and their SoundCloud link (the folder ops, `set_url` and `files_ready` take an optional `id`, default: the active library; `files_ready` ends an imported library's wait for its music). The view carries `link_missing` for a library imported without its link (`/api/refresh` then refuses with that code) and `folders_away` entries with `why: "waiting"` while an imported library waits for its files. `add` and `set_url` add `fetch_report: {unreadable}`, `set_url` also `{same, of, had}`; a new link that misses tracks the library had changes nothing and answers `{confirm: report}` until it is sent again with `confirm: true` |
 | `POST /api/device` | `{device}` | target player (`xdj-700`, `nxs2`, `cdj-3000`) |
-| `POST /api/settings` | `{inbox_dir?, auto_move?, refresh_min?, like_on_add?, sc_open?, do_all?}` | downloads folder (`""` = default), auto-move, check interval in minutes, like-on-add, where SoundCloud links open (`"discover"` or `"browser"`), the Do everything setup (`do_all: {on?, pn_app?, mik_app?, mik_db?, rb_xml?, close_apps?, press_start?, include_pending?, pn_replace_confirmed?}`, a path `""` clears it). The view's `settings` carries `do_all`, `do_all_ready` and `do_all_missing` / `do_all_optional` (codes) |
-| `POST /api/do-all/detect` | | finds Platinum Notes, Mixed In Key, its database, the rekordbox XML rekordbox imports from and Platinum Notes' output mode (not a view, not queued) |
-| `POST /api/do-all/start` | `{preview?, include_pending?}` | with `preview`: what a run would do (`move_files`, `pending_files` with their name checks, which file types each app takes) and what blocks it (`blockers`, codes); without: starts the run, or refuses with the first blocker's `code` (not a view, not queued) |
-| `GET /api/do-all/status` | | the run: steps, files, messages, report (not a view) |
-| `POST /api/do-all/control` | `{action, step?}` | `cancel`, `mark_done` / `skip_step` (with the step), `retry_failed`, `resume`, `dismiss` |
-| `POST /api/do-all/access` | `{prompt?}` | macOS: may DJ HQ press Start Processing in Platinum Notes (`state`: `granted`, `missing` Accessibility, `automation` (System Events not allowed), `unknown`; `unsupported` elsewhere); with `prompt` macOS asks, or System Settings opens at the right list (not a view, not queued) |
-| `POST /api/pick-file` | `{kind}` | Electron only: choose `pn_app`, `mik_app`, `mik_db` or `rb_xml` (headless answers `unsupported`) |
+| `POST /api/settings` | `{inbox_dir?, auto_move?, refresh_min?, like_on_add?, sc_open?}` | downloads folder (`""` = default), auto-move, check interval in minutes, like-on-add, where SoundCloud links open (`"discover"` or `"browser"`) |
 | `POST /api/config/export-info` | | what the export dialog warns about: libraries with private links, folders that are away, `can_save` (not a view) |
 | `POST /api/config/export` | `{leave_links_out?}` | Electron: a save dialog, then `{path}` or `{canceled}`; headless answers `unsupported` (not a view) |
 | `GET /api/config/export?leave_links_out=1` | | the configuration file as a download (only for `Host` 127.0.0.1 / localhost) |
@@ -1023,12 +848,7 @@ bodies are JSON.
 Pushing a `v*` tag makes GitHub Actions build the installers on macOS (Apple
 Silicon and Intel), Windows and Linux and publish them to the Releases page.
 The macOS apps are ad-hoc signed; they aren't notarized, hence the one-time
-"Open Anyway" step above. They carry the `com.apple.security.automation.apple-events`
-entitlement (`scripts/entitlements.plist`) and an `NSAppleEventsUsageDescription`
-(`build.mac.extendInfo` in `package.json`), which the hardened runtime needs for
-Do everything's "Press Start for me" to ask System Events. An ad-hoc signature
-changes with every build, so macOS may ask for the Accessibility and Automation
-permissions again after an update.
+"Open Anyway" step above.
 
 ### Out of scope
 

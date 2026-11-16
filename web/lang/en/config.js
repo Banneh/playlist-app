@@ -15,6 +15,7 @@ I18N.add('en', 'config', {
   exSub: 'One file with everything DJ HQ knows about your libraries. Save it to a USB stick or a cloud folder to take it along.',
   exIn: 'In the file: each library’s SoundCloud link and track list, its matches (by hand and automatic), names you edited, Have / Missing / not available marks, what’s new, and your settings.',
   exOut: 'Not in the file: the music files, the backed-up originals, the SoundCloud sign-in, and this computer’s Downloads folder and Do everything setup (they are looked up again on the other computer).',
+  exOutNoDa: 'Not in the file: the music files, the backed-up originals, the SoundCloud sign-in, and this computer’s Downloads folder (it is looked up again on the other computer).',
   exPrivate: {
     one: '<b>{names} is linked with a private share link.</b> Anyone who gets the file can open that playlist.',
     other: '<b>{names} are linked with private share links.</b> Anyone who gets the file can open those playlists.',
@@ -67,6 +68,7 @@ I18N.add('en', 'config', {
   imDroppedPins: { one: '{n} match of a track no longer in the playlist', other: '{n} matches of tracks no longer in the playlist' },
   imNoteIgnored: 'A setting this version of DJ HQ doesn’t know was skipped.',
   imMachine: 'The other computer’s Downloads folder and Do everything setup are not used: they belong to that computer.',
+  imMachineNoDa: 'The other computer’s Downloads folder is not used: it belongs to that computer.',
   imReplaces: {
     one: 'Importing replaces the library on this computer: {names}.',
     other: 'Importing replaces the {n} libraries on this computer: {names}.',
@@ -104,6 +106,7 @@ I18N.add('en', 'config', {
   imReplaceOk: 'Replace the libraries on this computer',
   imReplaceHint: 'Their matches, edits and marks are replaced by the ones in the file. A copy of the current data is saved first, in the backups folder of DJ HQ’s data folder.',
   imMachineOpt: 'Also use the other computer’s Downloads folder and Do everything setup',
+  imMachineOptNoDa: 'Also use the other computer’s Downloads folder',
   imMachineHint: 'Only paths that exist on this computer are used. Handy when you bring a backup back to the same computer.',
   imFirstScan: 'The first look at the folders reads every music file once. In a cloud folder whose files are kept online only, that downloads them.',
   imGo: 'Import',

@@ -14,6 +14,7 @@ I18N.add('pl', 'config', {
   exSub: 'Jeden plik ze wszystkim, co DJ HQ wie o twoich bibliotekach. Zapisz go na pamięci USB albo w folderze w chmurze, żeby mieć go przy sobie.',
   exIn: 'W pliku: link SoundCloud i lista utworów każdej biblioteki, jej dopasowania (ręczne i automatyczne), edytowane nazwy, oznaczenia Mam / Brak / niedostępny, to, co nowe, i twoje ustawienia.',
   exOut: 'Poza plikiem: pliki muzyczne, zachowane oryginały, logowanie do SoundCloud oraz folder Pobrane i konfiguracja funkcji Zrób wszystko z tego komputera (na drugim komputerze zostaną wyszukane od nowa).',
+  exOutNoDa: 'Poza plikiem: pliki muzyczne, zachowane oryginały, logowanie do SoundCloud oraz folder Pobrane z tego komputera (na drugim komputerze zostanie wyszukany od nowa).',
   exPrivate: {
     one: '<b>Biblioteka {names} ma prywatny link udostępniania.</b> Każdy, kto dostanie ten plik, może otworzyć tę playlistę.',
     few: '<b>Biblioteki {names} mają prywatne linki udostępniania.</b> Każdy, kto dostanie ten plik, może otworzyć te playlisty.',
@@ -101,6 +102,7 @@ I18N.add('pl', 'config', {
   },
   imNoteIgnored: 'Pominięto ustawienie, którego ta wersja DJ HQ nie zna.',
   imMachine: 'Folder Pobrane i konfiguracja funkcji Zrób wszystko z drugiego komputera nie są używane: należą do tamtego komputera.',
+  imMachineNoDa: 'Folder Pobrane z drugiego komputera nie jest używany: należy do tamtego komputera.',
   imReplaces: {
     one: 'Import zastąpi bibliotekę na tym komputerze: {names}.',
     few: 'Import zastąpi {n} biblioteki na tym komputerze: {names}.',
@@ -153,6 +155,7 @@ I18N.add('pl', 'config', {
   imReplaceOk: 'Zastąp biblioteki na tym komputerze',
   imReplaceHint: 'Ich dopasowania, zmienione nazwy i oznaczenia zostaną zastąpione tymi z pliku. Najpierw zostanie zapisana kopia bieżących danych – w folderze backups w folderze danych DJ HQ.',
   imMachineOpt: 'Użyj też folderu Pobrane i konfiguracji funkcji Zrób wszystko z drugiego komputera',
+  imMachineOptNoDa: 'Użyj też folderu Pobrane z drugiego komputera',
   imMachineHint: 'Używane są tylko ścieżki, które istnieją na tym komputerze. Przydaje się, gdy przywracasz kopię na tym samym komputerze.',
   imFirstScan: 'Przy pierwszym sprawdzeniu folderów każdy plik muzyczny jest odczytywany raz. W folderze w chmurze, którego pliki są przechowywane tylko online, oznacza to ich pobranie.',
   imGo: 'Importuj',

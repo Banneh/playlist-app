@@ -7,6 +7,7 @@
 /* structure only: page id → icon and, per section, the item icons or the number of tips.
    Every text is in lang/<en|pl>/guide.js: guide.<page>.title / .lead, .s<i>.h,
    .s<i>.i<j>.name / .text (html allowed), .s<i>.t<j> (tips); i and j count from 1.
+   An item's .textNoDa, where there is one, replaces .text while Do everything is off (APP.do_all).
    An entry reads as { icon, title, lead (html), sections: [{ h, items: [[icon, name, text (html)]] | tips: [html] }] }
    whose texts are getters, looked up each time the panel is drawn (so it follows a language change);
    pages/discover.js adds its own entries in the same shape and swaps a few items. */
@@ -20,7 +21,8 @@ function guidePage(page, ico, shape) {
     if (Array.isArray(sec)) s.items = sec.map((ic, j) => {
       const it = [ic];
       getter(it, 1, () => t(p + 'i' + (j + 1) + '.name'));
-      getter(it, 2, () => th(p + 'i' + (j + 1) + '.text'));
+      const tk = p + 'i' + (j + 1) + '.text';
+      getter(it, 2, () => th(!APP.do_all && I18N.has(tk + 'NoDa') ? tk + 'NoDa' : tk));
       return it;
     });
     else {

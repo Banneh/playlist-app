@@ -34,7 +34,8 @@ if (process.platform === "darwin") {
 }
 if (HOME !== SHARED) fs.rmSync(HOME, { recursive: true, force: true });
 process.env.HOME = HOME;   // os.homedir() → the sandbox
-process.env.DJ_HQ_DO_ALL_FEATURE_ENABLED = "true";   // the screens show Do everything (a feature switch, see README)
+delete process.env.DJ_HQ_DO_ALL_FEATURE_ENABLED;   // the screens show the app as it ships: without Do everything (a feature switch)
+delete process.env.dj_hq_do_all_feature_enabled;
 process.env.USERPROFILE = HOME;
 
 const MUSIC = path.join(HOME, "Music", "Trance");
