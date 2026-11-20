@@ -446,7 +446,17 @@ biorą twoje wartości.
    naprawdę je odczytuje (z plikami WAV jest wybredny). Gatunkiem staje się
    nazwa playlisty. Cała reszta tagów pliku zostaje: tonacja i energia,
    komentarze i okładka. Tonacja jest widoczna obok nazwy pliku i trafia do
-   eksportu rekordbox.
+   eksportu rekordbox. Plik WAV liczy się jako otagowany dopiero wtedy, gdy
+   nazwy są w jego bloku RIFF INFO, który czyta rekordbox; sam tag ID3 nie
+   wystarcza.
+
+   Gdy plik ma już tę samą nazwę zapisaną inaczej (wielkie litery,
+   interpunkcja), zostaje pisownia z pliku. Gdy ma własnego, innego wykonawcę
+   lub tytuł, **Zapisz tagi** najpierw wypisuje te pliki, każdy z tym, co jest
+   w pliku, i tym, co zostałoby zapisane, a ty wybierasz **Zapisz nazwy z DJ
+   HQ**, **Zostaw nazwy z plików** albo Anuluj. Nazwy wpisane przez ciebie są
+   zapisywane dokładnie tak, jak je wpisano, bez pytania. Tak samo nazwa
+   zostawiona w oknie **Sprawdź nazwy**, gdy pokazywało ono inną nazwę z pliku.
 
    Wykonawca i tytuł pochodzą z tytułu na SoundCloud: wykonawca przed
    myślnikiem, tytuł po nim. „Premiere:”, numer katalogowy albo strona winylu
@@ -457,8 +467,9 @@ biorą twoje wartości.
    potwierdza kolejności, utwór dostaje oznaczenie **Sprawdź nazwę**,
    a **Sprawdź nazwy** na karcie Tagi przechodzi przez te nazwy po kolei:
    **Zostaw** (Enter), **Zamień** (S), **Edytuj** (E), pomijanie albo powrót
-   strzałkami. Przełącz na **Wszystkie nazwy**, żeby przejść przez całą
-   bibliotekę. Twoje wybory są zapamiętywane i mają pierwszeństwo przed tym, co
+   strzałkami. Trafia tam też plik, który ma już inną nazwę: okno pokazuje ją
+   w wierszu **Teraz w pliku**, a **Weź z pliku** (F) ją przejmuje. Przełącz na
+   **Wszystkie nazwy**, żeby przejść przez całą bibliotekę. Twoje wybory są zapamiętywane i mają pierwszeństwo przed tym, co
    odczytuje DJ HQ; **Zapisz tagi** zapisuje je potem w plikach. **⋯ → Zamień
    wykonawcę z tytułem** w wierszu robi to samo dla jednego utworu.
 3. **Konwertuj** zamienia pliki, których twój odtwarzacz nie odtworzy, na

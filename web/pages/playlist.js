@@ -241,12 +241,58 @@ function fileReport(r, failedKey, doneKey) {
 }
 async function tagFromList(btn) {
   if (btn) { btn.disabled = true; btn.innerHTML = spin(t('tags.writingTags')); }
-  try {
-    DATA = await api('/api/tag', {});
-    const [msg, err] = fileReport(DATA.tag_report, 'tags.tagFailed', 'tags.tagDone');
-    toast(msg, err);
-  } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
+  await writeTagsAsking();
   render();
+}
+/** Write tags (every caller of /api/tag goes through here): a preview first, and when files
+   already carry a different name of their own, the user picks which names stay. The server
+   never writes over such a name without {replace} or {keep_file}, and only over the ones
+   listed here ({seen}). Names the user chose are shown too, though they need no answer. */
+async function writeTagsAsking() {
+  try {
+    const pv = await api('/api/tag', { preview: true });
+    let body = {};
+    if ((pv.replaces || []).length) {
+      const how = await tagReplaceAsk(pv.replaces);
+      if (!how) return;
+      const seen = pv.replaces.filter(x => !x.hand).map(x => x.sig);
+      body = how === 'keep' ? { keep_file: true, seen } : { replace: true, seen };
+    }
+    DATA = await api('/api/tag', body);
+    const r = DATA.tag_report || {};
+    let [msg, err] = fileReport(r, 'tags.tagFailed', 'tags.tagDone');
+    // nothing written because every file kept its own name: say that, not "Tagged 0 files"
+    if (r.kept_own && !r.done && !err) msg = tn('tags.keptOwn', r.kept_own);
+    else if (r.kept_own) msg += ' ' + tn('tags.keptOwn', r.kept_own);
+    // one toast: a second would cover the first
+    toast((r.kept || []).length ? msg + ' ' + tn('tags.keptNames', r.kept.length) : msg, err || !!(r.kept || []).length);
+  } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
+}
+/** "in the file → will be written" per file; resolves 'replace', 'keep' or null (cancel).
+   With only names the user chose there is nothing to decide: Write tags or Cancel. */
+function tagReplaceAsk(list) {
+  const ask = list.filter(x => !x.hand), hand = list.filter(x => x.hand);
+  const nm = (a, ti) => `${a ? esc(a) : `<span class="faint">${esc(t('names.noArtist'))}</span>`}<span class="faint"> · </span>${esc(ti || '')}`;
+  const rows = xs => `<div class="tr-list">${xs.map(x => `<div class="tr-row">
+      <div class="tr-file" title="${esc(x.key)}">${icon('file')}<span>${esc(x.key)}</span></div>
+      <div class="tr-names"><span class="tr-lbl">${esc(t('tags.replaceAsk.inFile'))}</span><span class="tr-val">${nm(x.file_artist, x.file_title)}</span>
+        <span class="tr-lbl">${esc(t('tags.replaceAsk.willWrite'))}</span><span class="tr-val tr-new">${nm(x.artist, x.title)}</span></div>
+    </div>`).join('')}</div>`;
+  return dialog({
+    title: esc(ask.length ? tn('tags.replaceAsk.title', ask.length) : tn('tags.replaceAsk.handTitle', hand.length)),
+    sub: th(ask.length ? 'tags.replaceAsk.text' : 'tags.replaceAsk.handText'), wide: true,
+    body: `<div class="tr-scroll">${rows(ask)}${hand.length ? `<h4 class="tr-head">${esc(t('tags.replaceAsk.handHead'))}</h4>${rows(hand)}` : ''}</div>`,
+    foot: `<button class="btn" data-close>${esc(t('common.cancel'))}</button><span class="spacer"></span>
+           ${ask.length ? `<button class="btn" data-a="replace">${icon('tag')}${esc(t('tags.replaceAsk.replace'))}</button>
+           <button class="btn btn-primary" data-a="keep">${icon('check')}${esc(t('tags.replaceAsk.keep'))}</button>`
+             : `<button class="btn btn-primary" data-a="replace">${icon('tag')}${esc(t('tags.writeTags'))}</button>`}`,
+    open(dlg, done) {
+      dlg.querySelector('[data-a=replace]').onclick = () => done('replace');
+      const keep = dlg.querySelector('[data-a=keep]');
+      if (keep) { keep.onclick = () => done('keep'); keep.focus(); }
+      else dlg.querySelector('[data-a=replace]').focus();
+    },
+  });
 }
 
 /* ---------- list helpers ---------- */

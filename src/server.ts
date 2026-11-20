@@ -268,7 +268,8 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         switch (req.url) {
           case "/api/refresh":  return route(() => core.refresh());
           case "/api/rescan":   return route(() => core.buildView());
-          case "/api/tag":      return route(() => core.tagAll());
+          case "/api/tag":      return route(() => core.tagAll({ preview: !!data.preview, replace: !!data.replace, keep_file: !!data.keep_file,
+                                                             seen: Array.isArray(data.seen) ? data.seen.map(String) : [] }));
           case "/api/convert":  return route(() => core.convertAll());
           case "/api/restore":  return route(() => core.restoreAll());
           case "/api/clean-backups": return route(() => core.cleanBackups());

@@ -1,6 +1,7 @@
 /* Check names: artist and title one at a time, as DJ HQ read them from the SoundCloud
-   title (or a file name). Keep them, swap the two, or type the right ones; every choice
-   is stored with /api/edit, so it survives a refresh and the tags use it.
+   title (or a file name). Keep them, swap the two, type the right ones, or take the name the
+   file already has (shown when it says something else); every choice is stored with
+   /api/edit, so it survives a refresh and the tags use it.
    Two lists: the names worth a look (the "Check name" tag) or every name in the library.
    Entry point: openCheckNames(scope, start) — the Tags card on Prepare for player and the
    "Check name" tag on a row (start: a track id, or a file name for a file not in the
@@ -42,6 +43,7 @@ function openCheckNames(scope, start) {
       else if (e.key === 'Enter' && !onControl) { e.preventDefault(); ncKeep(); }
       else if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey) { e.preventDefault(); ncSwap(); }
       else if ((e.key === 'e' || e.key === 'E') && !e.metaKey && !e.ctrlKey) { e.preventDefault(); ncEdit(); }
+      else if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey) { e.preventDefault(); ncUseFile(); }
     };
     document.addEventListener('keydown', NC.onKey, true);
     ncRender();
@@ -85,12 +87,19 @@ async function ncSave(body, advance = true) {
 /** Keep: confirm the derived name as it is (stored as a confirmation, not a hand edit) */
 function ncKeep() {
   const r = ncCurrent(); if (!r || NC.busy) return;
-  if (r.edited || r.name_ok) return ncNext();   // already decided
+  // already decided; a kept name the file now contradicts is kept again with that difference seen
+  if (r.edited || (r.name_ok && !r.check_name)) return ncNext();
   ncSave({ artist: r.artist, title: r.title, confirm: true });
 }
 function ncSwap() {
   const r = ncCurrent(); if (!r || NC.busy || NC.editing || !r.artist) return;
   ncSave({ artist: r.title, title: r.artist });
+}
+/** the file's own name (row.file_artist / file_title, only there when it differs), stored as a hand edit */
+const ncHasFile = r => !!r && r.file_artist !== undefined && !!(r.file_artist || r.file_title);
+function ncUseFile() {
+  const r = ncCurrent(); if (!r || NC.busy || NC.editing || !ncHasFile(r)) return;
+  ncSave({ artist: r.file_artist, title: r.file_title });
 }
 function ncEdit() {
   const r = ncCurrent(); if (!r || NC.busy) return;
@@ -111,8 +120,8 @@ function ncReset() { ncSave({ artist: '', title: '' }, false); }
 /* ---------- rendering ---------- */
 function ncState(r) {
   if (r.edited) return tag(t('tags.edited'), 'outline', 'pencil', t('names.editedTip'));
-  if (r.name_ok) return tag(t('names.kept'), 'ok', 'check', t('names.keptTip'));
   if (r.check_name) return tag(t('tags.checkName'), 'warn', 'alert');
+  if (r.name_ok) return tag(t('names.kept'), 'ok', 'check', t('names.keptTip'));
   return tag(t('names.looksRight'), 'outline', 'check');
 }
 function ncRender() {
@@ -167,6 +176,11 @@ function ncRender() {
   const art = isTrack ? `<button class="wt-art nc-art${r.art ? '' : ' none'}" onclick="window.open('${esc(r.url)}','_blank','noopener')" title="${esc(t('common.openOnSoundCloud'))}">${
       r.art ? `<img src="${esc(r.art)}" alt="" onerror="this.parentNode.classList.add('none');this.remove()">` : icon('music')}</button>` : '';
   const why = r.edited ? t('names.byHand') : ncWhy(r);
+  const sep = '<span class="faint"> · </span>';
+  const inFile = ncHasFile(r)
+    ? `<div class="nc-src nc-file"><span class="nc-lbl">${esc(t('names.inFile'))}</span><span class="nc-val" title="${esc([r.file_artist, r.file_title].filter(Boolean).join(' · '))}">${
+        r.file_artist ? esc(r.file_artist) : `<span class="faint">${esc(t('names.noArtist'))}</span>`}${sep}${esc(r.file_title)}</span>
+        <button class="btn btn-sm nc-usefile" onclick="ncUseFile()" ${NC.editing ? 'disabled' : ''} title="${esc(t('names.useFileTip'))}">${icon('file')}${esc(t('names.useFile'))}</button></div>` : '';
   dlg.innerHTML = head + `
     <div class="dlg-body">
       <div class="wt-card">
@@ -174,6 +188,7 @@ function ncRender() {
         <div class="wt-info">
           ${src}
           ${name}
+          ${inFile}
           <div class="nc-why">${ncState(r)}<span>${esc(why)}</span></div>
           ${r.edited || r.name_ok ? `<button class="btn btn-sm btn-ghost nc-reset" onclick="ncReset()" title="${esc(t('names.resetTip'))}">${icon('undo')}${esc(t('tags.backToAuto'))}</button>` : ''}
         </div>

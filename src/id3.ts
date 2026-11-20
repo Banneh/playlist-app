@@ -233,9 +233,38 @@ export interface KeyInfo {
   /** processed by Platinum Notes: WAV `PLTN` chunk, mp3/aiff "PlatinumNotes" GEOB
    *  frame; null when the format can't tell (FLAC, M4A, OGG) or the file can't be read */
   pn: boolean | null;
+  /** WAV only: artist and title of its RIFF LIST/INFO chunk (IART, INAM), the tags
+   *  rekordbox reads in a WAV; null when the file has no INFO chunk. Undefined for
+   *  anything that isn't a WAV. */
+  info?: { artist: string; title: string } | null;
+  /** WAV only: artist and title of its ID3 chunk (TPE1, TIT2), "" each when it has none.
+   *  ffprobe hides these whenever the file also has an INFO chunk, so a name kept only
+   *  there would otherwise go unseen (and be written over). */
+  id3?: { artist: string; title: string };
 }
 
-/** The musical key and Platinum Notes marker of a file, straight from its tags.
+/** IART / INAM of a WAV's LIST/INFO chunk (the last one, as with the ID3 chunk);
+ *  null when there is none. Values are taken as UTF-8 (ffmpeg writes them so). */
+function readInfo(fd: number, riff: NonNullable<ReturnType<typeof walkChunks>>): { artist: string; title: string } | null {
+  let out: { artist: string; title: string } | null = null;
+  for (const c of riff.chunks) {
+    if (c.id !== "LIST" || c.size < 4 || c.size > MAX_TAG) continue;
+    const b = readAt(fd, c.off, c.size);
+    if (b.toString("latin1", 0, 4) !== "INFO") continue;
+    const r = { artist: "", title: "" };
+    for (let off = 4; off + 8 <= b.length;) {
+      const id = b.toString("latin1", off, off + 4), n = b.readUInt32LE(off + 4);
+      const v = b.subarray(off + 8, Math.min(b.length, off + 8 + n)).toString("utf8").replace(/\0+$/, "").trim();
+      if (id === "IART") r.artist = v;
+      else if (id === "INAM") r.title = v;
+      off += 8 + n + (n % 2);
+    }
+    out = r;
+  }
+  return out;
+}
+
+/** The musical key and Platinum Notes marker of a file (and a WAV's INFO and ID3 names), straight from its tags.
  *  (ffprobe can't be used for this: it ignores a WAV's ID3 chunk when the file
  *  also has a RIFF INFO chunk, which DJ HQ and Mixed In Key both write.) */
 export function readKeyInfo(p: string): KeyInfo {
@@ -245,7 +274,13 @@ export function readKeyInfo(p: string): KeyInfo {
     const riff = walkChunks(fd);
     const t = openTag(fd, riff);
     let key: string | null = null, mark = false;
+    const names = { artist: "", title: "" };
     if (t) for (const f of rawFrames(t)) {
+      if (f.id === "TPE1" || f.id === "TP1" || f.id === "TIT2" || f.id === "TT2") {
+        const b = frameData(t, f, 2048), v = b && b.length ? (textValues(b)[0] || "").trim() : "";
+        if (f.id[1] === "P") names.artist = names.artist || v; else names.title = names.title || v;
+        continue;
+      }
       if ((f.id === "TKEY" || f.id === "TKE") && key === null) {
         const b = frameData(t, f, 256);
         if (b && b.length) key = (textValues(b)[0] || "").trim() || null;
@@ -256,7 +291,7 @@ export function readKeyInfo(p: string): KeyInfo {
     }
     const pn = riff ? riff.chunks.some((c) => c.id === "PLTN") || mark
       : path.extname(p).toLowerCase() === ".mp3" ? mark : null;
-    return { key, pn };
+    return riff && !riff.be ? { key, pn, info: readInfo(fd, riff), id3: names } : { key, pn };
   } catch {
     return { key: null, pn: null };
   } finally {

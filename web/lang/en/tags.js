@@ -74,6 +74,31 @@ I18N.add('en', 'tags', {
     one: 'Tagged {n} file — rekordbox will show the right names',
     other: 'Tagged {n} files — rekordbox will show the right names',
   },
+  keptNames: {
+    one: '{n} file has a different name of its own and was left as it is; Check names shows it.',
+    other: '{n} files have a different name of their own and were left as they are; Check names shows them.',
+  },
+  keptOwn: {
+    one: '{n} file kept its own name.',
+    other: '{n} files kept their own names.',
+  },
+  replaceAsk: {
+    title: {
+      one: '{n} file already has a different name',
+      other: '{n} files already have a different name',
+    },
+    text: 'DJ HQ’s name would replace the artist or title these files carry now. Choose which names they keep.',
+    inFile: 'In the file',
+    willWrite: 'Will be written',
+    handTitle: {
+      one: '{n} file gets a name you chose',
+      other: '{n} files get a name you chose',
+    },
+    handText: 'These files carry a different artist or title now. You typed the new name in or kept it in Check names, so it is written over theirs.',
+    handHead: 'Names you chose (written without asking)',
+    replace: 'Write DJ HQ’s names',
+    keep: 'Keep the files’ names',
+  },
   moveIn: 'Move into library',
   upgrade: 'Upgrade',
   movedIn: 'Moved into your library',

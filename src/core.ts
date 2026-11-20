@@ -90,11 +90,14 @@ export interface Library {
   uid?: string;
 }
 
-// dur_cache entry: [size, mtime, duration, [codec, sr, bits], [artist, title, genre], [key, pn]]
-// (entries written before the key was read have five elements: scanFolder adds the
-// sixth from the file's tag alone, without a new ffprobe run)
+// dur_cache entry: [size, mtime, duration, [codec, sr, bits], [artist, title, genre], [key, pn, info, id3]]
+// info: a WAV's LIST/INFO [artist, title], null without one (and for other formats);
+// id3: a WAV's ID3 chunk [artist, title] (ffprobe doesn't show them next to INFO).
+// (entries written before the key was read have five elements, and a WAV's written before
+// INFO / ID3 names were read lack them: scanFolder adds those from the file's tags alone,
+// without a new ffprobe run)
 type CacheEntry = [number, number, number, [string, number, number], [string, string, string],
-  [string | null, boolean | null]?];
+  [string | null, boolean | null, ([string, string] | null)?, ([string, string] | null)?]?];
 
 export interface AppState {
   libraries: Library[];
@@ -104,8 +107,10 @@ export interface AppState {
   /** artist / title typed in or swapped by hand, keyed by track id or "x:" + path; win
    *  over the derived ones. `ok` (artist and title empty) records a derived name the user
    *  kept as it is in Check names: nameSig of the values confirmed, so it lapses by
-   *  itself if the derivation ever changes. */
-  edits: Record<string, { artist: string; title: string; ok?: string }>;
+   *  itself if the derivation ever changes. `file`: nameSig of the different name the
+   *  file had when the user kept DJ HQ's (that difference was seen, so it no longer asks
+   *  for a look; a new one does). */
+  edits: Record<string, { artist: string; title: string; ok?: string; file?: string }>;
   /** manual file assignment: track id -> file name ("" = forced no file) */
   assigned: Record<string, string>;
   /** track ids whose assigned entry the user picked in the match dialog (the others come from
@@ -1027,13 +1032,20 @@ export function compatReason(fmt: [string, number, number], devKey: string): str
  *  prefixed with the folder name for extra folders); base: the file name alone. */
 interface LocalFile { name: string; base: string; path: string; dur: number; fmt: [string, number, number]; tags: [string, string, string];
   /** musical key from the file's tags, and whether Platinum Notes processed it (null = can't tell) */
-  key?: string | null; pn?: boolean | null; }
+  key?: string | null; pn?: boolean | null;
+  /** a WAV's LIST/INFO [artist, title] (null: it has none, so rekordbox shows no names even
+   *  when its ID3 chunk has them); undefined for other formats */
+  info?: [string, string] | null;
+  /** a WAV's ID3 chunk [artist, title] ("" each when absent); undefined for other formats */
+  id3?: [string, string] | null; }
+
+const keyEntry = (k: ReturnType<typeof readKeyInfo>): [string | null, boolean | null, [string, string] | null, [string, string] | null] =>
+  [k.key, k.pn, k.info ? [k.info.artist, k.info.title] : null, k.id3 ? [k.id3.artist, k.id3.title] : null];
 
 async function refreshCache(p: string): Promise<void> {
   const st = fs.statSync(p);
   const pr = await probe(p);
-  const k = readKeyInfo(p);
-  STATE.dur_cache[p] = [st.size, Math.floor(st.mtimeMs / 1000), pr.dur, pr.fmt, pr.tags, [k.key, k.pn]];
+  STATE.dur_cache[p] = [st.size, Math.floor(st.mtimeMs / 1000), pr.dur, pr.fmt, pr.tags, keyEntry(readKeyInfo(p))];
 }
 
 /** A library folder that can't be listed right now: "missing" (not there: an unmounted
@@ -1087,13 +1099,14 @@ async function scanFolder(d: string, recursive = false): Promise<LocalFile[]> {
       if (/\.tmp\.[^.]+$/i.test(f)) continue; // in-flight rewrite by writeTags/convertAll
       const st = fs.statSync(p);
       seen.add(p);
+      const wav = path.extname(f).toLowerCase() === ".wav";
       const c = cache[p] as CacheEntry | undefined;
       if (!c || c[0] !== st.size || c[1] !== Math.floor(st.mtimeMs / 1000) || c.length < 5)
         await refreshCache(p);
-      else if (c.length < 6) { const k = readKeyInfo(p); c[5] = [k.key, k.pn]; }
+      else if (c.length < 6 || (wav && (c[5]?.length ?? 0) < 4)) c[5] = keyEntry(readKeyInfo(p));
       const en = cache[p] as CacheEntry;
       files.push({ name: rel + f, base: f, path: p, dur: en[2], fmt: en[3], tags: en[4],
-                   key: en[5]?.[0] ?? null, pn: en[5]?.[1] ?? null });
+                   key: en[5]?.[0] ?? null, pn: en[5]?.[1] ?? null, ...(wav ? { info: en[5]?.[2] ?? null, id3: en[5]?.[3] ?? null } : {}) });
     }
   };
   const away = folderTrouble(d);
@@ -1370,15 +1383,65 @@ function libraryNames(tracks: PlTrack[]): Map<number, Named> {
 
 /** Worth a look in Check names: nothing confirms the order, or a risky split. */
 const nameNeedsLook = (n: Named) => n.conf === "low" || n.why === "pipe" || n.why === "loose-dash";
+/** A row's Check names flag and the reason shown for it: the derivation's doubts, or the
+ *  file already carrying a different name (unless the user typed the name, or kept DJ
+ *  HQ's having seen that very difference). */
+function nameLook(nm: Named, ed: AppState["edits"][string] | undefined, hand: boolean, confirmed: boolean,
+                  differs: { file_artist: string; file_title: string } | null): { check: boolean; why: string } {
+  if (hand) return { check: false, why: nm.why };
+  if (differs && !keptOver(ed, confirmed, differs)) return { check: true, why: "file-differs" };
+  return { check: !confirmed && nameNeedsLook(nm), why: nm.why };
+}
 /** The key a confirmed (kept as is) name is stored under in edits[].ok */
 const nameSig = (artist: string, title: string) => `${artist}\t${title}`;
 /** A hand edit: values typed in or swapped (an entry with only `ok` is a confirmation) */
 const handEdit = (ed: AppState["edits"][string] | undefined) => !!ed && !!(ed.artist || ed.title);
 
-const looseEq = (a: string, b: string) => norm(a) === norm(b);
-/** exact, apart from runs of spaces: for names the user decided on, which should end up
- *  in the file as they are, junk words included */
+/** the same name apart from case, punctuation and junk words; a name made only of what
+ *  norm() strips (non-Latin script, "The Edit") is compared as written, case aside, so it
+ *  never equals an empty field */
+const looseEq = (a: string, b: string) => {
+  const x = norm(a), y = norm(b);
+  return x || y ? x === y : a.trim().toLowerCase() === b.trim().toLowerCase();
+};
+/** exact, apart from runs of spaces: for names the user typed or swapped, which should
+ *  end up in the file as they are, junk words included */
 const sameName = (a: string, b: string) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
+/** which of artist / title the user typed or swapped (only those are compared and written exactly) */
+const handFields = (ed: AppState["edits"][string] | undefined): [boolean, boolean] => [!!ed?.artist, !!ed?.title];
+/** the file's own artist / title when it says something else than the row's (both
+ *  shown then, so the user sees the whole name the file has); null when it agrees */
+function fileDiffers(f: LocalFile, artist: string, title: string): { file_artist: string; file_title: string } | null {
+  const da = differingName(f, 0, artist), dt = differingName(f, 1, title);
+  return da || dt ? { file_artist: da || ownNames(f, 0)[0] || "", file_title: dt || ownNames(f, 1)[0] || "" } : null;
+}
+/** the file's own artist (0) or title (1), non-empty ones only: ffprobe's (a WAV's INFO
+ *  when it has one) first, then a WAV's ID3 chunk, which ffprobe hides next to INFO */
+const ownNames = (f: LocalFile, i: 0 | 1) => [f.tags[i].trim(), (f.id3?.[i] || "").trim()].filter(Boolean);
+/** one of those that says something else than `want` (an empty `want` writes nothing over) */
+const differingName = (f: LocalFile, i: 0 | 1, want: string) => want ? ownNames(f, i).find((v) => !looseEq(v, want)) : undefined;
+
+/** What tagging a file writes, decided in one place for Write tags and the pipeline.
+ *  A derived (or kept) name that only differs from the file's in spelling (case,
+ *  punctuation, junk words) leaves the file's spelling: the file is usually the better
+ *  source of capitals. A hand-typed field is written exactly. An empty name writes the
+ *  file's own. `replaces`: a non-empty artist or title in the file would give way to a
+ *  different name; `hand`: the user chose every such name (typed the field, or kept DJ HQ's
+ *  name having seen the file's: `decided`), so it is written without asking. */
+export interface TagPlan { artist: string; title: string; replaces: boolean; hand: boolean; }
+function tagPlan(f: LocalFile, artist: string, title: string, hand: [boolean, boolean], decided = false): TagPlan {
+  const pick = (i: 0 | 1, want: string, h: boolean) => {
+    const cur = ownNames(f, i)[0] || "";
+    return !want ? cur : !h && cur && looseEq(cur, want) ? cur : want;
+  };
+  const a = pick(0, artist, hand[0]), t = pick(1, title, hand[1]);
+  const differs = [!!differingName(f, 0, a), !!differingName(f, 1, t)];
+  const replaces = differs[0] || differs[1];
+  return { artist: a, title: t, replaces, hand: replaces && (decided || ((!differs[0] || hand[0]) && (!differs[1] || hand[1]))) };
+}
+/** Keep in Check names with the file's different name on screen: DJ HQ's name was chosen over it */
+const keptOver = (ed: AppState["edits"][string] | undefined, confirmed: boolean, differs: ReturnType<typeof fileDiffers>) =>
+  confirmed && !!differs && ed?.file === nameSig(differs.file_artist, differs.file_title);
 
 /** Artist/title for a local file that isn't in the playlist, from "Artist - Title.ext"
  *  (no uploader to check against, so a clean dash split is trusted). */
@@ -1517,12 +1580,16 @@ export function trackLinks(t: PlTrack): BuyLink[] {
 const linksSig = (ls: BuyLink[]) => ls.map((l) => l.url).sort().join("|");
 const LOSSY = /^(mp3|aac|vorbis|opus|wma)/;
 
-/** The file's tags match the names here; `exact` for a name the user decided on, which
- *  goes into the file as it is, not just loosely equal. An empty name is never written
- *  (writeTags keeps the file's own), so it isn't compared either. */
-function isTagged(f: LocalFile, artist: string, title: string, genre: string, exact = false): boolean {
-  const eq = exact ? sameName : looseEq;
-  return (!artist || eq(f.tags[0], artist)) && (!title || eq(f.tags[1], title)) && (!genre || looseEq(f.tags[2], genre));
+/** The file's tags match the names here: loosely (tagPlan keeps the file's spelling),
+ *  exactly for a field the user typed (`hand`). An empty name is never written (the
+ *  file's own stays), so it isn't compared either. A WAV also needs its LIST/INFO chunk
+ *  to carry them: rekordbox reads nothing else there, and Platinum Notes' rewrite drops
+ *  it while leaving the ID3 chunk, which ffprobe (and so f.tags) still reads. */
+function isTagged(f: LocalFile, artist: string, title: string, genre: string, hand: [boolean, boolean] = [false, false]): boolean {
+  const eq = (h: boolean) => h ? sameName : looseEq;
+  const info = f.info === undefined || (!!f.info && (!artist || looseEq(f.info[0], artist)) && (!title || looseEq(f.info[1], title)));
+  return info && (!artist || eq(hand[0])(f.tags[0], artist)) && (!title || eq(hand[1])(f.tags[1], title))
+    && (!genre || looseEq(f.tags[2], genre));
 }
 
 // ---------------- tagging & conversion ----------------
@@ -1575,7 +1642,9 @@ async function writeTags(p: string, artist: string, title: string, genre: string
   const tmp = p + ".tmp" + ext;
   const args = ["-y", "-v", "error", "-i", p];
   if (ext === ".wav") {
-    args.push("-map", "0:a", "-c", "copy", "-map_metadata", "-1",
+    // the file's metadata is mapped through, so the INFO fields DJ HQ doesn't set (album,
+    // date, comment, track) stay; ffmpeg writes only INFO ids, never the ID3 frames
+    args.push("-map", "0:a", "-c", "copy",
       ...metaArgs(artist, title, genre), "-fflags", "+bitexact", "-flags:a", "+bitexact");
   } else if (own) {
     args.push("-map", "0:a", "-c", "copy", "-map_metadata", "-1");
@@ -1852,9 +1921,12 @@ export async function buildView(libArg?: Library): Promise<any> {
     }
     let tagged: boolean | null = null, incompat: string | null = null, lossy = false;
     let key: string | null = null, pn: boolean | null = null;
+    let differs: ReturnType<typeof fileDiffers> = null, plan: TagPlan | null = null;
     if (m) {
       const f = fmap.get(m[0])!;
-      tagged = isTagged(f, a, ti, genre, hand || confirmed);
+      tagged = isTagged(f, a, ti, genre, handFields(ed));
+      differs = fileDiffers(f, a, ti);
+      if (!tagged) plan = tagPlan(f, a, ti, handFields(ed), keptOver(ed, confirmed, differs));
       incompat = compatReason(f.fmt, dev);
       lossy = LOSSY.test(f.fmt[0]);
       key = f.key ?? null; pn = f.pn ?? null;
@@ -1866,15 +1938,16 @@ export async function buildView(libArg?: Library): Promise<any> {
       if (!(ak in STATE.acquired)) { STATE.acquired[ak] = lib.acq_init ? now : 0; naDirty = true; }
     } else if (ak in STATE.acquired && !keep) { delete STATE.acquired[ak]; naDirty = true; }
     const acquired = m ? STATE.acquired[ak] : 0;
+    const look = nameLook(nm, ed, hand, confirmed, differs);
     return { n: i + 1, id: t.id, artist: a, title: ti, user: t.user, sc_title: t.title,
-             name_conf: nm.conf, name_why: nm.why, name_ok: confirmed, check_name: !hand && !confirmed && nameNeedsLook(nm),
+             name_conf: nm.conf, name_why: look.why, name_ok: confirmed, check_name: look.check, ...differs,
              dur: fmtDur(t.dur), url: t.url, art: t.art,
              have, na, auto: !!m, file: m ? m[0] : null, path: m ? fmap.get(m[0])!.path : null,
              score: m && m[1] >= 0 ? Math.min(1, m[1]) : null,
              pinned: manual.has(t.id), manual_match: manual.has(t.id) && !!STATE.by_hand[t.id], links, lossy, upgrade,
              added: t.added || 0, is_new: (t.added || 0) > (lib.seen_mark || 0),
              acquired, is_new_file: acquired > (lib.seen_mark || 0),
-             tagged, incompat, key, pn, override: o || null, edited: hand };
+             tagged, incompat, key, pn, override: o || null, edited: hand, ...(plan ? { tag_plan: plan } : {}) };
   });
   // first pass stamped existing files with 0 (not while a folder is away: its files would be NEW when it returns)
   if (!lib.acq_init && !keep) { lib.acq_init = true; naDirty = true; }
@@ -1887,10 +1960,12 @@ export async function buildView(libArg?: Library): Promise<any> {
     if (hand) { xa = ed!.artist || xa; xt = ed!.title || xt; }
     const confirmed = !hand && !!ed?.ok && ed.ok === nameSig(xa, xt);
     const fnd = STATE.found["x:" + f.path];
+    const tagged = isTagged(f, xa, xt, genre, handFields(ed)), differs = fileDiffers(f, xa, xt);
+    const look = nameLook(nm, ed, hand, confirmed, differs);
     return { name: f.name, path: f.path, incompat: compatReason(f.fmt, dev), dur: fmtDur(Math.round(f.dur)), lossy: LOSSY.test(f.fmt[0]),
-             artist: xa, title: xt, edited: hand,
-             name_conf: nm.conf, name_why: nm.why, name_ok: confirmed, check_name: !hand && !confirmed && nameNeedsLook(nm),
-             tagged: isTagged(f, xa, xt, genre, hand || confirmed),
+             artist: xa, title: xt, edited: hand, ...differs,
+             name_conf: nm.conf, name_why: look.why, name_ok: confirmed, check_name: look.check,
+             tagged, ...(tagged ? {} : { tag_plan: tagPlan(f, xa, xt, handFields(ed), keptOver(ed, confirmed, differs)) }),
              key: f.key ?? null, pn: f.pn ?? null,
              found: fnd ? { ...fnd, dur: fmtDur(fnd.dur) } : null };
   });
@@ -1918,28 +1993,64 @@ export async function buildView(libArg?: Library): Promise<any> {
 
 // ---------------- actions ----------------
 
-export async function tagAll(): Promise<any> {
+/** One file Write tags would write: its key, the edit key its name lives under, the plan
+ *  (tagPlan) and the file's current artist / title. */
+interface TagTodo { key: string; edit: string; plan: TagPlan; file_artist: string; file_title: string; }
+function tagTodo(view: any): TagTodo[] {
+  const out: TagTodo[] = [];
+  const add = (key: string, edit: string, r: any) => out.push({ key, edit, plan: r.tag_plan,
+    file_artist: r.file_artist ?? r.tag_plan.artist, file_title: r.file_title ?? r.tag_plan.title });
+  for (const r of view.tracks || []) if (r.file && r.tagged === false && r.tag_plan) add(r.file, String(r.id), r);
+  for (const e of view.extras || []) if (e.tagged === false && e.tag_plan) add(e.name, "x:" + e.path, e);
+  return out;
+}
+
+/** Write tags. A file whose own (non-empty) artist or title would give way to a different
+ *  name is only written with `replace`; with `keep_file` its names become hand edits first
+ *  (so the file keeps them and only gets what it lacks); with neither it is left alone and
+ *  reported (tag_report.kept). Both apply only to the replaces the user was shown (`seen`:
+ *  the preview's sigs), so one that turned up meanwhile is never written over unasked. A
+ *  name the user chose is written without asking. `preview` writes nothing: {writes,
+ *  replaces} for the page to ask with. */
+export async function tagAll(opts: { preview?: boolean; replace?: boolean; keep_file?: boolean; seen?: string[] } = {}): Promise<any> {
   const lib = requireLib();
   let view = await buildView();
+  let todo = tagTodo(view);
+  const sig = (x: TagTodo) => [x.key, x.plan.artist, x.plan.title, x.file_artist, x.file_title].join("\t");
+  const seen = new Set(opts.seen || []);
+  const asked = (x: TagTodo) => x.plan.replaces && !x.plan.hand;
+  const shown = (x: TagTodo) => asked(x) && seen.has(sig(x));
+  if (opts.preview) {
+    return { writes: todo.length, replaces: todo.filter((x) => x.plan.replaces).map((x) => ({ key: x.key, artist: x.plan.artist,
+      title: x.plan.title, file_artist: x.file_artist, file_title: x.file_title, hand: x.plan.hand, sig: sig(x) })) };
+  }
+  let keptOwn = 0;
+  if (opts.keep_file && !opts.replace && todo.some(shown)) {
+    for (const x of todo.filter(shown)) {
+      // a field the user typed stays theirs; the rest becomes what the file says
+      const ed = STATE.edits[x.edit], [ha, ht] = handFields(ed);
+      const a = ha ? ed!.artist : x.file_artist, t = ht ? ed!.title : x.file_title;
+      if (a || t) { STATE.edits[x.edit] = { artist: a, title: t }; keptOwn++; }
+    }
+    saveState();
+    view = await buildView();
+    todo = tagTodo(view);
+  }
   const genre = view.genre || "Trance";
   let done = 0;
-  const errors: string[] = [], error_items: ErrorItem[] = [];
-  const todo: [string, string, string][] = [];
-  for (const r of view.tracks || [])
-    if (r.file && r.tagged === false) todo.push([r.file, r.artist, r.title]);
-  for (const e of view.extras || [])
-    if (e.tagged === false) todo.push([e.name, e.artist, e.title]);
-  for (const [fname, artist, title] of todo) {
+  const errors: string[] = [], error_items: ErrorItem[] = [], kept: string[] = [];
+  for (const x of todo) {
+    if (asked(x) && !(opts.replace && shown(x))) { kept.push(x.key); continue; }
     try {
-      await writeTags(libPath(lib, fname), artist, title, genre);
+      await writeTags(libPath(lib, x.key), x.plan.artist, x.plan.title, genre);
       done++;
     } catch (e: any) {
-      errors.push(`${fname}: ${e.message}`);
-      error_items.push(errItem(fname, e));
+      errors.push(`${x.key}: ${e.message}`);
+      error_items.push(errItem(x.key, e));
     }
   }
   view = await buildView();
-  view.tag_report = { done, errors, error_items };
+  view.tag_report = { done, errors, error_items, kept, kept_own: keptOwn };
   return view;
 }
 
@@ -1949,7 +2060,11 @@ export async function tagAll(): Promise<any> {
  *  Notes mark from the file's tags. One view build for the lot; files not in the
  *  library (any more) are left out. */
 export interface BatchFile { key: string; path: string; track_id: number | null; artist: string; title: string; genre: string;
-  tagged: boolean; check_name: boolean; dur: number; size: number; tkey: string | null; pn: boolean | null; }
+  tagged: boolean; check_name: boolean; dur: number; size: number; tkey: string | null; pn: boolean | null;
+  /** when not tagged: what tagging writes (tagPlan), and the file's current names */
+  plan: TagPlan | null; file_artist: string; file_title: string; file_genre: string;
+  /** a WAV's LIST/INFO [artist, title] (null: none); undefined for other formats */
+  info?: [string, string] | null; }
 export async function batchInfo(keys: string[]): Promise<BatchFile[]> {
   const lib = requireLib();
   const view = await buildView(lib);
@@ -1966,12 +2081,32 @@ export async function batchInfo(keys: string[]): Promise<BatchFile[]> {
     try { size = fs.statSync(f.path).size; } catch {}
     out.push({ key: k, path: f.path, track_id: typeof r.id === "number" ? r.id : null, artist: r.artist, title: r.title,
                genre: view.genre || "Trance", tagged: r.tagged !== false, check_name: !!r.check_name,
-               dur: f.dur, size, tkey: f.key ?? null, pn: f.pn ?? null });
+               dur: f.dur, size, tkey: f.key ?? null, pn: f.pn ?? null,
+               plan: r.tagged === false ? r.tag_plan || null : null,
+               file_artist: ownNames(f, 0)[0] || "", file_title: ownNames(f, 1)[0] || "", file_genre: f.tags[2],
+               ...(f.info !== undefined ? { info: f.info } : {}) });
   }
   return out;
 }
 
-/** Tag one library file (writeTags: bit-perfect audio, other frames and chunks kept). */
+/** The artist / title a file goes into the rekordbox XML with: the file's own spelling where
+ *  it says the same as DJ HQ's name (as tagging keeps it), and the file's whole name when it
+ *  has a different one the user hasn't settled yet (`own`: the pipeline didn't write over it). */
+export function listedNames(f: BatchFile, own: boolean): { artist: string; title: string } {
+  const pick = (cur: string, want: string) => cur.trim() && (own || !want || looseEq(cur, want)) ? cur : want;
+  return { artist: pick(f.file_artist, f.artist), title: pick(f.file_title, f.title) };
+}
+
+/** The file still says exactly these names (and genre), where rekordbox reads them: for a
+ *  WAV in its LIST/INFO chunk too. Empty values aren't checked. */
+export function fileCarries(f: BatchFile, artist: string, title: string, genre: string): boolean {
+  const ok = (cur: string, want: string) => !want || sameName(cur, want);
+  return ok(f.file_artist, artist) && ok(f.file_title, title) && (!genre || looseEq(f.file_genre, genre))
+    && (f.info === undefined || (!!f.info && ok(f.info[0], artist) && ok(f.info[1], title)));
+}
+
+/** Tag one library file (writeTags: bit-perfect audio, other frames and chunks kept).
+ *  Callers pass a BatchFile's plan names, so the file's spelling rule holds here too. */
 export async function tagFile(key: string, artist: string, title: string, genre: string): Promise<void> {
   await writeTags(libPath(requireLib(), key), artist, title, genre);
 }
@@ -2677,7 +2812,13 @@ export async function setEdit(data: any): Promise<any> {
     const tracks = lib.playlist ? lib.playlist.tracks : [];
     const n = data.file ? extraName({ base: path.basename(key.slice(2)) } as LocalFile)
       : tracks.some((t) => String(t.id) === key) ? libraryNames(tracks).get(Number(key)) : undefined;
-    if (n && !handEdit(STATE.edits[key])) STATE.edits[key] = { artist: "", title: "", ok: nameSig(n.artist, n.title) };
+    if (n && !handEdit(STATE.edits[key])) {
+      // the different name the file has right now was on screen: kept over it, it stops asking
+      const v = await buildView(lib);
+      const r = data.file ? (v.extras || []).find((x: any) => x.name === String(data.file)) : (v.tracks || []).find((x: any) => String(x.id) === key);
+      STATE.edits[key] = { artist: "", title: "", ok: nameSig(n.artist, n.title),
+                           ...(r?.file_artist !== undefined ? { file: nameSig(r.file_artist, r.file_title) } : {}) };
+    }
   } else if (a || ti) STATE.edits[key] = { artist: a, title: ti };
   else delete STATE.edits[key];
   saveState();

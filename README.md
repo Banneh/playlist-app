@@ -433,7 +433,17 @@ values.
    reads them (it's picky about WAVs). The genre becomes the playlist name.
    Everything else in the file's tags stays:
    the key and energy, comments and cover art. The key shows next to the
-   file name and goes into the rekordbox export.
+   file name and goes into the rekordbox export. A WAV counts as tagged only
+   when the names are in its RIFF INFO chunk, the part rekordbox reads; an ID3
+   tag alone isn't enough.
+
+   When a file already has the same name in a different spelling (capitals,
+   punctuation), the file's spelling stays. When it has a different artist or
+   title of its own, **Write tags** first lists those files, each with what is
+   in the file and what would be written, and you choose **Write DJ HQ's
+   names**, **Keep the files' names** or Cancel. Names you typed yourself are
+   written exactly as typed, without asking, and so is a name you kept in
+   **Check names** while it showed the file's other name.
 
    Artist and title come from the SoundCloud title: artist before the dash,
    title after it. "Premiere:", a catalogue number or vinyl side in front, and
@@ -443,8 +453,10 @@ values.
    remixer stays in the title. When nothing confirms the order, the track gets
    a **Check name** tag, and **Check names** on the Tags card walks through
    those names one at a time: **Keep** (Enter), **Swap** (S), **Edit** (E),
-   skip or go back with the arrow keys. Switch to **All names** to go through
-   the whole library. Your choices are kept and win over what DJ HQ reads;
+   skip or go back with the arrow keys. A file that already carries a
+   different name is listed there too: the dialog shows it under **In the file
+   now**, and **Use the file's** (F) takes it. Switch to **All names** to go
+   through the whole library. Your choices are kept and win over what DJ HQ reads;
    **Write tags** then puts them into the files. **⋯ → Swap artist and title**
    on a row does the same for one track.
 3. **Convert** turns files your player can't play into ones it can, in place:
@@ -828,7 +840,8 @@ bodies are JSON.
 | `POST /api/assign` | `{id, file}` (`""` = no file, `null` = automatic) | pin a file to a track |
 | `POST /api/edit` | `{id, artist, title}` or `{file, artist, title}` | artist/title edit (track or local file) |
 | `POST /api/seen` | | mark all as seen |
-| `POST /api/tag` · `/api/convert` · `/api/restore` | | write tags / convert / restore originals (adds a report) |
+| `POST /api/tag` | `{preview?, replace?, keep_file?, seen?}` | write tags (adds `tag_report`; files whose own different name would be replaced are left and listed in `kept` unless `replace`, or `keep_file` makes their names hand edits first; both apply only to the previewed replaces whose `sig` is in `seen`); `preview` writes nothing and answers `{writes, replaces}` |
+| `POST /api/convert` · `/api/restore` | | convert / restore originals (adds a report) |
 | `POST /api/find` | `{file, q?}` | SoundCloud candidates for a local file (not a view) |
 | `POST /api/found` | `{file, track \| null}` | remember / forget the picked track |
 | `POST /api/find-all` | | search every unresolved file, accept sure matches |

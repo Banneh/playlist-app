@@ -32,13 +32,13 @@ interface TrackRec {
   /** pinned file: a library-relative key, "" = forced "no file" */
   file?: string; by_hand?: true;
   override?: "have" | "missing";
-  edit?: { artist: string; title: string; ok?: string };
+  edit?: { artist: string; title: string; ok?: string; file?: string };
   na?: { sig: string; at: number };
   /** ms when a file for the track first turned up (0 = before tracking) */
   acquired?: number;
 }
 /** Per file of a library ("x:" + path entries of this computer, made relative). */
-interface FileRec { edit?: { artist: string; title: string; ok?: string }; found?: core.Found; }
+interface FileRec { edit?: { artist: string; title: string; ok?: string; file?: string }; found?: core.Found; }
 interface FolderRec { path: string; key_prefix: string; away?: "missing" | "unreadable"; }
 interface LibRec {
   uid: string; url: string; subfolders: boolean; seen_mark: number; acq_init: boolean;
@@ -217,8 +217,8 @@ export function relKeyOk(k: unknown): boolean {
 const TID = /^\d{1,16}$/;
 
 function checkEdit(v: any, what: string) {
-  if (!isObj(v) || !isStr(v.artist) || !isStr(v.title) || (v.ok !== undefined && !isStr(v.ok))) throw invalid(what);
-  return { artist: v.artist, title: v.title, ...(v.ok !== undefined ? { ok: v.ok } : {}) };
+  if (!isObj(v) || !isStr(v.artist) || !isStr(v.title) || (v.ok !== undefined && !isStr(v.ok)) || (v.file !== undefined && !isStr(v.file))) throw invalid(what);
+  return { artist: v.artist, title: v.title, ...(v.ok !== undefined ? { ok: v.ok } : {}), ...(v.file !== undefined ? { file: v.file } : {}) };
 }
 /** A SoundCloud track's link as DJ HQ stores it ("" when there is none). The pages put these
  *  links into click handlers, so nothing else gets in: no other scheme or site, no quote,

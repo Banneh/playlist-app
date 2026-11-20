@@ -112,11 +112,7 @@ function ppBusy(id, text) {
 }
 async function ppTag() {
   ppBusy('#pp-tag', t('tags.writingTags'));
-  try {
-    DATA = await api('/api/tag', {});
-    const [msg, err] = fileReport(DATA.tag_report, 'tags.tagFailed', 'tags.tagDone');
-    toast(msg, err);
-  } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
+  await writeTagsAsking();   // pages/playlist.js: asks before a file's own name is replaced
   render();
 }
 async function ppConvert() {

@@ -81,6 +81,7 @@ export const TEXT: Record<string, string> = {
   move_failed: "Couldn't move it: {error}",
   file_gone: "The file is no longer in the library.",
   already_tagged: "Tags already right.",
+  name_in_file: "The file already has a different name ({file_artist} – {file_title}), so DJ HQ didn't write over it. Open Check names to choose which one is right.",
   tag_failed: "Couldn't write the tags: {error}",
   already_processed: "Platinum Notes has processed it before.",
   pn_unsupported_format: "Platinum Notes doesn't take this file type.",
@@ -88,6 +89,7 @@ export const TEXT: Record<string, string> = {
   pn_left_as_is: "Platinum Notes left this file as it is: it has most likely processed it before. DJ HQ can't read its mark in this file type.",
   retagged: "Files whose artist, title or genre were lost in Platinum Notes and Mixed In Key, written again by DJ HQ: {n}.",
   retag_failed: "Couldn't write the tags again after Platinum Notes and Mixed In Key ({file}): {error}. Write tags on Prepare for player can do it later.",
+  retag_name_differs: "After Platinum Notes and Mixed In Key, {file} has a name DJ HQ didn't write ({file_artist} – {file_title}), so DJ HQ left it. Open Check names to choose which one is right.",
   retag_failed_all: "Couldn't write the tags again after Platinum Notes and Mixed In Key: {error}. Write tags on Prepare for player can do it later.",
   pn_no_mark: "Platinum Notes reports it processed this file, but the file doesn't carry its mark. Check that it is set to “Replace original files”.",
   mik_unsupported_format: "Mixed In Key doesn't take this file type.",
@@ -148,6 +150,17 @@ export interface Item {
   steps: Record<FileStep, ItemStep>;
   /** the name needs a look (Check names); listed in the report, never blocks */
   check_name?: boolean;
+  /** "artist\ttitle": DJ HQ's name for the file at the tag step, when the file said it after
+   *  that step (DJ HQ wrote it, or it was right already): retagging after the apps may restore
+   *  it without asking, as long as DJ HQ's name is still the same */
+  tagged_as?: string;
+  /** the artist and title as the file spelled them after the tag step: what a retag restores
+   *  (the file's own spelling, which DJ HQ's derived name only loosely matches) */
+  tagged_names?: [string, string];
+  /** the file has a different name of its own, which DJ HQ didn't write over (the report lists it) */
+  name_differs?: { file_artist: string; file_title: string };
+  /** that name (and genre) as the tag step found it: put back if the apps take it away */
+  own_tags?: [string, string, string];
   /** the musical key used for rekordbox, and where it came from */
   tkey?: string | null; key_source?: "tag" | "mik_db" | null;
   /** the file as it was when Platinum Notes / Mixed In Key got it */
@@ -627,11 +640,26 @@ async function stepTag(st: StepRec): Promise<void> {
     if (!f) { setItem(it, "tag", "failed", "file_gone"); continue; }
     it.path = f.path; it.check_name = f.check_name; it.track_id = it.track_id ?? f.track_id;
     it.label = `${f.artist} – ${f.title}`;
-    if (f.tagged) { setItem(it, "tag", "skipped", "already_tagged"); continue; }
+    if (f.tagged || !f.plan) {
+      it.tagged_as = nameSig(f.artist, f.title);
+      it.tagged_names = [f.file_artist || f.artist, f.file_title || f.title];
+      setItem(it, "tag", "skipped", "already_tagged"); continue;
+    }
+    const plan = f.plan;
+    // a different name the file has is the user's to settle (Check names), never written over here
+    if (plan.replaces && !plan.hand) {
+      it.check_name = true;
+      it.name_differs = { file_artist: f.file_artist, file_title: f.file_title };
+      it.own_tags = [f.file_artist, f.file_title, f.file_genre];
+      setItem(it, "tag", "skipped", "name_in_file", { ...it.name_differs });
+      continue;
+    }
     setItem(it, "tag", "running");
     save();
     try {
-      await inLib(() => core.tagFile(f.key, f.artist, f.title, f.genre));
+      await inLib(() => core.tagFile(f.key, plan.artist, plan.title, f.genre));
+      it.tagged_as = nameSig(f.artist, f.title);
+      it.tagged_names = [plan.artist, plan.title];
       setItem(it, "tag", "ok");
     } catch (e: any) {
       if (libChanged(e)) { setItem(it, "tag", "pending"); return failStep(st, "library_changed"); }
@@ -641,6 +669,9 @@ async function stepTag(st: StepRec): Promise<void> {
   }
   st.state = "ok";
 }
+
+/** the artist and title a file was tagged with in this run, as one string */
+const nameSig = (artist: string, title: string) => `${artist}\t${title}`;
 
 const ID3_TYPES = [".wav", ".mp3", ".aif", ".aiff"];   // where readKeyInfo finds the key
 const mtimeOf = (p: string) => { try { return fs.statSync(p).mtimeMs; } catch { return -1; } };
@@ -928,10 +959,15 @@ async function closeApp(app: AppId, st: StepRec, waitMs = 0): Promise<void> {
 
 /** A WAV that went through Platinum Notes and then Mixed In Key comes out with only Mixed
  *  In Key's tags: its title (the file name) and key, without DJ HQ's artist and genre
- *  (seen in the live test; MP3s and a WAV that skipped Platinum Notes keep them). So
- *  after Mixed In Key the names are written again wherever they no longer say the right
- *  thing; the key, Mixed In Key's data and Platinum Notes' mark stay. A failure is only
- *  reported: the file still goes on, and Write tags on Prepare can do it later. */
+ *  (seen in the live test; MP3s and a WAV that skipped Platinum Notes keep them). A WAV
+ *  can also keep its ID3 names but lose the LIST/INFO chunk, the only tags rekordbox reads
+ *  there; it counts as untagged too (core.isTagged). So after Mixed In Key the names are
+ *  written again wherever they no longer say the right thing; the key, Mixed In Key's data
+ *  and Platinum Notes' mark stay. What goes back is what the file said after the tag step,
+ *  in its own spelling; a file whose own different name the tag step kept gets that name
+ *  back. A different name the file has that DJ HQ didn't write (or find) in this run is
+ *  left (reported, for Check names). A failure is only reported: the file still goes on,
+ *  and Write tags on Prepare can do it later. */
 async function retagAfterApps(): Promise<void> {
   // a file the user stopped waiting for (Mark as done, Skip) while Mixed In Key stays open
   // may still be written by it: left alone
@@ -943,10 +979,34 @@ async function retagAfterApps(): Promise<void> {
   let n = 0;
   try {
     const files = await inLib(() => core.batchInfo(done.map((it) => it.key!)));
+    const byKey = new Map(done.map((it) => [it.key!, it]));
     for (const f of files) {
       if (control.cancel) return;
-      if (f.tagged) continue;
-      try { await inLib(() => core.tagFile(f.key, f.artist, f.title, f.genre)); n++; }
+      const it = byKey.get(f.key)!;
+      if (it.own_tags) {
+        // the name DJ HQ promised not to write over: the apps don't get to drop it either
+        const [a, t, g] = it.own_tags;
+        if (core.fileCarries(f, a, t, g)) continue;
+        try { await inLib(() => core.tagFile(f.key, a, t, g || f.genre)); n++; }
+        catch (e: any) { say("retag_failed", { file: f.key, ...errVars(e) }); }
+        continue;
+      }
+      if (f.tagged || !f.plan) continue;
+      const plan = f.plan;
+      // the apps putting their own title in is no reason to ask: DJ HQ wrote (or found)
+      // these very names before them in this run, and they go back as the file spelled
+      // them then. Any other different name stays.
+      const same = it.tagged_as === nameSig(f.artist, f.title);
+      if (plan.replaces && !plan.hand && !same) {
+        if (!it.name_differs) {
+          it.check_name = true;
+          it.name_differs = { file_artist: f.file_artist, file_title: f.file_title };
+          say("retag_name_differs", { file: f.key, ...it.name_differs });
+        }
+        continue;
+      }
+      const [a, t] = same && it.tagged_names ? it.tagged_names : [plan.artist, plan.title];
+      try { await inLib(() => core.tagFile(f.key, a, t, f.genre)); n++; }
       catch (e: any) { say("retag_failed", { file: f.key, ...errVars(e) }); }
     }
   } catch (e: any) { say("retag_failed_all", errVars(e)); }
@@ -996,7 +1056,8 @@ async function stepXml(st: StepRec): Promise<void> {
         const f = it.key ? info.get(it.key) : undefined;
         if (!f) { setItem(it, "xml", "failed", "file_gone"); continue; }
         const key = readKeyInfo(f.path).key || it.tkey || null;   // the tag wins; the database only fills a gap
-        tracks.push({ path: f.path, name: f.title, artist: f.artist, genre: f.genre, size: f.size, totalTime: f.dur, key });
+        const nm = core.listedNames(f, !!it.name_differs);   // what the file says, as rekordbox will read it
+        tracks.push({ path: f.path, name: nm.title, artist: nm.artist, genre: f.genre, size: f.size, totalTime: f.dur, key });
       }
       return mergeIntoFile(file, tracks);
     });
@@ -1037,6 +1098,7 @@ function buildReport(): void {
   job.report = {
     counts, failed,
     check_names: job.items.filter((it) => it.check_name).map((it) => ({ n: it.n, label: it.label, file: it.key })),
+    name_differs: job.items.filter((it) => it.name_differs).map((it) => ({ n: it.n, label: it.label, file: it.key, ...it.name_differs })),
     no_key: job.items.filter((it) => it.steps.mik.code === "no_key").map((it) => ({ n: it.n, label: it.label, file: it.key })),
     key_from_db: job.items.filter((it) => it.key_source === "mik_db").map((it) => ({ n: it.n, label: it.label, file: it.key, key: it.tkey })),
     xml,
