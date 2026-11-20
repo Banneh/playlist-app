@@ -8,7 +8,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { execFile } from "child_process";
-import { buildId3v23, carriedFrames, carriedChunks, appendChunks, prependTag, readKeyInfo, id3Version } from "./id3";
+import { buildId3v23, carriedFrames, carriedChunks, appendChunks, prependTag, copyAfterTag, readKeyInfo, id3Version, infoFields, id3Names, rewriteLosses } from "./id3";
 import { listEntries, extractEntry, ZipEntry } from "./zip";
 import { checkXmlFile } from "./rbxml";
 import * as store from "./store";
@@ -1633,8 +1633,13 @@ const ID3_EXT = [".wav", ".mp3", ".aiff", ".aif"];
  *  (GEOB) and turn COMM into TXXX. The WAV/AIFF chunks ffmpeg doesn't write
  *  (Platinum Notes' PLTN, cues, bext) are carried over. flac/m4a/ogg: native tags.
  *  An mp3/aiff with no ID3v2.3/2.4 tag (none at all, ID3v2.2, ID3v1 only, AIFF text
- *  chunks only) has nothing to carry frame by frame: ffmpeg copies what it can read. */
-async function writeTags(p: string, artist: string, title: string, genre: string): Promise<void> {
+ *  chunks only) has nothing to carry frame by frame: ffmpeg copies what it can read.
+ *  `same(v, i)`: the file's own artist (0) / title (1) `v` already says the name, so that
+ *  INFO field or ID3 frame stays as it is (its spelling, every value of a multi-value
+ *  frame): Write tags in every file. The file keeps its mode, birth date and extended
+ *  attributes (Finder tags), since the new copy replaces it by rename. */
+async function writeTags(p: string, artist: string, title: string, genre: string,
+                         same?: (v: string, i: 0 | 1) => boolean): Promise<void> {
   const ext = path.extname(p).toLowerCase();
   const own = ext === ".wav" || (ID3_EXT.includes(ext) && id3Version(p) >= 3); // DJ HQ writes the ID3 tag
   const md5 = await audioMd5(p);
@@ -1643,9 +1648,14 @@ async function writeTags(p: string, artist: string, title: string, genre: string
   const args = ["-y", "-v", "error", "-i", p];
   if (ext === ".wav") {
     // the file's metadata is mapped through, so the INFO fields DJ HQ doesn't set (album,
-    // date, comment, track) stay; ffmpeg writes only INFO ids, never the ID3 frames
-    args.push("-map", "0:a", "-c", "copy",
-      ...metaArgs(artist, title, genre), "-fflags", "+bitexact", "-flags:a", "+bitexact");
+    // date, comment, track) stay; ffmpeg writes only INFO ids, never the ID3 frames. The
+    // INFO chunk's own values are handed back by id: mapped, the ID3 chunk's would win.
+    const info = infoFields(p) || [], iv = (id: string) => info.find(([k]) => k === id)?.[1].trim() || "";
+    const a = same && same(iv("IART"), 0) ? "" : artist, t = same && same(iv("INAM"), 1) ? "" : title;
+    const set = [a && "IART", t && "INAM", genre && "IGNR"];
+    args.push("-map", "0:a", "-c", "copy", ...metaArgs(a, t, genre));
+    for (const [k, v] of info) if (v && !set.includes(k)) args.push("-metadata", `${k}=${v}`);
+    args.push("-fflags", "+bitexact", "-flags:a", "+bitexact");
   } else if (own) {
     args.push("-map", "0:a", "-c", "copy", "-map_metadata", "-1");
     if (ext === ".mp3") args.push("-id3v2_version", "0");
@@ -1658,20 +1668,45 @@ async function writeTags(p: string, artist: string, title: string, genre: string
     if (key) args.push("-metadata", `TKEY=${key}`);
   }
   args.push(tmp);
-  const r = await run(FFMPEG, args, 300000);
+  // a field whose own ID3 frame says the name already is carried (mergedTag gets "")
+  const ids = own && same ? id3Names(p) : null;
+  const ia = ids && same!(ids[0], 0) ? "" : artist, it = ids && same!(ids[1], 1) ? "" : title;
+  // an mp3 with a tag of its own: the audio bytes are copied as they are (see copyAfterTag)
+  const raw = own && ext === ".mp3";
+  const r = raw ? { code: 0, stderr: "" } : await run(FFMPEG, args, 300000);
   try {
+    if (raw) copyAfterTag(p, tmp);
     if (r.code !== 0) throw appError("ffmpeg_failed", "ffmpeg: " + r.stderr.slice(0, 200), { error: r.stderr.slice(0, 200) });
-    if (own && ext === ".mp3") prependTag(tmp, mergedTag(p, artist, title, genre));
+    if (own && ext === ".mp3") prependTag(tmp, mergedTag(p, ia, it, genre));
     else if (own)
-      appendChunks(tmp, [{ id: ext === ".wav" ? "id3 " : "ID3 ", data: mergedTag(p, artist, title, genre) },
+      appendChunks(tmp, [{ id: ext === ".wav" ? "id3 " : "ID3 ", data: mergedTag(p, ia, it, genre) },
                          ...carriedChunks(p, true, true)]);
     if ((await audioMd5(tmp)) !== md5) throw appError("audio_would_change", "audio data would change, left untouched");
+    await keepFileMeta(p, tmp);
+    fs.renameSync(tmp, p);   // in here: a rename that fails (a locked file) leaves no copy behind
   } catch (e) {
     if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
     throw e;
   }
-  fs.renameSync(tmp, p);
   await refreshCache(p);
+}
+
+/** What the rename of a rewritten copy over `p` would lose: its mode, its birth date (an
+ *  earlier mtime pulls the birth time back on APFS/HFS+; then mtime becomes now) and, on
+ *  macOS, its extended attributes (Finder tags, "where from"). Best effort: never fails a write. */
+async function keepFileMeta(p: string, tmp: string): Promise<void> {
+  try {
+    const st = fs.statSync(p);
+    fs.chmodSync(tmp, st.mode & 0o7777);
+    const now = new Date();
+    if (st.birthtimeMs > 0) { fs.utimesSync(tmp, st.atime, st.birthtime); fs.utimesSync(tmp, st.atime, now); }
+  } catch { /* ignore */ }
+  if (process.platform !== "darwin") return;
+  const names = (await run("/usr/bin/xattr", [p], 10000).catch(() => null))?.stdout.split("\n").filter(Boolean) || [];
+  for (const n of names) {
+    const v = await run("/usr/bin/xattr", ["-px", n, p], 10000).catch(() => null);
+    if (v && v.code === 0) await run("/usr/bin/xattr", ["-wx", n, v.stdout.replace(/\s+/g, ""), tmp], 10000).catch(() => null);
+  }
 }
 
 function copyPreservingTimes(src: string, dst: string): void {
@@ -1795,7 +1830,8 @@ export function listAudioKeys(d: string, recursive: boolean, cap = 200000): stri
   return out;
 }
 
-export async function buildView(libArg?: Library): Promise<any> {
+/** `plans`: a tag_plan on tagged rows too (Write tags in every file); the page never needs them */
+export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}): Promise<any> {
   const gen = STATE_GEN;
   const lib = libArg || activeLib();
   let dev = STATE.device || "xdj-700";
@@ -1818,7 +1854,7 @@ export async function buildView(libArg?: Library): Promise<any> {
   if (!lib || !lib.playlist) return { ...base, ready: false };
   const away: FolderAway[] = [];
   const files = await scanLocal(lib, away);
-  if (gen !== STATE_GEN) return buildView();   // the state was replaced (an import) while the folders were scanned
+  if (gen !== STATE_GEN) return buildView(undefined, opts);   // the state was replaced (an import) while the folders were scanned
   const pl = lib.playlist;
   const genre = pl.title || "Trance";
   const fmap = new Map(files.map((f) => [f.name, f]));
@@ -1926,7 +1962,7 @@ export async function buildView(libArg?: Library): Promise<any> {
       const f = fmap.get(m[0])!;
       tagged = isTagged(f, a, ti, genre, handFields(ed));
       differs = fileDiffers(f, a, ti);
-      if (!tagged) plan = tagPlan(f, a, ti, handFields(ed), keptOver(ed, confirmed, differs));
+      if (!tagged || opts.plans) plan = tagPlan(f, a, ti, handFields(ed), keptOver(ed, confirmed, differs));
       incompat = compatReason(f.fmt, dev);
       lossy = LOSSY.test(f.fmt[0]);
       key = f.key ?? null; pn = f.pn ?? null;
@@ -1965,7 +2001,7 @@ export async function buildView(libArg?: Library): Promise<any> {
     return { name: f.name, path: f.path, incompat: compatReason(f.fmt, dev), dur: fmtDur(Math.round(f.dur)), lossy: LOSSY.test(f.fmt[0]),
              artist: xa, title: xt, edited: hand, ...differs,
              name_conf: nm.conf, name_why: look.why, name_ok: confirmed, check_name: look.check,
-             tagged, ...(tagged ? {} : { tag_plan: tagPlan(f, xa, xt, handFields(ed), keptOver(ed, confirmed, differs)) }),
+             tagged, ...(tagged && !opts.plans ? {} : { tag_plan: tagPlan(f, xa, xt, handFields(ed), keptOver(ed, confirmed, differs)) }),
              key: f.key ?? null, pn: f.pn ?? null,
              found: fnd ? { ...fnd, dur: fmtDur(fnd.dur) } : null };
   });
@@ -1994,34 +2030,91 @@ export async function buildView(libArg?: Library): Promise<any> {
 // ---------------- actions ----------------
 
 /** One file Write tags would write: its key, the edit key its name lives under, the plan
- *  (tagPlan) and the file's current artist / title. */
-interface TagTodo { key: string; edit: string; plan: TagPlan; file_artist: string; file_title: string; }
-function tagTodo(view: any): TagTodo[] {
+ *  (tagPlan), the file's current artist / title, and whether it counts as tagged. `all`:
+ *  tagged files too (a view built with plans), except one with no name at all: nothing to
+ *  write, and nothing to keep. */
+interface TagTodo { key: string; edit: string; plan: TagPlan; file_artist: string; file_title: string; tagged: boolean; hand: [boolean, boolean]; }
+function tagTodo(view: any, all = false): TagTodo[] {
   const out: TagTodo[] = [];
-  const add = (key: string, edit: string, r: any) => out.push({ key, edit, plan: r.tag_plan,
-    file_artist: r.file_artist ?? r.tag_plan.artist, file_title: r.file_title ?? r.tag_plan.title });
-  for (const r of view.tracks || []) if (r.file && r.tagged === false && r.tag_plan) add(r.file, String(r.id), r);
-  for (const e of view.extras || []) if (e.tagged === false && e.tag_plan) add(e.name, "x:" + e.path, e);
+  const add = (key: string, edit: string, r: any) => out.push({ key, edit, plan: r.tag_plan, tagged: r.tagged === true,
+    file_artist: r.file_artist ?? r.tag_plan.artist, file_title: r.file_title ?? r.tag_plan.title,
+    hand: handFields(STATE.edits[edit]) });
+  const want = (r: any) => r.tag_plan && (all ? !!(r.tag_plan.artist || r.tag_plan.title) : r.tagged === false);
+  for (const r of view.tracks || []) if (r.file && want(r)) add(r.file, String(r.id), r);
+  for (const e of view.extras || []) if (want(e)) add(e.name, "x:" + e.path, e);
   return out;
 }
+
+/** Write tags in every file (tagAll {all}): how far the run is, for GET /api/tag/progress
+ *  (the request itself only answers at the end), and its tag_report once done (a page
+ *  reloaded meanwhile picks it up there). One run at a time; while it goes every other
+ *  /api/tag (and convert / restore) is refused (tagIdle), not queued behind it for minutes. */
+export const TAG_RUN: { running: boolean; done: number; total: number; report: any } = { running: false, done: 0, total: 0, report: null };
+export function tagIdle(): void {
+  if (TAG_RUN.running) throw appError("tag_running", "tags are being written in every file; wait until that is done");
+}
+/** claimed by the route before the run is queued, so a second click finds it taken */
+export function claimTagRun(): void {
+  tagIdle();
+  Object.assign(TAG_RUN, { running: true, done: 0, total: 0, report: null });
+}
+
+/** A tagged file Write tags in every file leaves alone: DJ HQ doesn't write its tag itself
+ *  (FLAC, M4A, OGG, an ID3v2.2 or tagless MP3/AIFF: ffmpeg would rename or drop the key and
+ *  other marks), or the rewrite would drop something it holds (rewriteLosses). */
+function leaveTagged(p: string): boolean {
+  const ext = path.extname(p).toLowerCase();
+  if (!(ext === ".wav" || (ID3_EXT.includes(ext) && id3Version(p) >= 3))) return true;
+  return rewriteLosses(p).length > 0;
+}
+/** size and whole-second mtime, as dur_cache keeps them; `cached`: the entry the view (and
+ *  so the plan) was made from */
+const fileStamp = (p: string, cached = false) => {
+  if (cached) { const c = STATE.dur_cache[p]; return c ? c[0] + ":" + c[1] : "-"; }
+  try { const st = fs.statSync(p); return st.size + ":" + Math.floor(st.mtimeMs / 1000); } catch { return ""; }
+};
 
 /** Write tags. A file whose own (non-empty) artist or title would give way to a different
  *  name is only written with `replace`; with `keep_file` its names become hand edits first
  *  (so the file keeps them and only gets what it lacks); with neither it is left alone and
- *  reported (tag_report.kept). Both apply only to the replaces the user was shown (`seen`:
+ *  listed in `kept`. `replace` / `keep_file` cover only the previewed replaces (`seen`:
  *  the preview's sigs), so one that turned up meanwhile is never written over unasked. A
  *  name the user chose is written without asking. `preview` writes nothing: {writes,
  *  replaces} for the page to ask with. */
-export async function tagAll(opts: { preview?: boolean; replace?: boolean; keep_file?: boolean; seen?: string[] } = {}): Promise<any> {
-  const lib = requireLib();
-  let view = await buildView();
-  let todo = tagTodo(view);
+export async function tagAll(opts: { preview?: boolean; replace?: boolean; keep_file?: boolean; seen?: string[]; all?: boolean } = {}): Promise<any> {
+  if (!opts.all || opts.preview) return tagRun(opts);
+  try {
+    const view = await tagRun(opts);
+    TAG_RUN.report = view.tag_report;
+    return view;
+  } finally { TAG_RUN.running = false; }   // claimed by the route (claimTagRun)
+}
+/** tagAll; `all` also rewrites the files that count as tagged (with the same plans, so a file's
+ *  own spelling and a different own name are treated as above): the repair after other apps
+ *  dropped tags DJ HQ can't see missing (a WAV's INFO chunk was lost before 2.0.1 noticed).
+ *  There a field the file already says stays as it is in each of its tags, a tagged file
+ *  the rewrite would lose something in is left (`left`), and so is one that changed on disk
+ *  since its plan was made (`changed`: the run takes minutes; another app may rename meanwhile). */
+async function tagRun(opts: { preview?: boolean; replace?: boolean; keep_file?: boolean; seen?: string[]; all?: boolean }): Promise<any> {
+  const lib = requireLib(), all = !!opts.all, vo = { plans: all };
+  let left: string[] = [];
+  const list = async () => {
+    const view = await buildView(undefined, vo);
+    let todo = tagTodo(view, all);
+    if (all) {
+      left = todo.filter((x) => x.tagged && leaveTagged(libPath(lib, x.key))).map((x) => x.key);
+      todo = todo.filter((x) => !left.includes(x.key));
+    }
+    return { view, todo, stamps: new Map(all ? todo.map((x) => [x.key, fileStamp(libPath(lib, x.key), true)]) : []) };
+  };
+  let { view, todo, stamps } = await list();
   const sig = (x: TagTodo) => [x.key, x.plan.artist, x.plan.title, x.file_artist, x.file_title].join("\t");
   const seen = new Set(opts.seen || []);
   const asked = (x: TagTodo) => x.plan.replaces && !x.plan.hand;
   const shown = (x: TagTodo) => asked(x) && seen.has(sig(x));
   if (opts.preview) {
-    return { writes: todo.length, replaces: todo.filter((x) => x.plan.replaces).map((x) => ({ key: x.key, artist: x.plan.artist,
+    return { writes: todo.length, ...(all ? { left: left.length } : {}),
+      replaces: todo.filter((x) => x.plan.replaces).map((x) => ({ key: x.key, artist: x.plan.artist,
       title: x.plan.title, file_artist: x.file_artist, file_title: x.file_title, hand: x.plan.hand, sig: sig(x) })) };
   }
   let keptOwn = 0;
@@ -2033,24 +2126,32 @@ export async function tagAll(opts: { preview?: boolean; replace?: boolean; keep_
       if (a || t) { STATE.edits[x.edit] = { artist: a, title: t }; keptOwn++; }
     }
     saveState();
-    view = await buildView();
-    todo = tagTodo(view);
+    ({ view, todo, stamps } = await list());
   }
   const genre = view.genre || "Trance";
   let done = 0;
-  const errors: string[] = [], error_items: ErrorItem[] = [], kept: string[] = [];
+  const errors: string[] = [], error_items: ErrorItem[] = [], kept: string[] = [], changed: string[] = [];
+  if (all) TAG_RUN.total = todo.length;
   for (const x of todo) {
-    if (asked(x) && !(opts.replace && shown(x))) { kept.push(x.key); continue; }
-    try {
-      await writeTags(libPath(lib, x.key), x.plan.artist, x.plan.title, genre);
+    const p = libPath(lib, x.key);
+    // the file's own name may stay where it says the plan's (its spelling, all its values)
+    const want = [x.plan.artist, x.plan.title];
+    const same = all ? (v: string, i: 0 | 1) => !!v && (v === want[i] || (!x.hand[i] && looseEq(v, want[i]))) : undefined;
+    if (all) try { fs.unlinkSync(p + ".tmp" + path.extname(p)); } catch { /* none: a run cut off before leaves one */ }
+    if (asked(x) && !(opts.replace && shown(x))) kept.push(x.key);
+    else if (all && fileStamp(p) !== stamps.get(x.key)) changed.push(x.key);
+    else try {
+      await writeTags(p, x.plan.artist, x.plan.title, genre, same);
       done++;
     } catch (e: any) {
       errors.push(`${x.key}: ${e.message}`);
       error_items.push(errItem(x.key, e));
     }
+    if (all) TAG_RUN.done++;
   }
   view = await buildView();
-  view.tag_report = { done, errors, error_items, kept, kept_own: keptOwn };
+  view.tag_report = { done, errors, error_items, kept, kept_own: keptOwn,
+    ...(all ? { all: true, total: todo.length, left: left.length, changed } : {}) };
   return view;
 }
 

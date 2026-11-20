@@ -247,26 +247,59 @@ async function tagFromList(btn) {
 /** Write tags (every caller of /api/tag goes through here): a preview first, and when files
    already carry a different name of their own, the user picks which names stay. The server
    never writes over such a name without {replace} or {keep_file}, and only over the ones
-   listed here ({seen}). Names the user chose are shown too, though they need no answer. */
-async function writeTagsAsking() {
+   listed here ({seen}). Names the user chose are shown too, though they need no answer.
+   `all`: every file of the library again, tagged or not (Prepare: the repair after another
+   app damaged tags), after one confirmation that also stands in for the names-you-chose
+   question; `progress({done, total})` follows the run, which can take minutes. */
+async function writeTagsAsking(all, progress) {
+  const base = all ? { all: true } : {};
+  let poll = null;
   try {
-    const pv = await api('/api/tag', { preview: true });
-    let body = {};
-    if ((pv.replaces || []).length) {
-      const how = await tagReplaceAsk(pv.replaces);
+    const pv = await api('/api/tag', { ...base, preview: true });
+    const list = pv.replaces || [], ask = list.filter(x => !x.hand);
+    if (all && !pv.writes) return void toast(pv.left ? tn('tags.all.left', pv.left) : t('tags.all.none'));
+    if (all && !await tagAllAsk(pv.writes, ask.length, list.length - ask.length, pv.left || 0)) return;
+    let body = base;
+    if (ask.length || (!all && list.length)) {
+      const how = await tagReplaceAsk(list);
       if (!how) return;
-      const seen = pv.replaces.filter(x => !x.hand).map(x => x.sig);
-      body = how === 'keep' ? { keep_file: true, seen } : { replace: true, seen };
+      const seen = ask.map(x => x.sig);
+      body = { ...base, ...(how === 'keep' ? { keep_file: true, seen } : { replace: true, seen }) };
     }
+    if (all && progress) progress({ done: 0, total: 0 });   // busy from the click on, before the first poll answers
+    if (all && progress) poll = setInterval(() => fetch('/api/tag/progress').then(r => r.json())
+      .then(p => { if (p.running && poll) progress(p); }, () => {}), 700);
     DATA = await api('/api/tag', body);
-    const r = DATA.tag_report || {};
-    let [msg, err] = fileReport(r, 'tags.tagFailed', 'tags.tagDone');
-    // nothing written because every file kept its own name: say that, not "Tagged 0 files"
-    if (r.kept_own && !r.done && !err) msg = tn('tags.keptOwn', r.kept_own);
-    else if (r.kept_own) msg += ' ' + tn('tags.keptOwn', r.kept_own);
-    // one toast: a second would cover the first
-    toast((r.kept || []).length ? msg + ' ' + tn('tags.keptNames', r.kept.length) : msg, err || !!(r.kept || []).length);
+    tagToast(DATA.tag_report);
   } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
+  finally { clearInterval(poll); poll = null; }
+}
+/** the toast after Write tags (r: tag_report; also the one a reloaded Prepare page picks up
+    from GET /api/tag/progress when Write tags in every file ends) */
+function tagToast(r) {
+  r = r || {};
+  let [msg, err] = fileReport(r, 'tags.tagFailed', r.all ? 'tags.all.done' : 'tags.tagDone');
+  // nothing written because every file kept its own name: say that, not "Tagged 0 files"
+  if (r.kept_own && !r.done && !err) msg = tn('tags.keptOwn', r.kept_own);
+  else if (r.kept_own) msg += ' ' + tn('tags.keptOwn', r.kept_own);
+  const kept = (r.kept || []).length, changed = (r.changed || []).length;
+  if (kept) msg += ' ' + tn('tags.keptNames', kept);
+  if (r.left) msg += ' ' + tn('tags.all.left', r.left);
+  if (changed) msg += ' ' + tn('tags.all.changed', changed);
+  // one toast: a second would cover the first
+  toast(msg, err || !!kept || !!changed);
+}
+/** the one confirmation before Write tags in every file: how many, what stays (names the user
+    set count here: they get no list of their own), what is left, and Reload Tag in rekordbox.
+    Cancel is the default: Enter alone must not start minutes of rewriting. */
+function tagAllAsk(n, differ, hand, left) {
+  return uiConfirm({
+    title: tn('tags.all.title', n),
+    body: `<p>${th('tags.all.p1')}</p>
+           <p>${th('tags.all.p2')} ${hand ? tnh('tags.all.hand', hand) : th('tags.all.keep')}${differ ? ' ' + tnh('tags.all.differ', differ) : ''}${left ? ' ' + tnh('tags.all.leftAsk', left) : ''}</p>
+           <p>${th('tags.all.p3')}</p>`,
+    ok: t('tags.writeTags'), icon: 'tag', safe: true,
+  });
 }
 /** "in the file → will be written" per file; resolves 'replace', 'keep' or null (cancel).
    With only names the user chose there is nothing to decide: Write tags or Cancel. */

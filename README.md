@@ -445,6 +445,15 @@ values.
    written exactly as typed, without asking, and so is a name you kept in
    **Check names** while it showed the file's other name.
 
+   **Write tags in every file**, under those buttons, writes the names again
+   into every file of the library, also the ones that already count as
+   tagged: a repair for when another app damaged or removed tags without DJ HQ
+   noticing. The same rules apply, the audio is not touched, and the button
+   counts the files as it goes. Names a file already has stay in it as they
+   are. A tagged file whose rewrite would lose something else (FLAC, M4A, OGG,
+   some ID3v2.4 frames and INFO fields) is left as it is. Afterwards select the
+   tracks in rekordbox → right-click → *Reload Tag*.
+
    Artist and title come from the SoundCloud title: artist before the dash,
    title after it. "Premiere:", a catalogue number or vinyl side in front, and
    "Free DL" in any spelling are left out, and an en dash counts as a dash.
@@ -840,7 +849,8 @@ bodies are JSON.
 | `POST /api/assign` | `{id, file}` (`""` = no file, `null` = automatic) | pin a file to a track |
 | `POST /api/edit` | `{id, artist, title}` or `{file, artist, title}` | artist/title edit (track or local file) |
 | `POST /api/seen` | | mark all as seen |
-| `POST /api/tag` | `{preview?, replace?, keep_file?, seen?}` | write tags (adds `tag_report`; files whose own different name would be replaced are left and listed in `kept` unless `replace`, or `keep_file` makes their names hand edits first; both apply only to the previewed replaces whose `sig` is in `seen`); `preview` writes nothing and answers `{writes, replaces}` |
+| `POST /api/tag` | `{preview?, replace?, keep_file?, seen?, all?}` | write tags (adds `tag_report`; files whose own different name would be replaced are left and listed in `kept` unless `replace`, or `keep_file` makes their names hand edits first; both apply only to the previewed replaces whose `sig` is in `seen`); `preview` writes nothing and answers `{writes, replaces}`; `all` takes every library file, tagged or not (preview and `tag_report` add `left`: tagged files whose rewrite would lose something; `tag_report` also `all`, `total` and `changed`: files that changed on disk during the run), one run at a time: meanwhile every `/api/tag`, convert, restore and clean-backups is refused with code `tag_running` |
+| `GET /api/tag/progress` | | `{running, done, total, report}` of the `all` run (not queued; `report`: the last run's `tag_report`) |
 | `POST /api/convert` · `/api/restore` | | convert / restore originals (adds a report) |
 | `POST /api/find` | `{file, q?}` | SoundCloud candidates for a local file (not a view) |
 | `POST /api/found` | `{file, track \| null}` | remember / forget the picked track |

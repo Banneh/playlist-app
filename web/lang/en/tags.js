@@ -99,6 +99,42 @@ I18N.add('en', 'tags', {
     replace: 'Write DJ HQ’s names',
     keep: 'Keep the files’ names',
   },
+  all: {
+    title: {
+      one: 'Write tags again in {n} file?',
+      other: 'Write tags again in {n} files?',
+    },
+    p1: 'Artist, title and genre are written again into every file of this library, also into the ones that already count as tagged. Use it when another app has damaged or removed tags.',
+    p2: 'The audio is not touched, nor the musical key and the other marks in the tags.',
+    keep: 'Names already in the files stay as they are.',
+    hand: {
+      one: 'Names already in the files stay as they are, except in <b>{n} file</b>, which gets the name you set in DJ HQ.',
+      other: 'Names already in the files stay as they are, except in <b>{n} files</b>, which get the names you set in DJ HQ.',
+    },
+    differ: {
+      one: '<b>{n} file</b> has a different name of its own: you choose next what happens to it.',
+      other: '<b>{n} files</b> have a different name of their own: you choose next what happens to them.',
+    },
+    leftAsk: {
+      one: '<b>{n} file</b> is left as it is: its tags can’t be written again without losing something.',
+      other: '<b>{n} files</b> are left as they are: their tags can’t be written again without losing something.',
+    },
+    p3: 'Afterwards select the tracks in rekordbox → right-click → <b>Reload Tag</b>, so it reads the names again.',
+    progress: 'Writing tags… {done} / {total}',
+    done: {
+      one: 'Wrote tags again in {n} file. In rekordbox, use Reload Tag.',
+      other: 'Wrote tags again in {n} files. In rekordbox, use Reload Tag.',
+    },
+    none: 'No file has a name DJ HQ could write.',
+    left: {
+      one: '{n} file was left as it is: its tags can’t be written again without losing something.',
+      other: '{n} files were left as they are: their tags can’t be written again without losing something.',
+    },
+    changed: {
+      one: '{n} file changed on disk meanwhile and was left as it is; run it again.',
+      other: '{n} files changed on disk meanwhile and were left as they are; run it again.',
+    },
+  },
   moveIn: 'Move into library',
   upgrade: 'Upgrade',
   movedIn: 'Moved into your library',

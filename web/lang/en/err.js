@@ -64,6 +64,8 @@ I18N.add('en', 'err', {
   track_not_in_playlist: 'the track is not in the playlist',
   download_gone: '{name}: no longer in the downloads folder',
   zip_entry_missing: '{name}: not found inside {zip}',
+  tag_running: 'tags are being written in every file; wait until that is done',
+  tag_other_run: 'another run is working on the files; wait until it is done',
   checksum_failed: 'couldn’t check the audio data',
   audio_would_change: 'the audio data would change, so the file was left untouched',
   duration_changed: 'the length changed while converting, so the conversion was stopped',

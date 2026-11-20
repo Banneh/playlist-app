@@ -287,14 +287,17 @@ function dialog({ title, sub, body = '', foot = '', wide = false, open }) {
     open && open(dlg, done);
   }, { wide });
 }
-function uiConfirm({ title, body, ok = t('common.ok'), danger = false, icon: ico }) {
+/** `safe`: Cancel has the focus and Enter is no OK (a long action that touches many files) */
+function uiConfirm({ title, body, ok = t('common.ok'), danger = false, icon: ico, safe = false }) {
   return dialog({
     title: esc(title), body,
     foot: `<span class="spacer"></span><button class="btn" data-close>${esc(t('common.cancel'))}</button>
            <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-a="ok">${ico ? icon(ico) : ''}${esc(ok)}</button>`,
     open(dlg, done) {
       const okb = dlg.querySelector('[data-a=ok]');
-      okb.onclick = () => done(true); okb.focus();
+      okb.onclick = () => done(true);
+      if (safe) return void dlg.querySelector('[data-close]').focus();
+      okb.focus();
       dlg.addEventListener('keydown', e => { if (e.key === 'Enter') done(true); });
     },
   }).then(v => !!v);

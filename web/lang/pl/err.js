@@ -63,6 +63,8 @@ I18N.add('pl', 'err', {
   track_not_in_playlist: 'tego utworu nie ma na playliście',
   download_gone: '{name}: tego pliku nie ma już w folderze Pobrane',
   zip_entry_missing: '{name}: nie ma go w archiwum {zip}',
+  tag_running: 'trwa zapisywanie tagów we wszystkich plikach; poczekaj, aż się skończy',
+  tag_other_run: 'inny przebieg pracuje na plikach; poczekaj, aż się skończy',
   checksum_failed: 'nie udało się sprawdzić danych dźwięku',
   audio_would_change: 'zmieniłyby się dane dźwięku, więc plik zostawiono bez zmian',
   duration_changed: 'podczas konwersji zmieniła się długość, więc konwersję przerwano',

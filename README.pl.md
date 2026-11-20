@@ -458,6 +458,15 @@ biorą twoje wartości.
    zapisywane dokładnie tak, jak je wpisano, bez pytania. Tak samo nazwa
    zostawiona w oknie **Sprawdź nazwy**, gdy pokazywało ono inną nazwę z pliku.
 
+   **Zapisz we wszystkich plikach**, pod tymi przyciskami, zapisuje nazwy
+   jeszcze raz w każdym pliku biblioteki, także w tych, które już liczą się
+   jako otagowane: to naprawa na wypadek, gdy inna aplikacja uszkodziła albo
+   usunęła tagi, a DJ HQ tego nie zauważył. Obowiązują te same zasady, dźwięk
+   zostaje nietknięty, a przycisk na bieżąco liczy pliki. Nazwy, które plik już
+   ma, zostają w nim tak, jak są. Otagowany plik, w którym zapis straciłby coś
+   innego (FLAC, M4A, OGG, niektóre tagi ID3v2.4 i pola INFO), zostaje bez
+   zmian. Potem zaznacz utwory w rekordbox → prawy przycisk → *Reload Tag*.
+
    Wykonawca i tytuł pochodzą z tytułu na SoundCloud: wykonawca przed
    myślnikiem, tytuł po nim. „Premiere:”, numer katalogowy albo strona winylu
    na początku i „Free DL” w dowolnej pisowni są pomijane, a półpauza liczy się

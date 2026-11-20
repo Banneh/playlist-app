@@ -196,6 +196,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         return void core.buildView().then(json, (e) => json(errBody(e), 500));
       if (req.url === "/api/prefs") return json(readPrefs());
       if (req.url === "/api/do-all/status") return json(pipeline.status());   // never builds the view
+      if (req.url === "/api/tag/progress") return json(core.TAG_RUN);   // not queued: polled while the run holds the queue
       if (req.url === "/api/state/raw") {   // the saved data as state.json of DJ HQ 1.7 and older (support, going back)
         if (!localHost(req)) return send(403, "text/plain", "forbidden");   // it carries private links and paths
         return void enqueue(async () => JSON.stringify(core.STATE)).then((text) => {
@@ -255,6 +256,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         const route = (fn: () => Promise<any>) =>
           enqueue(fn).then(json, (e) => json(errBody(e), 500));
         const direct = (fn: () => Promise<any>) => void fn().then(json, (e) => json(errBody(e), 500));
+        const idle = (fn: () => Promise<any>) => { try { core.tagIdle(); } catch (e) { return json(errBody(e), 500); } return route(fn); };
         const doAll = (fn: () => Promise<any>) => core.DO_ALL_FEATURE ? direct(fn)
           : json(errBody(core.appError("do_all_feature_off", "Do everything is not enabled on this computer.")), 500);
         if (req.url === "/api/prefs") {   // not queued: must not wait behind a long tag/convert run
@@ -268,11 +270,24 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         switch (req.url) {
           case "/api/refresh":  return route(() => core.refresh());
           case "/api/rescan":   return route(() => core.buildView());
-          case "/api/tag":      return route(() => core.tagAll({ preview: !!data.preview, replace: !!data.replace, keep_file: !!data.keep_file,
-                                                             seen: Array.isArray(data.seen) ? data.seen.map(String) : [] }));
-          case "/api/convert":  return route(() => core.convertAll());
-          case "/api/restore":  return route(() => core.restoreAll());
-          case "/api/clean-backups": return route(() => core.cleanBackups());
+          case "/api/tag": {   // refused, not queued, while Write tags in every file runs (its progress: GET /api/tag/progress)
+            try {
+              core.tagIdle();
+              if (data.all && !data.preview) {
+                // not while the pipeline waits on other apps: it reads their work from the files' mtimes
+                const j = pipeline.status();
+                if (j.active || ["running", "waiting"].includes(j.job?.status))
+                  throw core.appError("tag_other_run", "another run is working on the files; wait until it is done");
+                core.claimTagRun();
+              }
+            } catch (e) { return json(errBody(e), 500); }
+            return route(() => core.tagAll({ preview: !!data.preview, replace: !!data.replace, keep_file: !!data.keep_file, all: !!data.all,
+                                             seen: Array.isArray(data.seen) ? data.seen.map(String) : [] }));
+          }
+          // the file actions are refused while Write tags in every file runs, not queued for minutes
+          case "/api/convert":  return idle(() => core.convertAll());
+          case "/api/restore":  return idle(() => core.restoreAll());
+          case "/api/clean-backups": return idle(() => core.cleanBackups());
           case "/api/library":  return route(() => core.libraryOp(data));
           case "/api/device":   return route(() => core.setDevice(data.device));
           case "/api/settings": return route(async () => {
@@ -282,7 +297,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           // not queued: the job queues its own file operations (see pipeline.ts)
           // (control stays open with the feature off: a run cut off earlier can still be cancelled)
           case "/api/do-all/detect":  return doAll(() => pipeline.detect());
-          case "/api/do-all/start":   return doAll(() => pipeline.start(data));
+          case "/api/do-all/start":   return doAll(async () => { core.tagIdle(); return pipeline.start(data); });
           case "/api/do-all/control": return direct(() => pipeline.controlJob(data));
           case "/api/do-all/access":  return doAll(() => pipeline.accessibility(data));
           case "/api/override": return route(() => core.setOverride(data));

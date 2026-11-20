@@ -315,9 +315,11 @@ const utf16 = (s: string, term = true) =>
 
 const textFrame = (id: string, text: string) => frame(id, Buffer.concat([Buffer.from([0x01]), utf16(text)]));
 
-// v2.4 frames a v2.3 reader doesn't know (TDRC is turned into TYER)
-const V24_ONLY = new Set(["ASPI", "EQU2", "RVA2", "SEIS", "SIGN", "TDEN", "TDOR", "TDRC", "TDRL",
-  "TDTG", "TIPL", "TMCL", "TMOO", "TPRO", "TSOA", "TSOP", "TSOT", "TSST"]);
+// v2.4 frames a v2.3 reader doesn't know and toV23 can't turn into one that it does
+// (TDRC/TDOR become TYER+TDAT/TORY, TIPL/TMCL IPLS, TMOO a TXXX; the sort frames TSOA/
+// TSOP/TSOT stay as they are, as iTunes writes them into v2.3 too)
+const V24_ONLY = new Set(["ASPI", "EQU2", "RVA2", "SEIS", "SIGN", "TDEN", "TDRL",
+  "TDTG", "TPRO", "TSST"]);
 // frames that hold no text-encoding byte: their bytes mean the same in v2.3
 const NO_ENCODING = /^(W(?!XXX)[A-Z0-9]{3}|PRIV|UFID|POPM|PCNT|MCDI|ETCO|MLLT|SYTC|RVRB|RBUF|AENC|LINK|POSS|ENCR|GRID|SEEK)$/;
 // text frames outside the T namespace (iTunes grouping / movement)
@@ -326,10 +328,21 @@ const TEXT_LIKE = new Set(["GRP1", "MVNM", "MVIN"]);
 /** A v2.4 frame in v2.3 form: text in encodings v2.3 lacks (UTF-8, UTF-16BE) is
  *  re-encoded as UTF-16, multiple values joined with "/". Frames whose layout we
  *  don't know are only kept when they hold no text, so nothing is written wrong. */
-function toV23(id: string, b: Buffer): Frame | null {
-  if (id === "TDRC") {
-    const y = (textValues(b)[0] || "").slice(0, 4);
-    return /^\d{4}$/.test(y) ? { id: "TYER", data: Buffer.concat([Buffer.from([0x01]), utf16(y)]) } : null;
+function toV23(id: string, b: Buffer): Frame | Frame[] | null {
+  const text = (fid: string, s: string): Frame => ({ id: fid, data: Buffer.concat([Buffer.from([0x01]), utf16(s)]) });
+  if (id === "TDRC" || id === "TDOR") {
+    const m = /^(\d{4})(?:-(\d\d)-(\d\d))?/.exec(textValues(b)[0] || "");
+    if (!m) return null;
+    if (id === "TDOR") return text("TORY", m[1]);
+    return m[2] ? [text("TYER", m[1]), text("TDAT", m[3] + m[2])] : text("TYER", m[1]);
+  }
+  if (id === "TIPL" || id === "TMCL") {   // role / name pairs: v2.3's IPLS, one list for both
+    const vals = textValues(b);
+    return vals.length ? { id: "IPLS", data: Buffer.concat([Buffer.from([0x01]), ...vals.map((s) => utf16(s))]) } : null;
+  }
+  if (id === "TMOO") {
+    const v = textValues(b).filter((s) => s).join("/");
+    return v ? { id: "TXXX", data: Buffer.concat([Buffer.from([0x01]), utf16("MOOD"), utf16(v)]) } : null;
   }
   if (V24_ONLY.has(id)) return null;
   if (NO_ENCODING.test(id)) return { id, data: b };
@@ -390,7 +403,7 @@ export function carriedFrames(p: string, drop: string[]): Frame[] {
       const b = frameData(t, f);
       if (!b) continue;
       const fr = t.head.ver === 3 ? { id: f.id, data: b } : toV23(f.id, b);
-      if (fr) out.push(fr);
+      if (fr) out.push(...[fr].flat());
     }
     return out;
   } catch {
@@ -412,6 +425,96 @@ export function id3Version(p: string): number {
   } finally {
     if (fd >= 0) try { fs.closeSync(fd); } catch { /* ignore */ }
   }
+}
+
+/** The fields of a WAV's LIST/INFO chunk (the last one, as readInfo), in order: [id, value];
+ *  only values that are valid UTF-8 (what ffmpeg writes; a Latin-1 one can't be handed back
+ *  to it as it is). null when the file has no INFO chunk. */
+export function infoFields(p: string): [string, string][] | null {
+  let fd = -1;
+  try {
+    fd = fs.openSync(p, "r");
+    const riff = walkChunks(fd);
+    let out: [string, string][] | null = null;
+    for (const c of riff && !riff.be ? riff.chunks : []) {
+      if (c.id !== "LIST" || c.size < 4 || c.size > MAX_TAG) continue;
+      const b = readAt(fd, c.off, c.size);
+      if (b.toString("latin1", 0, 4) !== "INFO") continue;
+      out = [];
+      for (let off = 4; off + 8 <= b.length;) {
+        const id = b.toString("latin1", off, off + 4), n = b.readUInt32LE(off + 4);
+        const raw = b.subarray(off + 8, Math.min(b.length, off + 8 + n)), v = raw.toString("utf8");
+        if (Buffer.from(v, "utf8").equals(raw)) out.push([id, v.replace(/\0+$/, "")]);
+        off += 8 + n + (n % 2);
+      }
+    }
+    return out;
+  } catch {
+    return null;
+  } finally {
+    if (fd >= 0) try { fs.closeSync(fd); } catch { /* ignore */ }
+  }
+}
+
+/** The first artist / title value of a file's ID3v2.3/2.4 tag (WAV/AIFF chunk or MP3
+ *  header), "" each when it has none: the frame a rewrite can carry as it is. */
+export function id3Names(p: string): [string, string] {
+  let fd = -1;
+  try {
+    fd = fs.openSync(p, "r");
+    const t = openTag(fd, walkChunks(fd));
+    const out: [string, string] = ["", ""];
+    if (t && t.head.ver >= 3) for (const f of rawFrames(t)) {
+      if (f.id !== "TPE1" && f.id !== "TIT2") continue;
+      const b = frameData(t, f, 2048), v = b && b.length ? (textValues(b)[0] || "").trim() : "";
+      const i = f.id === "TPE1" ? 0 : 1;
+      out[i] = out[i] || v;
+    }
+    return out;
+  } catch {
+    return ["", ""];
+  } finally {
+    if (fd >= 0) try { fs.closeSync(fd); } catch { /* ignore */ }
+  }
+}
+
+// the INFO ids ffmpeg's WAV muxer writes (libavformat/riff.c ff_riff_tags, IBSU excepted)
+const INFO_WRITTEN = new Set(("IARL IART IAS1 IAS2 IAS3 IAS4 IAS5 IAS6 IAS7 IAS8 IAS9 ICMS ICMT ICOP ICRD ICRP " +
+  "IDIM IDPI IENG IGNR IKEY ILGT ILNG IMED INAM IPLT IPRD IPRT ITRK ISBJ ISFT ISHP ISMP ISRC ISRF ITCH").split(" "));
+
+/** What a tag rewrite of `p` (writeTags) would drop: ID3v2.4 frames v2.3 has no form for,
+ *  INFO fields ffmpeg doesn't write back (or can't be handed as text). Write tags in every
+ *  file leaves a tagged file with any of these alone. */
+export function rewriteLosses(p: string): string[] {
+  const out = new Set<string>();
+  let fd = -1;
+  try {
+    fd = fs.openSync(p, "r");
+    const riff = walkChunks(fd), t = openTag(fd, riff);
+    if (t && t.head.ver === 4) for (const f of rawFrames(t)) {
+      const b = frameData(t, f);
+      if (b && !toV23(f.id, b)) out.add(f.id);
+    }
+    for (const c of riff && !riff.be ? riff.chunks : []) {
+      if (c.id !== "LIST" || c.size < 4 || c.size > MAX_TAG) continue;
+      const b = readAt(fd, c.off, c.size);
+      if (b.toString("latin1", 0, 4) !== "INFO") continue;
+      for (let off = 4; off + 8 <= b.length;) {
+        const id = b.toString("latin1", off, off + 4), n = b.readUInt32LE(off + 4);
+        const raw = b.subarray(off + 8, Math.min(b.length, off + 8 + n));
+        if (!INFO_WRITTEN.has(id) || !Buffer.from(raw.toString("utf8"), "utf8").equals(raw)) out.add(id);
+        off += 8 + n + (n % 2);
+      }
+    }
+    if (!riff) {   // an MP3's trailing tags, which the rewrite doesn't write again
+      const size = fs.fstatSync(fd).size, end = readAt(fd, Math.max(0, size - 160), Math.min(size, 160));
+      if (end.length >= 128 && end.toString("latin1", end.length - 128, end.length - 125) === "TAG") out.add("ID3v1");
+      if (end.includes("APETAGEX", 0, "latin1")) out.add("APE");
+    }
+  } catch { /* unreadable: nothing known to lose */ } finally {
+    if (fd >= 0) try { fs.closeSync(fd); } catch { /* ignore */ }
+  }
+  return [...out];
 }
 
 /** An ID3v2.3 tag: title, artist and genre (when given) followed by `keep`. */
@@ -498,6 +601,26 @@ export function appendChunks(p: string, chunks: Chunk[]): void {
     fs.writeSync(fd, head, 0, 4, 4);
   } finally {
     fs.closeSync(fd);
+  }
+}
+
+/** Copy an MP3 without its leading ID3v2 tag: every byte after the tag as it is. ffmpeg's
+ *  stream copy would write the first (Xing/Info) frame anew and lose its delay and padding
+ *  values, which shifts the audio a few milliseconds under the beat grids of a DJ program. */
+export function copyAfterTag(p: string, dst: string): void {
+  const src = fs.openSync(p, "r");
+  let out = -1;
+  try {
+    const h = Buffer.alloc(10);
+    let off = 0;
+    if (fs.readSync(src, h, 0, 10, 0) === 10 && h.toString("latin1", 0, 3) === "ID3")
+      off = 10 + ((h[6] & 0x7f) << 21 | (h[7] & 0x7f) << 14 | (h[8] & 0x7f) << 7 | (h[9] & 0x7f)) + (h[5] & 0x10 ? 10 : 0);
+    out = fs.openSync(dst, "w");
+    const buf = Buffer.alloc(4 * 1024 * 1024);
+    for (let n; (n = fs.readSync(src, buf, 0, buf.length, off)) > 0; off += n) fs.writeSync(out, buf, 0, n);
+  } finally {
+    fs.closeSync(src);
+    if (out >= 0) fs.closeSync(out);
   }
 }
 

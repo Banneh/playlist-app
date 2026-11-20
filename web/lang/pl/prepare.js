@@ -26,6 +26,9 @@ I18N.add('pl', 'prepare', {
     allDoneTip: 'Każdy plik ma już tagi',
     checkTip: 'Przejrzyj po kolei wątpliwe nazwy: zostaw, zamień albo edytuj',
     checkAllTip: 'Przejrzyj po kolei wszystkie nazwy',
+    all: 'Zapisz we wszystkich plikach',
+    allTip: 'Zapisz nazwy jeszcze raz w każdym pliku, także w otagowanych: naprawa po tym, jak inna aplikacja uszkodziła tagi',
+    noFilesTip: 'W bibliotece nie ma jeszcze plików',
   },
   compat: {
     title: 'Zgodność z odtwarzaczem',

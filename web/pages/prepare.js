@@ -37,8 +37,9 @@ PAGES.prepare = {
   sub: () => th('prepare.sub'),
   search: false,
   body: () => {
-    const dev = ppDevice(), n = DATA.untagged || 0, c = DATA.incompatible || 0, b = DATA.backups || 0, nc = DATA.name_checks || 0;
+    const dev = ppDevice(), n = DATA.untagged || 0, files = DATA.local_count || 0, c = DATA.incompatible || 0, b = DATA.backups || 0, nc = DATA.name_checks || 0;
     const rows = ppAttention();
+    ppAllResume();   // once: a run started before a reload
     const deviceCard = `
       <div class="card pp-device">
         <div class="card-icon pp-inline-icon">${icon('disc')}</div>
@@ -60,8 +61,10 @@ PAGES.prepare = {
             ? `${icon('alert')}<span>${tnh('prepare.tags.names', nc)}</span>`
             : `${icon('checkCircle')}<span>${th('prepare.tags.noNames')}</span>`}</div>
           <div class="card-acts">
-            <button class="btn ${n ? 'btn-primary' : ''}" id="pp-tag" onclick="ppTag()" ${n ? '' : 'disabled'} title="${esc(t(n ? 'prepare.tags.writeTip' : 'prepare.tags.allDoneTip'))}">${icon('tag')}${esc(t('tags.writeTags'))}${n ? ` ${badge(n)}` : ''}</button>
+            <button class="btn ${n ? 'btn-primary' : ''}" id="pp-tag" onclick="ppTag()" ${n && !PP_ALL ? '' : 'disabled'} title="${esc(t(n ? 'prepare.tags.writeTip' : 'prepare.tags.allDoneTip'))}">${icon('tag')}${esc(t('tags.writeTags'))}${n ? ` ${badge(n)}` : ''}</button>
             <button class="btn" onclick="openCheckNames('${nc ? 'check' : 'all'}')" title="${esc(t(nc ? 'prepare.tags.checkTip' : 'prepare.tags.checkAllTip'))}">${icon('listMusic')}${esc(t('names.title'))}${nc ? ` ${badge(nc)}` : ''}</button>
+            <span class="pp-break"></span><button class="btn btn-sm btn-ghost pp-again" id="pp-tag-all" onclick="ppTagAll()" ${PP_ALL || PP_ALL_ASKING || !files ? 'disabled' : ''}
+            title="${esc(t(files ? 'prepare.tags.allTip' : 'prepare.tags.noFilesTip'))}">${PP_ALL ? spin(ppAllText()) : icon('refresh') + esc(t('prepare.tags.all'))}</button>
           </div>
         </div>
         <div class="card">
@@ -70,8 +73,8 @@ PAGES.prepare = {
           <div class="pp-num">${c ? `<button class="big link" onclick="HFILTER='convert';go('have')" title="${esc(t('prepare.showOnHave'))}">${c}<small>${tnh('prepare.compat.toConvert', c)}</small></button>` : tag(t('prepare.compat.ready'), 'ok', 'check')}</div>
           <p>${c ? (dev.label ? tnh('prepare.compat.wontPlay', c, { player: dev.label }) : tnh('prepare.compat.wontPlayAny', c)) + ' ' : ''}${th('prepare.compat.text')}</p>
           <div class="card-acts">
-            <button class="btn ${c ? 'btn-primary' : ''}" id="pp-convert" onclick="ppConvert()" ${c ? '' : 'disabled'} title="${esc(t(c ? 'prepare.compat.convertTip' : 'prepare.compat.allOkTip'))}">${icon('sliders')}${esc(t('prepare.compat.convert'))}${c ? ` ${badge(c)}` : ''}</button>
-            <button class="btn" id="pp-restore" onclick="ppRestore()" ${b ? '' : 'disabled'} title="${esc(t(b ? 'prepare.compat.restoreTip' : 'prepare.compat.noRestoreTip'))}">${icon('history')}${esc(t('prepare.compat.restore'))}${b ? ` ${badge(b)}` : ''}</button>
+            <button class="btn ${c ? 'btn-primary' : ''}" id="pp-convert" onclick="ppConvert()" ${c && !PP_ALL ? '' : 'disabled'} title="${esc(PP_ALL ? errText({ code: 'tag_running' }) : t(c ? 'prepare.compat.convertTip' : 'prepare.compat.allOkTip'))}">${icon('sliders')}${esc(t('prepare.compat.convert'))}${c ? ` ${badge(c)}` : ''}</button>
+            <button class="btn" id="pp-restore" onclick="ppRestore()" ${b && !PP_ALL ? '' : 'disabled'} title="${esc(PP_ALL ? errText({ code: 'tag_running' }) : t(b ? 'prepare.compat.restoreTip' : 'prepare.compat.noRestoreTip'))}">${icon('history')}${esc(t('prepare.compat.restore'))}${b ? ` ${badge(b)}` : ''}</button>
           </div>
         </div>
         <div class="card">
@@ -114,6 +117,35 @@ async function ppTag() {
   ppBusy('#pp-tag', t('tags.writingTags'));
   await writeTagsAsking();   // pages/playlist.js: asks before a file's own name is replaced
   render();
+}
+/** Write tags in every file: null, or {done, total} while it runs (kept here so a re-render keeps the count) */
+let PP_ALL = null, PP_ALL_ASKING = false, PP_ALL_LOOKED = false;
+const ppAllText = () => PP_ALL && PP_ALL.total
+  ? t('tags.all.progress', { done: I18N.num(PP_ALL.done), total: I18N.num(PP_ALL.total) }) : t('tags.writingTags');
+const ppAllShow = p => { PP_ALL = p; const b = $('#pp-tag-all'); if (b) b.innerHTML = spin(ppAllText()); };
+async function ppTagAll() {
+  if (PP_ALL || PP_ALL_ASKING) return;   // a double click: one preview, one dialog, one run
+  PP_ALL_ASKING = true;
+  const b = $('#pp-tag-all'); if (b) b.disabled = true;
+  try {
+    await writeTagsAsking(true, p => { if (!PP_ALL) { PP_ALL = p; render(); } else ppAllShow(p); });
+  } finally { PP_ALL_ASKING = false; PP_ALL = null; render(); }
+}
+/** The page was reloaded (or opened anew) while a run goes on the server: follow its count,
+    and when it ends show its report from GET /api/tag/progress and the fresh view. */
+function ppAllResume() {
+  if (PP_ALL_LOOKED) return;
+  PP_ALL_LOOKED = true;
+  const get = () => fetch('/api/tag/progress').then(r => r.json());
+  get().then(async p => {
+    if (!p.running || PP_ALL || PP_ALL_ASKING) return;
+    PP_ALL = p; render();
+    while (p.running) { await new Promise(r => setTimeout(r, 700)); p = await get().catch(() => p); if (p.running) ppAllShow(p); }
+    PP_ALL = null;
+    try { DATA = await api('/api/rescan'); } catch {}
+    render();
+    if (p.report) tagToast(p.report);
+  }, () => {});
 }
 async function ppConvert() {
   const c = DATA.incompatible || 0;

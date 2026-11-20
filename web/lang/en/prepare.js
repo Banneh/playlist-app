@@ -26,6 +26,9 @@ I18N.add('en', 'prepare', {
     allDoneTip: 'Every file is already tagged',
     checkTip: 'Go through the doubtful names one by one: keep, swap or edit',
     checkAllTip: 'Go through every name one by one',
+    all: 'Write tags in every file',
+    allTip: 'Write the names again into every file, also the tagged ones: a repair after another app damaged tags',
+    noFilesTip: 'No files in the library yet',
   },
   compat: {
     title: 'Player compatibility',

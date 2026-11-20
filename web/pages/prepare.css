@@ -12,6 +12,11 @@
 .pp-cards .card { display: flex; flex-direction: column; min-height: 0; }
 .pp-cards .card p { flex: 1; }
 .pp-cards .card .card-acts { margin-top: 16px; }
+/* Write tags in every file: the quiet third action, on a line of its own under the two buttons */
+.pp-cards .card .pp-break { flex-basis: 100%; height: 0; }
+.pp-cards .card .pp-again { margin: -4px 0 -6px -10px; max-width: calc(100% + 10px); }
+/* a narrow card (900 px window): the label wraps inside the card instead of running out of it */
+.pp-cards .card .pp-again { height: auto; min-height: var(--ctl-sm); padding-block: 5px; white-space: normal; text-align: left; line-height: 1.25; }
 .pp-num { display: flex; align-items: center; min-height: 32px; margin: 6px 0 8px; }
 .pp-num .big { display: inline-flex; align-items: baseline; }
 .pp-num button.big { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; border-radius: var(--r-sm); }
