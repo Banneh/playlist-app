@@ -16,7 +16,7 @@ I18N.add('en', 'err', {
   link_is_likes: 'this library follows a Likes page; add a new library for a playlist',
   link_is_playlist: 'this library follows a playlist; add a new library for a Likes page',
   folder_in_library: 'this folder is already part of the library',
-  folder_inside: '{dir} is inside {parent}, which is already part of the library – turn on “Include subfolders” instead',
+  folder_inside: '{dir} is inside {parent}, which is already part of the library. Turn on “Include subfolders” instead',
   folder_contains: '{child} is inside {dir}; a library folder can’t contain another one',
   folder_other_library: 'this folder already belongs to the library “{name}”',
   main_folder_fixed: 'the main folder can’t be removed; remove the library instead',
@@ -24,7 +24,7 @@ I18N.add('en', 'err', {
   link_missing: 'this library has no SoundCloud link yet; set it with Change link… in Settings',
 
   // reading SoundCloud
-  sc_offline: 'couldn’t reach SoundCloud – is the internet connection working? ({error})',
+  sc_offline: 'couldn’t reach SoundCloud. Is the internet connection working? ({error})',
   http_status: 'SoundCloud answered {status} for {url}',
   sc_unreachable: 'couldn’t connect to SoundCloud',
   likes_unreadable: 'couldn’t read the likes page (is the profile public?)',
@@ -36,8 +36,8 @@ I18N.add('en', 'err', {
 
   // the signed-in SoundCloud account (Discover, Add, the heart)
   sc_page_failed: 'the SoundCloud page couldn’t send the request: {error}',
-  sc_signed_out: 'SoundCloud signed you out – sign in again on the Discover page',
-  sc_captcha: 'SoundCloud wants to check you are human – open Discover and solve the check there first',
+  sc_signed_out: 'SoundCloud signed you out. Sign in again on the Discover page',
+  sc_captcha: 'SoundCloud wants to check you are human. Open Discover and solve the check there first',
   sc_refused: 'SoundCloud refused this (403 on {where})',
   sc_refused_detail: 'SoundCloud refused this (403 on {where}): {detail}',
   sc_not_found: 'SoundCloud couldn’t find that ({where})',

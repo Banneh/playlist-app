@@ -6,7 +6,7 @@ I18N.add('en', 'prepare', {
   sub: 'Get your files ready for rekordbox and the players at the club.',
   device: {
     title: 'Target player',
-    text: 'Files are checked against this player’s limits — sample rate and bit depth — so what you copy to the USB stick actually plays.',
+    text: 'Files are checked against this player’s limits (sample rate and bit depth), so what you copy to the USB stick plays.',
   },
   showOnHave: 'Show these files on the Have page',
   tags: {
@@ -16,7 +16,7 @@ I18N.add('en', 'prepare', {
       other: 'files need tags',
     },
     allTagged: 'All files tagged',
-    text: 'Artist and title are written into each file — that’s what rekordbox shows as the track names.',
+    text: 'Artist and title are written into each file, and rekordbox shows them as the track names.',
     names: {
       one: '<b>{n} name</b> to check before you write tags: artist and title may be the wrong way round or split in the wrong place.',
       other: '<b>{n} names</b> to check before you write tags: artist and title may be the wrong way round or split in the wrong place.',
@@ -76,7 +76,7 @@ I18N.add('en', 'prepare', {
       one: 'Convert {n} file for your player?',
       other: 'Convert {n} files for your player?',
     },
-    p1: 'Files are converted in place — same file name and length — so rekordbox keeps your hot cues and beat grids.',
+    p1: 'Files are converted in place, with the same file name and length, so rekordbox keeps your hot cues and beat grids.',
     p2: 'The untouched originals are backed up first to:',
     dataFolder: 'the app data folder',
   },
@@ -85,8 +85,8 @@ I18N.add('en', 'prepare', {
     other: 'Converted {done}, {n} files failed: {err}',
   },
   convertDone: {
-    one: 'Converted {n} file — originals backed up',
-    other: 'Converted {n} files — originals backed up',
+    one: 'Converted {n} file, originals backed up',
+    other: 'Converted {n} files, originals backed up',
   },
   restoreAsk: {
     title: {
@@ -110,9 +110,9 @@ I18N.add('en', 'prepare', {
     title: 'rekordbox playlist exported',
     none: 'No libraries with a fetched playlist yet.',
     lead: 'In rekordbox:',
-    s1: 'Open <b>Preferences → Advanced → Database</b> and, under <b>rekordbox xml</b>, browse to the file above.',
+    s1: 'Open <b>Preferences > Advanced > Database</b> and, under <b>rekordbox xml</b>, browse to the file above.',
     s2: 'A <b>rekordbox xml</b> item appears in the tree on the left.',
     s3: 'Right-click the playlist in it and choose <b>Import Playlist</b>.',
-    after: 'Tracks already in your collection keep their cues and grids. Export again any time — the file path stays the same, so rekordbox picks up the changes on the next import.',
+    after: 'Tracks already in your collection keep their cues and grids. Export again any time. The file path stays the same, so rekordbox picks up the changes on the next import.',
   },
 });

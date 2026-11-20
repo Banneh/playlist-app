@@ -25,15 +25,15 @@ I18N.add('en', 'tour', {
     },
     discover: {
       title: 'Discover: SoundCloud inside DJ HQ',
-      text: 'soundcloud.com, right here. Sign in once, listen to what it suggests, and the bar above the page adds or likes what you hear with one click. Clicking a cover on any list plays the track there.',
+      text: 'The SoundCloud website inside the app. Sign in once and listen to its suggestions. The bar above the page adds or likes the track you are listening to with one click. Clicking a cover on any list plays the track there.',
     },
     new: {
       title: 'New: what changed',
-      text: 'Tracks added to the playlist and files that arrived in your folder collect here until you press Mark all as seen. Your to-do list for tagging and importing.',
+      text: 'Tracks added to the playlist and files that arrived in your folder collect here until you press Mark all as seen. Use it as your to-do list for tagging, converting and importing into rekordbox.',
     },
     inbox: {
       title: 'Downloads',
-      text: 'DJ HQ watches your Downloads folder. A download that matches a playlist track shows up here, one click away from your library. Nothing is renamed. A lossless file for a track you only have as MP3 offers an upgrade.',
+      text: 'DJ HQ watches your Downloads folder. A download that matches a playlist track shows up here, and one click moves it into your library. Nothing is renamed. A lossless file for a track you only have as MP3 offers an upgrade.',
     },
     extras: {
       title: 'Not in playlist',
@@ -45,7 +45,7 @@ I18N.add('en', 'tour', {
     },
     doall: {
       title: 'Do everything',
-      text: 'One click for the whole chain: the new downloads move into your library, get their tags, go through Platinum Notes and Mixed In Key, and land with their keys in your rekordbox XML. Switch it on and set it up in Settings; it needs both apps on this computer.',
+      text: 'One click for all the steps: the new downloads move into your library, get their tags, go through Platinum Notes and Mixed In Key, and land with their keys in your rekordbox XML. Switch it on and set it up in Settings; it needs both apps on this computer.',
     },
     refresh: {
       title: 'Always up to date',

@@ -5,7 +5,7 @@ I18N.add('pl', 'setup', {
   go: 'Zaczynamy',
   downloads: {
     title: 'Gdzie trafiają pobrane pliki',
-    text: 'DJ HQ obserwuje ten folder. Pobrany plik, który pasuje do utworu z playlisty, pojawia się na stronie Pobrane – jedno kliknięcie dzieli go od twojej biblioteki.',
+    text: 'DJ HQ obserwuje ten folder. Pobrany plik, który pasuje do utworu z playlisty, pojawia się na stronie Pobrane i jednym kliknięciem przeniesiesz go do biblioteki.',
     change: 'Zmień…',
     placeholder: '/ścieżka/do/folderu',
     use: 'Użyj tego folderu',
@@ -15,7 +15,7 @@ I18N.add('pl', 'setup', {
   },
   player: {
     title: 'Odtwarzacz, na którym grasz',
-    text: 'Pliki są sprawdzane pod kątem ograniczeń tego odtwarzacza, więc to, co skopiujesz na pamięć USB, naprawdę zagra. Nie masz pewności albo nie grasz na sprzęcie Pioneer? Zostaw pierwszy: jest najbardziej wymagający, a to, co przyjmie, zagra wszędzie.',
+    text: 'Pliki są sprawdzane pod kątem ograniczeń tego odtwarzacza, więc to, co skopiujesz na pamięć USB, zagra. Nie masz pewności albo nie grasz na sprzęcie Pioneer? Zostaw pierwszy: jest najbardziej wymagający, a to, co przyjmie, zagra wszędzie.',
     label: 'Docelowy odtwarzacz',
   },
   folder: {

@@ -153,7 +153,7 @@ I18N.add('pl', 'config', {
   imNoFiles: 'Zaimportuj na razie bibliotekę {name} bez plików',
   imNoFilesHint: 'Skopiuj muzykę do folderu później. Dopóki nie potwierdzisz, że kopiowanie jest zakończone, DJ HQ zachowuje każde dopasowanie i podpina je pod pliki w miarę, jak się pojawiają.',
   imReplaceOk: 'Zastąp biblioteki na tym komputerze',
-  imReplaceHint: 'Ich dopasowania, zmienione nazwy i oznaczenia zostaną zastąpione tymi z pliku. Najpierw zostanie zapisana kopia bieżących danych – w folderze backups w folderze danych DJ HQ.',
+  imReplaceHint: 'Ich dopasowania, zmienione nazwy i oznaczenia zostaną zastąpione tymi z pliku. Najpierw zostanie zapisana kopia bieżących danych, w podfolderze backups folderu danych DJ HQ.',
   imMachineOpt: 'Użyj też folderu Pobrane i konfiguracji funkcji Zrób wszystko z drugiego komputera',
   imMachineOptNoDa: 'Użyj też folderu Pobrane z drugiego komputera',
   imMachineHint: 'Używane są tylko ścieżki, które istnieją na tym komputerze. Przydaje się, gdy przywracasz kopię na tym samym komputerze.',
@@ -170,7 +170,7 @@ I18N.add('pl', 'config', {
   imDoneWaiting: '<b>{name}</b> czeka na muzykę w {dir}. Skopiuj tam pliki, a dopasowania pójdą za nimi.',
   imDoneBackup: 'Dane sprzed importu są zapisane w {file}.',
   imDoneLink: 'Jedna z bibliotek nie ma jeszcze linku SoundCloud: otwórz Ustawienia i wklej go przez „Zmień link…”.',
-  imDoneDoAll: 'Programy używane przez Zrób wszystko i plik XML rekordbox nie są częścią pliku: otwórz Ustawienia → Zrób wszystko → Skonfiguruj…, żeby znaleźć je na tym komputerze.',
+  imDoneDoAll: 'Programy używane przez Zrób wszystko i plik XML rekordbox nie są częścią pliku. Żeby znaleźć je na tym komputerze, otwórz Ustawienia i na karcie Zrób wszystko kliknij „Skonfiguruj…”.',
   imFailed: 'Nie udało się zaimportować: {error}',
   // after "na" / "Na" in imFrom and imWasPlatform (locative)
   imPlatform: { darwin: 'Macu', win32: 'Windows', linux: 'Linuksie' },

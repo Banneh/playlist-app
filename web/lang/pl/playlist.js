@@ -1,8 +1,8 @@
 /* DJ HQ strings: playlist, Polish. Owner: job B. */
 I18N.add('pl', 'playlist', {
   status: {
-    have: 'Mam – plik jest w moim folderze',
-    missing: 'Brak – muszę go jeszcze zdobyć',
+    have: 'Mam: plik jest w moim folderze',
+    missing: 'Brak: muszę go jeszcze zdobyć',
     na: 'Teraz niedostępny na SoundCloud',
     naHint: 'Ukryty na stronie Brakujące, dopóki nie pojawi się link do pobrania lub do sklepu',
     autoHint: 'Niech zdecyduje dopasowanie pliku',
@@ -67,7 +67,7 @@ I18N.add('pl', 'playlist', {
       few: 'Kopiuj {n} linki',
       many: 'Kopiuj {n} linków',
     },
-    copyTip: 'Kopiuj „Wykonawca – Tytuł ⇥ link” dla każdego widocznego utworu, po jednym w wierszu (najpierw link do sklepu, jeśli jest)',
+    copyTip: 'Kopiuj „Wykonawca - Tytuł ⇥ link” dla każdego widocznego utworu, po jednym w wierszu (najpierw link do sklepu, jeśli jest)',
     noNamesLeft: 'Nie ma tu już nazw do sprawdzenia.',
     nothingTitle: 'Niczego nie brakuje',
     nothingText: 'Wszystkie utwory z playlisty są w twoim folderze z muzyką.',

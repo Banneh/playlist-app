@@ -3,7 +3,7 @@ I18N.add('en', 'welcome', {
   title: 'Welcome to DJ HQ',
   lead: 'Keep your music folder in sync with a SoundCloud playlist, and get it ready for rekordbox and the club.',
   connect: 'Connect library',
-  connecting: 'Connecting — fetching the playlist…',
+  connecting: 'Connecting and fetching the playlist…',
   or: 'or',
   tour: 'Take a one-minute tour first',
   feat: {
@@ -49,6 +49,6 @@ I18N.add('en', 'welcome', {
   // /api/state failed at launch
   loadError: {
     title: 'Couldn’t load your library',
-    perm: '<b>macOS is blocking access to your music folder.</b> Open System Settings → Privacy & Security → Files and Folders, allow DJ HQ, then try again.',
+    perm: '<b>macOS is blocking access to your music folder.</b> Open System Settings > Privacy & Security > Files and Folders, allow DJ HQ, then try again.',
   },
 });

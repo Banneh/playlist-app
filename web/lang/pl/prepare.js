@@ -4,7 +4,7 @@ I18N.add('pl', 'prepare', {
   sub: 'Przygotuj pliki dla rekordbox i odtwarzaczy w klubie.',
   device: {
     title: 'Docelowy odtwarzacz',
-    text: 'Pliki są sprawdzane pod kątem ograniczeń tego odtwarzacza – częstotliwości próbkowania i głębi bitowej – żeby to, co skopiujesz na pamięć USB, naprawdę zagrało.',
+    text: 'Pliki są sprawdzane pod kątem ograniczeń tego odtwarzacza (częstotliwości próbkowania i głębi bitowej), żeby to, co skopiujesz na pamięć USB, zagrało.',
   },
   showOnHave: 'Pokaż te pliki na stronie Mam',
   tags: {
@@ -15,7 +15,7 @@ I18N.add('pl', 'prepare', {
       many: 'plików wymaga tagów',
     },
     allTagged: 'Wszystkie pliki mają tagi',
-    text: 'Wykonawca i tytuł są zapisywane w każdym pliku – to właśnie rekordbox pokazuje jako nazwy utworów.',
+    text: 'Wykonawca i tytuł są zapisywane w każdym pliku, a rekordbox pokazuje je jako nazwy utworów.',
     names: {
       one: '<b>{n} nazwa</b> do sprawdzenia przed zapisaniem tagów: wykonawca i tytuł mogą być zamienione miejscami albo podzielone w złym miejscu.',
       few: '<b>{n} nazwy</b> do sprawdzenia przed zapisaniem tagów: wykonawca i tytuł mogą być zamienione miejscami albo podzielone w złym miejscu.',
@@ -81,7 +81,7 @@ I18N.add('pl', 'prepare', {
       few: 'Przekonwertować {n} pliki na twój odtwarzacz?',
       many: 'Przekonwertować {n} plików na twój odtwarzacz?',
     },
-    p1: 'Pliki są konwertowane na miejscu – z tą samą nazwą i długością – więc rekordbox zachowa twoje punkty hot cue i siatki beatów.',
+    p1: 'Pliki są konwertowane na miejscu, z tą samą nazwą i długością, więc rekordbox zachowa twoje punkty hot cue i siatki beatów.',
     p2: 'Najpierw nietknięte oryginały trafiają do kopii zapasowej w:',
     dataFolder: 'folder danych aplikacji',
   },
@@ -91,9 +91,9 @@ I18N.add('pl', 'prepare', {
     many: 'Przekonwertowano: {done}, nie udało się przekonwertować {n} plików: {err}',
   },
   convertDone: {
-    one: 'Przekonwertowano {n} plik – oryginały mają kopię zapasową',
-    few: 'Przekonwertowano {n} pliki – oryginały mają kopię zapasową',
-    many: 'Przekonwertowano {n} plików – oryginały mają kopię zapasową',
+    one: 'Przekonwertowano {n} plik. Oryginał ma kopię zapasową',
+    few: 'Przekonwertowano {n} pliki. Oryginały mają kopię zapasową',
+    many: 'Przekonwertowano {n} plików. Oryginały mają kopię zapasową',
   },
   restoreAsk: {
     title: {
@@ -120,9 +120,9 @@ I18N.add('pl', 'prepare', {
     title: 'Wyeksportowano playlistę rekordbox',
     none: 'Nie ma jeszcze bibliotek z wczytaną playlistą.',
     lead: 'W rekordbox:',
-    s1: 'Otwórz <b>Preferences → Advanced → Database</b> i w sekcji <b>rekordbox xml</b> wskaż powyższy plik.',
+    s1: 'Otwórz <b>Preferences > Advanced > Database</b> i w sekcji <b>rekordbox xml</b> wskaż powyższy plik.',
     s2: 'W drzewie po lewej pojawi się pozycja <b>rekordbox xml</b>.',
     s3: 'Kliknij prawym przyciskiem playlistę w tej pozycji i wybierz <b>Import Playlist</b>.',
-    after: 'Utwory, które są już w twojej kolekcji, zachowają punkty cue i siatki. Eksportuj ponownie, kiedy chcesz – ścieżka pliku się nie zmienia, więc rekordbox wczyta zmiany przy następnym imporcie.',
+    after: 'Utwory, które są już w twojej kolekcji, zachowają punkty cue i siatki. Eksportuj ponownie, kiedy chcesz. Ścieżka pliku się nie zmienia, więc rekordbox wczyta zmiany przy następnym imporcie.',
   },
 });

@@ -1,12 +1,12 @@
 /* DJ HQ strings: extras, English (the source). Owner: job B.
    The Not in playlist page and the Find on SoundCloud dialog. */
 I18N.add('en', 'extras', {
-  noArtist: 'No artist yet — add one',
+  noArtist: 'No artist yet: add one',
   noArtistTip: 'Add the artist so the search and the tags are right',
-  foundTip: 'Found on SoundCloud — click to pick a different track',
+  foundTip: 'Found on SoundCloud. Click to pick a different track',
   addToPlaylist: 'Add to playlist',
-  addTip: 'Add the track to the playlist on SoundCloud — the file is matched right away',
-  addOpenTip: 'Open the track on SoundCloud and add it to the playlist there — the file is matched automatically afterwards',
+  addTip: 'Add the track to the playlist on SoundCloud. The file is matched right away',
+  addOpenTip: 'Open the track on SoundCloud and add it to the playlist there. The file is matched automatically afterwards',
   findTip: 'Search SoundCloud for this file',
   resetTip: 'Back to the values taken from the file name',
   resetDone: 'Back to the values from the file name',
@@ -20,7 +20,7 @@ I18N.add('en', 'extras', {
     sub: '<b>{name}</b> · {dur}. Pick the matching track, then add it to the playlist on SoundCloud.',
     browserTip: 'Search in your browser instead',
     matched: 'File matched to playlist track #{num}',
-    found: 'Found — now add it to the playlist on SoundCloud',
+    found: 'Found. Now add it to the playlist on SoundCloud',
   },
   forgotten: 'Match forgotten',
   findAll: {
@@ -40,13 +40,13 @@ I18N.add('en', 'extras', {
     notOnSc: '{n} not on SoundCloud',
     failed: '{n} failed: {err}',
     button: 'Find all',
-    tip: 'Search SoundCloud for every file at once — sure matches are filled in, the rest are left for you',
+    tip: 'Search SoundCloud for every file at once. Sure matches are filled in; the rest are left for you to pick',
   },
   sub: {
     allIn: 'Every file in your music folder is in the playlist',
     some: {
-      one: '{n} local file isn’t in the playlist. Find it on SoundCloud and add it to the playlist there — it’s matched automatically afterwards.',
-      other: '{n} local files aren’t in the playlist. Find each one on SoundCloud and add it to the playlist there — it’s matched automatically afterwards.',
+      one: '{n} local file isn’t in the playlist. Find it on SoundCloud and add it to the playlist there. It’s matched automatically afterwards.',
+      other: '{n} local files aren’t in the playlist. Find each one on SoundCloud and add it to the playlist there. It’s matched automatically afterwards.',
     },
     found: '<b>{n}</b> found, waiting to be added.',
   },

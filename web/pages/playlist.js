@@ -185,7 +185,7 @@ function openAssign(id) {
     .sort((a, b) => b.s - a.s || a.name.localeCompare(b.name));
   dialog({
     title: th('playlist.assign.title'),
-    sub: th('playlist.assign.sub', { name: (tr.artist ? tr.artist + ' – ' : '') + tr.title, dur: tr.dur }),
+    sub: th('playlist.assign.sub', { name: (tr.artist ? tr.artist + ' - ' : '') + tr.title, dur: tr.dur }),
     body: `<div class="search" style="width:100%"><span>${icon('search')}</span><input id="af-q" type="search" placeholder="${esc(t('playlist.assign.filter'))}" spellcheck="false"></div>
            <div class="optlist" id="af-list" style="margin-top:10px"></div>`,
     foot: `${tr.pinned || tr.manual_match ? `<button class="btn btn-ghost" data-a="auto" title="${esc(t('playlist.assign.autoTip'))}">${icon('wand')}${esc(t('playlist.assign.auto'))}</button>` : ''}
@@ -220,7 +220,7 @@ function openAssign(id) {
 /* ---------- copy links ---------- */
 function copyLinks() {
   const rows = LAST_ROWS.filter(r => r.links.length);
-  copyText(rows.map(r => `${r.artist} – ${r.title}\t${r.links[0].url}`).join('\n'), tn('playlist.copiedLinks', rows.length));
+  copyText(rows.map(r => `${r.artist} - ${r.title}\t${r.links[0].url}`).join('\n'), tn('playlist.copiedLinks', rows.length));
 }
 
 /* ---------- "files still need tags" notice + one-click tagging from the playlist pages ---------- */

@@ -15,7 +15,7 @@ function exFileLine(f) {
 function exFoundLine(f, i) {
   const fd = f.found; if (!fd) return '';
   return `<div class="t-file found link ex-found" onclick="openFind(${i})" title="${esc(t('extras.foundTip'))}"><span class="ic">${icon('cloud')}</span><span class="fn">${
-    esc(fd.user)} – ${esc(fd.title)}</span><span class="ex-dur">${esc(typeof fd.dur === 'number' ? fmtSecs(fd.dur) : fd.dur)}</span></div>`;
+    esc(fd.user)} - ${esc(fd.title)}</span><span class="ex-dur">${esc(typeof fd.dur === 'number' ? fmtSecs(fd.dur) : fd.dur)}</span></div>`;
 }
 function exRow(f, i) {
   if ('x' + i === EDIT_ID) return `
@@ -89,7 +89,7 @@ function exCandidate(c, k) {
   if (k === 0 && c.score >= 0.75) tags.push(tag(t('tags.find.bestMatch'), 'accent', 'check'));
   if (c.in_playlist) tags.push(tag(t('tags.find.inPlaylist', { num: c.in_playlist }), 'warn', 'listMusic', t('tags.find.inPlaylistTip')));
   return `<button class="opt" data-k="${k}">${icon('cloud', 'lead')}
-    <span class="opt-main"><span class="fn">${esc(c.user)} – ${esc(c.title)}</span>
+    <span class="opt-main"><span class="fn">${esc(c.user)} - ${esc(c.title)}</span>
     <span class="fi"><span>${esc(fmtSecs(c.dur))} · ${esc(durDiff(c.dur_diff))} · ${esc(t('tags.pctMatch', { pct: Math.round(c.score * 100) }))}</span>${tags.join('')}</span></span>
   </button>`;
 }

@@ -24,7 +24,7 @@ I18N.add('en', 'app', {
     notFetched: 'Playlist not fetched yet',
     dirMore: '{dir} + {n} more',
     withSubfolders: '(including subfolders)',
-    adding: 'Adding library — fetching the playlist…',
+    adding: 'Adding the library and fetching the playlist…',
     connected: 'Library connected',
     added: 'Library added',
     addFailed: 'Couldn’t add the library: {msg}',
@@ -34,7 +34,7 @@ I18N.add('en', 'app', {
     removed: 'Library removed',
     rescanned: 'Folders rescanned',
     add: 'Add library',
-    addHint: 'Add a music folder + playlist',
+    addHint: 'Add a music folder and a playlist',
     options: 'Library options',
   },
 
@@ -60,8 +60,8 @@ I18N.add('en', 'app', {
     refreshedDiff: 'Playlist and folder refreshed · {diff}',
     updated: 'Playlist updated: {diff}',
     fetchFailed: 'Couldn’t fetch the playlist: {msg}',
-    reavailable: 'Back in Missing — a link appeared: {names}',
-    reavailableMore: 'Back in Missing — a link appeared: {names} and {n} more',
+    reavailable: 'Back in Missing after a link appeared: {names}',
+    reavailableMore: 'Back in Missing after a link appeared: {names} and {n} more',
   },
 
   // the page head
@@ -87,12 +87,12 @@ I18N.add('en', 'app', {
   update: {
     ghStatus: 'GitHub answered {status}',
     noRelease: 'no release found',
-    upToDate: 'You’re up to date — DJ HQ {version}',
+    upToDate: 'You’re up to date: DJ HQ {version}',
     available: 'DJ HQ {version} is available',
     failed: 'Couldn’t check for updates: {msg}',
     isOut: '<b>DJ HQ {version} is out</b>',
     directText: 'Download it and install it over this version. Your library and settings stay.',
-    pageText: 'See what changed and grab the new version on GitHub.',
+    pageText: 'See what changed and download the new version on GitHub.',
     download: 'Download {version}',
     openPage: 'Open release page',
   },
@@ -107,9 +107,9 @@ I18N.add('en', 'app', {
   // data safety notices on top of every page
   safety: {
     folderMissing: '<b>This library’s folder isn’t available:</b> <b>{dir}</b>. Plug in the drive, let the cloud folder sync, or put the folder back where it was. Until then its tracks show as missing, and your matches and “new” marks are kept.',
-    folderUnreadable: '<b>DJ HQ isn’t allowed to read this library’s folder:</b> <b>{dir}</b>. Allow access to it (on a Mac: System Settings → Privacy & Security → Files and Folders), then look again. Your matches and “new” marks are kept meanwhile.',
+    folderUnreadable: '<b>DJ HQ isn’t allowed to read this library’s folder:</b> <b>{dir}</b>. Allow access to it (on a Mac: System Settings > Privacy & Security > Files and Folders), then look again. Your matches and “new” marks are kept meanwhile.',
     folderEmpty: '<b>This library’s folder lists no audio files:</b> <b>{dir}</b>. A cloud folder may not have synced yet. Your matches and “new” marks are kept until the files are back.',
-    folderWaiting: '<b>This library is waiting for its music files:</b> <b>{dir}</b>. It was imported before the music was copied here. Copy the files into the folder; every match is kept and follows its file as it arrives. Once the copy is complete, say so, and matches whose file still isn’t there are dropped.',
+    folderWaiting: '<b>This library is waiting for its music files:</b> <b>{dir}</b>. It was imported before the music was copied here. Copy the files into the folder. Every match is kept and follows its file as it arrives. Once the copy is complete, say so, and matches whose file still isn’t there are dropped.',
     filesReady: 'The copy is complete',
     filesReadyHint: 'Drop the matches whose file still isn’t in the folder',
     filesReadyTitle: 'Is the music copy complete?',

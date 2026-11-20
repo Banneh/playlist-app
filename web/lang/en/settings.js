@@ -26,7 +26,7 @@ I18N.add('en', 'settings', {
     removeFolderHint: 'Stop scanning this folder (the files stay where they are)',
     addFolderPh: 'Add another folder to this library…',
     addFolder: 'Add folder',
-    subfoldersHint: 'Also look inside the folders within each library folder. Off, only files directly in a library folder count. Files in subfolders show up as <i>subfolder/file</i>.',
+    subfoldersHint: 'Also look inside the folders within each library folder. When this is off, only files directly in a library folder count. Files in subfolders show up as <i>subfolder/file</i>.',
     changeLinkHint: 'Point this library at another SoundCloud link, e.g. the share link of the playlist once it is private',
   },
 
@@ -138,7 +138,7 @@ I18N.add('en', 'settings', {
   // Change link…
   link: {
     title: 'Change the SoundCloud link',
-    sub: 'Made the playlist private? Paste the link from Share on SoundCloud. Matches, edits and everything else in the library stay as they are; if the new link misses tracks the library has, you are asked first.',
+    sub: 'Made the playlist private? Paste the link from Share on SoundCloud. Matches, edits and everything else in the library stay as they are. If the new link misses tracks the library has, you are asked first.',
     label: 'SoundCloud link',
     hint: 'A public playlist link, or a private playlist’s share link: https://soundcloud.com/you/sets/your-playlist/s-…',
     use: 'Use this link',

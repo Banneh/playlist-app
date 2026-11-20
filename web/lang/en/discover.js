@@ -40,7 +40,7 @@ I18N.add('en', 'discover', {
     space: 'Space',
     inLikes: 'In your Likes',
     inPlaylist: 'In the playlist',
-    captcha: 'SoundCloud wants to check you are human. Solve the check on the page below; playing from lists, Add and the heart work again once it is gone.',
+    captcha: 'SoundCloud wants to check you are human. Solve the check on the page below. Once it is gone, playing from lists, Add and the heart work again.',
   },
 
   // the bottom bar while SoundCloud plays
@@ -61,7 +61,7 @@ I18N.add('en', 'discover', {
 
   toast: {
     gone: 'This track is no longer on SoundCloud',
-    notStarted: 'SoundCloud didn’t start the track — open Discover to see why',
+    notStarted: 'SoundCloud didn’t start the track. Open Discover to see why',
     unreachable: 'Couldn’t reach SoundCloud: {msg}',
     nothingPlaying: 'Nothing is playing yet',
     nothingToPlay: 'Nothing to play on this page yet',
@@ -71,10 +71,10 @@ I18N.add('en', 'discover', {
     cantAdd: 'Can’t add from here',
     alreadyLikes: 'Already in your Likes',
     alreadyPlaylist: 'Already in the playlist',
-    added: 'Added “{title}” — it’s in Missing now',
-    addedTrack: 'Added the track — it’s in Missing now',
-    addedLiked: 'Added “{title}” and liked it — it’s in Missing now',
-    addedLikedTrack: 'Added the track and liked it — it’s in Missing now',
+    added: 'Added “{title}”. It’s in Missing now',
+    addedTrack: 'Added the track. It’s in Missing now',
+    addedLiked: 'Added “{title}” and liked it. It’s in Missing now',
+    addedLikedTrack: 'Added the track and liked it. It’s in Missing now',
     likeFailed: 'Added “{title}”, but liking it failed: {msg}',
     likeFailedTrack: 'Added the track, but liking it failed: {msg}',
     removed: 'Removed “{title}”',
@@ -115,12 +115,12 @@ I18N.add('en', 'discover', {
         h: 'Keys',
         t1: '<kbd>Space</kbd> plays and pauses, <kbd>←</kbd> and <kbd>→</kbd> jump 10 seconds back or forward, <kbd>N</kbd> and <kbd>P</kbd> go to the next or previous track in SoundCloud’s queue.',
         t2: '<kbd>A</kbd> adds the playing track to the playlist (to your Likes for a Likes library), <kbd>L</kbd> likes or unlikes it.',
-        t3: 'They work whether you last clicked the bar or the SoundCloud page, as long as you aren’t typing in a field, and on every other page while the bar at the bottom is up.',
+        t3: 'They work whether you last clicked the bar or the SoundCloud page, unless you are typing in a field. They also work on every other page while the bar at the bottom is up.',
       },
       s3: {
         h: 'The bar at the bottom',
-        t1: 'Click a cover on any list and the track starts on SoundCloud without leaving the list. The bar at the bottom shows it, with play / pause, previous and next, a seek line you can click or drag, the heart and <b>Add</b>; the cloud button opens the page the track is on.',
-        t2: 'Leaving Discover while something plays keeps it playing; the same bar takes over. Its <b>×</b> pauses and hides it.',
+        t1: 'Click a cover on any list and the track starts on SoundCloud without leaving the list. The bar at the bottom shows it, with play / pause, previous and next, a seek line you can click or drag, the heart and <b>Add</b>. The cloud button opens the page the track is on.',
+        t2: 'If you leave Discover while something plays, it keeps playing and the same bar takes over. Its <b>×</b> pauses and hides it.',
         t3: 'It is the same bar that plays files from your folders: one thing plays at a time, so starting a file pauses SoundCloud and starting a track stops the file.',
       },
       s4: {
@@ -141,14 +141,14 @@ I18N.add('en', 'discover', {
       },
       s2: {
         h: 'Good to know',
-        t1: 'The likes list is cached for a few minutes; <b>Refresh</b> on the page reads it from SoundCloud again.',
+        t1: 'The likes list is cached for a few minutes. <b>Refresh</b> on the page reads it from SoundCloud again.',
         t2: 'A Likes library (a playlist link that ends in /likes) is this list by definition, so Add is hidden there.',
       },
     },
     artwork: {
       name: 'Artwork',
-      text: 'Click it to hear the track: it plays on SoundCloud inside DJ HQ while you stay on the list, and the bar at the bottom controls it. <b>Opening tracks</b> in Settings switches that to your browser.',
+      text: 'Click it to hear the track: it plays on SoundCloud inside DJ HQ while you stay on the list. The bar at the bottom controls it. <b>Opening tracks</b> in Settings switches that to your browser.',
     },
-    missingTip: 'Click a cover to hear the track first, without leaving the list; <b>Play</b> and <b>Open on Discover</b> sit in every row’s ⋯ menu as well.',
+    missingTip: 'Click a cover to hear the track first, without leaving the list. <b>Play</b> and <b>Open on Discover</b> sit in every row’s ⋯ menu as well.',
   },
 });

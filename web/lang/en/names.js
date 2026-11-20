@@ -39,7 +39,7 @@ I18N.add('en', 'names', {
   noneText: 'Every name has something that confirms it, or you decided it already. <b>All names</b> goes through every track one by one.',
   uploadedBy: 'Uploaded by',
   noArtist: 'none',
-  byHand: 'You set this name by hand; it wins over what DJ HQ reads.',
+  byHand: 'You set this name by hand, so it wins over what DJ HQ reads.',
   resetTip: 'Forget your choice for this name',
   keys: 'Enter keeps it · S swaps · E edits · F takes the file’s · → skip · ← back · Esc closes',
   inFile: 'In the file now',

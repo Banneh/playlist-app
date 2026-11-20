@@ -1,6 +1,6 @@
 /* DJ HQ strings: workthrough, Polish. Owner: job B. */
 I18N.add('pl', 'workthrough', {
-  parked: 'Odłożono jako niedostępny – wróci, gdy pojawi się link',
+  parked: 'Odłożono jako niedostępny. Wróci, gdy pojawi się link',
   moved: {
     one: 'przeniesiono {n} plik',
     few: 'przeniesiono {n} pliki',

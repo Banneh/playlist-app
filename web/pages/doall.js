@@ -484,7 +484,7 @@ function daReportHtml(j) {
     `<button class="btn btn-sm" onclick="daCheckNames()">${icon('listMusic')}${daT('repNamesBtn')}</button>`);
   if ((r.name_differs || []).length) out += sec(daNh('repDiffers', r.name_differs.length),
     `<p>${daT('repDiffersHelp')}</p><ul class="da-ul">${r.name_differs.map(f => `<li>${daHtml('repDiffersRow', { label: esc(f.label),
-      file: esc([f.file_artist, f.file_title].filter(Boolean).join(' – ')) })}</li>`).join('')}</ul>`,
+      file: esc([f.file_artist, f.file_title].filter(Boolean).join(' - ')) })}</li>`).join('')}</ul>`,
     `<button class="btn btn-sm" onclick="daCheckNames()">${icon('listMusic')}${daT('repNamesBtn')}</button>`);
   if ((r.no_key || []).length) out += sec(daNh('repNoKey', r.no_key.length),
     `<p>${daT('repNoKeyHelp')}</p><ul class="da-ul">${r.no_key.map(f => `<li>${esc(f.label)}</li>`).join('')}</ul>`);

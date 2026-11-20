@@ -24,7 +24,7 @@ I18N.add('pl', 'app', {
     notFetched: 'Playlista nie jest jeszcze wczytana',
     dirMore: '{dir} + jeszcze {n}',
     withSubfolders: '(z podfolderami)',
-    adding: 'Dodawanie biblioteki – wczytywanie playlisty…',
+    adding: 'Dodawanie biblioteki i wczytywanie playlisty…',
     connected: 'Połączono bibliotekę',
     added: 'Dodano bibliotekę',
     addFailed: 'Nie udało się dodać biblioteki: {msg}',
@@ -64,8 +64,8 @@ I18N.add('pl', 'app', {
     refreshedDiff: 'Odświeżono playlistę i folder · {diff}',
     updated: 'Zaktualizowano playlistę: {diff}',
     fetchFailed: 'Nie udało się wczytać playlisty: {msg}',
-    reavailable: 'Z powrotem na stronie Brakujące – pojawił się link: {names}',
-    reavailableMore: 'Z powrotem na stronie Brakujące – pojawił się link: {names} i jeszcze {n}',
+    reavailable: 'Z powrotem na stronie Brakujące (pojawił się link): {names}',
+    reavailableMore: 'Z powrotem na stronie Brakujące (pojawił się link): {names} i jeszcze {n}',
   },
 
   // the page head
@@ -91,7 +91,7 @@ I18N.add('pl', 'app', {
   update: {
     ghStatus: 'GitHub odpowiedział kodem {status}',
     noRelease: 'nie znaleziono żadnego wydania',
-    upToDate: 'Masz najnowszą wersję – DJ HQ {version}',
+    upToDate: 'Masz najnowszą wersję: DJ HQ {version}',
     available: 'Dostępna jest nowa wersja: DJ HQ {version}',
     failed: 'Nie udało się sprawdzić aktualizacji: {msg}',
     isOut: '<b>Jest nowa wersja: DJ HQ {version}</b>',
@@ -111,13 +111,13 @@ I18N.add('pl', 'app', {
   // data safety notices on top of every page
   safety: {
     folderMissing: '<b>Folder tej biblioteki jest niedostępny:</b> <b>{dir}</b>. Podłącz dysk, poczekaj, aż folder w chmurze się zsynchronizuje, albo przywróć folder tam, gdzie był. Do tego czasu jego utwory są pokazywane jako brakujące, a twoje dopasowania i oznaczenia „nowe” zostają zachowane.',
-    folderUnreadable: '<b>DJ HQ nie ma dostępu do folderu tej biblioteki:</b> <b>{dir}</b>. Zezwól na dostęp (na Macu: Ustawienia systemowe → Prywatność i ochrona → Pliki i foldery), a potem sprawdź jeszcze raz. Do tego czasu twoje dopasowania i oznaczenia „nowe” zostają zachowane.',
+    folderUnreadable: '<b>DJ HQ nie ma dostępu do folderu tej biblioteki:</b> <b>{dir}</b>. Zezwól na dostęp (na Macu: Ustawienia systemowe > Prywatność i ochrona > Pliki i foldery), a potem sprawdź jeszcze raz. Do tego czasu twoje dopasowania i oznaczenia „nowe” zostają zachowane.',
     folderEmpty: '<b>W folderze tej biblioteki nie ma plików audio:</b> <b>{dir}</b>. Folder w chmurze mógł się jeszcze nie zsynchronizować. Twoje dopasowania i oznaczenia „nowe” zostają zachowane, dopóki pliki nie wrócą.',
-    folderWaiting: '<b>Ta biblioteka czeka na swoje pliki z muzyką:</b> <b>{dir}</b>. Została zaimportowana, zanim muzyka została tu skopiowana. Skopiuj pliki do folderu; każde dopasowanie zostaje zachowane i trafi do swojego pliku, gdy ten się pojawi. Gdy kopiowanie się skończy, daj znać – dopasowania, których pliku nadal nie ma, zostaną usunięte.',
+    folderWaiting: '<b>Ta biblioteka czeka na swoje pliki z muzyką:</b> <b>{dir}</b>. Została zaimportowana, zanim muzyka została tu skopiowana. Skopiuj pliki do folderu. Każde dopasowanie zostaje zachowane i trafi do swojego pliku, gdy ten się pojawi. Gdy kopiowanie się skończy, daj znać, a dopasowania, których pliku nadal nie ma, zostaną usunięte.',
     filesReady: 'Kopiowanie zakończone',
     filesReadyHint: 'Usuń dopasowania, których pliku nadal nie ma w folderze',
     filesReadyTitle: 'Czy kopiowanie muzyki jest zakończone?',
-    filesReadyBody: 'Dopasowania plików, których nadal nie ma w folderach biblioteki, zostaną usunięte, tak jak przy każdym pliku, który zniknął. Pliki, które pojawią się później, zostaną dopasowane ponownie – przez DJ HQ albo przez ciebie.',
+    filesReadyBody: 'Dopasowania plików, których nadal nie ma w folderach biblioteki, zostaną usunięte, tak jak przy każdym pliku, który zniknął. Pliki, które pojawią się później, zostaną ponownie dopasowane przez DJ HQ albo przez ciebie.',
     filesReadyOk: 'Tak, zakończone',
     filesReadyDone: 'Biblioteka jest kompletna',
     linkMissing: '<b>Ta biblioteka nie ma jeszcze linku SoundCloud.</b> Została zaimportowana bez niego, więc playlista nie jest sprawdzana pod kątem zmian. Wszystko inne działa na liście utworów z pliku.',

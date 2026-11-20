@@ -699,7 +699,7 @@ const SC_DISCOVER = "https://soundcloud.com/discover";
 export type ScTransport = (method: string, url: string, headers: Record<string, string>, body?: string) => Promise<{ status: number; body: string }>;
 let scTransport: ScTransport | null = null;
 /** what every SoundCloud action says while the bot check is up in the view (see main.ts) */
-export const SC_CAPTCHA = "SoundCloud wants to check you are human — open Discover and solve the check there first";
+export const SC_CAPTCHA = "SoundCloud wants to check you are human. Open Discover and solve the check there first";
 export const scCaptchaError = () => appError("sc_captcha", SC_CAPTCHA);
 /** a 403's body is DataDome's challenge: {"url":"https://geo.captcha-delivery.com/captcha/?…"} */
 export const scCaptchaBody = (txt: string) => /captcha-delivery\.com/i.test(String(txt || ""));
@@ -741,7 +741,7 @@ async function scFetch(method: string, pathAndQuery: string, token?: string | nu
     const where = `${method} ${pathAndQuery.split("?")[0]}`;
     const detail = txt.replace(/\s+/g, " ").trim().slice(0, 160);
     console.error(`soundcloud ${status} on ${where}: ${txt.slice(0, 600)}`);
-    if (status === 401) throw appError("sc_signed_out", "SoundCloud signed you out — sign in again on the Discover page");
+    if (status === 401) throw appError("sc_signed_out", "SoundCloud signed you out. Sign in again on the Discover page");
     if (status === 403 && token && scTransport && scCaptchaBody(txt)) throw scCaptchaError();   // refused in the view: solvable there
     if (status === 403) throw appError(detail ? "sc_refused_detail" : "sc_refused", `SoundCloud refused this (403 on ${where})${detail ? ": " + detail : ""}`, { where, detail });
     if (status === 404) throw appError("sc_not_found", `SoundCloud could not find that (${where})`, { where });
@@ -1952,7 +1952,7 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
     if (naRec) {
       if (have || naRec.sig !== linksSig(links)) {
         delete STATE.na[String(t.id)]; naDirty = true;
-        if (!have) reavailable.push(`${a} – ${ti}`);
+        if (!have) reavailable.push(`${a} - ${ti}`);
       } else na = true;
     }
     let tagged: boolean | null = null, incompat: string | null = null, lossy = false;
@@ -2396,7 +2396,7 @@ export async function libraryOp(data: any): Promise<any> {
     const d = userDir(data.dir);
     for (const x of libDirs(lib)) {
       if (sameDir(x, d)) throw appError("folder_in_library", "this folder is already part of the library");
-      if (insideDir(d, x)) throw appError("folder_inside", `${d} is inside ${x}, which is already part of the library — turn on "Include subfolders" instead`, { dir: d, parent: x });
+      if (insideDir(d, x)) throw appError("folder_inside", `${d} is inside ${x}, which is already part of the library. Turn on "Include subfolders" instead`, { dir: d, parent: x });
       if (insideDir(x, d)) throw appError("folder_contains", `${x} is inside ${d}; a library folder cannot contain another one`, { dir: d, child: x });
     }
     for (const other of libs)

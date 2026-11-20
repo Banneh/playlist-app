@@ -89,7 +89,7 @@ I18N.add('pl', 'settings', {
   // the Backups card
   backups: {
     title: 'Kopie zapasowe',
-    text: 'Zanim plik zostanie przekonwertowany, jego nietknięty oryginał trafia tutaj – razem z plikami MP3 zastąpionymi przez bezstratne pobrane pliki. To właśnie te pliki przywraca „Przywróć oryginały”.',
+    text: 'Zanim plik zostanie przekonwertowany, jego nietknięty oryginał trafia tutaj, razem z plikami MP3 zastąpionymi przez bezstratne pobrane pliki. Te pliki przywraca „Przywróć oryginały”.',
     cleanHint: 'Usuń wszystkie kopie zapasowe tej biblioteki',
     nothingHint: 'Nie ma nic do wyczyszczenia',
     clean: 'Wyczyść kopie zapasowe…',
@@ -138,7 +138,7 @@ I18N.add('pl', 'settings', {
   // Change link…
   link: {
     title: 'Zmiana linku SoundCloud',
-    sub: 'Playlista jest teraz prywatna? Wklej link z przycisku Share (udostępnianie) na SoundCloud. Dopasowania, zmienione nazwy i cała reszta biblioteki zostają bez zmian; jeśli pod nowym linkiem brakuje utworów, które są w bibliotece, najpierw pojawi się pytanie.',
+    sub: 'Playlista jest teraz prywatna? Wklej link z przycisku Share (udostępnianie) na SoundCloud. Dopasowania, zmienione nazwy i cała reszta biblioteki zostają bez zmian. Jeśli pod nowym linkiem brakuje utworów, które są w bibliotece, najpierw pojawi się pytanie.',
     label: 'Link SoundCloud',
     hint: 'Link do publicznej playlisty albo link udostępniania prywatnej playlisty: https://soundcloud.com/ty/sets/twoja-playlista/s-…',
     use: 'Użyj tego linku',

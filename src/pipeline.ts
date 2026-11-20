@@ -81,7 +81,7 @@ export const TEXT: Record<string, string> = {
   move_failed: "Couldn't move it: {error}",
   file_gone: "The file is no longer in the library.",
   already_tagged: "Tags already right.",
-  name_in_file: "The file already has a different name ({file_artist} – {file_title}), so DJ HQ didn't write over it. Open Check names to choose which one is right.",
+  name_in_file: "The file already has a different name ({file_artist} - {file_title}), so DJ HQ didn't write over it. Open Check names to choose which one is right.",
   tag_failed: "Couldn't write the tags: {error}",
   already_processed: "Platinum Notes has processed it before.",
   pn_unsupported_format: "Platinum Notes doesn't take this file type.",
@@ -89,7 +89,7 @@ export const TEXT: Record<string, string> = {
   pn_left_as_is: "Platinum Notes left this file as it is: it has most likely processed it before. DJ HQ can't read its mark in this file type.",
   retagged: "Files whose artist, title or genre were lost in Platinum Notes and Mixed In Key, written again by DJ HQ: {n}.",
   retag_failed: "Couldn't write the tags again after Platinum Notes and Mixed In Key ({file}): {error}. Write tags on Prepare for player can do it later.",
-  retag_name_differs: "After Platinum Notes and Mixed In Key, {file} has a name DJ HQ didn't write ({file_artist} – {file_title}), so DJ HQ left it. Open Check names to choose which one is right.",
+  retag_name_differs: "After Platinum Notes and Mixed In Key, {file} has a name DJ HQ didn't write ({file_artist} - {file_title}), so DJ HQ left it. Open Check names to choose which one is right.",
   retag_failed_all: "Couldn't write the tags again after Platinum Notes and Mixed In Key: {error}. Write tags on Prepare for player can do it later.",
   pn_no_mark: "Platinum Notes reports it processed this file, but the file doesn't carry its mark. Check that it is set to “Replace original files”.",
   mik_unsupported_format: "Mixed In Key doesn't take this file type.",
@@ -110,7 +110,7 @@ export const TEXT: Record<string, string> = {
   rb_xml_not_utf8: "The rekordbox XML file has text that isn't stored as UTF-8, so DJ HQ left it alone: {path}. Export it again from rekordbox.",
   rb_xml_in_use: "Another program had the rekordbox XML file open, so nothing was written. Try again in a moment.",
   rb_added: "Added to the rekordbox XML.",
-  rb_updated: "Its key in the rekordbox XML was updated ({from} → {to}).",
+  rb_updated: "Its key in the rekordbox XML was changed (before: {from}, now: {to}).",
   rb_listed: "Already in the rekordbox XML; it is in the {playlist} playlist.",
   // job
   interrupted: "DJ HQ was closed while this run was going. Resume it, or dismiss it.",
@@ -431,8 +431,8 @@ export async function start(data: any): Promise<any> {
     return {
       preview: true, include_pending: includePending,
       moves: p.moves.length, pending: p.pending.length,
-      move_files: p.moves.map((m) => ({ file: m.file, zip: m.zip, id: m.id, label: `${m.artist} – ${m.title}`, action: m.action })),
-      pending_files: p.pending.map((f) => ({ key: f.key, label: `${f.artist} – ${f.title}`, pn: f.pn, key_tag: f.tkey, check_name: f.check_name })),
+      move_files: p.moves.map((m) => ({ file: m.file, zip: m.zip, id: m.id, label: `${m.artist} - ${m.title}`, action: m.action })),
+      pending_files: p.pending.map((f) => ({ key: f.key, label: `${f.artist} - ${f.title}`, pn: f.pn, key_tag: f.tkey, check_name: f.check_name })),
       // which files each app takes (by extension), so the dialog can say how many go where
       accepts: { pn: DEPS.apps.accepts("pn"), mik: DEPS.apps.accepts("mik") },
       blockers: block.map((c) => extra[c] || msg(c)), setup: core.doAllStatus(),
@@ -442,9 +442,9 @@ export async function start(data: any): Promise<any> {
   const pend = (): Record<FileStep, ItemStep> => ({ move: { state: "pending" }, tag: { state: "pending" }, pn: { state: "pending" }, mik: { state: "pending" }, xml: { state: "pending" } });
   const items: Item[] = [];
   for (const m of p.moves)
-    items.push({ n: items.length + 1, label: `${m.artist} – ${m.title}`, source: { file: m.file, zip: m.zip }, key: null, path: null, track_id: m.id, steps: pend() });
+    items.push({ n: items.length + 1, label: `${m.artist} - ${m.title}`, source: { file: m.file, zip: m.zip }, key: null, path: null, track_id: m.id, steps: pend() });
   for (const f of p.pending) {
-    const it: Item = { n: items.length + 1, label: `${f.artist} – ${f.title}`, source: null, key: f.key, path: f.path, track_id: f.track_id, steps: pend() };
+    const it: Item = { n: items.length + 1, label: `${f.artist} - ${f.title}`, source: null, key: f.key, path: f.path, track_id: f.track_id, steps: pend() };
     setItem(it, "move", "skipped", "in_library");
     items.push(it);
   }
@@ -639,7 +639,7 @@ async function stepTag(st: StepRec): Promise<void> {
     const f = it.key ? info.get(it.key) : undefined;
     if (!f) { setItem(it, "tag", "failed", "file_gone"); continue; }
     it.path = f.path; it.check_name = f.check_name; it.track_id = it.track_id ?? f.track_id;
-    it.label = `${f.artist} – ${f.title}`;
+    it.label = `${f.artist} - ${f.title}`;
     if (f.tagged || !f.plan) {
       it.tagged_as = nameSig(f.artist, f.title);
       it.tagged_names = [f.file_artist || f.artist, f.file_title || f.title];
@@ -1069,7 +1069,7 @@ async function stepXml(st: StepRec): Promise<void> {
   }
   const byPath = new Map<string, { code: string; vars?: Record<string, unknown> }>();
   for (const x of w.added) byPath.set(x.path, { code: "rb_added" });
-  for (const x of w.updated) byPath.set(x.path, { code: "rb_updated", vars: { from: x.from || "–", to: x.to } });
+  for (const x of w.updated) byPath.set(x.path, { code: "rb_updated", vars: { from: x.from || "-", to: x.to } });
   for (const x of w.existing) byPath.set(x.path, { code: "rb_listed", vars: { playlist: OWNED_PLAYLIST } });
   for (const it of todo) if (it.steps.xml.state === "running") {
     const r = it.path ? byPath.get(it.path) : undefined;

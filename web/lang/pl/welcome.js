@@ -3,7 +3,7 @@ I18N.add('pl', 'welcome', {
   title: 'Witaj w DJ HQ',
   lead: 'Utrzymuj folder z muzyką w zgodzie z playlistą na SoundCloud i przygotuj go do rekordbox i do grania w klubie.',
   connect: 'Połącz bibliotekę',
-  connecting: 'Łączenie – wczytywanie playlisty…',
+  connecting: 'Łączenie i wczytywanie playlisty…',
   or: 'albo',
   tour: 'Zacznij od minutowego oprowadzania',
   feat: {
@@ -11,7 +11,7 @@ I18N.add('pl', 'welcome', {
     missingText: 'Brakujące utwory z linkami do darmowego pobrania lub do sklepu',
     boothTitle: 'Gotowe do grania',
     boothText: 'Zapisuje tagi i konwertuje pliki dla odtwarzaczy Pioneer',
-    rbTitle: 'Prosto do rekordbox',
+    rbTitle: 'Do rekordbox',
     rbText: 'Eksportuje playlistę do rekordbox',
   },
   privacy: 'Wszystko zostaje na tym komputerze. Nic nie jest wysyłane.',
@@ -41,7 +41,7 @@ I18N.add('pl', 'welcome', {
     text: 'Playlista nie została jeszcze wczytana z SoundCloud. Wczytaj ją teraz, aby zobaczyć, które utwory są już w twoim folderze, a których wciąż brakuje.',
     fetch: 'Wczytaj playlistę',
     changeLinkHint: 'Ustaw dla tej biblioteki inny link SoundCloud, np. link udostępniania prywatnej playlisty',
-    hintPublic: 'Playlista musi być <b>publiczna</b>, a jeśli jest prywatna – połączona linkiem z przycisku <b>Share</b> (udostępnianie) na SoundCloud. <b>Zmień link…</b> pozwala go podmienić.',
+    hintPublic: 'Playlista musi być <b>publiczna</b> albo, jeśli jest prywatna, połączona linkiem z przycisku <b>Share</b> (udostępnianie) na SoundCloud. <b>Zmień link…</b> pozwala go podmienić.',
     hintNet: 'Pierwsze wczytanie wymaga połączenia z internetem. Potem zmiany są sprawdzane automatycznie co 15 minut.',
     hintFolder: 'Folder z muzyką: {path}',
   },
@@ -49,6 +49,6 @@ I18N.add('pl', 'welcome', {
   // /api/state failed at launch
   loadError: {
     title: 'Nie udało się wczytać biblioteki',
-    perm: '<b>macOS blokuje dostęp do folderu z muzyką.</b> Otwórz Ustawienia systemowe → Prywatność i ochrona → Pliki i foldery, zezwól na dostęp dla DJ HQ i spróbuj ponownie.',
+    perm: '<b>macOS blokuje dostęp do folderu z muzyką.</b> Otwórz Ustawienia systemowe > Prywatność i ochrona > Pliki i foldery, zezwól na dostęp dla DJ HQ i spróbuj ponownie.',
   },
 });

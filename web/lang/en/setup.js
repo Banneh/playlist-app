@@ -5,7 +5,7 @@ I18N.add('en', 'setup', {
   go: 'Let’s go',
   downloads: {
     title: 'Where your downloads land',
-    text: 'DJ HQ watches this folder. A download that matches a playlist track shows up on the Downloads page, one click away from your library.',
+    text: 'DJ HQ watches this folder. A download that matches a playlist track shows up on the Downloads page, and one click moves it into your library.',
     change: 'Change…',
     placeholder: '/path/to/the/folder',
     use: 'Use this folder',
@@ -15,7 +15,7 @@ I18N.add('en', 'setup', {
   },
   player: {
     title: 'The player you play on',
-    text: 'Files are checked against this player’s limits, so what you copy to the USB stick actually plays. Not sure, or not on Pioneer gear? Keep the first one: it is the strictest, and what it accepts plays everywhere.',
+    text: 'Files are checked against this player’s limits, so the files you copy to the USB stick will play. Not sure, or not on Pioneer gear? Keep the first one: it is the strictest, and what it accepts plays everywhere.',
     label: 'Target player',
   },
   folder: {

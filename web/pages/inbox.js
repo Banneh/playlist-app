@@ -130,7 +130,7 @@ function ibFind(i) {
     },
   }).then(async r => {
     if (!r) return;
-    const c = r.track, what = `${c.user} – ${c.title}`;
+    const c = r.track, what = `${c.user} - ${c.title}`;
     try {
       DATA = await api('/api/inbox-move', { file: it.name, zip: it.zip || undefined, track: c });
     } catch (e) { toast(t('common.moveFailed', { msg: errText(e) }), true); await loadInbox(); return; }

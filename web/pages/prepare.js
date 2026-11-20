@@ -25,7 +25,7 @@ function ppRow(r) {
     ${r.art ? artHtml({ art: r.art, url: r.url }) : `<span class="pp-fico">${icon('music')}</span>`}
     <div class="t-meta">
       <div class="t-title">${playBtn(filePath(r, r.name), r.title || r.name, r.artist || '')}<span title="${esc(r.name)}">${esc(r.name)}</span></div>
-      <div class="t-sub">${r.title ? `${esc(r.artist ? r.artist + ' – ' : '')}${esc(r.title)}` : `<span class="via">${esc(t('tags.notInPlaylist'))}</span>`}</div>
+      <div class="t-sub">${r.title ? `${esc(r.artist ? r.artist + ' - ' : '')}${esc(r.title)}` : `<span class="via">${esc(t('tags.notInPlaylist'))}</span>`}</div>
     </div>
     <div class="pp-issues">${ppIssueTags(r)}</div>
     <span class="dur">${esc(r.dur)}</span>

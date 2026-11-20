@@ -13,7 +13,7 @@ I18N.add('pl', 'tour', {
     },
     missing: {
       title: 'Brakujące: czego jeszcze potrzebujesz',
-      text: 'Każdy utwór z playlisty, którego jeszcze nie ma w twoim folderze. <b>Za darmo</b> i <b>Kup</b> prowadzą prosto do bramki pobierania albo do sklepu. Gdy utwór ma oba linki, <b>Kup</b> jest pierwszy, bo sklepy sprzedają pliki bezstratne.',
+      text: 'Każdy utwór z playlisty, którego jeszcze nie ma w twoim folderze. <b>Za darmo</b> i <b>Kup</b> otwierają bramkę pobierania albo sklep. Gdy utwór ma oba linki, <b>Kup</b> jest pierwszy, bo sklepy sprzedają pliki bezstratne.',
     },
     status: {
       title: 'Status zależy od ciebie',
@@ -25,7 +25,7 @@ I18N.add('pl', 'tour', {
     },
     discover: {
       title: 'Discover: SoundCloud w DJ HQ',
-      text: 'soundcloud.com – tutaj, w aplikacji. Zaloguj się raz, słuchaj tego, co proponuje SoundCloud, a pasek nad stroną jednym kliknięciem doda albo polubi to, czego słuchasz. Kliknięcie okładki na dowolnej liście odtwarza tam utwór.',
+      text: 'Strona SoundCloud wewnątrz aplikacji. Zaloguj się raz i słuchaj jej propozycji. Pasek nad stroną jednym kliknięciem doda albo polubi utwór, którego słuchasz. Kliknięcie okładki na dowolnej liście odtwarza tam utwór.',
     },
     new: {
       title: 'Nowe: co się zmieniło',
@@ -45,7 +45,7 @@ I18N.add('pl', 'tour', {
     },
     doall: {
       title: 'Zrób wszystko',
-      text: 'Jedno kliknięcie na cały łańcuch: nowe pobrane pliki trafiają do twojej biblioteki, dostają tagi, przechodzą przez Platinum Notes i Mixed In Key i lądują z tonacjami w twoim pliku XML rekordbox. Włącz i skonfiguruj tę funkcję w Ustawieniach; oba programy muszą być na tym komputerze.',
+      text: 'Jedno kliknięcie na wszystkie kroki: nowe pobrane pliki trafiają do twojej biblioteki, dostają tagi, przechodzą przez Platinum Notes i Mixed In Key i lądują z tonacjami w twoim pliku XML rekordbox. Włącz i skonfiguruj tę funkcję w Ustawieniach; oba programy muszą być na tym komputerze.',
     },
     refresh: {
       title: 'Zawsze na bieżąco',

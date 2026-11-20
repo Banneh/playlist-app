@@ -2,8 +2,8 @@
    The Missing, Have, All tracks and New pages, the status menu and the file-match dialog. */
 I18N.add('en', 'playlist', {
   status: {
-    have: 'Have — the file is in my folder',
-    missing: 'Missing — still need to get it',
+    have: 'Have: the file is in my folder',
+    missing: 'Missing: still need to get it',
     na: 'Not available on SoundCloud now',
     naHint: 'Hidden from Missing until a download or shop link appears',
     autoHint: 'Let the file match decide',
@@ -63,7 +63,7 @@ I18N.add('en', 'playlist', {
       one: 'Copy {n} link',
       other: 'Copy {n} links',
     },
-    copyTip: 'Copy “Artist – Title ⇥ link” for every track shown, one per line (shop link first when there is one)',
+    copyTip: 'Copy “Artist - Title ⇥ link” for every track shown, one per line (shop link first when there is one)',
     noNamesLeft: 'No names left to check here.',
     nothingTitle: 'Nothing missing',
     nothingText: 'Every track in the playlist is in your music folder.',

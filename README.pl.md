@@ -4,21 +4,21 @@
 
 **Folder z muzyką zgodny z playlistą na SoundCloud, a utwory gotowe dla rekordbox i na klub.**
 
-**[Strona pobierania →](https://banneh.github.io/dj-hq-site/)** wybiera instalator pasujący do twojego komputera i prowadzi przez pierwsze uruchomienie.
+**[Strona pobierania](https://banneh.github.io/dj-hq-site/)** wybiera instalator pasujący do twojego komputera i prowadzi przez pierwsze uruchomienie.
 
 ![DJ HQ z listą Brakujące: każdy utwór, którego jeszcze potrzebujesz, z linkiem do pobrania albo do sklepu](docs/screens/missing-light.png)
 
 DJ HQ to darmowa aplikacja na komputer dla DJ-ów, którzy zbierają muzykę przez
 playlisty na SoundCloud. Porównuje playlistę z folderem, w którym trzymasz
-utwory, pokazuje, czego jeszcze brakuje i gdzie to zdobyć, porządkuje pliki,
-które już masz, tak żeby rekordbox i odtwarzacze Pioneer nie miały zastrzeżeń,
-a na koniec daje ci gotową playlistę rekordbox. Sam SoundCloud jest w aplikacji
-na stronie **Discover**, więc możesz słuchać i jednym kliknięciem dodawać do
-playlisty to, co ci się podoba. Wszystko działa na twoim komputerze; nic nie
+utwory, pokazuje, czego jeszcze brakuje i gdzie to zdobyć, poprawia tagi
+i konwertuje pliki, które już masz, tak żeby rekordbox i odtwarzacze Pioneer
+mogły je odczytać, i eksportuje playlistę rekordbox. Sam SoundCloud otwiera się
+w aplikacji na stronie **Discover**, gdzie możesz słuchać i jednym kliknięciem
+dodawać utwory do playlisty. Wszystko działa na twoim komputerze i nic nie
 jest nigdzie wysyłane.
 
 Aplikacja działa po polsku i po angielsku: domyślnie w języku twojego systemu,
-a zmienisz to w **Ustawienia → Język**.
+a zmienisz to w **Ustawienia > Język**.
 
 ## Spis treści
 
@@ -55,8 +55,8 @@ Aplikacja wczytuje playlistę, skanuje foldery i ustala, który plik należy do
 którego utworu, porównując nazwy i długości. Wszystko inne opiera się na tym:
 
 - **Brakujące** wypisuje każdy utwór z playlisty, którego jeszcze nie ma
-  w twoim folderze, z przyciskiem **Za darmo** albo **Kup**, który prowadzi
-  prosto do bramki pobierania albo do sklepu. Linki są szukane w przycisku
+  w twoim folderze, z przyciskiem **Za darmo** albo **Kup**, który otwiera
+  bramkę pobierania albo sklep. Linki są szukane w przycisku
   pobierania utworu *i* w jego opisie.
 - **Mam** pokazuje plik każdego utworu, który masz, i oznacza
   wszystko, co jeszcze wymaga tagów, konwersji albo można podmienić z MP3 na
@@ -101,7 +101,7 @@ wersję ze [strony Releases](https://github.com/Banneh/playlist-app/releases):
 | Linux | `DJ-HQ-<version>.AppImage` |
 
 > [!TIP]
-> Nie wiesz, jakiego masz Maca? Kliknij menu Apple → **Ten Mac**. Jeśli widać
+> Nie wiesz, jakiego masz Maca? Otwórz menu Apple i wybierz **Ten Mac**. Jeśli widać
 > *Czip: Apple M…*, potrzebujesz pliku dla Apple Silicon; jeśli
 > *Procesor: Intel…*, pliku dla Intela.
 
@@ -117,7 +117,7 @@ Terminal nie jest potrzebny.
 
 1. Otwórz plik DMG, przeciągnij **DJ HQ** do folderu **Aplikacje** i kliknij dwa razy.
    macOS powie, że nie może zweryfikować aplikacji. Kliknij **Gotowe**.
-2. Otwórz **Ustawienia systemowe → Prywatność i ochrona** i przewiń w dół do
+2. Otwórz **Ustawienia systemowe > Prywatność i ochrona** i przewiń w dół do
    sekcji *Ochrona*. Obok komunikatu o zablokowaniu „DJ HQ” kliknij **Otwórz
    mimo to**.
 3. Potwierdź hasłem albo Touch ID. Od tej chwili aplikacja otwiera się jak
@@ -138,7 +138,7 @@ a potem **Uruchom mimo to**.
 DJ HQ raz dziennie sprawdza w serwisie GitHub, czy jest nowsza wersja. Gdy jest, na
 dole paska bocznego pojawia się mała informacja z przyciskiem **Pobierz** dla
 twojego komputera. Zainstaluj nową wersję w miejsce starej; biblioteka i ustawienia
-zostają tam, gdzie były. **⋯ → Sprawdź aktualizacje…** sprawdza od razu.
+zostają tam, gdzie były. **⋯ > Sprawdź aktualizacje…** sprawdza od razu.
 
 ## Pierwsze kroki
 
@@ -160,7 +160,7 @@ utworów (usuniętych, zablokowanych w twoim kraju albo prywatnych
 i nieudostępnionych przez link), wiersz stanu powie, ilu nie udało się odczytać.
 
 Żeby później skierować bibliotekę na inny link, na przykład po ustawieniu jej
-playlisty jako prywatnej, użyj **Ustawienia → Zmień link…**. Nowy link jest
+playlisty jako prywatnej, użyj **Ustawienia > Zmień link…**. Nowy link jest
 najpierw wczytywany; twoje dopasowania, zmienione nazwy i oznaczenia nowości zostają,
 a jeśli nowego linku nie da się odczytać, zostaje stary. Jeśli pod nowym
 linkiem brakuje utworów, które ma biblioteka (inna playlista albo utwory,
@@ -173,8 +173,8 @@ Za pierwszym razem ekran **Zanim zaczniemy** pyta o podstawy: do którego
 folderu trafiają pobrane pliki i czy dokładne dopasowania mogą same trafiać do
 biblioteki, na jakim odtwarzaczu grasz, czy foldery wewnątrz folderu z muzyką
 też się liczą, jasny czy ciemny wygląd i jaki język. Każde z tych pytań ma
-rozsądną wartość domyślną, więc **Zaczynamy** to dobra odpowiedź; wszystko
-można potem zmienić w Ustawieniach.
+wartość domyślną, więc możesz od razu kliknąć **Zaczynamy**; wszystko można
+potem zmienić w Ustawieniach.
 
 Trafiasz na listę **Brakujące**, a pasek boczny pokazuje, jaka część playlisty
 jest już w twoim folderze.
@@ -183,7 +183,7 @@ Za pierwszym razem DJ HQ proponuje minutowe oprowadzanie, które pokazuje, do
 czego służy każda lista. Działa na kilku przykładowych utworach, więc możesz
 je obejrzeć, zanim cokolwiek połączysz (na ekranie powitalnym jest do tego
 przycisk), i nic w twojej bibliotece się nie zmieni. Kliknij **Nie teraz**,
-żeby je pominąć; **⋯ → Oprowadź mnie** powtarza je w każdej chwili.
+żeby je pominąć; **⋯ > Oprowadź mnie** powtarza je w każdej chwili.
 
 ![Oprowadzanie: krótka karta objaśnia każdą część aplikacji na przykładowych danych, a reszta jest przygaszona](docs/screens/tour.png)
 
@@ -197,7 +197,7 @@ przycisk), i nic w twojej bibliotece się nie zmieni. Kliknij **Nie teraz**,
 ### Brakujące: utwory, których jeszcze potrzebujesz
 
 Na tej liście spędzisz najwięcej czasu: każdy utwór z playlisty, którego nie
-ma w twoim folderze, z najszybszym sposobem, żeby go zdobyć.
+ma w twoim folderze, z linkami, pod którymi go zdobędziesz.
 
 - **Za darmo** to darmowe pobieranie: bramka w stylu Hypeddit, plik
   udostępniony na Dysku Google albo w Dropboksie, albo przycisk pobierania
@@ -228,8 +228,8 @@ między utworami, N odkłada utwór jako niedostępny, Esc zamyka.
 
 **Co jeszcze można tu zrobić**
 
-- **Kopiuj linki** kopiuje do schowka każdy utwór widoczny na ekranie jako
-  „Wykonawca – Tytuł, link”, po jednym w wierszu. Przydaje się na zakupy.
+- **Kopiuj linki** kopiuje do schowka każdy utwór widoczny na ekranie, po
+  jednym w wierszu: wykonawca i tytuł, tabulator, a potem link. Przydaje się na zakupy.
 - Kliknij status utworu, żeby zmienić go ręcznie. **Teraz niedostępny na
   SoundCloud** odkłada utwór do osobnej sekcji na dole; wraca sam, gdy tylko
   pojawi się dla niego link. **Przywróć ustawienie automatyczne** cofa każdy status
@@ -274,7 +274,7 @@ dopasowania, więc niepewne dopasowanie można sprawdzić na słuch.
 
 **Jak poprawić złe dopasowanie**
 
-1. Kliknij nazwę pliku pod utworem albo wybierz **⋯ → Dopasuj do pliku
+1. Kliknij nazwę pliku pod utworem albo wybierz **⋯ > Dopasuj do pliku
    lokalnego…**.
 2. Wybierz właściwy plik. Najbardziej prawdopodobne są na początku; pliki
    dopasowane już do innego utworu są oznaczone, a wybranie takiego zwalnia
@@ -324,12 +324,12 @@ klawisze. Wyjście z Discover w trakcie odtwarzania nie przerywa muzyki,
 a sterowanie przejmuje pasek; jego **×** pauzuje i ukrywa odtwarzanie. Menu
 **⋯** wiersza ma też **Odtwórz**, **Otwórz na Discover** i **Podobne utwory na
 Discover**. Mała strzałka, która pojawia się obok tytułu po najechaniu,
-otwiera utwór w przeglądarce. Wolisz do wszystkiego przeglądarkę? Przełącz
-**Otwieranie utworów** w Ustawieniach, a strzałka zmieni się w przycisk
+otwiera utwór w przeglądarce. Żeby wszystko otwierać w przeglądarce, przełącz
+**Otwieranie utworów** w Ustawieniach; strzałka zmieni się wtedy w przycisk
 odtwarzania na SoundCloud w aplikacji.
 
-Po zalogowaniu **Dodaj do playlisty** na stronie Spoza playlisty to
-też jedno kliknięcie, zamiast wycieczki na stronę. **Wyloguj się…**
+Po zalogowaniu **Dodaj do playlisty** na stronie Spoza playlisty też
+działa jednym kliknięciem, bez otwierania strony SoundCloud. **Wyloguj się…**
 w Ustawieniach usuwa sesję.
 
 Od czasu do czasu ochrona SoundCloud przed botami prosi o udowodnienie, że
@@ -390,8 +390,8 @@ do twojej biblioteki, gdzie wyłapie go strona Spoza playlisty. **Znajdź na
 SoundCloud** najpierw szuka utworu: wybierz właściwy wynik, a plik trafi do
 biblioteki dopasowany do niego, a przy zaznaczonym polu (po zalogowaniu na
 Discover) utwór w tym samym kroku trafi na playlistę na SoundCloud, więc od
-razu pojawi się w Mam. Wynik, który już jest na playliście, po prostu staje się
-plikiem tego utworu.
+razu pojawi się w Mam. Jeśli wynik jest już na playliście, plik zostaje
+dopasowany do tego utworu.
 
 Zakupy z Bandcamp przychodzą jako archiwa zip; DJ HQ zagląda do nich,
 wypisuje utwory z playlisty (z oznaczeniem „z Album.zip”) i rozpakowuje tylko
@@ -411,8 +411,8 @@ kliknięcie.
 ![Lista Spoza playlisty z przyciskiem Znajdź na SoundCloud przy każdym pliku](docs/screens/not-in-playlist.png)
 
 Utwory w twoim folderze, które nie pasują do niczego na playliście. Chodzi
-o to, żeby trafiły *na* playlistę, a playlista pozostała jedyną listą, która
-zawsze się zgadza.
+o to, żeby dodać je do playlisty, tak aby playlista nadal obejmowała wszystkie
+twoje utwory.
 
 1. Kliknij **Znajdź wszystkie**, żeby wyszukać na SoundCloud wszystkie pliki
    naraz. Pewne dopasowania są od razu przyjmowane, reszta czeka na twój
@@ -430,20 +430,20 @@ zawsze się zgadza.
 <p align="center"><img src="docs/screens/find-dialog.png" width="480" alt="Znajdź na SoundCloud: wyniki z długością i dopasowaniem"></p>
 
 Jeśli wykonawca albo tytuł pliku się nie zgadza (DJ HQ odczytuje je z nazwy
-pliku), najpierw kliknij **⋯ → Edytuj wykonawcę / tytuł**; wyszukiwanie i tagi
+pliku), najpierw kliknij **⋯ > Edytuj wykonawcę / tytuł**; wyszukiwanie i tagi
 biorą twoje wartości.
 
 ### Przygotuj na odtwarzacz: tagi, konwersja i rekordbox
 
 ![Strona Przygotuj na odtwarzacz: docelowy odtwarzacz, tagi, zgodność, eksport do rekordbox i pliki, które jeszcze czegoś wymagają](docs/screens/prepare.png)
 
-1. **Wybierz swój odtwarzacz** na górze. Wszystko poniżej dostosowuje się do
-   tego, co on odtwarza: XDJ-700 i XDJ-1000 przyjmują tylko 16-bitowe pliki WAV
+1. **Wybierz swój odtwarzacz** na górze. Kroki poniżej zależą od tego, co on
+   odtwarza: XDJ-700 i XDJ-1000 przyjmują tylko 16-bitowe pliki WAV
    44,1 albo 48 kHz, a CDJ-2000NXS2, XDJ-XZ i CDJ-3000 odtwarzają też 24 bity,
    96 kHz i FLAC.
-2. **Zapisz tagi** zapisuje wykonawcę i tytuł w każdym pliku, w którym ich
-   brakuje albo różnią się od nazw pokazywanych przez DJ HQ, tak jak rekordbox
-   naprawdę je odczytuje (z plikami WAV jest wybredny). Gatunkiem staje się
+2. **Zapisz tagi** zapisuje wykonawcę i tytuł tak, jak odczytuje je rekordbox
+   (przy plikach WAV jest wymagający), w każdym pliku, w którym ich brakuje
+   albo różnią się od nazw pokazywanych przez DJ HQ. Gatunkiem staje się
    nazwa playlisty. Cała reszta tagów pliku zostaje: tonacja i energia,
    komentarze i okładka. Tonacja jest widoczna obok nazwy pliku i trafia do
    eksportu rekordbox. Plik WAV liczy się jako otagowany dopiero wtedy, gdy
@@ -465,7 +465,8 @@ biorą twoje wartości.
    zostaje nietknięty, a przycisk na bieżąco liczy pliki. Nazwy, które plik już
    ma, zostają w nim tak, jak są. Otagowany plik, w którym zapis straciłby coś
    innego (FLAC, M4A, OGG, niektóre tagi ID3v2.4 i pola INFO), zostaje bez
-   zmian. Potem zaznacz utwory w rekordbox → prawy przycisk → *Reload Tag*.
+   zmian. Potem zaznacz utwory w rekordbox, kliknij je prawym przyciskiem
+   i wybierz *Reload Tag*.
 
    Wykonawca i tytuł pochodzą z tytułu na SoundCloud: wykonawca przed
    myślnikiem, tytuł po nim. „Premiere:”, numer katalogowy albo strona winylu
@@ -479,7 +480,7 @@ biorą twoje wartości.
    strzałkami. Trafia tam też plik, który ma już inną nazwę: okno pokazuje ją
    w wierszu **Teraz w pliku**, a **Weź z pliku** (F) ją przejmuje. Przełącz na
    **Wszystkie nazwy**, żeby przejść przez całą bibliotekę. Twoje wybory są zapamiętywane i mają pierwszeństwo przed tym, co
-   odczytuje DJ HQ; **Zapisz tagi** zapisuje je potem w plikach. **⋯ → Zamień
+   odczytuje DJ HQ; **Zapisz tagi** zapisuje je potem w plikach. **⋯ > Zamień
    wykonawcę z tytułem** w wierszu robi to samo dla jednego utworu.
 3. **Konwertuj** zamienia pliki, których twój odtwarzacz nie odtworzy, na
    takie, które odtworzy, w tym samym miejscu: ta sama nazwa pliku, ta sama
@@ -487,8 +488,8 @@ biorą twoje wartości.
    Oryginały są najpierw zapisywane w kopii zapasowej, a **Przywróć
    oryginały** przywraca je, kiedy chcesz.
 4. **Eksportuj XML…** zapisuje playlistę rekordbox ze wszystkimi dopasowanymi
-   plikami i pokazuje, jak ją zaimportować. W rekordbox: *Preferences →
-   Advanced → Database → rekordbox xml*, raz wskaż ten plik; w drzewie pojawi
+   plikami i pokazuje, jak ją zaimportować. W rekordbox: *Preferences >
+   Advanced > Database > rekordbox xml*, raz wskaż ten plik; w drzewie pojawi
    się pozycja *rekordbox xml*, a kliknięcie tam playlisty prawym przyciskiem
    da opcję **Import Playlist**. Utwory, które już są w twojej kolekcji,
    zachowują punkty cue i siatki. Eksportuj ponownie przy każdej zmianie
@@ -496,9 +497,8 @@ biorą twoje wartości.
 
 <p align="center"><img src="docs/screens/export-dialog.png" width="480" alt="Okno eksportu ze ścieżką pliku i trzema krokami importu w rekordbox"></p>
 
-Lista **Pliki wymagające uwagi** poniżej pokazuje dokładnie te pliki, które
-wciąż wymagają tagów albo konwersji, zanim będą gotowe do kabiny DJ-a, każdy
-z okładką i przyciskiem odtwarzania.
+Lista **Pliki wymagające uwagi** poniżej pokazuje pliki, które wciąż wymagają
+tagów albo konwersji, każdy z okładką i przyciskiem odtwarzania.
 
 ### Wygląd, wyszukiwanie i pasek boczny
 
@@ -554,11 +554,11 @@ rozrzucone po kilku albo posortowane w podfoldery. Oba przypadki działają:
   folder pozostaje *główny*: do niego trafiają pobrane pliki. Folder można
   potem usunąć z biblioteki; jego pliki zostają na miejscu.
 - **Uwzględnij podfoldery** skanuje też foldery wewnątrz każdego folderu
-  biblioteki. Jest wyłączone, dopóki go nie włączysz, więc biblioteka nigdy nie
-  bierze więcej, niż chcesz.
+  biblioteki. Domyślnie jest wyłączone, więc liczą się tylko pliki leżące
+  bezpośrednio w folderze.
 
 Pliki spoza folderu głównego są wypisane z nazwą folderu na początku, na
-przykład `Deep/Artist – Title.wav` albo `Vinyl rips/Artist – Title.wav`, żeby
+przykład `Deep/Artist - Title.wav` albo `Vinyl rips/Artist - Title.wav`, żeby
 było widać, gdzie leży każdy z nich. Tagi, konwersja, kopie zapasowe
 i przywracanie działają na nich jak na każdym innym pliku.
 
@@ -570,14 +570,14 @@ na górze. Każda biblioteka ma własne dopasowania, zmienione nazwy i oznaczeni
 
 ### Inny komputer albo kopia zapasowa
 
-**Ustawienia → Przenoszenie i kopia konfiguracji → Eksportuj konfigurację…**
+**Ustawienia > Przenoszenie i kopia konfiguracji > Eksportuj konfigurację…**
 zapisuje jeden plik, `DJ HQ config <date>.djhq.json`, ze wszystkim, co DJ HQ
 wie o twoich bibliotekach: link SoundCloud i listę utworów każdej biblioteki,
 jej dopasowania (ręczne i automatyczne), edytowane nazwy, oznaczenia Mam / Brak
 / niedostępny, nowości i twoje ustawienia (częstotliwość odświeżania,
 automatyczne przenoszenie, wygląd, docelowy odtwarzacz). Zapisz go na
-pamięci USB albo w folderze w chmurze (tu folder w chmurze to po prostu folder
-na dysku) i zaimportuj na drugim komputerze, na komputerze z Windows albo
+pamięci USB albo w folderze w chmurze (dla DJ HQ folder w chmurze to zwykły
+folder na dysku) i zaimportuj na drugim komputerze, na komputerze z Windows albo
 znowu na tym, jako kopię zapasową.
 
 Czego nie ma w pliku: samej muzyki, oryginałów z kopii zapasowej (więc
@@ -637,7 +637,7 @@ nowej bazy danych.
   zakupu i nie podał go w opisie. Menu **⋯** nadal otwiera utwór na
   SoundCloud.
 - **Znajdź na SoundCloud nic nie znajduje.** Spróbuj krótszego tekstu i usuń
-  część z remiksem. Niektórych wersji po prostu nie ma na SoundCloud; **⋯ →
+  część z remiksem. Niektórych wersji w ogóle nie ma na SoundCloud; **⋯ >
   Szukaj na soundcloud.com** otwiera wyszukiwarkę samej strony.
 - **Kliknięcie okładki otwiera Discover, ale nic nie gra.** SoundCloud wymaga
   zalogowania, zanim cokolwiek odtworzy. Zaloguj się raz na stronie Discover;
@@ -650,18 +650,18 @@ nowej bazy danych.
   **Przeskanuj ponownie**. Plik, którego nazwa już istnieje w twoim folderze,
   liczy się jako „już w bibliotece”.
 - **rekordbox po konwersji wciąż pokazuje starą głębię bitową.** Ta kolumna
-  jest zapamiętana. Kliknij utwór prawym przyciskiem → *Analyze Track* (punkty
-  hot cue przetrwają) albo po prostu to zignoruj; odtwarzanie używa
-  prawdziwego pliku.
+  jest zapamiętana. Kliknij utwór prawym przyciskiem i wybierz *Analyze Track*
+  (punkty hot cue przetrwają) albo to zignoruj: odtwarzanie używa prawdziwego
+  pliku.
 - **Tagi nie są widoczne przy utworach, które już są w rekordbox.** Zaznacz
-  je → prawy przycisk → *Reload Tag*.
+  je, kliknij prawym przyciskiem i wybierz *Reload Tag*.
 - **Playlista XML się zaimportowała, ale utwory wyglądają tak samo.** To
   kaprys rekordbox: import playlisty nie aktualizuje utworów, które już są
   w kolekcji. Kliknij prawym przyciskiem utwory w gałęzi *rekordbox xml*
   i zaimportuj także je.
 - **„Nie udało się wczytać biblioteki: operation not permitted” (macOS).** Daj
-  aplikacji dostęp do folderu z muzyką w Ustawienia systemowe → Prywatność
-  i ochrona → Pliki i foldery.
+  aplikacji dostęp do folderu z muzyką: Ustawienia systemowe > Prywatność
+  i ochrona > Pliki i foldery.
 - **macOS mówi, że aplikacja jest „uszkodzona” i należy ją przenieść do
   Kosza.** Dzieje się tak, gdy narzędzie do pobierania usunie podpis aplikacji.
   Pobierz plik DMG ponownie przez Safari albo Chrome. Jeśli nadal widać
@@ -674,9 +674,8 @@ nowej bazy danych.
 bit w bit i sprawdza go przed zastąpieniem pliku; przy jakiejkolwiek
 wątpliwości oryginał zostaje nietknięty. Konwersja najpierw zapisuje oryginał
 w kopii zapasowej, a potem sprawdza długość, i kopie zapasowe nigdy nie są
-usuwane. Przeniesienie pobranego pliku to prawdziwe przeniesienie, a nie
-skopiowanie i zapomnienie. Mimo to rób własne kopie zapasowe: to twoja
-biblioteka.
+usuwane. Pobrany plik jest przenoszony, a nie kopiowany: w folderze Pobrane
+nic po nim nie zostaje. Mimo to rób własne kopie zapasowe.
 
 **Gdzie co jest.** Aplikacja trzyma dane w systemowym folderze danych
 użytkownika: `~/Library/Application Support/DJ HQ` na macOS
@@ -691,7 +690,7 @@ folderu projektu. W środku:
 | `rekordbox.xml` | ostatni eksport rekordbox |
 | `backups/` | kopie `djhq.db` sprzed każdego importu konfiguracji (ostatnie pięć i wszystkie z ostatniego tygodnia) |
 | `state.json.imported-<time>` | `state.json` z DJ HQ 1.7 lub starszego, taki, jaki był w chwili przeniesienia do `djhq.db` (zachowany, nigdy więcej nie czytany; tak samo `prefs.json`) |
-| `Partitions/` | sesja logowania do SoundCloud dla Discover (Ustawienia → Wyloguj się ją usuwa) |
+| `Partitions/` | sesja logowania do SoundCloud dla Discover (Ustawienia > Wyloguj się ją usuwa) |
 
 Każdy zapis to jedna transakcja SQLite, która zapisuje tylko to, co się
 zmieniło, i trafia na dysk, zanim DJ HQ pójdzie dalej, więc awaria albo zanik
@@ -713,7 +712,7 @@ pierwsze uruchomienie przenosi do niej `state.json` i `prefs.json` i zachowuje
 te pliki jako `state.json.imported-<time>` (obok leży `state.json.README.txt`,
 który mówi to samo). DJ HQ 1.7 i starsze nie czytają `djhq.db` i startują
 puste. Żeby zabrać do takiej wersji bieżące dane: gdy DJ HQ jeszcze działa,
-zapisz je przez **Ustawienia → Eksportuj surowe dane (JSON)** (albo
+zapisz je przez **Ustawienia > Eksportuj surowe dane (JSON)** (albo
 `GET /api/state/raw` w trybie headless); zamknij DJ HQ; umieść ten plik
 w folderze danych jako `state.json`. Zmiana nazwy
 `state.json.imported-<time>` z powrotem na `state.json` też działa, ale to są
@@ -751,10 +750,10 @@ Znajdź wszystkie.
 ## Szczegóły techniczne
 
 Uruchamianie ze źródeł, tryb headless, budowa projektu, tłumaczenia (jak dodać
-kolejny język), HTTP API i wydania są opisane po angielsku w
-[README.md → Technical details](README.md#technical-details); o językach
-w [README.md → Languages](README.md#languages).
+kolejny język), HTTP API i wydania są opisane po angielsku w README.md,
+w rozdziale [Technical details](README.md#technical-details); o językach
+w rozdziale [Languages](README.md#languages).
 
 ## Licencja
 
-MIT – zobacz [LICENSE](LICENSE).
+MIT, zobacz [LICENSE](LICENSE).

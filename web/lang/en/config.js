@@ -117,7 +117,7 @@ I18N.add('en', 'config', {
   imDoneWaiting: '<b>{name}</b> waits for its music in {dir}. Copy the files there; the matches follow them.',
   imDoneBackup: 'The data from before is saved in {file}.',
   imDoneLink: 'A library has no SoundCloud link yet: open Settings and use Change link… to paste it.',
-  imDoneDoAll: 'Do everything’s apps and the rekordbox XML are not part of the file: open Settings → Do everything → Configure… to find them on this computer.',
+  imDoneDoAll: 'Do everything’s apps and the rekordbox XML are not part of the file: open Settings > Do everything > Configure… to find them on this computer.',
   imFailed: 'Couldn’t import: {error}',
   // after "on" / "On" in imFrom and imWasPlatform
   imPlatform: { darwin: 'a Mac', win32: 'Windows', linux: 'Linux' },

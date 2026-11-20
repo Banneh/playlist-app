@@ -7,7 +7,7 @@ I18N.add('pl', 'discover', {
   },
   noApp: {
     title: 'Discover działa tylko w aplikacji na komputer',
-    text: 'Wbudowany odtwarzacz SoundCloud jest częścią aplikacji DJ HQ na komputery Mac, Windows i Linux. W przeglądarce otwórz po prostu soundcloud.com w karcie obok DJ HQ.',
+    text: 'Wbudowany odtwarzacz SoundCloud jest częścią aplikacji DJ HQ na komputery Mac, Windows i Linux. W przeglądarce otwórz soundcloud.com w karcie obok DJ HQ.',
   },
 
   // the bar above the page
@@ -38,7 +38,7 @@ I18N.add('pl', 'discover', {
     space: 'Spacja',
     inLikes: 'W polubieniach',
     inPlaylist: 'Na playliście',
-    captcha: 'SoundCloud chce sprawdzić, czy jesteś człowiekiem. Przejdź weryfikację na stronie poniżej; odtwarzanie z list, „Dodaj” i serce zadziałają znowu, gdy weryfikacja zniknie.',
+    captcha: 'SoundCloud chce sprawdzić, czy jesteś człowiekiem. Przejdź weryfikację na stronie poniżej. Gdy zniknie, odtwarzanie z list, „Dodaj” i serce znów zadziałają.',
   },
 
   // the bottom bar while SoundCloud plays
@@ -59,7 +59,7 @@ I18N.add('pl', 'discover', {
 
   toast: {
     gone: 'Tego utworu nie ma już na SoundCloud',
-    notStarted: 'SoundCloud nie uruchomił utworu – otwórz Discover, żeby zobaczyć dlaczego',
+    notStarted: 'SoundCloud nie uruchomił utworu. Otwórz Discover, żeby zobaczyć dlaczego',
     unreachable: 'Nie udało się połączyć z SoundCloud: {msg}',
     nothingPlaying: 'Jeszcze nic nie gra',
     nothingToPlay: 'Na tej stronie nie ma jeszcze nic do odtworzenia',
@@ -69,10 +69,10 @@ I18N.add('pl', 'discover', {
     cantAdd: 'Stąd nie można dodawać',
     alreadyLikes: 'Już jest w twoich polubieniach',
     alreadyPlaylist: 'Już jest na playliście',
-    added: 'Dodano „{title}” – jest teraz na stronie Brakujące',
-    addedTrack: 'Dodano utwór – jest teraz na stronie Brakujące',
-    addedLiked: 'Dodano i polubiono „{title}” – jest teraz na stronie Brakujące',
-    addedLikedTrack: 'Dodano i polubiono utwór – jest teraz na stronie Brakujące',
+    added: 'Dodano „{title}”. Jest teraz na stronie Brakujące',
+    addedTrack: 'Dodano utwór. Jest teraz na stronie Brakujące',
+    addedLiked: 'Dodano i polubiono „{title}”. Jest teraz na stronie Brakujące',
+    addedLikedTrack: 'Dodano i polubiono utwór. Jest teraz na stronie Brakujące',
     likeFailed: 'Dodano „{title}”, ale nie udało się go polubić: {msg}',
     likeFailedTrack: 'Dodano utwór, ale nie udało się go polubić: {msg}',
     removed: 'Usunięto „{title}”',
@@ -100,7 +100,7 @@ I18N.add('pl', 'discover', {
   guide: {
     discover: {
       title: 'Discover',
-      lead: 'soundcloud.com w DJ HQ. Zaloguj się tam raz, słuchaj tego, co proponuje SoundCloud, i dodawaj do playlisty to, co ci się podoba, z paska nad stroną – bez wyskakującego okna dla każdego utworu.',
+      lead: 'soundcloud.com w DJ HQ. Zaloguj się tam raz, słuchaj tego, co proponuje SoundCloud, i dodawaj do playlisty to, co ci się podoba, z paska nad stroną, bez wyskakującego okna dla każdego utworu.',
       s1: {
         h: 'Pasek nad stroną',
         i1: { name: 'Teraz gra', text: 'Tu pojawia się to, co gra odtwarzacz SoundCloud: z okładką, długością i informacją, czy utwór jest już na playliście.' },
@@ -112,12 +112,12 @@ I18N.add('pl', 'discover', {
       s2: {
         h: 'Klawisze',
         t1: '<kbd>Spacja</kbd> odtwarza i wstrzymuje, <kbd>←</kbd> i <kbd>→</kbd> przeskakują o 10 sekund do tyłu lub do przodu, <kbd>N</kbd> i <kbd>P</kbd> przechodzą do następnego lub poprzedniego utworu w kolejce SoundCloud.',
-        t2: '<kbd>A</kbd> dodaje grający utwór do playlisty (w bibliotece polubień – do twoich polubień), <kbd>L</kbd> dodaje go do polubień albo cofa polubienie.',
-        t3: 'Działają niezależnie od tego, czy ostatnio kliknięto pasek, czy stronę SoundCloud – o ile nie piszesz w polu tekstowym – a także na każdej innej stronie, gdy na dole widać pasek odtwarzania.',
+        t2: '<kbd>A</kbd> dodaje grający utwór do playlisty (w bibliotece polubień: do twoich polubień), <kbd>L</kbd> dodaje go do polubień albo cofa polubienie.',
+        t3: 'Działają niezależnie od tego, czy ostatnio kliknięto pasek, czy stronę SoundCloud, chyba że piszesz w polu tekstowym. Działają też na każdej innej stronie, gdy na dole widać pasek odtwarzania.',
       },
       s3: {
         h: 'Pasek na dole',
-        t1: 'Kliknij okładkę na dowolnej liście, a utwór zacznie grać na SoundCloud bez opuszczania listy. Pokazuje go pasek na dole: z odtwarzaniem i pauzą, poprzednim i następnym utworem, linią przewijania, którą można kliknąć lub przeciągnąć, sercem i przyciskiem <b>Dodaj</b>; przycisk z chmurką otwiera stronę, na której jest utwór.',
+        t1: 'Kliknij okładkę na dowolnej liście, a utwór zacznie grać na SoundCloud bez opuszczania listy. Pokazuje go pasek na dole: z odtwarzaniem i pauzą, poprzednim i następnym utworem, linią przewijania, którą można kliknąć lub przeciągnąć, sercem i przyciskiem <b>Dodaj</b>. Przycisk z chmurką otwiera stronę, na której jest utwór.',
         t2: 'Po wyjściu z Discover muzyka gra dalej, a sterowanie przejmuje ten sam pasek. Jego <b>×</b> wstrzymuje odtwarzanie i chowa pasek.',
         t3: 'To ten sam pasek, który odtwarza pliki z twoich folderów: naraz gra tylko jedna rzecz, więc włączenie pliku wstrzymuje SoundCloud, a włączenie utworu zatrzymuje plik.',
       },
@@ -139,14 +139,14 @@ I18N.add('pl', 'discover', {
       },
       s2: {
         h: 'Warto wiedzieć',
-        t1: 'Lista polubień jest zapamiętywana na kilka minut; <b>Odśwież</b> na tej stronie wczytuje ją z SoundCloud od nowa.',
+        t1: 'Lista polubień jest zapamiętywana na kilka minut. <b>Odśwież</b> na tej stronie wczytuje ją z SoundCloud od nowa.',
         t2: 'Biblioteka polubień (link kończący się na /likes) z definicji jest tą listą, więc nie ma w niej przycisku „Dodaj”.',
       },
     },
     artwork: {
       name: 'Okładka',
-      text: 'Kliknij ją, żeby posłuchać utworu: gra na SoundCloud w DJ HQ, a ty zostajesz na liście; steruje nim pasek na dole. <b>Otwieranie utworów</b> w Ustawieniach przełącza to na przeglądarkę.',
+      text: 'Kliknij ją, żeby posłuchać utworu: gra na SoundCloud w DJ HQ, a ty zostajesz na liście. Steruje nim pasek na dole. <b>Otwieranie utworów</b> w Ustawieniach przełącza to na przeglądarkę.',
     },
-    missingTip: 'Kliknij okładkę, żeby najpierw posłuchać utworu bez opuszczania listy; <b>Odtwórz</b> i <b>Otwórz na Discover</b> są też w menu ⋯ każdego wiersza.',
+    missingTip: 'Kliknij okładkę, żeby najpierw posłuchać utworu bez opuszczania listy. <b>Odtwórz</b> i <b>Otwórz na Discover</b> są też w menu ⋯ każdego wiersza.',
   },
 });
