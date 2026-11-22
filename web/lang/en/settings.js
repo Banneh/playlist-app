@@ -28,6 +28,10 @@ I18N.add('en', 'settings', {
     addFolder: 'Add folder',
     subfoldersHint: 'Also look inside the folders within each library folder. When this is off, only files directly in a library folder count. Files in subfolders show up as <i>subfolder/file</i>.',
     changeLinkHint: 'Point this library at another SoundCloud link, e.g. the share link of the playlist once it is private',
+    changeMain: 'Change…',
+    changeMainHint: 'Use another folder as the main folder of this library. No files are moved.',
+    makeMain: 'Make main folder',
+    makeMainHint: 'Use this folder as the main folder. The current main folder stays in the library as an extra folder. No files are moved.',
   },
 
   // the Downloads card
@@ -108,6 +112,10 @@ I18N.add('en', 'settings', {
   toast: {
     scanningToo: 'Now also scanning {dir}',
     folderRemoved: 'Folder removed from the library',
+    folderRemovedLost: {
+      one: 'Folder removed from the library. {n} track has no file now.',
+      other: 'Folder removed from the library. {n} tracks have no file now.',
+    },
     subfoldersOn: 'Subfolders are scanned too',
     subfoldersOff: 'Only the library folders themselves are scanned',
     inboxReset: 'Back to the default Downloads folder',
@@ -125,7 +133,7 @@ I18N.add('en', 'settings', {
   },
   removeFolder: {
     title: 'Remove {dir} from the library?',
-    body: 'DJ HQ stops scanning this folder. The files in it stay exactly where they are; tracks matched to them show as missing again.',
+    body: 'DJ HQ stops scanning this folder. The files in it stay exactly where they are. A track matched to one of them keeps its match when the library has a file of the same name in another folder, also with another extension. The other tracks show as missing again.',
     ok: 'Remove folder',
   },
   cleanBackups: {
@@ -172,6 +180,153 @@ I18N.add('en', 'settings', {
         other: 'If you use it, the {n} tracks that aren’t in it leave the library, with their matches; changing the link back won’t bring the matches back.',
       },
       ok: 'Use this link anyway',
+    },
+  },
+
+  // a new main folder for the library (Change… on the Library card, or the folder was moved)
+  main: {
+    typeTitle: 'Where is the main folder now?',
+    typePh: '/path/to/the/folder',
+    typeNext: 'Next',
+    checking: 'Looking at the folder…',
+    title: 'Use {dir} as the main folder?',
+    p1: 'DJ HQ moves no files. It only looks for this library’s music in the new folder. Matches, pins, edits and backups carry over, also when a file has the same name with another extension.',
+    counts: 'Tracks with a file now: <b>{before}</b>. In the new folder: <b>{after}</b>.',
+    countsAway: 'The old folder is not there. Tracks that had a file when it was last seen: <b>{before}</b>. In the new folder: <b>{after}</b>.',
+    otherExt: {
+      one: '{n} match follows a file with another extension.',
+      other: '{n} matches follow a file with another extension.',
+    },
+    loseHead: {
+      one: '{n} track would lose its file:',
+      other: '{n} tracks would lose their file:',
+    },
+    loseNone: 'No track loses its file.',
+    more: {
+      one: 'and {n} more',
+      other: 'and {n} more',
+    },
+    empty: 'There are no audio files in this folder.',
+    ok: 'Use this folder',
+    done: 'Main folder changed to {dir}',
+    // the folder is one of the library's extra folders: the two swap roles
+    swapTitle: 'Make {dir} the main folder?',
+    swapP1: 'DJ HQ moves no files. New downloads go into this folder from now on, and {old} stays in the library as an extra folder. Matches, pins, edits and backups stay with their files.',
+    swapOk: 'Make main folder',
+    swapDone: '{dir} is the main folder now. {old} stays in the library.',
+    notChanged: 'The main folder was not changed',
+    failed: 'The main folder could not be changed: {msg}',
+  },
+
+  // the AIFF instead of WAV card
+  aiff: {
+    title: 'AIFF instead of WAV',
+    text: 'rekordbox shows cover art for AIFF files and not for WAV files. AIFF holds the same uncompressed audio at the same size. Nothing about the sound changes.',
+    auto: 'Convert new WAV files to AIFF',
+    autoHint: 'A WAV file that DJ HQ moves into the library becomes an AIFF file. The audio is checked against the WAV first, and the WAV goes to the backups.',
+    autoOn: 'New WAV files will be converted to AIFF',
+    autoOff: 'New WAV files stay WAV',
+    wavCount: {
+      one: '{n} WAV file in this library',
+      other: '{n} WAV files in this library',
+    },
+    wavNone: 'No WAV files in this library',
+    convert: 'Convert WAV files to AIFF…',
+    rekordbox: 'Update a rekordbox export…',
+    rekordboxHint: 'Makes a copy of a collection exported from rekordbox in which converted or moved tracks point at their new files',
+    ask: {
+      title: {
+        one: 'Convert {n} WAV file to AIFF?',
+        other: 'Convert {n} WAV files to AIFF?',
+      },
+      p1: 'Each file is written as AIFF with the same sample rate and bit depth, with its tags and cover. The audio of the copy is compared with the WAV. Only when they are identical does the AIFF take the WAV’s place.',
+      p2: 'The WAV files go to the backups ({size}). Restore originals on the Prepare page puts them back and moves the AIFF files to the backups. Free the space later in Settings > Backups.',
+      free: 'Free space in the data folder: {size}.',
+      skip: {
+        one: '{n} file stays WAV (its format is not converted, or an AIFF with its name exists).',
+        other: '{n} files stay WAV (their format is not converted, or an AIFF with their name exists).',
+      },
+      keptHead: {
+        one: 'This file stays WAV:',
+        other: 'These files stay WAV:',
+      },
+      p3: 'rekordbox sees the AIFF files as new tracks. Afterwards use Update a rekordbox export… to keep cue points and playlists.',
+      ok: 'Convert',
+    },
+    none: 'No WAV file to convert',
+    converting: 'Converting…',
+    progress: 'Converting {done} of {total}…',
+    done: {
+      one: '{n} file converted to AIFF',
+      other: '{n} files converted to AIFF',
+    },
+    kept: {
+      one: '{n} file kept as WAV',
+      other: '{n} files kept as WAV',
+    },
+    changed: {
+      one: '{n} file changed meanwhile and was left for a later run',
+      other: '{n} files changed meanwhile and were left for a later run',
+    },
+    report: {
+      title: 'Conversion finished',
+      keptHead: {
+        one: '{n} file stays WAV:',
+        other: '{n} files stay WAV:',
+      },
+      failedHead: {
+        one: '{n} file could not be converted and stays WAV:',
+        other: '{n} files could not be converted and stay WAV:',
+      },
+      changedHead: {
+        one: '{n} file changed during the run and was left for a later run:',
+        other: '{n} files changed during the run and were left for a later run:',
+      },
+    },
+    busy: 'Wait until the conversion is done',
+    resumed: 'WAV files are being converted to AIFF. Settings > AIFF instead of WAV shows how far it is.',
+    failed: 'Conversion failed: {msg}',
+    failedSome: {
+      one: '{done} converted, {n} failed: {err}',
+      other: '{done} converted, {n} failed, first: {err}',
+    },
+    rb: {
+      title: 'rekordbox export updated',
+      before: 'First export your collection in rekordbox: File > Export Collection in xml format. Then choose that file here.',
+      pick: 'Choose the export…',
+      typeTitle: 'Where is the exported collection file?',
+      typePh: '/path/to/collection.xml',
+      typeNext: 'Update',
+      working: 'Updating the export…',
+      none: 'No new file was written: no track of this export belongs to a file that DJ HQ converted or that moved with the main folder.',
+      ownOnly: 'No new file was written: the new files of these tracks are in the export already, with cue points of their own, and no playlist lists the old entries.',
+      own: {
+        one: '{n} track has an entry for its new file with cue points of its own. Both entries stay, and the playlists list the new one.',
+        other: '{n} tracks have an entry for their new file with cue points of their own. Both entries stay, and the playlists list the new ones.',
+      },
+      wrote: 'New file: <b>{file}</b>, next to your export. Your export was not changed.',
+      counts: {
+        one: '{n} track now points at its new file. Cue points kept: {cues}.',
+        other: '{n} tracks now point at their new files. Cue points kept: {cues}.',
+      },
+      missing: {
+        one: '{n} track was left as it is because no new file was found for it.',
+        other: '{n} tracks were left as they are because no new file was found for them.',
+      },
+      dropped: {
+        one: '{n} entry without cue points for the same file was left out.',
+        other: '{n} entries without cue points for the same files were left out.',
+      },
+      stepsHead: 'In rekordbox',
+      s1: 'Remove the new AIFF tracks from the collection if rekordbox already has them without cue points. If they stay, rekordbox may ignore the data in the file.',
+      s2: 'Open Preferences > Advanced > Database > rekordbox xml and choose the new file.',
+      s3: 'In the tree on the left open rekordbox xml > Playlists, right-click each of these playlists and choose Import Playlist:',
+      s3loose: {
+        one: '{n} track is in no playlist. Open rekordbox xml > All Tracks, find it, right-click it and choose Import To Collection.',
+        other: '{n} tracks are in no playlist. Open rekordbox xml > All Tracks, select them, right-click and choose Import To Collection.',
+      },
+      s4: 'Check a few tracks, then delete the old playlists and the old WAV entries yourself. DJ HQ removes nothing in rekordbox.',
+      failed: 'The export could not be updated: {msg}',
     },
   },
 });

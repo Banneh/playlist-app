@@ -385,7 +385,7 @@ const sc: ScView = {
 /** The file pickers of the "Do everything" setup. On macOS an app is a folder (a
  *  bundle) that the open panel shows as one item when "app" is the only extension;
  *  a path inside a bundle is cut back to the bundle. */
-const PICK_TEXT = { pn_app: "pick.pn_app", mik_app: "pick.mik_app", mik_db: "pick.mik_db", rb_xml: "pick.rb_xml", config: "pick.config" } as const satisfies Record<PickKind, string>;
+const PICK_TEXT = { pn_app: "pick.pn_app", mik_app: "pick.mik_app", mik_db: "pick.mik_db", rb_xml: "pick.rb_xml", config: "pick.config", rb_export: "pick.rb_export" } as const satisfies Record<PickKind, string>;
 async function pickFile(kind: PickKind): Promise<string | null> {
   const mac = process.platform === "darwin", winOs = process.platform === "win32";
   const home = app.getPath("home");

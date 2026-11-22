@@ -39,6 +39,7 @@ The app speaks English and Polish: it follows your system language, and
   - [Appearance, search and the sidebar](#appearance-search-and-the-sidebar)
   - [Settings](#settings)
   - [More than one folder](#more-than-one-folder)
+  - [AIFF instead of WAV, and moving the main folder](#aiff-instead-of-wav-and-moving-the-main-folder)
   - [More than one playlist](#more-than-one-playlist)
   - [Moving to another computer, or a backup](#moving-to-another-computer-or-a-backup)
 - [Tips and troubleshooting](#tips-and-troubleshooting)
@@ -425,7 +426,8 @@ values.
 
 1. **Pick your player** at the top. Everything below adapts to what it can
    play: the XDJ-700 and XDJ-1000 only take 16-bit WAV at 44.1 or 48 kHz, while
-   the CDJ-2000NXS2, XDJ-XZ and CDJ-3000 also play 24-bit, 96 kHz and FLAC.
+   the CDJ-2000NXS2, XDJ-XZ, CDJ-3000 and CDJ-3000X also play 24-bit, 96 kHz and FLAC,
+   and the CDJ-3000X plays 32-bit files too.
 2. **Write tags** writes the artist and title into every file where they are
    missing or differ from the names DJ HQ shows, the way rekordbox reads them
    (it is strict about WAV files). The genre becomes the playlist name.
@@ -450,6 +452,19 @@ values.
    are. A tagged file whose rewrite would lose something else (FLAC, M4A, OGG,
    some ID3v2.4 frames and INFO fields) is left as it is. Afterwards select the
    tracks in rekordbox, right-click them and choose *Reload Tag*.
+
+   **Add cover art**, under it, puts the artwork of each track on SoundCloud
+   into its file as the front cover, where the file has no picture yet. It is
+   fetched at 500 x 500 pixels, smaller only when SoundCloud has no such size
+   (a plain download of the public picture, no sign-in). A picture already in
+   a file is never replaced; the new one is added to the file's ID3 tag and
+   every other tag, chunk and the audio stay byte for byte. Only tagged WAV,
+   MP3 and AIFF files with an ID3v2.3 or v2.4 tag get one; the confirmation
+   lists the others and why. When the downloads keep failing (no network),
+   the run stops and the rest is left for another try.
+   rekordbox may not show pictures in WAV files, and then the players don't
+   either; it does in MP3 and AIFF. Afterwards use *Reload Tag* in rekordbox,
+   which also replaces names you changed there with the names in the files.
 
    Artist and title come from the SoundCloud title: artist before the dash,
    title after it. "Premiere:", a catalogue number or vinyl side in front, and
@@ -511,7 +526,8 @@ The gear at the bottom of the sidebar. From top to bottom: the library (its
 folders, playlist, remove), the SoundCloud account signed in on Discover (sign
 out, and the switch that likes every track you add), where tracks open
 (Discover or your browser), the Downloads folder DJ HQ watches and the switch
-for moving exact matches automatically, how often the playlist is checked,
+for moving exact matches automatically, AIFF instead of WAV (see
+[below](#aiff-instead-of-wav-and-moving-the-main-folder)), how often the playlist is checked,
 appearance, language, backups (how much space the originals of converted files and
 replaced MP3s take, with a **Clean up** button once you're sure you won't need
 them), moving or backing up your setup (**Export configuration…** and
@@ -530,8 +546,9 @@ over several, or sorted into subfolders. Both work:
 
 - **Add folder** in the library card of Settings adds another folder to the
   library. Files in any of its folders count as yours. The first folder stays
-  the *main* one: that is where downloads are moved into. A folder can be
-  removed from the library again; its files stay where they are.
+  the *main* one: that is where downloads are moved into, until you click
+  **Make main folder** on another folder's row. A folder can be removed from
+  the library again; its files stay where they are.
 - **Include subfolders** also scans the folders inside each library folder.
   It is off unless you turn it on, so a library never picks up more than you
   asked for.
@@ -540,6 +557,28 @@ Files outside the main folder are listed with their folder in front, for
 example `Deep/Artist - Title.wav` or `Vinyl rips/Artist - Title.wav`, so you
 can see where each one lives. Tags, conversion, backups and restore work on
 them like on any other file.
+
+### AIFF instead of WAV, and moving the main folder
+
+rekordbox shows cover art for AIFF files and not for WAV files, so DJ HQ can
+turn WAV files into AIFF files with the same audio at the same sample rate and
+bit depth: switch on **Convert new WAV files to AIFF** in Settings > AIFF
+instead of WAV for new downloads, or use **Convert WAV files to AIFF…** there
+for the files you have. Each copy is compared with its WAV before the WAV goes
+to the backups. **Restore originals** on the Prepare page undoes it: the WAV
+comes back and the AIFF goes to the backups. rekordbox then sees
+new files without cue points: export your collection in rekordbox with File >
+Export Collection in xml format, choose that file with **Update a rekordbox
+export…**, and import from the new file DJ HQ writes next to it the playlists
+it names (tracks that are in no playlist come in through All Tracks). If you moved or renamed the library's folder, use
+**Change…** next to the main folder in Settings > Library: no files are moved,
+and your matches carry over, also when a file now has the same name with
+another extension. When the AIFF copies are already in an extra folder of the
+library, click **Make main folder** on that folder's row: the two folders swap
+roles, the old main folder stays in the library as an extra folder, and every
+match, pin and edit stays with its file. Remove the old folder afterwards if
+you like: a track matched to a file there keeps its match when the library has
+a file of the same name in another folder, also with another extension.
 
 ### More than one playlist
 
@@ -827,9 +866,9 @@ bodies are JSON.
 | `GET /api/app` | | app version, platform and whether it runs packaged (not a view) |
 | `POST /api/refresh` | | fetch the playlist, then the view (with `fetch_report: {unreadable}`, tracks SoundCloud wouldn't hand out) |
 | `POST /api/rescan` | | rescan the library folders |
-| `POST /api/library` | `{op: "add", dir, url}` · `{op: "select", id}` · `{op: "remove", id}` · `{op: "add_folder", dir}` · `{op: "remove_folder", dir}` · `{op: "subfolders", on}` · `{op: "set_url", url, confirm?}` · `{op: "files_ready"}` | manage libraries, their folders and their SoundCloud link (the folder ops, `set_url` and `files_ready` take an optional `id`, default: the active library; `files_ready` ends an imported library's wait for its music). The view carries `link_missing` for a library imported without its link (`/api/refresh` then refuses with that code) and `folders_away` entries with `why: "waiting"` while an imported library waits for its files. `add` and `set_url` add `fetch_report: {unreadable}`, `set_url` also `{same, of, had}`; a new link that misses tracks the library had changes nothing and answers `{confirm: report}` until it is sent again with `confirm: true` |
-| `POST /api/device` | `{device}` | target player (`xdj-700`, `nxs2`, `cdj-3000`) |
-| `POST /api/settings` | `{inbox_dir?, auto_move?, refresh_min?, like_on_add?, sc_open?}` | downloads folder (`""` = default), auto-move, check interval in minutes, like-on-add, where SoundCloud links open (`"discover"` or `"browser"`) |
+| `POST /api/library` | `{op: "add", dir, url}` · `{op: "select", id}` · `{op: "remove", id}` · `{op: "add_folder", dir}` · `{op: "remove_folder", dir}` · `{op: "subfolders", on}` · `{op: "set_url", url, confirm?}` · `{op: "files_ready"}` · `{op: "set_dir", dir, confirm?}` | manage libraries, their folders and their SoundCloud link (the folder ops, `set_url`, `set_dir` and `files_ready` take an optional `id`, default: the active library; `files_ready` ends an imported library's wait for its music; `set_dir` makes another folder the main folder, moving no files: without `confirm` it changes nothing and answers `{confirm: {dir, from, from_away, files, empty, before, after, lose, lose_count, gain, pins, records}}`, with it the view carries `main_report`; matches, edits and found tracks follow their files, also to the same name with another audio extension; for one of the library's extra folders the two folders swap roles, `swap: true` in the plan and in `main_report`; `remove_folder` moves a pin or record of a file in that folder to the one file of the same name left in the library, also with another extension, and the view carries `remove_report: {dir, followed, before, after, lost, lost_count}`). `folders_away` entries carry `main: true` for the main folder and `drive: true` when its drive isn't mounted. The view carries `link_missing` for a library imported without its link (`/api/refresh` then refuses with that code) and `folders_away` entries with `why: "waiting"` while an imported library waits for its files. `add` and `set_url` add `fetch_report: {unreadable}`, `set_url` also `{same, of, had}`; a new link that misses tracks the library had changes nothing and answers `{confirm: report}` until it is sent again with `confirm: true` |
+| `POST /api/device` | `{device}` | target player (`xdj-700`, `nxs2`, `cdj-3000`, `cdj-3000x`) |
+| `POST /api/settings` | `{inbox_dir?, auto_move?, refresh_min?, like_on_add?, sc_open?, aiff_auto?}` | downloads folder (`""` = default), auto-move, check interval in minutes, like-on-add, where SoundCloud links open (`"discover"` or `"browser"`), whether WAV files moved into the library become AIFF files (the move's view carries `move_report: {key, aiff_kept}`, Move all's `inbox_report` has `aiff_kept`) |
 | `POST /api/config/export-info` | | what the export dialog warns about: libraries with private links, folders that are away, `can_save` (not a view) |
 | `POST /api/config/export` | `{leave_links_out?}` | Electron: a save dialog, then `{path}` or `{canceled}`; headless answers `unsupported` (not a view) |
 | `GET /api/config/export?leave_links_out=1` | | the configuration file as a download (only for `Host` 127.0.0.1 / localhost) |
@@ -846,8 +885,11 @@ bodies are JSON.
 | `POST /api/edit` | `{id, artist, title}` or `{file, artist, title}` | artist/title edit (track or local file) |
 | `POST /api/seen` | | mark all as seen |
 | `POST /api/tag` | `{preview?, replace?, keep_file?, seen?, all?}` | write tags (adds `tag_report`; files whose own different name would be replaced are left and listed in `kept` unless `replace`, or `keep_file` makes their names hand edits first; both apply only to the previewed replaces whose `sig` is in `seen`); `preview` writes nothing and answers `{writes, replaces}`; `all` takes every library file, tagged or not (preview and `tag_report` add `left`: tagged files whose rewrite would lose something; `tag_report` also `all`, `total` and `changed`: files that changed on disk during the run), one run at a time: meanwhile every `/api/tag`, convert, restore and clean-backups is refused with code `tag_running` |
-| `GET /api/tag/progress` | | `{running, done, total, report}` of the `all` run (not queued; `report`: the last run's `tag_report`) |
+| `GET /api/tag/progress` | | `{running, kind, done, total, report}` of the `all` run or of `/api/art` (`kind` `tags`, `art` or `aiff`; not queued; `report`: the last run's `tag_report` or `art_report`) |
+| `POST /api/art` | `{preview?}` | Add cover art: the track's SoundCloud artwork (500x500, then 300x300, then the stored link, each step only on a 404/410) goes into each matched file that is tagged, has an ID3v2.3/2.4 tag DJ HQ writes and no picture; adds `art_report` `{done, errors, error_items, changed, total, left, offline?}` (`offline`: files not tried after three links in a row failed to download); `preview` writes and downloads nothing and answers `{writes, wav, left}` (`left` by reason: `has_pic`, `untagged`, `format`, `no_art`, `extra`; the view's `art` has the same counts). One file-writing run at a time with Write tags in every file: while it runs those calls are refused with `art_running`, and it is refused with `tag_running` during theirs |
 | `POST /api/convert` · `/api/restore` | | convert / restore originals (adds a report) |
+| `POST /api/aiff` | `{preview?}` | Convert WAV files to AIFF (16, 24 and 32 bit PCM only, same rate and depth; tags, cover and the other tag frames carried; decoded audio compared before the WAV goes to the backups); adds `aiff_report` `{done, total, kept, errors, error_items, changed, backup_dir}`; `preview` answers `{wav, convert, skip: {format, exists}, kept, bytes, free_bytes, backup_dir}` (`kept`: the files that stay WAV, with the reason). `POST /api/restore` undoes a conversion: the WAV back, the AIFF to `originals/<lib>/replaced/`. An every-file run like `/api/art` (`kind` `aiff` in `/api/tag/progress`, refused with `aiff_running` meanwhile). The view's `aiff` is `{on, wav}` |
+| `POST /api/aiff/rekordbox` | `{pick: true}` · `{path}` | writes `<export> AIFF.xml` (`<export> moved.xml` when no WAV became an AIFF) next to a collection exported from rekordbox, with converted or moved tracks pointing at their new files (cue points and grids kept, cue-less duplicates left out, an entry of the new file that has cue points of its own kept and listed in the playlists instead, changed playlists renamed with the same suffix); answers `{file, out, total, remapped, wav_to_aiff, folder_moved, missing, missing_names, dropped, own_cues, cues, no_cues, playlists, loose, suffix}` (`out` null when nothing needed it; `loose`: remapped tracks no playlist lists) |
 | `POST /api/find` | `{file, q?}` | SoundCloud candidates for a local file (not a view) |
 | `POST /api/found` | `{file, track \| null}` | remember / forget the picked track |
 | `POST /api/find-all` | | search every unresolved file, accept sure matches |

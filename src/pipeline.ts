@@ -616,10 +616,13 @@ async function stepMove(st: StepRec): Promise<void> {
       // a move that went through before a restart (or auto-move took it first): the file is
       // in the library, and the download is gone, or (a zip, which stays) the file is pinned
       // to this track
-      const dst = path.join(lib.dir, name);
+      // (with "AIFF instead of WAV" on, the WAV may have become "<name>.aif" right after its move)
+      const aif = /\.wav$/i.test(name) && core.getSettings().aiff_auto ? name.replace(/\.wav$/i, ".aif") : "";
+      const there = !fs.existsSync(path.join(lib.dir, name)) && aif && fs.existsSync(path.join(lib.dir, aif)) ? aif : name;
+      const dst = path.join(lib.dir, there);
       const src = path.join(core.getSettings().inbox_dir, it.source.zip || name);
-      const pinned = it.track_id != null && core.STATE.assigned[String(it.track_id)] === name;
-      if (fs.existsSync(dst) && (it.source.zip ? pinned : !fs.existsSync(src))) { it.key = name; it.path = dst; setItem(it, "move", "ok"); }
+      const pinned = it.track_id != null && core.STATE.assigned[String(it.track_id)] === there;
+      if (fs.existsSync(dst) && (it.source.zip ? pinned : !fs.existsSync(src))) { it.key = there; it.path = dst; setItem(it, "move", "ok"); }
       else setItem(it, "move", "failed", "move_failed", { file: name, ...errVars(e) });
     }
     save();

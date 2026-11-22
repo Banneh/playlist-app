@@ -146,6 +146,66 @@ I18N.add('pl', 'tags', {
       many: '{n} plików zmieniło się w międzyczasie na dysku i zostało bez zmian. Uruchom zapis jeszcze raz.',
     },
   },
+  art: {
+    title: {
+      one: 'Dodać okładkę do {n} pliku?',
+      few: 'Dodać okładki do {n} plików?',
+      many: 'Dodać okładki do {n} plików?',
+    },
+    p1: 'Każdy plik dostanie okładkę swojego utworu z SoundCloud (do 500 x 500 pikseli), zapisaną w tagach jako przednia okładka. Obrazki, które pliki już mają, nie są zastępowane, a dźwięk i pozostałe tagi zostają nietknięte.',
+    wav: {
+      one: '<b>{n} z nich to plik WAV.</b> rekordbox może nie pokazywać obrazków w plikach WAV, a wtedy odtwarzacze też ich nie pokażą. Inne aplikacje je pokazują.',
+      few: '<b>{n} z nich to pliki WAV.</b> rekordbox może nie pokazywać obrazków w plikach WAV, a wtedy odtwarzacze też ich nie pokażą. Inne aplikacje je pokazują.',
+      many: '<b>{n} z nich to pliki WAV.</b> rekordbox może nie pokazywać obrazków w plikach WAV, a wtedy odtwarzacze też ich nie pokażą. Inne aplikacje je pokazują.',
+    },
+    leftHead: 'Bez zmian zostaną:',
+    left: {
+      has_pic: {
+        one: '{n} plik, który ma już obrazek',
+        few: '{n} pliki, które mają już obrazek',
+        many: '{n} plików, które mają już obrazek',
+      },
+      untagged: {
+        one: '{n} plik bez tagów: najpierw zapisz tagi',
+        few: '{n} pliki bez tagów: najpierw zapisz tagi',
+        many: '{n} plików bez tagów: najpierw zapisz tagi',
+      },
+      format: {
+        one: '{n} plik w formacie, do którego DJ HQ nie dodaje obrazków (FLAC, M4A, OGG, stare tagi ID3)',
+        few: '{n} pliki w formacie, do którego DJ HQ nie dodaje obrazków (FLAC, M4A, OGG, stare tagi ID3)',
+        many: '{n} plików w formacie, do którego DJ HQ nie dodaje obrazków (FLAC, M4A, OGG, stare tagi ID3)',
+      },
+      no_art: {
+        one: '{n} plik, którego utwór nie ma okładki na SoundCloud',
+        few: '{n} pliki, których utwory nie mają okładki na SoundCloud',
+        many: '{n} plików, których utwory nie mają okładki na SoundCloud',
+      },
+      extra: {
+        one: '{n} plik spoza playlisty',
+        few: '{n} pliki spoza playlisty',
+        many: '{n} plików spoza playlisty',
+      },
+    },
+    p3: 'Potem zaznacz utwory w rekordbox, kliknij je prawym przyciskiem i wybierz <b>Reload Tag</b>, żeby odczytał obrazki. Reload Tag zastępuje też nazwy zmienione w rekordbox tymi z plików.',
+    adding: 'Dodawanie okładek…',
+    progress: 'Dodawanie okładek… {done} / {total}',
+    done: {
+      one: 'Dodano okładkę do {n} pliku. W rekordbox użyj Reload Tag.',
+      few: 'Dodano okładki do {n} plików. W rekordbox użyj Reload Tag.',
+      many: 'Dodano okładki do {n} plików. W rekordbox użyj Reload Tag.',
+    },
+    failed: {
+      one: 'Dodano: {done}, nie udało się w {n} pliku: {err}',
+      few: 'Dodano: {done}, nie udało się w {n} plikach: {err}',
+      many: 'Dodano: {done}, nie udało się w {n} plikach: {err}',
+    },
+    offline: {
+      one: 'Przerwano: {err}. {n} plik został bez zmian; sprawdź połączenie i dodaj okładki jeszcze raz.',
+      few: 'Przerwano: {err}. {n} pliki zostały bez zmian; sprawdź połączenie i dodaj okładki jeszcze raz.',
+      many: 'Przerwano: {err}. {n} plików zostało bez zmian; sprawdź połączenie i dodaj okładki jeszcze raz.',
+    },
+    none: 'Żaden plik nie potrzebuje okładki.',
+  },
   moveIn: 'Przenieś do biblioteki',
   upgrade: 'Podmień na bezstratny',
   movedIn: 'Przeniesiono do biblioteki',

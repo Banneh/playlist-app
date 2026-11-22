@@ -178,6 +178,7 @@ export function buildExport(opts: { leaveLinksOut?: boolean; theme?: unknown }):
   if (typeof s.auto_move === "boolean") settings.auto_move = s.auto_move;
   if (typeof s.refresh_min === "number") settings.refresh_min = s.refresh_min;
   if (typeof s.like_on_add === "boolean") settings.like_on_add = s.like_on_add;
+  if (typeof s.aiff_auto === "boolean") settings.aiff_auto = s.aiff_auto;
   if (s.sc_open) settings.sc_open = s.sc_open;
   const machine: any = {};
   if (S.inbox_dir) machine.inbox_dir = S.inbox_dir;
@@ -430,8 +431,8 @@ function checkDir(raw: unknown): { dir: string } | { problem: string } {
 interface FolderMatch {
   dir: string; files: number;
   pins: { total: number; found: number }; known: { total: number; found: number }; entries: { total: number; found: number };
-  ambiguous: number; needs_subfolders: boolean; how: { exact: number; folded: number; base: number };
-  map: Map<string, { to: string; how: "exact" | "folded" | "base" }>;
+  ambiguous: number; needs_subfolders: boolean; how: { exact: number; folded: number; base: number; stem: number };
+  map: Map<string, { to: string; how: core.MatchHow }>;
 }
 /** Match one exported folder's keys to the files in `dir` (names only, any depth). */
 function matchFolder(l: LibRec, fi: number, dir: string): FolderMatch {
@@ -439,7 +440,7 @@ function matchFolder(l: LibRec, fi: number, dir: string): FolderMatch {
   const disk = core.listAudioKeys(dir, true);
   const m = core.matchKeys([...w.pins, ...w.known, ...w.files], disk);
   const hit = (ks: string[]) => ks.filter((k) => m.map.has(k)).length;
-  const how = { exact: 0, folded: 0, base: 0 };
+  const how = { exact: 0, folded: 0, base: 0, stem: 0 };
   for (const v of m.map.values()) how[v.how]++;
   return {
     dir, files: disk.length,
@@ -617,6 +618,7 @@ export async function apply(data: any, opts: { jobActive: boolean }): Promise<an
   if (typeof fs_.auto_move === "boolean") st.auto_move = fs_.auto_move;
   if (core.REFRESH_CHOICES.includes(fs_.refresh_min)) st.refresh_min = fs_.refresh_min;
   if (typeof fs_.like_on_add === "boolean") st.like_on_add = fs_.like_on_add;
+  if (typeof fs_.aiff_auto === "boolean") st.aiff_auto = fs_.aiff_auto;
   if (fs_.sc_open === "discover" || fs_.sc_open === "browser") st.sc_open = fs_.sc_open;
   if (S.settings?.do_all) st.do_all = S.settings.do_all;
   if (S.inbox_dir) next.inbox_dir = S.inbox_dir;

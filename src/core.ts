@@ -7,8 +7,9 @@
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { execFile } from "child_process";
-import { buildId3v23, carriedFrames, carriedChunks, appendChunks, prependTag, copyAfterTag, readKeyInfo, id3Version, infoFields, id3Names, rewriteLosses } from "./id3";
+import { execFile, ChildProcess } from "child_process";
+import { buildId3v23, carriedFrames, carriedChunks, appendChunks, prependTag, copyAfterTag, readKeyInfo, id3Version, infoFields, id3Names, rewriteLosses,
+         pictureTag, replaceTagChunk, rawTagFrames, apicFrame, otherChunks, infoAsFrames } from "./id3";
 import { listEntries, extractEntry, ZipEntry } from "./zip";
 import { checkXmlFile } from "./rbxml";
 import * as store from "./store";
@@ -25,6 +26,9 @@ export const DEVICES: Record<string, Device> = {
   "nxs2":     { label: "CDJ-2000NXS2 / XDJ-XZ", wavBits: 24,
                 srs: [44100, 48000, 88200, 96000], flac: true },
   "cdj-3000": { label: "CDJ-3000", wavBits: 24,
+                srs: [44100, 48000, 88200, 96000], flac: true },
+  // 32-bit WAV and AIFF (integer and float) play on the 3000X: seen on the owner's player, not in a spec sheet
+  "cdj-3000x": { label: "CDJ-3000X", wavBits: 32,
                 srs: [44100, 48000, 88200, 96000], flac: true },
 };
 
@@ -45,15 +49,28 @@ function resolveBin(mod: string, fallback: string): string {
 export const FFMPEG = resolveBin("ffmpeg-static", "ffmpeg");
 export const FFPROBE = resolveBin("ffprobe-static", "ffprobe");
 
+/** The child processes running now (ffmpeg, ffprobe, xattr): shutdown() ends them, so none
+ *  goes on writing a temp file after the app is gone. */
+const CHILDREN = new Set<ChildProcess>();
+/** Temp files being written right now (a tag or picture write, a convert, a WAV to AIFF copy,
+ *  a zip entry staged): shutdown() removes them, the stale-temp sweep leaves them alone. */
+const LIVE_TMP = new Set<string>();
 function run(cmd: string, args: string[], timeoutMs: number): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    execFile(cmd, args, { timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
+    const child = execFile(cmd, args, { timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
+      CHILDREN.delete(child);
       let code = 0;
       if (err) code = typeof (err as any).code === "number" ? (err as any).code : 1;
       resolve({ code, stdout: String(stdout), stderr: String(stderr) });
     });
+    CHILDREN.add(child);
   });
 }
+/** a temp file next to a library file; `p` is its path (removed by shutdown() while it is listed) */
+const liveTmp = (p: string) => { LIVE_TMP.add(p); return p; };
+/** liveTmp, after removing a temp file of that name that a write cut off earlier left behind */
+const staleGone = (p: string) => { if (!LIVE_TMP.has(p)) try { fs.unlinkSync(p); } catch { /* none */ } return liveTmp(p); };
+const doneTmp = (p: string) => { LIVE_TMP.delete(p); try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch { /* ignore */ } };
 
 // ---------------- state ----------------
 
@@ -88,16 +105,25 @@ export interface Library {
   files_pending?: boolean;
   /** the library's id on the computer a configuration file came from (kept for later matching) */
   uid?: string;
+  /** earlier main folders of this library (set_dir), newest last, at most 5: the rekordbox
+   *  export update (aiff.ts) points tracks that are still listed there at the new folder */
+  moved_from?: string[];
+  /** earlier main folders that are extra folders of this library now (set_dir to one of its extra
+   *  folders swaps the two): removing one from the library adds it to moved_from then */
+  former_main?: string[];
+  /** backups that Convert WAV files to AIFF made: the WAV's key -> the AIFF's key it became, so
+   *  Restore originals can undo that (the WAV back, the AIFF to replaced/, the records back) */
+  aiff_from?: Record<string, string>;
 }
 
-// dur_cache entry: [size, mtime, duration, [codec, sr, bits], [artist, title, genre], [key, pn, info, id3]]
+// dur_cache entry: [size, mtime, duration, [codec, sr, bits], [artist, title, genre], [key, pn, info, id3, pic, ver]]
 // info: a WAV's LIST/INFO [artist, title], null without one (and for other formats);
-// id3: a WAV's ID3 chunk [artist, title] (ffprobe doesn't show them next to INFO).
-// (entries written before the key was read have five elements, and a WAV's written before
-// INFO / ID3 names were read lack them: scanFolder adds those from the file's tags alone,
-// without a new ffprobe run)
+// id3: a WAV's ID3 chunk [artist, title] (ffprobe doesn't show them next to INFO);
+// pic: the ID3 tag holds a picture; ver: that tag's version (0 = none), for Add cover art.
+// (entries written before the key was read have five elements, and older ones lack the
+// later fields: scanFolder adds those from the file's tags alone, without a new ffprobe run)
 type CacheEntry = [number, number, number, [string, number, number], [string, string, string],
-  [string | null, boolean | null, ([string, string] | null)?, ([string, string] | null)?]?];
+  [string | null, boolean | null, ([string, string] | null)?, ([string, string] | null)?, boolean?, number?]?];
 
 export interface AppState {
   libraries: Library[];
@@ -123,7 +149,9 @@ export interface AppState {
   /** folder watched for fresh downloads; default ~/Downloads */
   inbox_dir?: string;
   /** user settings (see getSettings) */
-  settings?: { auto_move?: boolean; refresh_min?: number; like_on_add?: boolean; sc_open?: "discover" | "browser"; do_all?: DoAll };
+  settings?: { auto_move?: boolean; refresh_min?: number; like_on_add?: boolean; sc_open?: "discover" | "browser"; do_all?: DoAll;
+               /** WAV files DJ HQ moves into a library become AIFF files (wavToAiff); off by default */
+               aiff_auto?: boolean };
   /** probe results for audio inside zips in the downloads folder: "<zip path>|<entry>|<size>" -> [dur, fmt, tags] */
   zip_cache?: Record<string, [number, [string, number, number], [string, string, string]]>;
   /** "<lib id>:<track id>" -> ms when a file for the track first turned up (0 = predates tracking) */
@@ -233,7 +261,15 @@ export const setPrefs = (patch: Record<string, unknown>) => store.setPrefs(patch
 /** a consistent copy of the database (state and preferences) at `dst` */
 export const backupDb = (dst: string) => store.snapshot(dst);
 /** close the database (quit); every save is already on disk, this releases the lock */
-export function shutdown(): void { store.close(); }
+export function shutdown(): void {
+  // a quit in the middle of a file write: no catch block runs, so the child processes are
+  // ended and the temp files removed here (synchronously: the process is on its way out)
+  for (const c of CHILDREN) { try { c.kill("SIGKILL"); } catch { /* ignore */ } }
+  CHILDREN.clear();
+  for (const p of LIVE_TMP) { try { fs.unlinkSync(p); } catch { /* ignore */ } }
+  LIVE_TMP.clear();
+  store.close();
+}
 
 /** Bumped whenever STATE is replaced as a whole (an import): a view that was being built
  *  from the old state starts over instead of pruning the new one with the old folders. */
@@ -290,6 +326,7 @@ export function getSettings(): any {
     auto_move: !!s.auto_move, refresh_min: REFRESH_CHOICES.includes(s.refresh_min || 0) ? s.refresh_min : 15,
     like_on_add: !!s.like_on_add,
     sc_open: s.sc_open === "browser" ? "browser" : "discover",
+    aiff_auto: !!s.aiff_auto,
     data_dir: DATA_DIR,
     ...doAllStatus(),
   };
@@ -406,6 +443,7 @@ function patchDoAll(p: any): void {
 /** POST /api/settings {inbox_dir?: string|null ("" or null = back to ~/Downloads), auto_move?: boolean, refresh_min?: number,
  *  like_on_add?: boolean (Discover: also like a track when adding it to the playlist),
  *  sc_open?: "discover" | "browser" (where SoundCloud links open; the desktop app defaults to Discover),
+ *  aiff_auto?: boolean (WAV files moved into the library become AIFF files),
  *  do_all?: a partial DoAll (the "Do everything" setup; see patchDoAll)} */
 export async function setSettings(data: any): Promise<any> {
   const s = STATE.settings || (STATE.settings = {});
@@ -419,6 +457,7 @@ export async function setSettings(data: any): Promise<any> {
   }
   if ("auto_move" in data) s.auto_move = !!data.auto_move;
   if ("like_on_add" in data) s.like_on_add = !!data.like_on_add;
+  if ("aiff_auto" in data) s.aiff_auto = !!data.aiff_auto;
   if ("sc_open" in data) s.sc_open = data.sc_open === "browser" ? "browser" : "discover";
   if ("do_all" in data) patchDoAll(data.do_all);
   if ("refresh_min" in data) {
@@ -588,10 +627,23 @@ async function fetchLikeIds(userId: number): Promise<number[]> {
  *  SoundCloud would not hand out (deleted, blocked, or private and not shared with the link). */
 export async function fetchPlaylist(lib: Library): Promise<number> {
   if (!lib.url) throw linkMissing();
+  await healLibUrl(lib).catch(() => {});   // the read below follows a short link on its own
   const r = await readPlaylist(lib.url, lib.playlist);
   lib.playlist = r.playlist;
   saveState();
   return r.unreadable;
+}
+
+/** A library may still carry the phone app's short link (on.soundcloud.com/…) from an older
+ *  version or an imported configuration. api-v2's resolve does not know those, so the link is
+ *  replaced by the page it leads to, once. */
+async function healLibUrl(lib: Library): Promise<void> {
+  if (!/^https?:\/\/on\.soundcloud\.com\//i.test(normScUrl(lib.url))) return;
+  const url = await expandScUrl(lib.url);
+  if (/^https?:\/\/on\.soundcloud\.com\//i.test(url) || !/^https?:\/\/(www\.|m\.)?soundcloud\.com\/./i.test(url)) return;
+  lib.url = url;
+  if (lib.playlist && /^https?:\/\/on\.soundcloud\.com\//i.test(lib.playlist.url || "")) lib.playlist.url = url;
+  saveState();
 }
 
 /** A library imported from a configuration file whose link was left out has url "": it keeps
@@ -793,6 +845,7 @@ export async function scCanWrite(token: string): Promise<ScCan> {
   const lib = activeLib();
   if (!lib) return cannot(false, "no_library", "no library");
   const me = await scMe(token);
+  await healLibUrl(lib);
   if (!lib.url) return cannot(false, "can_no_link", "This library has no SoundCloud link yet; set it with Change link… in Settings.");
   const likes = likesUser(lib.url);
   if (likes) {
@@ -1037,10 +1090,12 @@ interface LocalFile { name: string; base: string; path: string; dur: number; fmt
    *  when its ID3 chunk has them); undefined for other formats */
   info?: [string, string] | null;
   /** a WAV's ID3 chunk [artist, title] ("" each when absent); undefined for other formats */
-  id3?: [string, string] | null; }
+  id3?: [string, string] | null;
+  /** the ID3 tag holds a picture, and that tag's version (0: none) */
+  pic?: boolean; tagv?: number; }
 
-const keyEntry = (k: ReturnType<typeof readKeyInfo>): [string | null, boolean | null, [string, string] | null, [string, string] | null] =>
-  [k.key, k.pn, k.info ? [k.info.artist, k.info.title] : null, k.id3 ? [k.id3.artist, k.id3.title] : null];
+const keyEntry = (k: ReturnType<typeof readKeyInfo>): [string | null, boolean | null, [string, string] | null, [string, string] | null, boolean, number] =>
+  [k.key, k.pn, k.info ? [k.info.artist, k.info.title] : null, k.id3 ? [k.id3.artist, k.id3.title] : null, !!k.pic, k.ver || 0];
 
 async function refreshCache(p: string): Promise<void> {
   const st = fs.statSync(p);
@@ -1051,7 +1106,24 @@ async function refreshCache(p: string): Promise<void> {
 /** A library folder that can't be listed right now: "missing" (not there: an unmounted
  *  drive, a renamed folder, a cloud folder not synced yet), "unreadable" (no permission),
  *  or "empty" (readable, but no audio files in it). */
-interface FolderAway { dir: string; why: "missing" | "unreadable" | "empty" | "waiting"; }
+interface FolderAway { dir: string; why: "missing" | "unreadable" | "empty" | "waiting";
+  /** it is the library's main folder */
+  main?: true;
+  /** it is on a drive that is not mounted (an unplugged disk): away, not moved or deleted */
+  drive?: true; }
+/** The folder is on a volume that isn't mounted right now: macOS /Volumes/<name>, a Windows
+ *  drive letter, Linux /media/<user>/<name>, /run/media/<user>/<name> or /mnt/<name>. */
+export function driveMissing(d: string): boolean {
+  const there = (p: string) => { try { return fs.existsSync(p); } catch { return true; } };
+  const abs = path.resolve(d);
+  if (process.platform === "win32") { const root = path.parse(abs).root; return !!root && !there(root); }
+  const seg = abs.split("/").filter(Boolean);
+  if (process.platform === "darwin") return seg[0] === "Volumes" && seg.length >= 2 && !there("/" + seg.slice(0, 2).join("/"));
+  if (seg[0] === "media" && seg.length >= 3) return !there("/" + seg.slice(0, 3).join("/"));
+  if (seg[0] === "run" && seg[1] === "media" && seg.length >= 4) return !there("/" + seg.slice(0, 4).join("/"));
+  if (seg[0] === "mnt" && seg.length >= 2) return !there("/" + seg.slice(0, 2).join("/"));
+  return false;
+}
 export function folderTrouble(d: string): "missing" | "unreadable" | null {
   try { if (!fs.statSync(d).isDirectory()) return "missing"; }
   catch (e: any) { return e?.code === "ENOENT" || e?.code === "ENOTDIR" ? "missing" : "unreadable"; }
@@ -1061,15 +1133,17 @@ export function folderTrouble(d: string): "missing" | "unreadable" | null {
 /** Every audio file of a library: all its folders, with their subfolders when the
  *  library asks for that. With `away`, the folders that could not be listed (or came
  *  back empty) are reported there. Keys (name) are unique across folders; a path that is
- *  reachable twice (nested folders) is listed once. */
-async function scanLocal(lib: Library, away?: FolderAway[]): Promise<LocalFile[]> {
+ *  reachable twice (nested folders) is listed once. `sweep` false: a stale temp file of DJ HQ's
+ *  is left where it is (scanFolder), for a folder that is only being looked at. */
+async function scanLocal(lib: Library, away?: FolderAway[], sweep = true): Promise<LocalFile[]> {
   const out: LocalFile[] = [];
   const seenPath = new Set<string>(), seenKey = new Set<string>();
   for (const [d, prefix] of dirPrefixes(lib)) {
     const why = folderTrouble(d);
-    if (why) { away?.push({ dir: d, why }); continue; }
-    const list = await scanFolder(d, !!lib.subfolders);
-    if (!list.length) away?.push({ dir: d, why: "empty" });
+    const main = d === lib.dir ? { main: true as const } : {};
+    if (why) { away?.push({ dir: d, why, ...main, ...(why === "missing" && driveMissing(d) ? { drive: true as const } : {}) }); continue; }
+    const list = await scanFolder(d, !!lib.subfolders, sweep);
+    if (!list.length) away?.push({ dir: d, why: "empty", ...main });
     for (const f of list) {
       const key = prefix + f.name;
       if (seenPath.has(f.path) || seenKey.has(key)) continue;
@@ -1082,7 +1156,17 @@ async function scanLocal(lib: Library, away?: FolderAway[]): Promise<LocalFile[]
 
 /** Audio files inside a folder (and, with `recursive`, its subfolders), probed once
  *  and cached by size+mtime. Names are relative to the folder, "/"-separated. */
-async function scanFolder(d: string, recursive = false): Promise<LocalFile[]> {
+/** A temp file DJ HQ wrote next to a library file ("<name>.<ext>.tmp.<same ext>", see writeTags)
+ *  that nothing writes any more: older than 15 minutes and not being written now. */
+const STALE_TMP = /^.+\.([A-Za-z0-9]+)\.tmp\.\1$/i;
+const STALE_TMP_AGE = 15 * 60 * 1000;
+function staleTmp(p: string, name: string): boolean {
+  if (!STALE_TMP.test(name) || LIVE_TMP.has(p)) return false;
+  try { return Date.now() - fs.statSync(p).mtimeMs > STALE_TMP_AGE; } catch { return false; }
+}
+/** `sweep` (library folders only, never the downloads folder): a stale temp file of DJ HQ's
+ *  (staleTmp) is removed, best effort. A quit in the middle of a write can leave one. */
+async function scanFolder(d: string, recursive = false, sweep = false): Promise<LocalFile[]> {
   const cache = STATE.dur_cache;
   const files: LocalFile[] = [];
   const seen = new Set<string>();
@@ -1096,17 +1180,21 @@ async function scanFolder(d: string, recursive = false): Promise<LocalFile[]> {
       const p = path.join(dir, f);
       if (e.isDirectory()) { if (recursive) await walk(p, rel + f + "/"); continue; }
       if (!e.isFile() || !AUDIO_EXT.includes(path.extname(f).toLowerCase())) continue;
-      if (/\.tmp\.[^.]+$/i.test(f)) continue; // in-flight rewrite by writeTags/convertAll
+      if (/\.tmp\.[^.]+$/i.test(f)) {   // in-flight rewrite by writeTags/convertAll
+        if (sweep && staleTmp(p, f)) try { fs.unlinkSync(p); } catch { /* ignore */ }
+        continue;
+      }
       const st = fs.statSync(p);
       seen.add(p);
       const wav = path.extname(f).toLowerCase() === ".wav";
       const c = cache[p] as CacheEntry | undefined;
       if (!c || c[0] !== st.size || c[1] !== Math.floor(st.mtimeMs / 1000) || c.length < 5)
         await refreshCache(p);
-      else if (c.length < 6 || (wav && (c[5]?.length ?? 0) < 4)) c[5] = keyEntry(readKeyInfo(p));
+      else if (c.length < 6 || (c[5]?.length ?? 0) < 6) c[5] = keyEntry(readKeyInfo(p));   // once per older entry
       const en = cache[p] as CacheEntry;
       files.push({ name: rel + f, base: f, path: p, dur: en[2], fmt: en[3], tags: en[4],
-                   key: en[5]?.[0] ?? null, pn: en[5]?.[1] ?? null, ...(wav ? { info: en[5]?.[2] ?? null, id3: en[5]?.[3] ?? null } : {}) });
+                   key: en[5]?.[0] ?? null, pn: en[5]?.[1] ?? null, pic: !!en[5]?.[4], tagv: en[5]?.[5] ?? 0,
+                   ...(wav ? { info: en[5]?.[2] ?? null, id3: en[5]?.[3] ?? null } : {}) });
     }
   };
   const away = folderTrouble(d);
@@ -1644,7 +1732,7 @@ async function writeTags(p: string, artist: string, title: string, genre: string
   const own = ext === ".wav" || (ID3_EXT.includes(ext) && id3Version(p) >= 3); // DJ HQ writes the ID3 tag
   const md5 = await audioMd5(p);
   if (!md5) throw appError("checksum_failed", "could not checksum audio");
-  const tmp = p + ".tmp" + ext;
+  const tmp = staleGone(p + ".tmp" + ext);
   const args = ["-y", "-v", "error", "-i", p];
   if (ext === ".wav") {
     // the file's metadata is mapped through, so the INFO fields DJ HQ doesn't set (album,
@@ -1687,7 +1775,7 @@ async function writeTags(p: string, artist: string, title: string, genre: string
   } catch (e) {
     if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
     throw e;
-  }
+  } finally { LIVE_TMP.delete(tmp); }
   await refreshCache(p);
 }
 
@@ -1707,6 +1795,123 @@ async function keepFileMeta(p: string, tmp: string): Promise<void> {
     const v = await run("/usr/bin/xattr", ["-px", n, p], 10000).catch(() => null);
     if (v && v.code === 0) await run("/usr/bin/xattr", ["-wx", n, v.stdout.replace(/\s+/g, ""), tmp], 10000).catch(() => null);
   }
+}
+
+// ---------------- cover art ----------------
+
+/** Why Add cover art leaves a file alone ("add": it gets one): it has a picture already
+ *  (never replaced), its track has no artwork on SoundCloud (an uploader's avatar doesn't
+ *  count), DJ HQ doesn't write its tag itself (FLAC, M4A, OGG; an MP3/AIFF with an ID3v2.2
+ *  tag or none), or it isn't tagged yet (a WAV without an ID3 chunk too: Write tags gives
+ *  it one). Extras have no track to take the artwork from. */
+type ArtWhy = "add" | "has_pic" | "no_art" | "format" | "untagged";
+const ART_LEFT = ["has_pic", "untagged", "format", "no_art", "extra"] as const;
+const artworkUrl = (u: string) => /^https?:\/\/[^\/?#]+\/(?:[^?#]*\/)?artworks-[^\/?#]+$/i.test(u || "");
+function artReason(f: LocalFile, art: string, tagged: boolean): ArtWhy {
+  if (f.pic) return "has_pic";
+  if (!artworkUrl(art)) return "no_art";
+  const ext = path.extname(f.path).toLowerCase();
+  if (!ID3_EXT.includes(ext)) return "format";
+  if (!tagged) return "untagged";
+  if ((f.tagv || 0) < 3) return ext === ".wav" ? "untagged" : "format";
+  return "add";
+}
+/** the view's count for the Prepare page: files that get a picture, and the rest by reason */
+function artCounts(rows: any[], extras: number): { add: number; left: Record<string, number> } {
+  const left: Record<string, number> = Object.fromEntries(ART_LEFT.map((k) => [k, 0]));
+  let add = 0;
+  for (const r of rows) if (r.art_why === "add") add++; else if (r.art_why) left[r.art_why]++;
+  left.extra = extras;
+  return { add, left };
+}
+
+/** The sizes asked for, best first: 500x500 (above the 240x240 rekordbox exports to players,
+ *  under the 800x800 older players read from a file), 300x300, then the link as stored
+ *  ("-large", 100x100). Never "-original": up to 4000x4000 and several MB. Any host, as the
+ *  name alone carries the size. */
+function artSizes(url: string): string[] {
+  const m = /^(.*\/artworks-[^\/?#]*?)-[a-z0-9]+\.(?:jpe?g|png)$/i.exec(url);
+  return [...new Set(m ? [m[1] + "-t500x500.jpg", m[1] + "-t300x300.jpg", url] : [url])];
+}
+const ART_MAX = 2 * 1024 * 1024, ART_TIMEOUT = 15000;
+interface Picture { mime: string; data: Buffer; }
+/** the picture's type from its first bytes (the server's Content-Type is not trusted) */
+function pictureMime(b: Buffer): string | null {
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+  if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  return null;
+}
+/** A track's artwork: a plain GET of the public image (no cookies, no SoundCloud session),
+ *  the next size down only when one doesn't exist (404/410: a 429 or 403 is an error, so a
+ *  later run tries 500x500 again rather than a small picture going in for good), a JPEG
+ *  or PNG under 2 MB or an error. The body is counted as it arrives: a server that sends
+ *  no length can't fill memory. */
+async function fetchArt(url: string): Promise<Picture> {
+  let status = 0;
+  for (const u of artSizes(url)) {
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(Object.assign(new Error("timed out"), { name: "TimeoutError" })), ART_TIMEOUT);
+    let b: Buffer;
+    try {
+      const r = await fetch(u, { headers: { "User-Agent": UA }, signal: ctl.signal });
+      if (r.status === 404 || r.status === 410) { status = r.status; await r.body?.cancel().catch(() => {}); continue; }
+      if (!r.ok) { await r.body?.cancel().catch(() => {}); throw appError("art_http", `HTTP ${r.status} fetching the artwork`, { status: r.status }); }
+      const tooLarge = () => appError("art_too_large", "the artwork is larger than 2 MB");
+      if (Number(r.headers.get("content-length")) > ART_MAX) { await r.body?.cancel().catch(() => {}); throw tooLarge(); }
+      const parts: Buffer[] = [];
+      let n = 0;
+      if (r.body) for await (const c of r.body as any) {
+        n += c.length;
+        if (n > ART_MAX) { ctl.abort(); throw tooLarge(); }
+        parts.push(Buffer.from(c));
+      }
+      b = Buffer.concat(parts);
+    } catch (e: any) {
+      if (e?.code && /^art_/.test(e.code)) throw e;
+      const timedOut = e?.name === "TimeoutError" || ctl.signal.reason?.name === "TimeoutError";
+      // undici hides the reason in its cause (an AggregateError when every address was refused)
+      if (timedOut) throw appError("art_timeout", "the artwork download timed out");
+      const why = String(e?.cause?.code || e?.cause?.errors?.[0]?.code || e?.message || e);
+      throw appError("art_download", "could not download the artwork: " + why, { error: why });
+    } finally { clearTimeout(timer); }
+    const mime = pictureMime(b);
+    if (!mime || b.length < 64) throw appError("art_not_image", "the artwork link did not return a JPEG or PNG picture");
+    return { mime, data: b };
+  }
+  throw appError("art_http", `HTTP ${status} fetching the artwork`, { status });
+}
+
+/** Add one picture to a file that has none: its ID3 tag gets an APIC frame and keeps every
+ *  other frame byte for byte (pictureTag); an MP3's audio bytes are copied as they are, a
+ *  WAV's or AIFF's other chunks (LIST/INFO, PLTN, unknown ones) too. Checked before the
+ *  copy replaces the file: the old frames plus the new one, the other chunks unchanged,
+ *  the audio MD5. Mode, birth date and extended attributes are kept (keepFileMeta). */
+async function writePicture(p: string, pic: Picture): Promise<void> {
+  const ext = path.extname(p).toLowerCase();
+  const md5 = await audioMd5(p);
+  if (!md5) throw appError("checksum_failed", "could not checksum audio");
+  const tmp = staleGone(p + ".tmp" + ext);
+  // by content, not by name: a WAV saved as .mp3 gets its ID3 chunk replaced, not a tag in front of "RIFF"
+  const before = rawTagFrames(p), chunks = otherChunks(p);
+  try {
+    if (!before) throw appError("art_no_tag", "the file has no ID3v2.3/2.4 tag DJ HQ can add a picture to");
+    const tag = pictureTag(p, pic.mime, pic.data);
+    if (chunks) replaceTagChunk(p, tmp, tag);
+    else if (ext === ".mp3") { copyAfterTag(p, tmp); prependTag(tmp, tag); }
+    else throw appError("art_layout", "not a WAV or AIFF file inside, left untouched");
+    const after = rawTagFrames(tmp), want = [...before.frames, apicFrame(before.ver, pic.mime, pic.data)];
+    const same = (a: { id: string; data: Buffer }[] | null, b: { id: string; data: Buffer }[] | null) =>
+      !!a && !!b && a.length === b.length && a.every((x, i) => x.id === b[i].id && x.data.equals(b[i].data));
+    if (!after || after.ver !== before.ver || after.frames.length !== want.length || !after.frames.every((f, i) => f.equals(want[i]))
+        || (chunks && !same(chunks, otherChunks(tmp))))
+      throw appError("art_check_failed", "the copy with the picture did not come out as planned, left untouched");
+    if ((await audioMd5(tmp)) !== md5) throw appError("audio_would_change", "audio data would change, left untouched");
+    await keepFileMeta(p, tmp);
+    fs.renameSync(tmp, p);
+  } catch (e) {
+    if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+    throw e;
+  } finally { LIVE_TMP.delete(tmp); }
+  await refreshCache(p);
 }
 
 function copyPreservingTimes(src: string, dst: string): void {
@@ -1737,13 +1942,39 @@ function backupEntries(lib: Library): [string, string][] {
   return out;
 }
 
-/** Backups that could go back into the library: [key, backup path, library path];
- *  a backup whose folder is gone (removed from the library, deleted) is left out. */
-function restorable(lib: Library): [string, string, string][] {
-  const out: [string, string, string][] = [];
+/** The files next to `p` with its name and another audio extension ("X.aif" for "X.wav"; rule E). */
+function otherExt(p: string): string[] {
+  const dir = path.dirname(p), base = path.basename(p), stem = stemKey(base);
+  let names: string[] = [];
+  try { names = fs.readdirSync(dir); } catch { return []; }
+  return names.filter((n) => n !== base && AUDIO_EXT_RE.test(n) && !/\.tmp\.[^.]+$/i.test(n) && stemKey(n) === stem)
+    .map((n) => path.join(dir, n)).filter((q) => { try { return fs.statSync(q).isFile(); } catch { return false; } });
+}
+/** The AIFF a backup of Convert WAV files to AIFF became, when it is still there: its key and path. */
+function aiffOfBackup(lib: Library, key: string): [string, string] | null {
+  const aKey = lib.aiff_from?.[key];
+  if (!aKey) return null;
+  const p = libPath(lib, aKey);
+  if (fs.existsSync(p)) return [aKey, p];
+  // the AIFF was renamed in another letter case or to .aiff meanwhile: the one such file
+  const c = otherExt(libPath(lib, key)).filter((q) => /\.aiff?$/i.test(q));
+  if (c.length !== 1) return null;
+  const rel = path.relative(lib.dir, c[0]);
+  return rel.startsWith("..") || path.isAbsolute(rel) ? null : [rel.split(path.sep).join("/"), c[0]];
+}
+/** Backups that could go back into the library: [key, backup path, library path, the AIFF it
+ *  became (Convert WAV files to AIFF) when that is there]. Left out: a backup whose folder is gone
+ *  (removed from the library, deleted), and one whose file is now there under another extension
+ *  that DJ HQ did not convert it to (converted by hand, or a main folder of AIFF copies): putting
+ *  the original back would make the track's file twice. */
+function restorable(lib: Library): [string, string, string, [string, string] | null][] {
+  const out: [string, string, string, [string, string] | null][] = [];
   for (const [key, src] of backupEntries(lib)) {
     const dst = libPath(lib, key);
-    if (fs.existsSync(path.dirname(dst))) out.push([key, src, dst]);
+    if (!fs.existsSync(path.dirname(dst))) continue;
+    const aiff = aiffOfBackup(lib, key);
+    if (!aiff && !fs.existsSync(dst) && otherExt(dst).length) continue;
+    out.push([key, src, dst, aiff]);
   }
   return out;
 }
@@ -1752,7 +1983,8 @@ function restorableCount(lib: Library | null): number {
   // backups that differ (size/mtime) from the current library copy
   if (!lib) return 0;
   let n = 0;
-  for (const [, src, dst] of restorable(lib)) {
+  for (const [, src, dst, aiff] of restorable(lib)) {
+    if (aiff) { n++; continue; }   // a WAV that became an AIFF: restoring it undoes that
     try {
       const b = fs.statSync(src), c = fs.statSync(dst);
       if (b.size !== c.size || Math.abs(b.mtimeMs - c.mtimeMs) > 1000) n++;
@@ -1764,6 +1996,131 @@ function restorableCount(lib: Library | null): number {
 }
 
 const fmtDur = (d: number) => `${Math.floor(d / 60)}:${String(d % 60).padStart(2, "0")}`;
+
+// ---------------- rule E: the audio extension does not matter ----------------
+
+const AUDIO_EXT_RE = /\.(wav|mp3|aiff?|flac|m4a|ogg)$/i;
+/** A file key (or path) without its audio extension, NFC, lower case: "Sub/X.wav" and
+ *  "sub/x.AIF" are the same recording in another format. */
+export function stemKey(key: string): string {
+  return key.normalize("NFC").replace(AUDIO_EXT_RE, "").toLowerCase();
+}
+/** Move what DJ HQ remembers about one file to another name: the pins of this library's tracks
+ *  (`assigned`, by_hand stays with the track), the found / edits records keyed "x:" + path
+ *  (never over a record the new path has already), and the old path's cache entry. Old and new
+ *  are given as key and absolute path each, so a folder change can use it too. */
+function moveRecords(trackIds: Set<number>, oldKey: string, newKey: string, oldPath: string, newPath: string): boolean {
+  let changed = false;
+  if (oldKey !== newKey)
+    for (const [tid, f] of Object.entries(STATE.assigned))
+      if (f === oldKey && trackIds.has(Number(tid))) { STATE.assigned[tid] = newKey; changed = true; }
+  if (oldPath !== newPath) {
+    for (const map of [STATE.found, STATE.edits] as Record<string, unknown>[]) {
+      const ok = "x:" + oldPath, nk = "x:" + newPath;
+      if (ok in map) { if (!(nk in map)) map[nk] = map[ok]; delete map[ok]; changed = true; }
+    }
+    if (oldPath in STATE.dur_cache) { delete STATE.dur_cache[oldPath]; changed = true; }
+  }
+  return changed;
+}
+const libTrackIds = (lib: Library) => new Set((lib.playlist?.tracks || []).map((t) => t.id));
+/** moveRecords for a file of `lib` that changed its name (a WAV converted to AIFF) */
+function renameRecords(lib: Library, oldKey: string, newKey: string): void {
+  if (moveRecords(libTrackIds(lib), oldKey, newKey, libPath(lib, oldKey), libPath(lib, newKey))) saveState();
+}
+/** Rule E, on every view: a pin, found or edits record whose file is gone follows the one file
+ *  of the library with the same name and another audio extension ("X.wav" converted to "X.aif",
+ *  by DJ HQ or by hand). Never a guess: with no such file or several, or one that another pin
+ *  (or record) names already, nothing changes. While "X.wav" is there the record stays on it.
+ *  A folder that is away lists no files, so nothing of it can follow anything. */
+function followRenamed(lib: Library, files: LocalFile[], fmap: Map<string, LocalFile>, byPath: Map<string, LocalFile>, trackIds: Set<number>): void {
+  const byStem = new Map<string, LocalFile[]>();
+  for (const f of files) { const k = stemKey(f.name); byStem.set(k, [...(byStem.get(k) || []), f]); }
+  let changed = false;
+  const pinned = new Set(Object.entries(STATE.assigned).filter(([k, f]) => f && trackIds.has(Number(k))).map(([, f]) => f));
+  for (const [tid, fname] of Object.entries(STATE.assigned)) {
+    if (!fname || !trackIds.has(Number(tid)) || fmap.has(fname)) continue;
+    const c = (byStem.get(stemKey(fname)) || []).filter((f) => !pinned.has(f.name));
+    if (c.length !== 1) continue;
+    pinned.add(c[0].name);
+    STATE.assigned[tid] = c[0].name;
+    changed = true;
+  }
+  // the "x:" records (extras' names and found tracks) of files in this library's folders
+  const dirs = libDirs(lib).map((d) => d + path.sep);
+  const pathStem = new Map<string, LocalFile[]>();
+  for (const f of files) { const k = stemKey(f.path); pathStem.set(k, [...(pathStem.get(k) || []), f]); }
+  for (const map of [STATE.found, STATE.edits] as Record<string, unknown>[]) {
+    for (const k of Object.keys(map)) {
+      if (!k.startsWith("x:")) continue;
+      const p = k.slice(2);
+      if (byPath.has(p) || !dirs.some((d) => p.startsWith(d))) continue;
+      const c = (pathStem.get(stemKey(p)) || []).filter((f) => !(("x:" + f.path) in map));
+      if (c.length !== 1) continue;
+      map["x:" + c[0].path] = map[k];
+      delete map[k];
+      changed = true;
+    }
+  }
+  if (changed) saveState();
+}
+
+/** remove_folder: `prev` is the library with the folder `gone`, `lib` without it. Rule E across
+ *  folders: a pin, found or edits record of a file in that folder follows the one file of the
+ *  library left with the same relative name, in any letter case and with any audio extension
+ *  ("Music HQ/X.wav" becomes the main folder's "X.aif" when that folder holds the AIFF copies).
+ *  Never a guess: with no such file or several, or one another pin (or record) has already,
+ *  nothing changes and the track loses its file with the next view. The other folders' keys
+ *  follow too when their prefix changes (two folders of the same name: " (2)" goes away).
+ *  Answers how many pins followed a file. */
+function followRemoved(prev: Library, lib: Library, gone: string): number {
+  const trackIds = libTrackIds(lib);
+  const oldPre = dirPrefixes(prev), newPre = dirPrefixes(lib);
+  const goneP = oldPre.get(gone)!;
+  const inGone = (k: string) => k.startsWith(goneP);   // (keys as they were with the folder)
+  // the other folders' keys under the new prefixes (the removed folder's keys stay as they are)
+  const shifted = rekeyer(prev, lib);
+  // what the library holds without the folder: key, path and the relative name's stem
+  const left: { key: string; path: string; stem: string }[] = [];
+  for (const [d, p] of newPre)
+    if (!folderTrouble(d))
+      for (const rel of listAudioKeys(d, !!lib.subfolders)) left.push({ key: p + rel, path: path.join(d, ...rel.split("/")), stem: stemKey(rel) });
+  const byStem = new Map<string, typeof left>();
+  for (const f of left) byStem.set(f.stem, [...(byStem.get(f.stem) || []), f]);
+  let followed = 0, changed = false;
+  const pins = Object.entries(STATE.assigned).filter(([tid, f]) => f && trackIds.has(Number(tid)));
+  const gonePins = pins.filter(([, f]) => inGone(f));
+  const taken = new Set<string>();
+  for (const [tid, f] of pins) {
+    if (inGone(f)) continue;
+    const nk = shifted(f);
+    taken.add(nk);
+    if (nk !== f) { STATE.assigned[tid] = nk; changed = true; }
+  }
+  for (const [tid, f] of gonePins) {
+    const c = (byStem.get(stemKey(f.slice(goneP.length))) || []).filter((x) => !taken.has(x.key));
+    if (c.length !== 1) continue;
+    STATE.assigned[tid] = c[0].key; taken.add(c[0].key); followed++; changed = true;
+  }
+  if (lib.aiff_from && Object.keys(lib.aiff_from).some((a) => !inGone(a) && shifted(a) !== a)) {
+    const af: Record<string, string> = {};
+    for (const [a, b] of Object.entries(lib.aiff_from)) af[inGone(a) ? a : shifted(a)] = inGone(b) ? b : shifted(b);
+    lib.aiff_from = af;
+  }
+  try { rekeyBackups(lib, shifted); } catch { /* best effort: a backup left under its old key is only not offered by Restore originals */ }
+  for (const map of [STATE.found, STATE.edits] as Record<string, unknown>[])
+    for (const k of Object.keys(map)) {
+      if (!k.startsWith("x:" + gone + path.sep)) continue;
+      const rel = path.relative(gone, k.slice(2)).split(path.sep).join("/");
+      const c = (byStem.get(stemKey(rel)) || []).filter((x) => !(("x:" + x.path) in map));
+      if (c.length !== 1) continue;
+      map["x:" + c[0].path] = map[k];
+      delete map[k];
+      changed = true;
+    }
+  if (changed) saveState();
+  return followed;
+}
 
 /** A library imported before its music was copied here (files_pending): pins whose file isn't
  *  in the scan are moved to a file that turned up under another spelling (matchKeys). The
@@ -1785,17 +2142,21 @@ function filesPending(lib: Library, files: LocalFile[], fmap: Map<string, LocalF
 /** Find files again after they were copied to another computer or folder: each wanted key
  *  ("/"-separated, relative) is matched to one of `onDisk` by its exact key, then with
  *  Unicode composition and case folded (NFD from macOS, a case-changing copy), then by a file
- *  name that is unique on both sides. One file takes at most one key: two keys that would land
+ *  name that is unique on both sides, then by that name without its audio extension (a file
+ *  converted to another format). One file takes at most one key: two keys that would land
  *  on the same file, or a name found twice, count as not found (`ambiguous`). */
-export function matchKeys(wanted: string[], onDisk: string[]): { map: Map<string, { to: string; how: "exact" | "folded" | "base" }>; ambiguous: number } {
-  const map = new Map<string, { to: string; how: "exact" | "folded" | "base" }>();
+export type MatchHow = "exact" | "folded" | "base" | "stem";
+export function matchKeys(wanted: string[], onDisk: string[]): { map: Map<string, { to: string; how: MatchHow }>; ambiguous: number } {
+  const map = new Map<string, { to: string; how: MatchHow }>();
   const want = [...new Set(wanted)];
   const disk = new Set(onDisk), taken = new Set<string>();
   for (const w of want) if (disk.has(w)) { map.set(w, { to: w, how: "exact" }); taken.add(w); }
   const fold = (s: string) => s.normalize("NFC").toLowerCase();
   const base = (s: string) => fold(s.slice(s.lastIndexOf("/") + 1));
+  // last: the file name without its audio extension (rule E: "X.wav" was converted to "X.aif")
+  const stem = (s: string) => stemKey(base(s));
   let ambiguous = 0;
-  for (const [fn, how] of [[fold, "folded"], [base, "base"]] as const) {
+  for (const [fn, how] of [[fold, "folded"], [base, "base"], [stem, "stem"]] as const) {
     const byDisk = new Map<string, string[]>(), byWant = new Map<string, string[]>();
     for (const d of onDisk) if (!taken.has(d)) { const k = fn(d); byDisk.set(k, [...(byDisk.get(k) || []), d]); }
     for (const w of want) if (!map.has(w)) { const k = fn(w); byWant.set(k, [...(byWant.get(k) || []), w]); }
@@ -1830,6 +2191,36 @@ export function listAudioKeys(d: string, recursive: boolean, cap = 200000): stri
   return out;
 }
 
+/** Which file goes with which track: the pins (`manual`: track id -> file key, "" = no file)
+ *  first, then every other file to the playlist track its name and length are closest to
+ *  (sim). matched: track id -> [file key, score] (score -1: a pin); fileHit: the files that
+ *  went to a track (the rest are extras). Pure: the folder change's preview uses it too. */
+function matchFiles(files: LocalFile[], tracks: PlTrack[], manual: Map<number, string>): { matched: Map<number, [string, number]>; fileHit: Set<string> } {
+  const manualFiles = new Set([...manual.values()].filter(Boolean));
+  const fmap = new Set(files.map((f) => f.name));
+  const matched = new Map<number, [string, number]>(); // score -1 = manual
+  const fileHit = new Set<string>();
+  for (const f of files) {
+    if (manualFiles.has(f.name)) { fileHit.add(f.name); continue; }
+    let best: PlTrack | null = null, bestS = 0;
+    for (const t of tracks) {
+      if (manual.has(t.id)) continue; // manually decided, don't steal / re-fill
+      let s = Math.max(sim(f.base, t.title), sim(f.base, `${t.user} ${t.title}`));
+      const dd = Math.abs(f.dur - t.dur);
+      s += dd < 3 ? 0.15 : dd < 10 ? 0.07 : 0;
+      if (s > bestS) { best = t; bestS = s; }
+    }
+    if (best && bestS >= 0.6) {
+      const prev = matched.get(best.id);
+      if (!prev || bestS > prev[1]) matched.set(best.id, [f.name, Math.round(bestS * 100) / 100]);
+      fileHit.add(f.name);
+    }
+  }
+  for (const [tid, fname] of manual)
+    if (fname && fmap.has(fname)) matched.set(tid, [fname, -1]); // a pin into a folder that's away stays, without a file
+  return { matched, fileHit };
+}
+
 /** `plans`: a tag_plan on tagged rows too (Write tags in every file); the page never needs them */
 export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}): Promise<any> {
   const gen = STATE_GEN;
@@ -1860,6 +2251,8 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
   const fmap = new Map(files.map((f) => [f.name, f]));
   const byPath = new Map(files.map((f) => [f.path, f]));
   const trackIds = new Set(pl.tracks.map((t) => t.id));
+  // rule E first: a record whose file now has another extension follows it, before anything is pruned
+  followRenamed(lib, files, fmap, byPath, trackIds);
   // A folder that is gone or unreadable, or one that lists no audio although files in it
   // are pinned or found, is "not available": the drive is unplugged, the cloud folder hasn't
   // synced, the folder was renamed. Its files aren't gone for good, so nothing of this
@@ -1904,32 +2297,11 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
   }
   if (assignedDirty) saveState();
   const manual = new Map<number, string>(); // track id -> file name ("" = no file)
-  const manualFiles = new Set<string>();
   for (const [k, fname] of Object.entries(STATE.assigned)) {
     if (!trackIds.has(Number(k))) continue;   // another library's pin: its file name means nothing here
     manual.set(Number(k), fname);
-    if (fname) manualFiles.add(fname);
   }
-  const matched = new Map<number, [string, number]>(); // score -1 = manual
-  const fileHit = new Set<string>();
-  for (const f of files) {
-    if (manualFiles.has(f.name)) { fileHit.add(f.name); continue; }
-    let best: PlTrack | null = null, bestS = 0;
-    for (const t of pl.tracks) {
-      if (manual.has(t.id)) continue; // manually decided, don't steal / re-fill
-      let s = Math.max(sim(f.base, t.title), sim(f.base, `${t.user} ${t.title}`));
-      const dd = Math.abs(f.dur - t.dur);
-      s += dd < 3 ? 0.15 : dd < 10 ? 0.07 : 0;
-      if (s > bestS) { best = t; bestS = s; }
-    }
-    if (best && bestS >= 0.6) {
-      const prev = matched.get(best.id);
-      if (!prev || bestS > prev[1]) matched.set(best.id, [f.name, Math.round(bestS * 100) / 100]);
-      fileHit.add(f.name);
-    }
-  }
-  for (const [tid, fname] of manual)
-    if (fname && fmap.has(fname)) matched.set(tid, [fname, -1]); // a pin into a folder that's away stays, without a file
+  const { matched, fileHit } = matchFiles(files, pl.tracks, manual);
   const reavailable: string[] = [];
   let naDirty = false;
   const now = Date.now();
@@ -1957,10 +2329,11 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
     }
     let tagged: boolean | null = null, incompat: string | null = null, lossy = false;
     let key: string | null = null, pn: boolean | null = null;
-    let differs: ReturnType<typeof fileDiffers> = null, plan: TagPlan | null = null;
+    let differs: ReturnType<typeof fileDiffers> = null, plan: TagPlan | null = null, artWhy: ArtWhy | null = null;
     if (m) {
       const f = fmap.get(m[0])!;
       tagged = isTagged(f, a, ti, genre, handFields(ed));
+      artWhy = artReason(f, t.art, tagged);
       differs = fileDiffers(f, a, ti);
       if (!tagged || opts.plans) plan = tagPlan(f, a, ti, handFields(ed), keptOver(ed, confirmed, differs));
       incompat = compatReason(f.fmt, dev);
@@ -1983,7 +2356,8 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
              pinned: manual.has(t.id), manual_match: manual.has(t.id) && !!STATE.by_hand[t.id], links, lossy, upgrade,
              added: t.added || 0, is_new: (t.added || 0) > (lib.seen_mark || 0),
              acquired, is_new_file: acquired > (lib.seen_mark || 0),
-             tagged, incompat, key, pn, override: o || null, edited: hand, ...(plan ? { tag_plan: plan } : {}) };
+             tagged, incompat, key, pn, override: o || null, edited: hand, ...(plan ? { tag_plan: plan } : {}),
+             ...(artWhy ? { art_why: artWhy } : {}) };
   });
   // first pass stamped existing files with 0 (not while a folder is away: its files would be NEW when it returns)
   if (!lib.acq_init && !keep) { lib.acq_init = true; naDirty = true; }
@@ -2024,6 +2398,8 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
             + extras.filter((e) => e.tagged === false).length,
     incompatible: files.filter((f) => compatReason(f.fmt, dev)).length,
     local_count: files.length,
+    art: artCounts(rows, extras.length),
+    aiff: { on: !!STATE.settings?.aiff_auto, wav: files.filter((f) => path.extname(f.name).toLowerCase() === ".wav").length },
   };
 }
 
@@ -2049,14 +2425,19 @@ function tagTodo(view: any, all = false): TagTodo[] {
  *  (the request itself only answers at the end), and its tag_report once done (a page
  *  reloaded meanwhile picks it up there). One run at a time; while it goes every other
  *  /api/tag (and convert / restore) is refused (tagIdle), not queued behind it for minutes. */
-export const TAG_RUN: { running: boolean; done: number; total: number; report: any } = { running: false, done: 0, total: 0, report: null };
+/** Add cover art (addArt) is the other every-file run and shares this, `kind` saying which goes. */
+/** Convert WAV files to AIFF (aiffAll) is the third, kind "aiff". */
+export const TAG_RUN: { running: boolean; kind: "tags" | "art" | "aiff"; done: number; total: number; report: any } =
+  { running: false, kind: "tags", done: 0, total: 0, report: null };
 export function tagIdle(): void {
+  if (TAG_RUN.running && TAG_RUN.kind === "art") throw appError("art_running", "pictures are being added to the files; wait until that is done");
+  if (TAG_RUN.running && TAG_RUN.kind === "aiff") throw appError("aiff_running", "WAV files are being converted to AIFF; wait until that is done");
   if (TAG_RUN.running) throw appError("tag_running", "tags are being written in every file; wait until that is done");
 }
 /** claimed by the route before the run is queued, so a second click finds it taken */
-export function claimTagRun(): void {
+export function claimTagRun(kind: "tags" | "art" | "aiff" = "tags"): void {
   tagIdle();
-  Object.assign(TAG_RUN, { running: true, done: 0, total: 0, report: null });
+  Object.assign(TAG_RUN, { running: true, kind, done: 0, total: 0, report: null });
 }
 
 /** A tagged file Write tags in every file leaves alone: DJ HQ doesn't write its tag itself
@@ -2155,6 +2536,55 @@ async function tagRun(opts: { preview?: boolean; replace?: boolean; keep_file?: 
   return view;
 }
 
+/** Add cover art: the SoundCloud artwork of each playlist track goes into its file when the
+ *  file has no picture (artReason says which files). `preview` writes nothing: {writes, left
+ *  by reason, wav: how many of them are WAVs, where rekordbox may not show it}. The run (claimed by the route: claimTagRun("art")) downloads a few pictures
+ *  ahead of the file being written, keeps them for this run only, and skips a file that
+ *  changed on disk since the view was made; a download or write that fails is that file's error. */
+export async function addArt(opts: { preview?: boolean } = {}): Promise<any> {
+  if (opts.preview) return artRun(true);
+  try {
+    const view = await artRun(false);
+    TAG_RUN.report = view.art_report;
+    return view;
+  } finally { TAG_RUN.running = false; }
+}
+async function artRun(preview: boolean): Promise<any> {
+  const lib = requireLib();
+  let view = await buildView(lib);
+  const left = view.art?.left || Object.fromEntries(ART_LEFT.map((k) => [k, 0]));
+  const todo: { key: string; path: string; art: string; stamp: string }[] = (view.tracks || [])
+    .filter((r: any) => r.art_why === "add" && r.path).map((r: any) => ({ key: r.file, path: r.path, art: r.art, stamp: fileStamp(r.path, true) }));
+  if (preview) return { writes: todo.length, wav: todo.filter((x) => path.extname(x.path).toLowerCase() === ".wav").length, left };
+  TAG_RUN.total = todo.length;
+  const pics = new Map<string, Promise<Picture>>();
+  const pic = (u: string) => { let q = pics.get(u); if (!q) { q = fetchArt(u); q.catch(() => {}); pics.set(u, q); } return q; };
+  let done = 0, offline = 0, failedNet = new Set<string>();
+  const errors: string[] = [], error_items: ErrorItem[] = [], changed: string[] = [];
+  for (let i = 0; i < todo.length; i++) {
+    const x = todo[i];
+    // three different links failing to download in a row, none in between: the network (or
+    // SoundCloud) is down. The rest is left for a later run instead of minutes of time-outs.
+    if (failedNet.size >= 3) { offline = todo.length - i; TAG_RUN.done = todo.length; break; }
+    for (const y of todo.slice(i, i + 3)) pic(y.art);   // three downloads at most
+    try { fs.unlinkSync(x.path + ".tmp" + path.extname(x.path)); } catch { /* none: a run cut off before leaves one */ }
+    try {
+      const got = await pic(x.art);
+      failedNet.clear();
+      if (fileStamp(x.path) !== x.stamp) changed.push(x.key);
+      else { await writePicture(x.path, got); done++; }
+    } catch (e: any) {
+      if (e?.code === "art_download" || e?.code === "art_timeout") failedNet.add(x.art); else if (/^art_(http|not_image|too_large)$/.test(e?.code)) failedNet.clear();
+      errors.push(`${x.key}: ${e.message}`);
+      error_items.push(errItem(x.key, e));
+    }
+    TAG_RUN.done++;
+  }
+  view = await buildView();
+  view.art_report = { done, errors, error_items, changed, total: todo.length, left, art: true, ...(offline ? { offline } : {}) };
+  return view;
+}
+
 /** What DJ HQ knows about some files of the active library (keys as the view hands
  *  them out): the names it would tag them with, whether the tags already say so,
  *  whether the name needs a look (Check names), duration, musical key and Platinum
@@ -2238,7 +2668,7 @@ export async function convertAll(): Promise<any> {
       error_items.push(errItem(f.name, codec ? appError("convert_manual", msg, { codec }) : appError("convert_manual_unknown", msg)));
       continue;
     }
-    const tmp = f.path + ".tmp" + ext;
+    const tmp = liveTmp(f.path + ".tmp" + ext);
     try {
       const bpath = path.join(bdir, ...f.name.split("/"));
       fs.mkdirSync(path.dirname(bpath), { recursive: true });
@@ -2271,7 +2701,7 @@ export async function convertAll(): Promise<any> {
       if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
       errors.push(`${f.name}: ${e.message}`);
       error_items.push(errItem(f.name, e));
-    }
+    } finally { LIVE_TMP.delete(tmp); }
   }
   saveState();
   const view = await buildView();
@@ -2279,14 +2709,237 @@ export async function convertAll(): Promise<any> {
   return view;
 }
 
-export async function restoreAll(): Promise<any> {
-  // Copy backed-up originals back into the library folder (backups are kept).
+// ---------------- WAV to AIFF ----------------
+
+/** The PCM codecs a WAV may have to become an AIFF, and the AIFF codec each becomes: the
+ *  same samples in big-endian order. Nothing else is converted (float, 8 bit, compressed). */
+const AIFF_CODEC: Record<string, string> = { pcm_s16le: "pcm_s16be", pcm_s24le: "pcm_s24be", pcm_s32le: "pcm_s32be",
+  pcm_f32le: "pcm_f32be", pcm_f64le: "pcm_f64be" };   // float: the same samples in an AIFF-C file
+/** What ffprobe says about a file's first audio stream: codec, rate, bit depth, channels, duration, names. */
+async function probeAudio(p: string): Promise<{ codec: string; sr: number; bits: number; ch: number; dur: number; tags: [string, string, string] } | null> {
+  const r = await run(FFPROBE, ["-v", "error", "-select_streams", "a:0", "-show_entries",
+    "stream=codec_name,sample_rate,bits_per_sample,bits_per_raw_sample,channels:stream_tags=artist,title,genre:format=duration:format_tags=artist,title,genre",
+    "-of", "json", p], 30000);
+  try {
+    const j = JSON.parse(r.stdout), st = j.streams?.[0];
+    if (!st) return null;
+    const tags = { ...(j.format?.tags || {}), ...(st.tags || {}) };
+    return { codec: st.codec_name || "", sr: parseInt(st.sample_rate || "0", 10) || 0,
+             bits: Number(st.bits_per_sample) || Number(st.bits_per_raw_sample) || 0, ch: Number(st.channels) || 0,
+             dur: parseFloat(j.format?.duration || "0") || 0,
+             tags: [lookupTag(tags, "artist"), lookupTag(tags, "title"), lookupTag(tags, "genre")] };
+  } catch { return null; }
+}
+/** MD5 of the decoded audio as 32-bit samples: the same for a WAV and its AIFF copy exactly when
+ *  every sample is the same (a plain "-f md5" decodes to 16 bit and misses the low byte of a 24-bit sample). */
+async function pcmMd5(p: string, as = "pcm_s32le"): Promise<string> {
+  const r = await run(FFMPEG, ["-v", "error", "-nostdin", "-i", p, "-map", "0:a:0", "-c:a", as, "-f", "md5", "-"], 600000);
+  return r.code === 0 ? r.stdout.trim() : "";
+}
+const isRiffWave = (p: string) => {
+  try { const fd = fs.openSync(p, "r"); const b = Buffer.alloc(12); fs.readSync(fd, b, 0, 12, 0); fs.closeSync(fd);
+        return b.toString("latin1", 0, 4) === "RIFF" && b.toString("latin1", 8, 12) === "WAVE"; } catch { return false; }
+};
+/** the AIFF a WAV key becomes, and an AIFF of that name already there ("X.aif" or "X.aiff") */
+const aiffKey = (key: string) => key.replace(/\.wav$/i, ".aif");
+const aiffThere = (p: string) => [".aif", ".aiff", ".AIF", ".AIFF"].some((e) => fs.existsSync(p.replace(/\.wav$/i, e)));
+/** Why a WAV of the library can't become an AIFF now (null: it can): its format, or an AIFF with its name. */
+function aiffSkip(f: LocalFile): "format" | "exists" | null {
+  if (!AIFF_CODEC[f.fmt[0]]) return "format";
+  return aiffThere(f.path) ? "exists" : null;
+}
+/** The error that says why a WAV stays WAV for its format: float audio in words, else the codec. */
+function aiffFormatError(codec: string): Error {
+  const fl = /^pcm_f(\d+)/.exec(codec);
+  if (fl) return appError("aiff_float", `this file holds ${fl[1]}-bit float audio, which most players cannot play, so it was left as WAV. If Prepare for player lists it as not playable, use Convert there first, then convert to AIFF again`, { bits: Number(fl[1]) });
+  return appError("aiff_format", `${codec} audio stays WAV: only WAV files with 16, 24 or 32-bit integer samples are converted`, { codec });
+}
+const aiffExistsError = () => appError("aiff_exists", "an AIFF file with this name is already there, so the WAV was left alone");
+
+/** Move a file into the backups (or out of them): a rename, or on another volume a copy with
+ *  its times kept and then the source removed (the copy is removed again when that fails). */
+function backupMove(src: string, dst: string): void {
+  try { fs.renameSync(src, dst); }
+  catch (e: any) {
+    if (e?.code !== "EXDEV") throw e;
+    copyPreservingTimes(src, dst);
+    try { fs.unlinkSync(src); } catch (e2) { try { fs.unlinkSync(dst); } catch { /* ignore */ } throw e2; }
+  }
+}
+/** A free name in originals/<lib>/replaced/ for `base` (" (2)", " (3)" … when taken), the folder made. */
+function replacedName(lib: Library, base: string): string {
+  const rdir = path.join(backupDir(lib), "replaced");
+  fs.mkdirSync(rdir, { recursive: true });
+  let keep = path.join(rdir, base);
+  for (let i = 2; fs.existsSync(keep); i++) keep = path.join(rdir, base.replace(/(\.[^.]+)$/, ` (${i})$1`));
+  return keep;
+}
+
+/** One WAV of the library becomes an AIFF: the same samples (pcm_sNNle to pcm_sNNbe, same rate,
+ *  depth and channels; nothing is ever resampled or changed in depth), its names and every other
+ *  ID3 frame (key, comments, Platinum Notes' mark, cover) as an ID3v2.3 tag written by DJ HQ, the
+ *  LIST/INFO fields the tag lacks as frames, Platinum Notes' PLTN chunk, the file's dates and
+ *  extended attributes. Written to "X.aif.tmp.aif" and checked before the WAV goes: decoded audio
+ *  (32-bit MD5), format, duration, the names ffprobe reads and the key / picture / mark DJ HQ
+ *  reads. Then the AIFF takes the WAV's place, the WAV goes to the backups (originals/<lib>/<key>,
+ *  so Restore originals can put it back; an older backup of that key is kept), and everything
+ *  DJ HQ remembers about the file follows it. On any doubt the WAV stays and the copy is
+ *  deleted. Returns the new key. */
+export async function wavToAiff(lib: Library, key: string): Promise<string> {
+  const src = libPath(lib, key);
+  if (path.extname(src).toLowerCase() !== ".wav") throw appError("aiff_format", "only WAV files are converted", { codec: path.extname(src).slice(1) || "?" });
+  const before = await probeAudio(src);
+  const be = before && isRiffWave(src) ? AIFF_CODEC[before.codec] : undefined;
+  if (!before || !be) throw aiffFormatError(before?.codec || "unknown");
+  if (aiffThere(src)) throw appError("aiff_exists", "an AIFF file with this name is already there, so the WAV was left alone");
+  const newKey = aiffKey(key), dst = libPath(lib, newKey);
+  const tmp = staleGone(dst + ".tmp.aif");
+  const fail = (why: string) => appError("aiff_check_failed", "the AIFF copy did not match the WAV, so the WAV was kept: " + why, { why });
+  let srcMd5 = "";
+  // float audio is compared as float (as 32-bit integers it would be clipped and rounded)
+  const md5As = /^pcm_f/.test(before.codec) ? before.codec : "pcm_s32le";
+  try {
+    const r = await run(FFMPEG, ["-y", "-v", "error", "-nostdin", "-i", src, "-map", "0:a:0", "-c:a", be,
+      "-map_metadata", "-1", "-write_id3v2", "0", "-fflags", "+bitexact", tmp], 600000);
+    if (r.code !== 0) throw appError("ffmpeg_failed", "ffmpeg: " + r.stderr.slice(0, 200), { error: r.stderr.slice(0, 200) });
+    // the names rekordbox showed for the WAV (its LIST/INFO first, as ffprobe reads it), every other frame carried
+    const [artist, title, genre] = before.tags;
+    const tag = mergedTag(src, artist, title, genre);
+    const have = carriedFrames(src, []).map((f) => f.id);
+    const extra = infoAsFrames(src, have);
+    const full = extra.length ? buildId3v23(artist, title, genre, [...carriedFrames(src, ["TPE1", "TIT2", "TCON"].filter((_, i) => [artist, title, genre][i])), ...extra]) : tag;
+    const pltn = carriedChunks(src, true, true).filter((c) => c.id === "PLTN");
+    const wrote = full.length > 10;
+    appendChunks(tmp, [...(wrote ? [{ id: "ID3 ", data: full }] : []), ...pltn]);
+    if (process.env.DJHQ_TEST_AIFF_CORRUPT === "1") {   // tests: a copy whose audio differs must never replace the WAV
+      const fd = fs.openSync(tmp, "r+"); const b = Buffer.alloc(1); const at = Math.floor(fs.fstatSync(fd).size / 2);
+      fs.readSync(fd, b, 0, 1, at); b[0] ^= 0x01; fs.writeSync(fd, b, 0, 1, at); fs.closeSync(fd);
+    }
+    // the check, before anything is removed
+    const after = await probeAudio(tmp);
+    if (!after || after.codec !== be || after.sr !== before.sr || after.bits !== before.bits || after.ch !== before.ch
+        || Math.abs(after.dur - before.dur) > 0.05) throw fail("format");
+    const [m1, m2] = [await pcmMd5(src, md5As), await pcmMd5(tmp, md5As)];
+    if (!m1 || m1 !== m2) throw fail("audio");
+    srcMd5 = m1;
+    // (a name the WAV shows none for comes from its ID3 chunk, carried as it is)
+    if (after.tags.some((v, i) => !!before.tags[i].trim() && v.trim() !== before.tags[i].trim())) throw fail("names");
+    const k1 = readKeyInfo(src), k2 = readKeyInfo(tmp);
+    if ((wrote && k2.ver !== 3) || k1.key !== k2.key || !!k1.pic !== !!k2.pic || k1.pn !== k2.pn) throw fail("tag");
+    await keepFileMeta(src, tmp);
+    if (fs.existsSync(dst)) throw appError("aiff_exists", "an AIFF file with this name is already there, so the WAV was left alone");
+    fs.renameSync(tmp, dst);
+  } catch (e) {
+    doneTmp(tmp);
+    throw e;
+  } finally { LIVE_TMP.delete(tmp); }
+  // the WAV to the backups: only then is it gone from the library. A backup of this key that is
+  // there already is never thrown away, and the WAV just converted is never dropped unless the
+  // backup holds the same audio:
+  // - the backup is the WAV of an earlier conversion of this name (aiff_from), so this WAV is a
+  //   later file (a new download of the same name): it becomes the backup, the older one goes to replaced/;
+  // - otherwise the backup is the original a Convert on the Prepare page kept: it stays the backup
+  //   (Restore originals puts that original back) and this WAV goes to replaced/.
+  try {
+    const bpath = path.join(backupDir(lib), ...key.split("/"));
+    if (!fs.existsSync(bpath)) {
+      fs.mkdirSync(path.dirname(bpath), { recursive: true });
+      backupMove(src, bpath);
+    } else if (srcMd5 && (await pcmMd5(bpath, md5As)) === srcMd5) fs.unlinkSync(src);
+    else if (lib.aiff_from?.[key]) {
+      const keep = replacedName(lib, path.basename(bpath));
+      backupMove(bpath, keep);
+      try { backupMove(src, bpath); } catch (e) { try { backupMove(keep, bpath); } catch { /* ignore */ } throw e; }
+    } else backupMove(src, replacedName(lib, path.basename(src)));
+  } catch (e: any) {
+    try { fs.unlinkSync(dst); } catch { /* ignore */ }
+    throw appError("aiff_backup_failed", "the WAV could not be moved to the backups, so it was kept and the AIFF copy was removed: " + String(e?.message || e), { error: String(e?.code || e?.message || e) });
+  }
+  renameRecords(lib, key, newKey);
+  lib.aiff_from = { ...(lib.aiff_from || {}), [key]: newKey };
+  delete STATE.dur_cache[src];
+  await refreshCache(dst);
+  saveState();
+  return newKey;
+}
+
+/** Convert WAV files to AIFF for the active library. `preview`: nothing is written; {wav, convert,
+ *  skip: {format, exists}, bytes (of the WAVs that would go to the backups), free_bytes (in the data
+ *  folder), backup_dir}. The run (claimed by the route: claimTagRun("aiff")) goes through every WAV
+ *  with wavToAiff, skips one that changed on disk since the scan, and reports in view.aiff_report
+ *  (also TAG_RUN.report): {aiff: true, done, total, kept: the WAVs left as they are and why, errors,
+ *  error_items, changed, backup_dir}. */
+export async function aiffAll(opts: { preview?: boolean } = {}): Promise<any> {
+  if (opts.preview) return aiffRun(true);
+  try {
+    const view = await aiffRun(false);
+    TAG_RUN.report = view.aiff_report;
+    return view;
+  } finally { TAG_RUN.running = false; }
+}
+async function aiffRun(preview: boolean): Promise<any> {
   const lib = requireLib();
+  const wavs = (await scanLocal(lib)).filter((f) => path.extname(f.name).toLowerCase() === ".wav");
+  const bdir = backupDir(lib);
+  if (preview) {
+    const skip = { format: 0, exists: 0 };
+    const kept: ErrorItem[] = [];   // which files stay WAV and why (at most 200)
+    let convert = 0, bytes = 0;
+    for (const f of wavs) {
+      const why = aiffSkip(f);
+      if (why) {
+        skip[why]++;
+        if (kept.length < 200) kept.push(errItem(f.name, why === "format" ? aiffFormatError(f.fmt[0] || "unknown") : aiffExistsError()));
+        continue;
+      }
+      convert++;
+      try { bytes += fs.statSync(f.path).size; } catch { /* gone */ }
+    }
+    let free: number | null = null;
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); const st = (fs as any).statfsSync(DATA_DIR); free = Number(st.bavail) * Number(st.bsize); } catch { /* unknown */ }
+    return { wav: wavs.length, convert, skip, kept, bytes, free_bytes: free, backup_dir: bdir };
+  }
+  TAG_RUN.total = wavs.length;
+  const stamps = new Map(wavs.map((f) => [f.path, fileStamp(f.path, true)]));
   let done = 0;
+  const kept: ErrorItem[] = [], errors: string[] = [], error_items: ErrorItem[] = [], changed: string[] = [];
+  for (const f of wavs) {
+    const stamp = stamps.get(f.path);
+    try { const t = aiffKey(f.path) + ".tmp.aif"; if (!LIVE_TMP.has(t)) fs.unlinkSync(t); } catch { /* none: a run cut off before leaves one */ }
+    if (fileStamp(f.path) !== stamp) changed.push(f.name);
+    else try {
+      await wavToAiff(lib, f.name);
+      done++;
+    } catch (e: any) {
+      if (e?.code === "aiff_format" || e?.code === "aiff_float" || e?.code === "aiff_exists") kept.push(errItem(f.name, e));
+      else { errors.push(`${f.name}: ${e.message}`); error_items.push(errItem(f.name, e)); }
+    }
+    TAG_RUN.done++;
+  }
+  const view = await buildView();
+  view.aiff_report = { aiff: true, done, total: wavs.length, kept, errors, error_items, changed, backup_dir: bdir };
+  return view;
+}
+
+/** Copy backed-up originals back into the library folder (backups are kept). A WAV that Convert
+ *  WAV files to AIFF made an AIFF of is an undo of that: the WAV comes back, the AIFF goes to
+ *  originals/<lib>/replaced/ (nothing is deleted; Clean up frees it), and what DJ HQ remembers
+ *  about the AIFF (pins, found, edits) moves back to the WAV. */
+export async function restoreAll(): Promise<any> {
+  const lib = requireLib();
+  let done = 0, aiff_undone = 0;
   const errors: string[] = [], error_items: ErrorItem[] = [];
-  for (const [key, src, dst] of restorable(lib)) {
+  for (const [key, src, dst, aiff] of restorable(lib)) {
     try {
+      const had = fs.existsSync(dst);
       copyPreservingTimes(src, dst);
+      if (aiff) {
+        try { backupMove(aiff[1], replacedName(lib, path.basename(aiff[1]))); }
+        catch (e) { if (!had) try { fs.unlinkSync(dst); } catch { /* ignore */ } throw e; }
+        renameRecords(lib, aiff[0], key);
+        delete STATE.dur_cache[aiff[1]];
+        aiff_undone++;
+      }
       done++;
     } catch (e: any) {
       errors.push(`${key}: ${e.message}`);
@@ -2294,7 +2947,7 @@ export async function restoreAll(): Promise<any> {
     }
   }
   const view = await buildView();
-  view.restore_report = { done, errors, error_items };
+  view.restore_report = { done, aiff_undone, errors, error_items };
   return view;
 }
 
@@ -2311,6 +2964,7 @@ export async function cleanBackups(): Promise<any> {
     }
   };
   if (fs.existsSync(bdir)) { walk(bdir); fs.rmSync(bdir, { recursive: true, force: true }); }
+  if (lib.aiff_from) { delete lib.aiff_from; saveState(); }   // nothing left to undo
   const view = await buildView();
   view.clean_report = { freed_bytes: freed, files };
   return view;
@@ -2333,7 +2987,8 @@ function userDir(raw: any): string {
 
 /** POST /api/library: {op: "add", dir, url} · {op: "select", id} · {op: "remove", id}
  *  · {op: "add_folder", dir, id?} · {op: "remove_folder", dir, id?} · {op: "subfolders", on, id?}
- *  · {op: "set_url", url, id?} · {op: "files_ready", id?} (the folder ops and set_url act on the active library unless
+ *  · {op: "set_url", url, id?} · {op: "files_ready", id?} · {op: "set_dir", dir, id?, confirm?} (see setMainDir)
+ *  (the folder ops and set_url act on the active library unless
  *  `id` says otherwise). add and set_url answer with view.fetch_report = {unreadable}, set_url
  *  also with {same, of, had}: how many of the tracks were already in the old playlist. When the
  *  new link misses tracks the library had, set_url changes nothing and answers {confirm: report}
@@ -2407,14 +3062,32 @@ export async function libraryOp(data: any): Promise<any> {
     const lib = target();
     const d = String(data.dir || "");
     if (sameDir(lib.dir, d)) throw appError("main_folder_fixed", "the main folder cannot be removed; remove the library instead");
-    const before = (lib.dirs || []).length;
-    lib.dirs = (lib.dirs || []).filter((x) => !sameDir(x, d));
-    if (lib.dirs.length === before) throw appError("folder_not_in_library", "that folder is not part of the library");
+    const gone = (lib.dirs || []).find((x) => sameDir(x, d));
+    if (gone === undefined) throw appError("folder_not_in_library", "that folder is not part of the library");
+    const had = lib.playlist ? ((await buildView(lib)).tracks || []).filter((r: any) => r.file) : [];
+    const prev: Library = { ...lib };
+    lib.dirs = (lib.dirs || []).filter((x) => x !== gone);
     if (!lib.dirs.length) delete lib.dirs;
-    for (const k of Object.keys(STATE.dur_cache)) if (k.startsWith(d + path.sep)) delete STATE.dur_cache[k];
+    const followed = followRemoved(prev, lib, gone);
+    // an earlier main folder (a swap) leaves the library: the rekordbox export update follows it like a moved main folder
+    if ((lib.former_main || []).some((y) => sameDir(y, gone))) {
+      lib.former_main = lib.former_main!.filter((y) => !sameDir(y, gone));
+      if (!lib.former_main.length) delete lib.former_main;
+      lib.moved_from = [...(lib.moved_from || []).filter((y) => !sameDir(y, gone) && !sameDir(y, lib.dir)), gone].slice(-5);
+    }
+    for (const k of Object.keys(STATE.dur_cache)) if (k.startsWith(gone + path.sep)) delete STATE.dur_cache[k];
+    saveState();
+    const view = await buildView();
+    // the tracks whose file was in that folder and that have none now (no file of the same name elsewhere)
+    const now = new Set(((lib === activeLib() ? view : await buildView(lib)).tracks || []).filter((r: any) => r.file).map((r: any) => r.id));
+    const lost = had.filter((r: any) => !now.has(r.id)).map((r: any) => ({ id: r.id, artist: r.artist, title: r.title, file: r.file }));
+    view.remove_report = { dir: gone, followed, before: had.length, after: now.size, lost: lost.slice(0, 200), lost_count: lost.length };
+    return view;
   } else if (op === "subfolders") {
     const lib = target();
     if (data.on) lib.subfolders = true; else delete lib.subfolders;
+  } else if (op === "set_dir") {
+    return setMainDir(target(), data);
   } else if (op === "files_ready") {
     // an imported library whose music was being copied: the user says the copy is complete, so
     // pins whose file still isn't there are dropped with the next view, as for any other library
@@ -2424,6 +3097,200 @@ export async function libraryOp(data: any): Promise<any> {
   }
   saveState();
   return buildView();
+}
+
+/** A folder change's "before": the tracks that have a file now; with the main folder gone (or
+ *  listing no audio), those that had one when it was last seen. */
+async function tracksWithFile(lib: Library): Promise<{ fromAway: boolean; had: { id: number; artist: string; title: string; file: string }[] }> {
+  const tracks = lib.playlist?.tracks || [];
+  const fromAway = !!folderTrouble(lib.dir) || !listAudioKeys(lib.dir, !!lib.subfolders, 1).length;
+  if (!fromAway) {
+    const view = await buildView(lib);
+    return { fromAway, had: (view.tracks || []).filter((r: any) => r.file).map((r: any) => ({ id: r.id, artist: r.artist, title: r.title, file: r.file })) };
+  }
+  const names = libraryNames(tracks);
+  const nameOf = (t: PlTrack) => {
+    const nm = names.get(t.id)!, ed = STATE.edits[String(t.id)];
+    return handEdit(ed) ? { artist: ed!.artist || nm.artist, title: ed!.title || nm.title } : { artist: nm.artist, title: nm.title };
+  };
+  return { fromAway, had: tracks.filter((t) => `${lib.id}:${t.id}` in STATE.acquired || !!STATE.assigned[String(t.id)])
+    .map((t) => ({ id: t.id, ...nameOf(t), file: STATE.assigned[String(t.id)] || "" })) };
+}
+
+/** The key a file of `lib` gets when the library's folders become `next`'s (same folders, other
+ *  roles or order): the folder a key belongs to is found by its prefix under `lib`, and the key
+ *  gets that folder's prefix under `next` (the main folder's is ""). */
+function rekeyer(lib: Library, next: Library): (k: string) => string {
+  const oldPre = dirPrefixes(lib), newPre = dirPrefixes(next);
+  const byPre = [...oldPre].filter(([, p]) => p);
+  return (k: string) => {
+    let dir = lib.dir, rest = k;
+    for (const [d, p] of byPre) if (k.startsWith(p)) { dir = d; rest = k.slice(p.length); break; }
+    const p2 = newPre.get(dir);
+    return p2 === undefined ? k : p2 + rest;
+  };
+}
+/** Move the backups under originals/<lib>/ (keyed like the library's files) to their new keys.
+ *  Two steps through a folder next to it, since one backup's new key can be another's old one;
+ *  a step that fails puts back what it moved and throws, so nothing is half done. */
+function rekeyBackups(lib: Library, rekey: (k: string) => string): void {
+  const moves = backupEntries(lib).map(([k, p]) => [k, rekey(k), p] as [string, string, string]).filter(([a, b]) => a !== b);
+  if (!moves.length) return;
+  const bdir = backupDir(lib), tmp = path.join(DATA_DIR, "originals", `.${lib.id}.rekey`);
+  fs.rmSync(tmp, { recursive: true, force: true });
+  const done: [string, string][] = [];   // [from, to] in the order made
+  const mv = (a: string, b: string) => { fs.mkdirSync(path.dirname(b), { recursive: true }); fs.renameSync(a, b); done.push([a, b]); };
+  try {
+    for (const [, nk, p] of moves) mv(p, path.join(tmp, ...nk.split("/")));
+    for (const [, nk] of moves) {
+      const dst = path.join(bdir, ...nk.split("/"));
+      if (fs.existsSync(dst)) throw appError("backup_in_way", `a backup is in the way: ${dst}`, { file: dst });
+      mv(path.join(tmp, ...nk.split("/")), dst);
+    }
+  } catch (e) {
+    for (const [a, b] of done.reverse()) try { fs.mkdirSync(path.dirname(a), { recursive: true }); fs.renameSync(b, a); } catch { /* left in tmp, kept */ }
+    throw e;
+  }
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+
+/** set_dir with one of the library's extra folders: the two folders swap roles. That folder
+ *  becomes the main folder (new downloads go there) and the old main folder an extra folder; both
+ *  stay in the library and no file on disk is touched. Only the keys change (an extra folder's
+ *  files carry its name as a prefix, the main folder's none), so every record keyed by one follows
+ *  its own file: the pins, the backups and the Convert to AIFF record. The found and edits
+ *  records, the file cache and everything keyed by track id are keyed by path or track and stay
+ *  as they are. Same protocol as setMainDir: {confirm: plan} (swap: true) until `confirm`. */
+async function swapMainDir(lib: Library, at: number, data: any): Promise<any> {
+  const x = lib.dirs![at], old = lib.dir;
+  for (const other of STATE.libraries)
+    if (other !== lib && libDirs(other).some((y) => sameDir(y, x)))
+      throw appError("folder_other_library", `this folder already belongs to the library “${libName(other)}”`, { name: libName(other) });
+  tagIdle();
+  const tracks = lib.playlist?.tracks || [];
+  const trackIds = libTrackIds(lib);
+  const next: Library = { ...lib, dir: x, dirs: lib.dirs!.map((y, i) => (i === at ? old : y)) };
+  const rekey = rekeyer(lib, next);
+  const pins = Object.entries(STATE.assigned).filter(([tid, f]) => f && trackIds.has(Number(tid)));
+  const { fromAway, had } = await tracksWithFile(lib);
+  const files = await scanLocal(next, undefined, false);
+  const manual = new Map<number, string>();
+  for (const [tid, f] of Object.entries(STATE.assigned))
+    if (trackIds.has(Number(tid))) manual.set(Number(tid), f ? rekey(f) : "");
+  const { matched } = matchFiles(files, tracks, manual);
+  const hadIds = new Set(had.map((h) => h.id));
+  const lose = had.filter((h) => !matched.has(h.id));
+  const gain = [...matched.keys()].filter((id) => !hadIds.has(id)).length;
+  const under = (p: string) => [old, x].some((d) => p.startsWith(d + path.sep));
+  const recs = [STATE.found, STATE.edits].reduce((n, m) => n + Object.keys(m).filter((k) => k.startsWith("x:") && under(k.slice(2))).length, 0);
+  const disk = listAudioKeys(x, !!lib.subfolders);
+  const plan = { swap: true, dir: x, from: old, from_away: fromAway, files: disk.length, empty: !disk.length,
+                 before: had.length, after: matched.size, lose: lose.slice(0, 200), lose_count: lose.length, gain,
+                 pins: { total: pins.length, kept: pins.length, other_ext: 0, lost: 0 }, records: { carried: recs, lost: 0 } };
+  if (!data.confirm) return { confirm: plan };
+  // apply: the backups first (the only step that can fail), then the keys in the state
+  rekeyBackups(lib, rekey);
+  for (const [tid, f] of pins) STATE.assigned[tid] = rekey(f);
+  if (lib.aiff_from) lib.aiff_from = Object.fromEntries(Object.entries(lib.aiff_from).map(([a, b]) => [rekey(a), rekey(b)]));
+  lib.dir = x;
+  lib.dirs = next.dirs;
+  lib.former_main = [...(lib.former_main || []).filter((y) => !sameDir(y, x) && !sameDir(y, old)), old];
+  if (lib.moved_from) { lib.moved_from = lib.moved_from.filter((y) => !sameDir(y, x) && !sameDir(y, old)); if (!lib.moved_from.length) delete lib.moved_from; }
+  saveState();
+  const view = await buildView();
+  view.main_report = { swap: true, dir: x, from: old, before: plan.before, after: plan.after, lost: lose.length };
+  return view;
+}
+
+/** Use another folder as a library's main folder (the music was moved, renamed, or converted into
+ *  a copy of the folder). No file is touched. Everything DJ HQ remembers about the old folder's
+ *  files follows them by name (matchKeys: exact, case and Unicode folded, the file name alone, the
+ *  name without its audio extension): pins, found and edits records; the backups, file-arrival
+ *  times and everything keyed by track id stay as they are. Without `confirm` nothing changes and
+ *  the answer is {confirm: plan}: how many tracks have a file now (or had one when the old folder
+ *  was last seen) and would have one in the new folder, which would lose theirs, and what happens
+ *  to the pins and records. With it the plan is applied and the view has main_report. */
+async function setMainDir(lib: Library, data: any): Promise<any> {
+  const d = userDir(data.dir);
+  const old = lib.dir;
+  if (sameDir(old, d)) throw appError("folder_same", "this folder is already the main folder of the library", { dir: d });
+  const swapAt = (lib.dirs || []).findIndex((x) => sameDir(x, d));
+  if (swapAt >= 0) return swapMainDir(lib, swapAt, data);
+  for (const x of lib.dirs || []) {
+    if (insideDir(d, x)) throw appError("folder_inside", `${d} is inside ${x}, which is already part of the library. Turn on "Include subfolders" instead`, { dir: d, parent: x });
+    if (insideDir(x, d)) throw appError("folder_contains", `${x} is inside ${d}; a library folder cannot contain another one`, { dir: d, child: x });
+  }
+  for (const other of STATE.libraries)
+    if (other !== lib && libDirs(other).some((x) => sameDir(x, d)))
+      throw appError("folder_other_library", `this folder already belongs to the library “${libName(other)}”`, { name: libName(other) });
+  tagIdle();
+  const tracks = lib.playlist?.tracks || [];
+  const trackIds = libTrackIds(lib);
+  const next: Library = { ...lib, dir: d };
+  const oldPre = dirPrefixes(lib), newPre = dirPrefixes(next);
+  // an extra folder whose key prefix changes (a subfolder of the new main folder has its name)
+  const extraMove: [string, string][] = (lib.dirs || []).map((x) => [oldPre.get(x)!, newPre.get(x)!] as [string, string]).filter(([a, b]) => a !== b);
+  const isMain = (k: string) => ![...oldPre.values()].some((pre) => pre && k.startsWith(pre));
+  const reExtra = (k: string) => { for (const [a, b] of extraMove) if (k.startsWith(a)) return b + k.slice(a.length); return k; };
+  const pins = Object.entries(STATE.assigned).filter(([tid, f]) => f && trackIds.has(Number(tid)));
+  const mainPins = pins.filter(([, f]) => isMain(f));
+  // the records keyed by path under the old main folder (subfolders only when they are scanned)
+  const recs: { map: Record<string, unknown>; k: string; rel: string }[] = [];
+  for (const map of [STATE.found, STATE.edits] as Record<string, unknown>[])
+    for (const k of Object.keys(map)) {
+      if (!k.startsWith("x:" + old + path.sep)) continue;
+      const rel = path.relative(old, k.slice(2)).split(path.sep).join("/");
+      if (rel && (lib.subfolders || !rel.includes("/"))) recs.push({ map, k, rel });
+    }
+  const disk = listAudioKeys(d, !!lib.subfolders);
+  const m = matchKeys([...mainPins.map(([, f]) => f), ...recs.map((r) => r.rel)], disk);
+  const { fromAway, had } = await tracksWithFile(lib);
+  // after: the new folder (and the extra folders) matched as the view would, the pins carried over
+  // (no sweep: until the change is confirmed the new folder is not the library's, and nothing in it is touched)
+  const files = await scanLocal(next, undefined, false);
+  const fileNames = new Set(files.map((f) => f.name));
+  const stems = new Map<string, string[]>();
+  for (const f of files) stems.set(stemKey(f.name), [...(stems.get(stemKey(f.name)) || []), f.name]);
+  const manual = new Map<number, string>();
+  for (const [tid, f] of Object.entries(STATE.assigned)) {
+    if (!trackIds.has(Number(tid))) continue;
+    if (!f) { manual.set(Number(tid), ""); continue; }
+    let to = isMain(f) ? m.map.get(f)?.to : reExtra(f);
+    if (to && !isMain(f) && !fileNames.has(to)) { const c = stems.get(stemKey(to)) || []; to = c.length === 1 ? c[0] : to; }
+    if (to) manual.set(Number(tid), to);   // else the pin is dropped with the next view; the file may still match by name
+  }
+  const { matched } = matchFiles(files, tracks, manual);
+  const hadIds = new Set(had.map((h) => h.id));
+  const lose = had.filter((h) => !matched.has(h.id));
+  const gain = [...matched.keys()].filter((id) => !hadIds.has(id)).length;
+  const ext = (k: string) => path.extname(k).toLowerCase();
+  const mapped = mainPins.filter(([, f]) => m.map.has(f));
+  const pinsRep = { total: mainPins.length, kept: mapped.filter(([, f]) => ext(m.map.get(f)!.to) === ext(f)).length,
+                    other_ext: mapped.filter(([, f]) => ext(m.map.get(f)!.to) !== ext(f)).length, lost: mainPins.length - mapped.length };
+  const records = { carried: recs.filter((r) => m.map.has(r.rel)).length, lost: recs.filter((r) => !m.map.has(r.rel)).length };
+  const plan = { dir: d, from: old, from_away: fromAway, files: disk.length, empty: !disk.length,
+                 before: had.length, after: matched.size, lose: lose.slice(0, 200), lose_count: lose.length, gain, pins: pinsRep, records };
+  if (!data.confirm) return { confirm: plan };
+  // apply: the records follow their files; nothing on disk changes
+  for (const [tid, f] of pins) {
+    const to = isMain(f) ? m.map.get(f)?.to : reExtra(f);
+    if (to && to !== f) STATE.assigned[tid] = to;
+  }
+  for (const r of recs) {
+    const to = m.map.get(r.rel)?.to;
+    if (!to) continue;
+    const nk = "x:" + path.join(d, ...to.split("/"));
+    if (nk === r.k) continue;
+    if (!(nk in r.map)) r.map[nk] = r.map[r.k];
+    delete r.map[r.k];
+  }
+  for (const k of Object.keys(STATE.dur_cache)) if (k.startsWith(old + path.sep)) delete STATE.dur_cache[k];
+  lib.moved_from = [...(lib.moved_from || []).filter((x) => !sameDir(x, old) && !sameDir(x, d)), old].slice(-5);
+  lib.dir = d;
+  saveState();
+  const view = await buildView();
+  view.main_report = { dir: d, from: old, before: plan.before, after: plan.after, lost: lose.length };
+  return view;
 }
 
 export async function refresh(): Promise<any> {
@@ -2737,16 +3604,22 @@ export async function inboxView(opts: { auto?: boolean } = {}): Promise<any> {
   const dir = inboxDir();
   const base = { dir, exists: fs.existsSync(dir), items: [] as any[], unmatched: [] as any[], others: 0, already: 0,
                  moved: [] as string[], move_errors: [] as string[], zip_errors: [] as string[],
-                 move_error_items: [] as ErrorItem[], zip_error_items: [] as ErrorItem[] };
+                 move_error_items: [] as ErrorItem[], zip_error_items: [] as ErrorItem[], aiff_kept: [] as ErrorItem[] };
   if (!base.exists || !lib.playlist) return base;
   const view = await buildView();
   const rows = new Map<number, any>(view.tracks.map((r: any) => [r.id, r]));
-  const libNames = new Set((await scanLocal(lib)).map((f) => f.base));
+  const libFiles = await scanLocal(lib);
+  const libNames = new Set(libFiles.map((f) => f.base));
+  // rule E: "X.wav" in the downloads is already there when the library has "X.aif" (converted);
+  // not when the library's file is lossy and the download isn't (that may be an upgrade)
+  const libStems = new Map<string, boolean>();   // stem -> every library file of that name is lossless
+  for (const f of libFiles) { const k = stemKey(f.base); libStems.set(k, (libStems.get(k) ?? true) && !LOSSY.test(f.fmt[0])); }
   const scan = await scanInbox(dir);
   base.zip_errors = scan.errors;
   base.zip_error_items = scan.error_items;
   for (const f of scan.files) {
     if (libNames.has(f.name)) { base.already++; continue; } // copied in already
+    if (libStems.get(stemKey(f.name)) || (libStems.has(stemKey(f.name)) && LOSSY.test(f.fmt[0]))) { base.already++; continue; } // in another format
     const [t, score] = bestTrackNames(f.matchNames, f.dur, lib.playlist.tracks);
     const row = t && rows.get(t.id);
     const lossy = LOSSY.test(f.fmt[0]);
@@ -2771,7 +3644,11 @@ export async function inboxView(opts: { auto?: boolean } = {}): Promise<any> {
     for (const it of base.items) {
       const exact = it.action === "move" && it.score >= 0.999 && Math.abs(it.dur_diff) <= 2 && !movedTracks.has(it.id);
       if (!exact) { keep.push(it); continue; }
-      try { await inboxMoveOne({ file: it.name, id: it.id, zip: it.zip }); base.moved.push(it.name); movedTracks.add(it.id); }
+      try {
+        const r = await inboxMoveOne({ file: it.name, id: it.id, zip: it.zip });
+        base.moved.push(it.name); movedTracks.add(it.id);
+        if (r.aiff && !r.aiff.ok) base.aiff_kept.push(r.aiff.item!);
+      }
       catch (e: any) { base.move_errors.push(withName(it.name, e.message)); base.move_error_items.push(errItem(it.name, e)); keep.push(it); }
     }
     base.items = keep;
@@ -2795,18 +3672,26 @@ function moveFile(src: string, dst: string): void {
  *  as it is and, with `track` (a SoundCloud search result), remembered as found for that
  *  track, the way Not in playlist does; a track already in the playlist is matched outright. */
 export async function inboxMove(data: any): Promise<any> {
-  await inboxMoveOne(data);
-  return buildView();
+  const r = await inboxMoveOne(data);
+  const view = await buildView();
+  view.move_report = { key: r.key, aiff_kept: r.aiff && !r.aiff.ok ? [r.aiff.item] : [] };
+  return view;
 }
 
-/** inboxMove without the view: the moved file's library key and path, and its track. */
-export async function inboxMoveOne(data: any): Promise<{ key: string; path: string; track_id: number | null }> {
+/** inboxMove without the view: the moved file's library key and path, and its track. With
+ *  "AIFF instead of WAV" on, a WAV becomes an AIFF right after the move (wavToAiff), before it is
+ *  pinned, and the key returned is the AIFF's; `aiff` says how that went. A WAV that can't be
+ *  converted stays as it is and is moved all the same ({ok: false, item}: the reason). */
+export async function inboxMoveOne(data: any): Promise<{ key: string; path: string; track_id: number | null; aiff?: { ok: boolean; item?: ErrorItem } }> {
   const lib = requireLib();
   const name = path.basename(String(data.file || ""));
   const zip = data.zip ? path.basename(String(data.zip)) : "";
   if (!name) throw appError("no_file", "no file given");
   const dst = path.join(lib.dir, name);
   if (fs.existsSync(dst)) throw appError("name_taken", `${name}: a file with this name is already in the library`, { name });
+  // the WAV would become an AIFF that is there already
+  const toAiff = !!STATE.settings?.aiff_auto && path.extname(name).toLowerCase() === ".wav";
+  if (toAiff && aiffThere(dst)) throw appError("name_taken", `${name}: a file with this name is already in the library`, { name });
   const found = data.track && typeof data.track === "object" ? data.track : null;
   const inList = (id: any) => !!lib.playlist?.tracks.some((t) => String(t.id) === String(id));
   // the playlist track the file is for: the one given, or the found track when it is in the playlist already
@@ -2819,8 +3704,9 @@ export async function inboxMoveOne(data: any): Promise<{ key: string; path: stri
   if (zip) {
     const entry = listEntries(src).filter(zipEntryAudio).find((e) => path.posix.basename(e.name) === name);
     if (!entry) throw appError("zip_entry_missing", `${name}: not found inside ${zip}`, { name, zip });
-    staged = dst.replace(/(\.[^.]+)$/, ".tmp$1");   // the folder scan ignores *.tmp.<ext>
-    extractEntry(src, entry, staged);
+    // "X.wav.tmp.wav": the folder scan ignores *.tmp.<ext>, and its sweep removes one a kill left behind
+    staged = staleGone(dst + ".tmp" + path.extname(dst));
+    try { extractEntry(src, entry, staged); } catch (e) { doneTmp(staged); throw e; }
   }
   const row = tid ? (await buildView()).tracks.find((r: any) => String(r.id) === tid) : null;
   let kept: [string, string] | null = null;
@@ -2842,20 +3728,25 @@ export async function inboxMoveOne(data: any): Promise<{ key: string; path: stri
     if (kept) try { moveFile(kept[1], kept[0]); } catch {}   // put the replaced file back
     if (staged) try { fs.unlinkSync(staged); } catch {}
     throw e;
+  } finally { if (staged) LIVE_TMP.delete(staged); }
+  let key = name, at = dst, aiff: { ok: boolean; item?: ErrorItem } | undefined;
+  if (toAiff) {
+    try { key = await wavToAiff(lib, name); at = libPath(lib, key); aiff = { ok: true }; }
+    catch (e: any) { aiff = { ok: false, item: errItem(name, e) }; }
   }
-  for (const a of Object.keys(STATE.assigned)) if (STATE.assigned[a] === name) { delete STATE.assigned[a]; delete STATE.by_hand[a]; }
-  delete STATE.found["x:" + dst];
+  for (const a of Object.keys(STATE.assigned)) if (STATE.assigned[a] === key) { delete STATE.assigned[a]; delete STATE.by_hand[a]; }
+  delete STATE.found["x:" + at];
   if (tid) {
-    STATE.assigned[tid] = name;   // pinned to the track, but not "by hand": the download is the file for it
+    STATE.assigned[tid] = key;   // pinned to the track, but not "by hand": the download is the file for it
     delete STATE.by_hand[tid];
     delete STATE.overrides[tid];
     delete STATE.na[tid];
   } else if (found && found.url) {   // not in the playlist yet: Not in playlist shows it as found, one Add away
-    STATE.found["x:" + dst] = { id: Number(found.id), url: String(found.url), title: String(found.title || ""),
-                                user: String(found.user || ""), dur: Number(found.dur) || 0 };
+    STATE.found["x:" + at] = { id: Number(found.id), url: String(found.url), title: String(found.title || ""),
+                               user: String(found.user || ""), dur: Number(found.dur) || 0 };
   }
   saveState();
-  return { key: name, path: dst, track_id: tid ? Number(tid) : null };   // the main folder's files are keyed by name
+  return { key, path: at, track_id: tid ? Number(tid) : null, ...(aiff ? { aiff } : {}) };   // the main folder's files are keyed by name
 }
 
 /** Search SoundCloud for a download that matches nothing in the playlist:
@@ -2874,12 +3765,15 @@ export async function inboxMoveAll(): Promise<any> {
   const scan = await inboxView();
   let done = scan.moved.length;   // auto-move may have handled some already
   const errors: string[] = [...scan.move_errors], error_items: ErrorItem[] = [...scan.move_error_items];
+  const aiff_kept: ErrorItem[] = [...scan.aiff_kept];
   for (const it of scan.items) {
-    try { await inboxMoveOne({ file: it.name, id: it.id, zip: it.zip }); done++; }
-    catch (e: any) { errors.push(withName(it.name, e.message)); error_items.push(errItem(it.name, e)); }
+    try {
+      const r = await inboxMoveOne({ file: it.name, id: it.id, zip: it.zip }); done++;
+      if (r.aiff && !r.aiff.ok) aiff_kept.push(r.aiff.item!);
+    } catch (e: any) { errors.push(withName(it.name, e.message)); error_items.push(errItem(it.name, e)); }
   }
   const view = await buildView();
-  view.inbox_report = { done, errors, error_items };
+  view.inbox_report = { done, errors, error_items, aiff_kept };
   return view;
 }
 

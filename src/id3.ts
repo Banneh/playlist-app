@@ -241,6 +241,11 @@ export interface KeyInfo {
    *  ffprobe hides these whenever the file also has an INFO chunk, so a name kept only
    *  there would otherwise go unseen (and be written over). */
   id3?: { artist: string; title: string };
+  /** the tag holds a picture (APIC, v2.2 PIC): Add cover art never adds a second one */
+  pic?: boolean;
+  /** version of the ID3v2 tag read (2, 3, 4; 0 = none): a picture is only added to a v2.3/2.4 one.
+   *  -4: a v2.4 tag unsynchronised as a whole, which pictureTag can't carry frame by frame */
+  ver?: number;
 }
 
 /** IART / INAM of a WAV's LIST/INFO chunk (the last one, as with the ID3 chunk);
@@ -273,9 +278,10 @@ export function readKeyInfo(p: string): KeyInfo {
     fd = fs.openSync(p, "r");
     const riff = walkChunks(fd);
     const t = openTag(fd, riff);
-    let key: string | null = null, mark = false;
+    let key: string | null = null, mark = false, pic = false;
     const names = { artist: "", title: "" };
     if (t) for (const f of rawFrames(t)) {
+      if (f.id === "APIC" || f.id === "PIC") { pic = true; continue; }
       if (f.id === "TPE1" || f.id === "TP1" || f.id === "TIT2" || f.id === "TT2") {
         const b = frameData(t, f, 2048), v = b && b.length ? (textValues(b)[0] || "").trim() : "";
         if (f.id[1] === "P") names.artist = names.artist || v; else names.title = names.title || v;
@@ -291,7 +297,8 @@ export function readKeyInfo(p: string): KeyInfo {
     }
     const pn = riff ? riff.chunks.some((c) => c.id === "PLTN") || mark
       : path.extname(p).toLowerCase() === ".mp3" ? mark : null;
-    return riff && !riff.be ? { key, pn, info: readInfo(fd, riff), id3: names } : { key, pn };
+    const ver = !t ? 0 : t.head.ver === 4 && t.head.flags & 0x80 ? -4 : t.head.ver;
+    return riff && !riff.be ? { key, pn, info: readInfo(fd, riff), id3: names, pic, ver } : { key, pn, pic, ver };
   } catch {
     return { key: null, pn: null };
   } finally {
@@ -624,6 +631,125 @@ export function copyAfterTag(p: string, dst: string): void {
   }
 }
 
+// ---------------- cover art ----------------
+
+const tagError = (code: string, msg: string) => Object.assign(new Error(msg), { code });
+
+/** The frames of a file's ID3v2.3/2.4 tag exactly as stored (header and body; a v2.3 tag's
+ *  whole-tag unsynchronisation undone), and the tag's version; null without such a tag.
+ *  `rest`: non-zero bytes after the last frame the parser can walk (an odd frame id such as
+ *  iTunes' "TCP\0", a cut frame), which a copy of the frames alone would lose. */
+export function rawTagFrames(p: string): { ver: number; frames: Buffer[]; rest: boolean } | null {
+  let fd = -1;
+  try {
+    fd = fs.openSync(p, "r");
+    const t = openTag(fd, walkChunks(fd));
+    if (!t || t.head.ver < 3) return null;
+    // v2.4 marks unsynchronisation per frame as well; one flag for the whole tag can't be carried frame by frame
+    if (t.head.ver === 4 && t.head.flags & 0x80) return null;
+    const fr = [...rawFrames(t)], last = fr[fr.length - 1];
+    let at = 10;
+    if (!last && t.head.flags & 0x40) { const e = t.src(10, 4); at += e.length < 4 ? 0 : t.head.ver === 4 ? unsyncsafe(e, 0) : 4 + e.readUInt32BE(0); }
+    if (last) at = last.off + last.size;
+    const rest = at < 10 + t.head.size && t.src(at, 10 + t.head.size - at).some((b) => b !== 0);
+    return { ver: t.head.ver, frames: fr.map((f) => Buffer.from(t.src(f.off - 10, f.size + 10))), rest };
+  } catch {
+    return null;
+  } finally {
+    if (fd >= 0) try { fs.closeSync(fd); } catch { /* ignore */ }
+  }
+}
+
+/** An APIC frame: front cover (type 3), empty description, Latin-1 (encoding 0, which v2.3
+ *  and v2.4 read alike). A v2.4 tag gets a synchsafe size. */
+export function apicFrame(ver: number, mime: string, img: Buffer): Buffer {
+  const body = Buffer.concat([Buffer.from([0x00]), Buffer.from(mime + "\0", "latin1"), Buffer.from([0x03, 0x00]), img]);
+  const head = Buffer.alloc(10);
+  head.write("APIC", 0, "latin1");
+  if (ver === 4) syncsafe(body.length).copy(head, 4); else head.writeUInt32BE(body.length, 4);
+  return Buffer.concat([head, body]);
+}
+
+/** The file's ID3v2.3/2.4 tag with one picture added at its end: every frame already there
+ *  as it was stored, byte for byte (not re-encoded as buildId3v23 does, so the names are
+ *  exactly what they were), the version kept. The extended header (its CRC would be
+ *  stale) and the padding are left out. Throws on a tag that has a picture already, or
+ *  bytes after its frames that aren't padding (they would be lost). */
+export function pictureTag(p: string, mime: string, img: Buffer): Buffer {
+  const t = rawTagFrames(p);
+  if (!t) throw tagError("art_no_tag", "the file has no ID3v2.3/2.4 tag DJ HQ can add a picture to");
+  if (t.frames.some((f) => f.toString("latin1", 0, 4) === "APIC")) throw tagError("art_has_picture", "the file has a picture already");
+  if (t.rest) throw tagError("art_tag_layout", "the file's tag has frames DJ HQ can't read, left untouched");
+  const body = Buffer.concat([...t.frames, apicFrame(t.ver, mime, img)]);
+  if (body.length >= 1 << 28) throw tagError("tag_too_large", "tag too large");
+  return Buffer.concat([Buffer.from("ID3", "latin1"), Buffer.from([t.ver, 0x00, 0x00]), syncsafe(body.length), body]);
+}
+
+/** Copy a WAV or AIFF to `dst` with the data of its ID3 chunk (the last one: the one
+ *  readers take) replaced by `tag`. Every other chunk is copied as it is, in its place:
+ *  unlike an ffmpeg rewrite, LIST/INFO, PLTN and unknown chunks come out byte-identical.
+ *  Refuses a file whose chunks don't reach its end (bytes the copy would leave out) or
+ *  whose last chunk is cut short. */
+export function replaceTagChunk(p: string, dst: string, tag: Buffer): void {
+  const src = fs.openSync(p, "r");
+  let out = -1;
+  try {
+    const riff = walkChunks(src), size = fs.fstatSync(src).size;
+    const c = riff?.chunks.filter((x) => x.id.toLowerCase() === "id3 ").pop();
+    if (!riff || !c) throw tagError("art_no_tag", "the file has no ID3 chunk");
+    const last = riff.chunks[riff.chunks.length - 1], end = last.off + last.size;
+    if (size - end > 1) throw tagError("art_layout", "the file has bytes after its last chunk");
+    // a chunk cut short (an incomplete download): its header would get the clipped size, a repair nobody asked for
+    for (const x of riff.chunks) {
+      const h = readAt(src, x.off - 8, 8);
+      if ((riff.be ? h.readUInt32BE(4) : h.readUInt32LE(4)) !== x.size) throw tagError("art_layout", "a chunk of the file is cut short");
+    }
+    out = fs.openSync(dst, "w");
+    const head = readAt(src, 0, 12);
+    fs.writeSync(out, head);
+    let at = 12;
+    const buf = Buffer.alloc(4 * 1024 * 1024);
+    for (const x of riff.chunks) {
+      const h = Buffer.alloc(8);
+      h.write(x.id, 0, "latin1");
+      const n = x === c ? tag.length : x.size;
+      if (riff.be) h.writeUInt32BE(n, 4); else h.writeUInt32LE(n, 4);
+      fs.writeSync(out, h); at += 8;
+      if (x === c) { fs.writeSync(out, tag); at += tag.length; }
+      else for (let off = x.off, left = x.size; left > 0;) {
+        const k = fs.readSync(src, buf, 0, Math.min(buf.length, left), off);
+        if (k <= 0) throw tagError("art_layout", "short read");
+        fs.writeSync(out, buf, 0, k); off += k; left -= k; at += k;
+      }
+      if (n % 2) { fs.writeSync(out, Buffer.from([0])); at++; }
+    }
+    if (at - 8 > 0xffffffff) throw tagError("file_too_large", "file too large for its format (4 GB)");
+    const sz = Buffer.alloc(4);
+    if (riff.be) sz.writeUInt32BE(at - 8, 0); else sz.writeUInt32LE(at - 8, 0);
+    fs.writeSync(out, sz, 0, 4, 4);
+  } finally {
+    fs.closeSync(src);
+    if (out >= 0) fs.closeSync(out);
+  }
+}
+
+/** The chunks of a WAV/AIFF other than its ID3 and audio ones (the audio is checked by its
+ *  MD5), in order: the check after a picture was added; null for anything else. */
+export function otherChunks(p: string): Chunk[] | null {
+  let fd = -1;
+  try {
+    fd = fs.openSync(p, "r");
+    const riff = walkChunks(fd);
+    if (!riff) return null;
+    return riff.chunks.filter((c) => c.id.toLowerCase() !== "id3 " && c.id !== "data" && c.id !== "SSND")
+      .map((c) => ({ id: c.id, data: readAt(fd, c.off, Math.min(c.size, MAX_TAG)) }));
+  } catch {
+    return null;
+  } finally {
+    if (fd >= 0) try { fs.closeSync(fd); } catch { /* ignore */ }
+  }
+}
+
 /** Put an ID3v2 tag in front of an MP3 that has none (ffmpeg output written with
  *  -id3v2_version 0). Goes through `<p>.part`, renamed over `p` at the end. */
 export function prependTag(p: string, tag: Buffer): void {
@@ -644,4 +770,23 @@ export function prependTag(p: string, tag: Buffer): void {
     if (dst >= 0) fs.closeSync(dst);
   }
   fs.renameSync(part, p);
+}
+
+/** A WAV's LIST/INFO fields that the ID3 tag has no frame for, as ID3v2.3 frames: album
+ *  (IPRD), year (ICRD), track (ITRK) and comment (ICMT). `have`: the frame ids the tag will
+ *  hold already. For a WAV becoming an AIFF, whose ID3 chunk is then its only tag. */
+export function infoAsFrames(p: string, have: string[]): Frame[] {
+  const map: [string, string][] = [["IPRD", "TALB"], ["ICRD", "TYER"], ["ITRK", "TRCK"], ["ICMT", "COMM"]];
+  const info = infoFields(p) || [];
+  const out: Frame[] = [];
+  for (const [inf, id] of map) {
+    if (have.includes(id)) continue;
+    let v = (info.find(([k]) => k === inf)?.[1] || "").trim();
+    if (id === "TYER") v = /^\d{4}/.test(v) ? v.slice(0, 4) : "";   // TYER holds a year alone
+    if (!v) continue;
+    // COMM: encoding, language, an empty description, the text
+    out.push({ id, data: id === "COMM" ? Buffer.concat([Buffer.from([0x01]), Buffer.from("eng", "latin1"), utf16(""), utf16(v, false)])
+                                       : Buffer.concat([Buffer.from([0x01]), utf16(v)]) });
+  }
+  return out;
 }

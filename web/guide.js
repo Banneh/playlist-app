@@ -43,9 +43,9 @@ const GUIDES = {
   new: guidePage('new', 'sparkles', [['sparkles', 'file', 'eye'], 3]),
   inbox: guidePage('inbox', 'inbox', [['inbox', 'folderIn', 'arrowUpCircle', 'file', 'check'], ['search', 'folderIn'], 5]),
   extras: guidePage('extras', 'folder', [['search', 'search', 'plus', 'pencil'], 3]),
-  prepare: guidePage('prepare', 'disc', [['disc', 'listMusic', 'tag', 'refresh', 'sliders', 'history', 'upload', 'alert'],
+  prepare: guidePage('prepare', 'disc', [['disc', 'listMusic', 'tag', 'refresh', 'image', 'sliders', 'history', 'upload', 'alert'],
     ['wand', 'settings', 'folder', 'sparkles', 'upload', 'check', 'wand', 'x'], 2]),
-  settings: guidePage('settings', 'settings', [['folder', 'inbox', 'wand', 'refresh', 'sun', 'languages', 'history', 'copy', 'info'], 4]),
+  settings: guidePage('settings', 'settings', [['folder', 'inbox', 'wand', 'refresh', 'sun', 'languages', 'history', 'copy', 'info', 'image'], 5]),
 };
 
 let GUIDE = null;   // the open panel's root element

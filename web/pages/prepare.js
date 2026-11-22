@@ -38,6 +38,7 @@ PAGES.prepare = {
   search: false,
   body: () => {
     const dev = ppDevice(), n = DATA.untagged || 0, files = DATA.local_count || 0, c = DATA.incompatible || 0, b = DATA.backups || 0, nc = DATA.name_checks || 0;
+    const na = (DATA.art && DATA.art.add) || 0, run = PP_ALL ? PP_ALL.kind : '';
     const rows = ppAttention();
     ppAllResume();   // once: a run started before a reload
     const deviceCard = `
@@ -64,7 +65,9 @@ PAGES.prepare = {
             <button class="btn ${n ? 'btn-primary' : ''}" id="pp-tag" onclick="ppTag()" ${n && !PP_ALL ? '' : 'disabled'} title="${esc(t(n ? 'prepare.tags.writeTip' : 'prepare.tags.allDoneTip'))}">${icon('tag')}${esc(t('tags.writeTags'))}${n ? ` ${badge(n)}` : ''}</button>
             <button class="btn" onclick="openCheckNames('${nc ? 'check' : 'all'}')" title="${esc(t(nc ? 'prepare.tags.checkTip' : 'prepare.tags.checkAllTip'))}">${icon('listMusic')}${esc(t('names.title'))}${nc ? ` ${badge(nc)}` : ''}</button>
             <span class="pp-break"></span><button class="btn btn-sm btn-ghost pp-again" id="pp-tag-all" onclick="ppTagAll()" ${PP_ALL || PP_ALL_ASKING || !files ? 'disabled' : ''}
-            title="${esc(t(files ? 'prepare.tags.allTip' : 'prepare.tags.noFilesTip'))}">${PP_ALL ? spin(ppAllText()) : icon('refresh') + esc(t('prepare.tags.all'))}</button>
+            title="${esc(t(files ? 'prepare.tags.allTip' : 'prepare.tags.noFilesTip'))}">${run === 'tags' ? spin(ppAllText()) : icon('refresh') + esc(t('prepare.tags.all'))}</button>
+            <span class="pp-break"></span><button class="btn btn-sm btn-ghost pp-again" id="pp-art" onclick="ppArt()" ${PP_ALL || PP_ALL_ASKING || !na ? 'disabled' : ''}
+            title="${esc(t(na ? 'prepare.tags.artTip' : 'prepare.tags.noArtTip'))}">${run === 'art' ? spin(ppAllText()) : icon('image') + esc(t('prepare.tags.art')) + (na ? ` ${badge(na)}` : '')}</button>
           </div>
         </div>
         <div class="card">
@@ -73,8 +76,8 @@ PAGES.prepare = {
           <div class="pp-num">${c ? `<button class="big link" onclick="HFILTER='convert';go('have')" title="${esc(t('prepare.showOnHave'))}">${c}<small>${tnh('prepare.compat.toConvert', c)}</small></button>` : tag(t('prepare.compat.ready'), 'ok', 'check')}</div>
           <p>${c ? (dev.label ? tnh('prepare.compat.wontPlay', c, { player: dev.label }) : tnh('prepare.compat.wontPlayAny', c)) + ' ' : ''}${th('prepare.compat.text')}</p>
           <div class="card-acts">
-            <button class="btn ${c ? 'btn-primary' : ''}" id="pp-convert" onclick="ppConvert()" ${c && !PP_ALL ? '' : 'disabled'} title="${esc(PP_ALL ? errText({ code: 'tag_running' }) : t(c ? 'prepare.compat.convertTip' : 'prepare.compat.allOkTip'))}">${icon('sliders')}${esc(t('prepare.compat.convert'))}${c ? ` ${badge(c)}` : ''}</button>
-            <button class="btn" id="pp-restore" onclick="ppRestore()" ${b && !PP_ALL ? '' : 'disabled'} title="${esc(PP_ALL ? errText({ code: 'tag_running' }) : t(b ? 'prepare.compat.restoreTip' : 'prepare.compat.noRestoreTip'))}">${icon('history')}${esc(t('prepare.compat.restore'))}${b ? ` ${badge(b)}` : ''}</button>
+            <button class="btn ${c ? 'btn-primary' : ''}" id="pp-convert" onclick="ppConvert()" ${c && !PP_ALL ? '' : 'disabled'} title="${esc(PP_ALL ? errText({ code: ppRunCode() }) : t(c ? 'prepare.compat.convertTip' : 'prepare.compat.allOkTip'))}">${icon('sliders')}${esc(t('prepare.compat.convert'))}${c ? ` ${badge(c)}` : ''}</button>
+            <button class="btn" id="pp-restore" onclick="ppRestore()" ${b && !PP_ALL ? '' : 'disabled'} title="${esc(PP_ALL ? errText({ code: ppRunCode() }) : t(b ? 'prepare.compat.restoreTip' : 'prepare.compat.noRestoreTip'))}">${icon('history')}${esc(t('prepare.compat.restore'))}${b ? ` ${badge(b)}` : ''}</button>
           </div>
         </div>
         <div class="card">
@@ -84,6 +87,7 @@ PAGES.prepare = {
           <p>${th('prepare.rb.text')}</p>
           <div class="card-acts">
             <button class="btn" id="pp-export" onclick="exportXml()" ${DATA.have ? '' : 'disabled'}>${icon('upload')}${esc(t('prepare.rb.export'))}</button>
+            <button class="btn" id="pp-cues" onclick="ppCueFix()" title="${esc(t('prepare.cues.tip'))}">${icon('wand')}${esc(t('prepare.cues.button'))}</button>
           </div>
         </div>
       </div>`;
@@ -118,19 +122,27 @@ async function ppTag() {
   await writeTagsAsking();   // pages/playlist.js: asks before a file's own name is replaced
   render();
 }
-/** Write tags in every file: null, or {done, total} while it runs (kept here so a re-render keeps the count) */
+/** The every-file run (Write tags in every file, or Add cover art: `kind` 'tags' / 'art'): null, or
+    {kind, done, total} while it runs (kept here so a re-render keeps the count). One at a time, as on the server. */
 let PP_ALL = null, PP_ALL_ASKING = false, PP_ALL_LOOKED = false;
-const ppAllText = () => PP_ALL && PP_ALL.total
-  ? t('tags.all.progress', { done: I18N.num(PP_ALL.done), total: I18N.num(PP_ALL.total) }) : t('tags.writingTags');
-const ppAllShow = p => { PP_ALL = p; const b = $('#pp-tag-all'); if (b) b.innerHTML = spin(ppAllText()); };
-async function ppTagAll() {
+const ppAllText = () => {
+  const art = PP_ALL && PP_ALL.kind === 'art';
+  return PP_ALL && PP_ALL.total ? t(art ? 'tags.art.progress' : 'tags.all.progress', { done: I18N.num(PP_ALL.done), total: I18N.num(PP_ALL.total) })
+    : t(art ? 'tags.art.adding' : 'tags.writingTags');
+};
+const ppRunCode = () => PP_ALL && PP_ALL.kind === 'art' ? 'art_running' : 'tag_running';
+const ppAllShow = p => { PP_ALL = { ...p, kind: PP_ALL ? PP_ALL.kind : p.kind }; const b = $(PP_ALL.kind === 'art' ? '#pp-art' : '#pp-tag-all'); if (b) b.innerHTML = spin(ppAllText()); };
+/** one every-file run from a click: `ask(progress)` previews, confirms and runs it (pages/playlist.js) */
+async function ppRun(kind, ask) {
   if (PP_ALL || PP_ALL_ASKING) return;   // a double click: one preview, one dialog, one run
   PP_ALL_ASKING = true;
-  const b = $('#pp-tag-all'); if (b) b.disabled = true;
+  const b = $(kind === 'art' ? '#pp-art' : '#pp-tag-all'); if (b) b.disabled = true;
   try {
-    await writeTagsAsking(true, p => { if (!PP_ALL) { PP_ALL = p; render(); } else ppAllShow(p); });
+    await ask(p => { if (!PP_ALL) { PP_ALL = { ...p, kind }; render(); } else ppAllShow(p); });
   } finally { PP_ALL_ASKING = false; PP_ALL = null; render(); }
 }
+const ppTagAll = () => ppRun('tags', progress => writeTagsAsking(true, progress));
+const ppArt = () => ppRun('art', addArtAsking);
 /** The page was reloaded (or opened anew) while a run goes on the server: follow its count,
     and when it ends show its report from GET /api/tag/progress and the fresh view. */
 function ppAllResume() {
@@ -138,13 +150,13 @@ function ppAllResume() {
   PP_ALL_LOOKED = true;
   const get = () => fetch('/api/tag/progress').then(r => r.json());
   get().then(async p => {
-    if (!p.running || PP_ALL || PP_ALL_ASKING) return;
+    if (!p.running || p.kind === 'aiff' || PP_ALL || PP_ALL_ASKING) return;   // a WAV to AIFF run is followed in Settings
     PP_ALL = p; render();
     while (p.running) { await new Promise(r => setTimeout(r, 700)); p = await get().catch(() => p); if (p.running) ppAllShow(p); }
     PP_ALL = null;
-    try { DATA = await api('/api/rescan'); } catch {}
+    try { DATA = await api('/api/rescan', {}); } catch {}   // POST: queued behind the run, so the counts are fresh
     render();
-    if (p.report) tagToast(p.report);
+    if (p.report) (p.kind === 'art' ? artToast : tagToast)(p.report);
   }, () => {});
 }
 async function ppConvert() {
@@ -211,6 +223,59 @@ async function exportXml() {
     open(dlg, done) {
       const rv = dlg.querySelector('[data-a=reveal]');
       if (rv) rv.onclick = () => api('/api/reveal', { path: r.path }).catch(e => toast(t('common.error', { msg: errText(e) }), true));
+      const okb = dlg.querySelector('[data-a=ok]'); okb.onclick = () => done(true); okb.focus();
+    },
+  });
+}
+
+/* ---------- cue points one beat late (Mixed In Key's cues against rekordbox's beatgrid) ---------- */
+const ppCueErr = e => errText(e, 'doall');
+async function ppCueFix() {
+  const b = $('#pp-cues'), old = b ? b.innerHTML : '';
+  const busy = on => { if (!b) return; if (on) ppBusy('#pp-cues', t('prepare.cues.checking')); else { b.disabled = false; b.innerHTML = old; } };
+  busy(true);
+  let r;
+  try { r = await api('/api/cue-fix', {}); }
+  catch (e) { busy(false); toast(t('prepare.cues.failed', { msg: ppCueErr(e) }), true); return; }
+  busy(false);
+  const pathHtml = `<div class="path">${icon('file')}<span title="${esc(r.file)}">${esc(shortPath(r.file))}</span></div>`;
+  const seen = `<p class="pp-cue-seen">${tnh('prepare.cues.seen', r.with_cues, { analysed: r.analysed })}${r.unclear ? ' ' + tnh('prepare.cues.unclear', r.unclear) : ''}</p>`;
+  if (!r.moved) {
+    await dialog({ title: th('prepare.cues.noneTitle'), body: `${pathHtml}<p>${th('prepare.cues.noneText')}</p>${seen}`,
+      foot: `<span class="spacer"></span><button class="btn btn-primary" data-close>${esc(t('common.done'))}</button>` });
+    return;
+  }
+  const rows = r.tracks.map(x => `<li><span class="pp-cue-name" title="${esc(x.artist + ' - ' + x.name)}"><b>${esc(x.name)}</b>${x.artist ? ' · ' + esc(x.artist) : ''}</span><span class="pp-cue-n">${esc(t('prepare.cues.row', { moved: I18N.num(x.moved), cues: I18N.num(x.cues) }))}</span></li>`).join('');
+  const go = await dialog({
+    title: th('prepare.cues.title'),
+    sub: tnh('prepare.cues.sub', r.moved, { tracks: I18N.num(r.tracks.length) }),
+    body: `${pathHtml}<p>${th('prepare.cues.lead')}</p><ul class="pp-cue-list">${rows}</ul>${seen}`,
+    foot: `<span class="spacer"></span><button class="btn" data-close>${esc(t('common.cancel'))}</button>
+           <button class="btn btn-primary" data-a="ok">${icon('wand')}${esc(tn('prepare.cues.apply', r.moved))}</button>`,
+    open(dlg, done) { dlg.querySelector('[data-a=ok]').onclick = () => done(true); },
+  });
+  if (!go) return;
+  busy(true);
+  let w;
+  try { w = await api('/api/cue-fix', { apply: true }); }
+  catch (e) { busy(false); toast(t('prepare.cues.failed', { msg: ppCueErr(e) }), true); return; }
+  busy(false);
+  await dialog({
+    title: tnh('prepare.cues.doneTitle', w.moved),
+    body: `${pathHtml}
+      ${w.backup ? `<p>${th('prepare.cues.backup', { file: I18N.raw('<b>' + esc(shortPath(w.backup).split(/[\\/]/).pop()) + '</b>') })}</p>` : ''}
+      <p class="pp-steps-lead">${th('prepare.xml.lead')}</p>
+      <ol class="steps">
+        <li>${th('prepare.cues.s1')}</li>
+        <li>${th('prepare.cues.s2')}</li>
+        <li>${th('prepare.cues.s3')}</li>
+      </ol>
+      <p>${th('prepare.cues.after')}</p>`,
+    foot: `${DATA.can_reveal ? `<button class="btn" data-a="reveal">${icon('folder')}${esc(t('common.showInFolder'))}</button>` : ''}
+           <span class="spacer"></span><button class="btn btn-primary" data-a="ok">${esc(t('common.done'))}</button>`,
+    open(dlg, done) {
+      const rv = dlg.querySelector('[data-a=reveal]');
+      if (rv) rv.onclick = () => api('/api/reveal', { path: w.file }).catch(e => toast(t('common.error', { msg: errText(e) }), true));
       const okb = dlg.querySelector('[data-a=ok]'); okb.onclick = () => done(true); okb.focus();
     },
   });

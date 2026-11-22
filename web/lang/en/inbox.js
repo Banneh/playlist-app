@@ -2,6 +2,10 @@
    The Downloads page and the "find on SoundCloud and move in" dialog. */
 I18N.add('en', 'inbox', {
   autoMovedMore: 'Moved into your library: {names} and {n} more',
+  aiffKept: {
+    one: '{n} file was kept as WAV',
+    other: '{n} files were kept as WAV',
+  },
   exactTip: 'The file name matches the playlist entry',
   pctTip: 'How closely the file name matches the playlist entry',
   durTip: 'Length compared to the SoundCloud track',

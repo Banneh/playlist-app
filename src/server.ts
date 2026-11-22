@@ -9,6 +9,9 @@ import * as core from "./core";
 import * as config from "./config";
 import * as pipeline from "./pipeline";
 import { platformApps } from "./extapps";
+import { cueFixRoute } from "./cuefix";
+import { remapExport } from "./aiff";
+import { aifAsWav } from "./aifplay";
 
 export interface ServerOpts {
   dataDir: string;
@@ -33,8 +36,9 @@ export interface ServerOpts {
   prefsChanged?: () => void;
 }
 
-/** config: a configuration file to import (asked for by the import route itself, not /api/pick-file) */
-export type PickKind = "pn_app" | "mik_app" | "mik_db" | "rb_xml" | "config";
+/** config: a configuration file to import, rb_export: a collection exported from rekordbox (both asked
+ *  for by their routes themselves, not /api/pick-file) */
+export type PickKind = "pn_app" | "mik_app" | "mik_db" | "rb_xml" | "config" | "rb_export";
 const PICK_KINDS: PickKind[] = ["pn_app", "mik_app", "mik_db", "rb_xml"];
 
 /** An error as JSON: the message, plus its stable code (and vars) when it has one. */
@@ -221,15 +225,21 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         const ok = core.allowedDirs().some((d) => p.startsWith(d + path.sep));
         if (!ok || !fs.existsSync(p) || !fs.statSync(p).isFile()) return send(404, "text/plain", "not found");
         const types: Record<string, string> = { ".mp3": "audio/mpeg", ".wav": "audio/wav", ".flac": "audio/flac", ".aiff": "audio/aiff", ".aif": "audio/aiff", ".m4a": "audio/mp4", ".ogg": "audio/ogg", ".opus": "audio/ogg" };
-        const type = types[path.extname(p).toLowerCase()] || "application/octet-stream";
-        const size = fs.statSync(p).size;
+        const ext = path.extname(p).toLowerCase();
+        // the app's player has no AIFF reader: an AIFF goes out as WAV (same samples, nothing written)
+        const aif = ext === ".aif" || ext === ".aiff" ? aifAsWav(p) : null;
+        const type = aif ? "audio/wav" : types[ext] || "application/octet-stream";
+        const size = aif ? aif.size : fs.statSync(p).size;
         const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || ""));
         let start = 0, end = size - 1;
         if (range) { if (range[1]) start = Number(range[1]); if (range[2]) end = Number(range[2]); if (!range[1] && range[2]) { start = Math.max(0, size - Number(range[2])); end = size - 1; } }
         if (start > end || end >= size) { res.writeHead(416, { "Content-Range": `bytes */${size}` }); return res.end(); }
         res.writeHead(range ? 206 : 200, { "Content-Type": type, "Accept-Ranges": "bytes", "Content-Length": end - start + 1,
           ...(range ? { "Content-Range": `bytes ${start}-${end}/${size}` } : {}) });
-        return void fs.createReadStream(p, { start, end }).pipe(res);
+        const body = aif ? aif.stream(start, end) : fs.createReadStream(p, { start, end });
+        body.on("error", () => res.destroy());
+        res.on("close", () => body.destroy());
+        return void body.pipe(res);
       }
       if (req.url === "/api/app") {
         let version = "";
@@ -257,6 +267,8 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           enqueue(fn).then(json, (e) => json(errBody(e), 500));
         const direct = (fn: () => Promise<any>) => void fn().then(json, (e) => json(errBody(e), 500));
         const idle = (fn: () => Promise<any>) => { try { core.tagIdle(); } catch (e) { return json(errBody(e), 500); } return route(fn); };
+        // not while the pipeline waits on other apps or works on the files
+        const pipelineBusy = () => { const j = pipeline.status(); return !!j.active || ["running", "waiting"].includes(j.job?.status); };
         const doAll = (fn: () => Promise<any>) => core.DO_ALL_FEATURE ? direct(fn)
           : json(errBody(core.appError("do_all_feature_off", "Do everything is not enabled on this computer.")), 500);
         if (req.url === "/api/prefs") {   // not queued: must not wait behind a long tag/convert run
@@ -284,11 +296,51 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
             return route(() => core.tagAll({ preview: !!data.preview, replace: !!data.replace, keep_file: !!data.keep_file, all: !!data.all,
                                              seen: Array.isArray(data.seen) ? data.seen.map(String) : [] }));
           }
+          case "/api/art": {   // Add cover art: the other every-file run (same progress, same refusals)
+            try {
+              core.tagIdle();
+              if (!data.preview) {
+                const j = pipeline.status();
+                if (j.active || ["running", "waiting"].includes(j.job?.status))
+                  throw core.appError("tag_other_run", "another run is working on the files; wait until it is done");
+                core.claimTagRun("art");
+              }
+            } catch (e) { return json(errBody(e), 500); }
+            return route(() => core.addArt({ preview: !!data.preview }));
+          }
           // the file actions are refused while Write tags in every file runs, not queued for minutes
           case "/api/convert":  return idle(() => core.convertAll());
           case "/api/restore":  return idle(() => core.restoreAll());
           case "/api/clean-backups": return idle(() => core.cleanBackups());
-          case "/api/library":  return route(() => core.libraryOp(data));
+          case "/api/library": {   // set_dir: refused while a run works on the files (it would follow the old folder)
+            if (data && data.op === "set_dir") {
+              try {
+                core.tagIdle();
+                if (pipelineBusy()) throw core.appError("tag_other_run", "another run is working on the files; wait until it is done");
+              } catch (e) { return json(errBody(e), 500); }
+            }
+            return route(() => core.libraryOp(data));
+          }
+          case "/api/aiff": {   // Convert WAV files to AIFF: {preview} or the run (an every-file run: GET /api/tag/progress)
+            try {
+              core.tagIdle();
+              if (!data.preview) {
+                if (pipelineBusy()) throw core.appError("tag_other_run", "another run is working on the files; wait until it is done");
+                core.claimTagRun("aiff");
+              }
+            } catch (e) { return json(errBody(e), 500); }
+            return route(() => core.aiffAll({ preview: !!data.preview }));
+          }
+          case "/api/aiff/rekordbox": {   // {pick: true} (a file dialog) or {path} (headless): a remapped copy next to the export
+            const go = (p: string) => route(async () => remapExport(p, core.STATE.libraries));
+            if (data.pick) {
+              if (!opts.pickFile) return json({ unsupported: true });
+              return void opts.pickFile("rb_export").then((p) => p ? go(p) : json({ canceled: true }), (e) => json(errBody(e), 500));
+            }
+            const p = core.typedPath(data.path);
+            if (!p) return json(errBody(core.appError("rb_xml_not_found", "no file given")), 500);
+            return go(p);
+          }
           case "/api/device":   return route(() => core.setDevice(data.device));
           case "/api/settings": return route(async () => {
             if (data && data.do_all) await pipeline.checkSettingsPatch(data.do_all);   // the app bundles / exes
@@ -312,6 +364,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/inbox-find":     return route(() => core.inboxFind(data));
           case "/api/inbox-move-all": return route(() => core.inboxMoveAll());
           case "/api/export-xml":     return route(() => core.exportRekordboxXml());
+          case "/api/cue-fix":        return route(() => cueFixRoute(core.doAllStatus().do_all.rb_xml, !!data.apply));
           // configuration export / import (see config.ts)
           case "/api/config/export-info": return route(async () => ({ ...config.exportInfo(), can_save: !!opts.saveFile }));
           case "/api/config/export": {   // {leave_links_out}: a save dialog; headless answers {unsupported} and the page downloads GET /api/config/export

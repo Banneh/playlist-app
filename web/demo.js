@@ -21,6 +21,7 @@ const DEMO_DEVICES = [
   { id: 'xdj-700', label: 'XDJ-700 / XDJ-1000 / CDJ-2000NXS' },
   { id: 'nxs2', label: 'CDJ-2000NXS2 / XDJ-XZ' },
   { id: 'cdj-3000', label: 'CDJ-3000' },
+  { id: 'cdj-3000x', label: 'CDJ-3000X' },
 ];
 // name: demo.library, filled in by demoView() (the language can change between tours)
 const DEMO_LIB = { id: 'demo', dir: '/Users/you/Music/Sample', dirs: ['/Users/you/Music/Sample'], subfolders: false };

@@ -23,6 +23,14 @@ I18N.add('pl', 'setup', {
     text: 'Liczą się tylko pliki leżące bezpośrednio w folderze, chyba że uwzględnisz też podfoldery. Kolejne foldery możesz dodać do biblioteki w Ustawieniach.',
     subText: 'Pliki z podfolderów są pokazywane jako <i>podfolder/plik</i>.',
   },
+  aiff: {
+    title: 'WAV czy AIFF',
+    text: 'rekordbox pokazuje okładki plików AIFF, a plików WAV nie. AIFF to ten sam nieskompresowany dźwięk w tym samym rozmiarze. Po włączeniu pliki WAV, które DJ HQ przenosi do biblioteki, są konwertowane do AIFF. Możesz to zmienić później w Ustawieniach.',
+    switch: 'Konwertuj pliki WAV do AIFF',
+    switchText: 'Wyłączone: pliki zostają takie, jak je pobrano.',
+    on: 'Pliki WAV będą konwertowane do AIFF',
+    off: 'Pliki WAV zostają jako WAV',
+  },
   look: {
     title: 'Jak ma wyglądać',
   },

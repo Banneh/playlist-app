@@ -253,7 +253,7 @@ async function tagFromList(btn) {
    question; `progress({done, total})` follows the run, which can take minutes. */
 async function writeTagsAsking(all, progress) {
   const base = all ? { all: true } : {};
-  let poll = null;
+  let stop = null;
   try {
     const pv = await api('/api/tag', { ...base, preview: true });
     const list = pv.replaces || [], ask = list.filter(x => !x.hand);
@@ -266,13 +266,64 @@ async function writeTagsAsking(all, progress) {
       const seen = ask.map(x => x.sig);
       body = { ...base, ...(how === 'keep' ? { keep_file: true, seen } : { replace: true, seen }) };
     }
-    if (all && progress) progress({ done: 0, total: 0 });   // busy from the click on, before the first poll answers
-    if (all && progress) poll = setInterval(() => fetch('/api/tag/progress').then(r => r.json())
-      .then(p => { if (p.running && poll) progress(p); }, () => {}), 700);
+    if (all && progress) stop = followRun(progress);
     DATA = await api('/api/tag', body);
     tagToast(DATA.tag_report);
   } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
-  finally { clearInterval(poll); poll = null; }
+  finally { if (stop) stop(); }
+}
+/** follows an every-file run (Write tags in every file, Add cover art) through GET /api/tag/progress:
+    progress({done, total}) at once (busy from the click on) and then while the run goes; returns stop() */
+function followRun(progress) {
+  let on = true;
+  progress({ done: 0, total: 0 });
+  const poll = setInterval(() => fetch('/api/tag/progress').then(r => r.json())
+    .then(p => { if (p.running && on) progress(p); }, () => {}), 700);
+  return () => { on = false; clearInterval(poll); };
+}
+/** Add cover art (Prepare): a preview, one confirmation, then the run with `progress` and one toast */
+async function addArtAsking(progress) {
+  let stop = null;
+  try {
+    const pv = await api('/api/art', { preview: true });
+    if (!pv.writes) return void toast(t('tags.art.none'));
+    if (!await artAsk(pv)) return;
+    if (progress) stop = followRun(progress);
+    DATA = await api('/api/art', {});
+    artToast(DATA.art_report);
+  } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
+  finally { if (stop) stop(); }
+}
+const ART_LEFT_KEYS = { has_pic: 'tags.art.left.has_pic', untagged: 'tags.art.left.untagged', format: 'tags.art.left.format',
+  no_art: 'tags.art.left.no_art', extra: 'tags.art.left.extra' };
+/** the one confirmation before Add cover art: how many, where the pictures come from, what isn't
+    touched, the WAV caveat, what is left and why, and Reload Tag. Cancel is the default. */
+function artAsk(pv) {
+  const left = Object.keys(ART_LEFT_KEYS).filter(k => pv.left && pv.left[k]);
+  return uiConfirm({
+    title: tn('tags.art.title', pv.writes),
+    body: `<p>${th('tags.art.p1')}</p>
+           ${pv.wav ? `<p>${tnh('tags.art.wav', pv.wav)}</p>` : ''}
+           ${left.length ? `<p class="art-left-head">${th('tags.art.leftHead')}</p>
+           <ul class="art-left">${left.map(k => `<li>${esc(tn(ART_LEFT_KEYS[k], pv.left[k]))}</li>`).join('')}</ul>` : ''}
+           <p>${th('tags.art.p3')}</p>`,
+    ok: t('prepare.tags.art'), icon: 'image', safe: true,
+  });
+}
+/** the toast after Add cover art (r: art_report; also the one a reloaded Prepare page picks up) */
+function artToast(r) {
+  r = r || {};
+  let [msg, err] = fileReport(r, 'tags.art.failed', 'tags.art.done');
+  // the downloads stopped (no network): one message with the reason, not a file name per error
+  if (r.offline) {
+    const items = r.error_items || [];
+    msg = (r.done ? tn('tags.art.done', r.done) + ' ' : '')
+      + tn('tags.art.offline', r.offline + items.length, { err: items.length ? errText(items[items.length - 1]) : '' });
+    err = true;
+  }
+  const changed = (r.changed || []).length;
+  if (changed) msg += ' ' + tn('tags.all.changed', changed);
+  toast(msg, err || !!changed);
 }
 /** the toast after Write tags (r: tag_report; also the one a reloaded Prepare page picks up
     from GET /api/tag/progress when Write tags in every file ends) */

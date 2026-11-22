@@ -135,6 +135,56 @@ I18N.add('en', 'tags', {
       other: '{n} files changed on disk meanwhile and were left as they are. Run it again.',
     },
   },
+  art: {
+    title: {
+      one: 'Add cover art to {n} file?',
+      other: 'Add cover art to {n} files?',
+    },
+    p1: 'Each file gets the artwork of its track on SoundCloud (up to 500 x 500 pixels), stored in its tags as the front cover. Pictures already in files are not replaced, and the audio and the other tags are not touched.',
+    wav: {
+      one: '<b>{n} of them is a WAV file.</b> rekordbox may not show pictures in WAV files, and then the players don’t either. Other apps show them.',
+      other: '<b>{n} of them are WAV files.</b> rekordbox may not show pictures in WAV files, and then the players don’t either. Other apps show them.',
+    },
+    leftHead: 'Left as they are:',
+    left: {
+      has_pic: {
+        one: '{n} file that already has a picture',
+        other: '{n} files that already have a picture',
+      },
+      untagged: {
+        one: '{n} file without tags yet: write tags first',
+        other: '{n} files without tags yet: write tags first',
+      },
+      format: {
+        one: '{n} file in a format DJ HQ doesn’t add pictures to (FLAC, M4A, OGG, old ID3 tags)',
+        other: '{n} files in a format DJ HQ doesn’t add pictures to (FLAC, M4A, OGG, old ID3 tags)',
+      },
+      no_art: {
+        one: '{n} file whose track has no artwork on SoundCloud',
+        other: '{n} files whose tracks have no artwork on SoundCloud',
+      },
+      extra: {
+        one: '{n} file that isn’t in the playlist',
+        other: '{n} files that aren’t in the playlist',
+      },
+    },
+    p3: 'Afterwards select the tracks in rekordbox, right-click them and choose <b>Reload Tag</b>, so it reads the pictures. Reload Tag also replaces names you changed in rekordbox with the names in the files.',
+    adding: 'Adding cover art…',
+    progress: 'Adding cover art… {done} / {total}',
+    done: {
+      one: 'Added a picture to {n} file. In rekordbox, use Reload Tag.',
+      other: 'Added pictures to {n} files. In rekordbox, use Reload Tag.',
+    },
+    failed: {
+      one: 'Added {done}, {n} file failed: {err}',
+      other: 'Added {done}, {n} files failed: {err}',
+    },
+    offline: {
+      one: 'Stopped: {err}. {n} file was left as it was; check the connection and add cover art again.',
+      other: 'Stopped: {err}. {n} files were left as they were; check the connection and add cover art again.',
+    },
+    none: 'No file needs a picture.',
+  },
   moveIn: 'Move into library',
   upgrade: 'Upgrade',
   movedIn: 'Moved into your library',

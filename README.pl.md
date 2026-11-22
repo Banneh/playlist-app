@@ -40,6 +40,7 @@ a zmienisz to w **Ustawienia > Język**.
   - [Wygląd, wyszukiwanie i pasek boczny](#wygląd-wyszukiwanie-i-pasek-boczny)
   - [Ustawienia](#ustawienia)
   - [Więcej niż jeden folder](#więcej-niż-jeden-folder)
+  - [AIFF zamiast WAV i przeniesienie folderu głównego](#aiff-zamiast-wav-i-przeniesienie-folderu-głównego)
   - [Więcej niż jedna playlista](#więcej-niż-jedna-playlista)
   - [Inny komputer albo kopia zapasowa](#inny-komputer-albo-kopia-zapasowa)
 - [Wskazówki i rozwiązywanie problemów](#wskazówki-i-rozwiązywanie-problemów)
@@ -439,8 +440,8 @@ biorą twoje wartości.
 
 1. **Wybierz swój odtwarzacz** na górze. Kroki poniżej zależą od tego, co on
    odtwarza: XDJ-700 i XDJ-1000 przyjmują tylko 16-bitowe pliki WAV
-   44,1 albo 48 kHz, a CDJ-2000NXS2, XDJ-XZ i CDJ-3000 odtwarzają też 24 bity,
-   96 kHz i FLAC.
+   44,1 albo 48 kHz, a CDJ-2000NXS2, XDJ-XZ, CDJ-3000 i CDJ-3000X odtwarzają też 24 bity,
+   96 kHz i FLAC, a CDJ-3000X także pliki 32-bitowe.
 2. **Zapisz tagi** zapisuje wykonawcę i tytuł tak, jak odczytuje je rekordbox
    (przy plikach WAV jest wymagający), w każdym pliku, w którym ich brakuje
    albo różnią się od nazw pokazywanych przez DJ HQ. Gatunkiem staje się
@@ -467,6 +468,20 @@ biorą twoje wartości.
    innego (FLAC, M4A, OGG, niektóre tagi ID3v2.4 i pola INFO), zostaje bez
    zmian. Potem zaznacz utwory w rekordbox, kliknij je prawym przyciskiem
    i wybierz *Reload Tag*.
+
+   **Dodaj okładki**, pod nim, zapisuje w każdym pliku okładkę jego utworu
+   z SoundCloud jako przednią okładkę, jeśli plik nie ma jeszcze obrazka.
+   Okładka jest pobierana w rozmiarze 500 x 500 pikseli, mniejszym tylko
+   wtedy, gdy SoundCloud nie ma takiego (zwykłe pobranie publicznego obrazka,
+   bez logowania). Obrazek, który plik już ma, nigdy nie jest zastępowany;
+   nowy trafia do tagu ID3 pliku, a pozostałe tagi, bloki i dźwięk zostają
+   co do bajtu. Okładkę dostają tylko otagowane pliki WAV, MP3 i AIFF z tagiem
+   ID3v2.3 albo v2.4; potwierdzenie wymienia pozostałe i mówi dlaczego. Gdy
+   pobieranie ciągle się nie udaje (brak sieci), DJ HQ przerywa i zostawia
+   resztę na kolejną próbę. rekordbox może nie pokazywać obrazków
+   w plikach WAV, a wtedy odtwarzacze też ich nie pokażą; w MP3 i AIFF je
+   pokazuje. Potem użyj *Reload Tag* w rekordbox, co zastępuje też nazwy
+   zmienione tam tymi z plików.
 
    Wykonawca i tytuł pochodzą z tytułu na SoundCloud: wykonawca przed
    myślnikiem, tytuł po nim. „Premiere:”, numer katalogowy albo strona winylu
@@ -530,7 +545,8 @@ Zębatka na dole paska bocznego. Od góry: biblioteka (jej foldery, playlista,
 usuwanie), konto SoundCloud zalogowane na Discover (wylogowanie i przełącznik,
 który dodaje do polubień każdy dodany utwór), gdzie otwierają się utwory (Discover albo
 przeglądarka), folder Pobrane obserwowany przez DJ HQ i przełącznik
-automatycznego przenoszenia dokładnych dopasowań, jak często sprawdzana jest
+automatycznego przenoszenia dokładnych dopasowań, AIFF zamiast WAV (zobacz
+[niżej](#aiff-zamiast-wav-i-przeniesienie-folderu-głównego)), jak często sprawdzana jest
 playlista, wygląd, język,
 kopie zapasowe (ile miejsca zajmują oryginały przekonwertowanych plików
 i zastąpione pliki MP3, z przyciskiem **Wyczyść**, gdy masz pewność, że nie
@@ -551,7 +567,8 @@ rozrzucone po kilku albo posortowane w podfoldery. Oba przypadki działają:
 
 - **Dodaj folder** na karcie biblioteki w Ustawieniach dodaje do biblioteki
   kolejny folder. Pliki w każdym z jej folderów liczą się jako twoje. Pierwszy
-  folder pozostaje *główny*: do niego trafiają pobrane pliki. Folder można
+  folder pozostaje *główny*: do niego trafiają pobrane pliki, dopóki nie
+  klikniesz **Ustaw jako główny** w wierszu innego folderu. Folder można
   potem usunąć z biblioteki; jego pliki zostają na miejscu.
 - **Uwzględnij podfoldery** skanuje też foldery wewnątrz każdego folderu
   biblioteki. Domyślnie jest wyłączone, więc liczą się tylko pliki leżące
@@ -561,6 +578,32 @@ Pliki spoza folderu głównego są wypisane z nazwą folderu na początku, na
 przykład `Deep/Artist - Title.wav` albo `Vinyl rips/Artist - Title.wav`, żeby
 było widać, gdzie leży każdy z nich. Tagi, konwersja, kopie zapasowe
 i przywracanie działają na nich jak na każdym innym pliku.
+
+### AIFF zamiast WAV i przeniesienie folderu głównego
+
+rekordbox pokazuje okładki plików AIFF, a plików WAV nie, dlatego DJ HQ może
+zamieniać pliki WAV na pliki AIFF z tym samym dźwiękiem, tą samą
+częstotliwością próbkowania i głębią bitową: włącz **Konwertuj nowe pliki WAV
+do AIFF** w Ustawienia > AIFF zamiast WAV dla nowych pobranych plików albo użyj
+tam przycisku **Konwertuj pliki WAV do AIFF…** dla plików, które już masz.
+Każda kopia jest porównywana z plikiem WAV, zanim plik WAV trafi do kopii
+zapasowych. **Przywróć oryginały** na stronie Przygotuj to cofa: plik WAV
+wraca, a plik AIFF trafia do kopii zapasowych. rekordbox widzi
+potem nowe pliki bez punktów cue: wyeksportuj kolekcję w rekordbox przez Plik >
+Eksportuj kolekcję w formacie xml, wybierz ten plik przyciskiem **Zaktualizuj
+eksport z rekordbox…** i zaimportuj z nowego pliku, który DJ HQ zapisuje obok,
+playlisty, które wymienia (utwory spoza playlist trafiają do kolekcji przez
+Wszystkie utwory). Jeśli folder biblioteki został
+przeniesiony albo zmieniono jego nazwę, użyj **Zmień…** obok folderu głównego
+w Ustawienia > Biblioteka: żadne pliki nie są przenoszone, a dopasowania
+zostają, także gdy plik ma teraz tę samą nazwę z innym rozszerzeniem. Gdy kopie
+AIFF są już w dodatkowym folderze biblioteki, kliknij **Ustaw jako główny**
+w wierszu tego folderu: oba foldery zamieniają się rolami, dotychczasowy folder
+główny zostaje w bibliotece jako dodatkowy, a każde dopasowanie, przypięcie
+i poprawka zostają przy swoim pliku. Stary folder możesz potem usunąć
+z biblioteki: utwór dopasowany do pliku w nim zachowa dopasowanie, gdy
+biblioteka ma plik o tej samej nazwie w innym folderze, także z innym
+rozszerzeniem.
 
 ### Więcej niż jedna playlista
 

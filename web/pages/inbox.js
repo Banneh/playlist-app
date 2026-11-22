@@ -17,7 +17,7 @@ async function loadInbox({ quiet = false } = {}) {
   if (moved.length) {   // auto-move (Settings) put files into the library: counts changed
     try { DATA = await api('/api/state'); } catch {}
     const names = moved.slice(0, 2).join(', ');
-    toast(moved.length > 2 ? t('inbox.autoMovedMore', { names, n: I18N.num(moved.length - 2) }) : t('common.movedIn', { name: names }));
+    toast((moved.length > 2 ? t('inbox.autoMovedMore', { names, n: I18N.num(moved.length - 2) }) : t('common.movedIn', { name: names })) + ibAiffKept(INBOX.aiff_kept));
   }
   render();
 }
@@ -147,13 +147,15 @@ function ibFind(i) {
 }
 
 /* ---------- actions ---------- */
+/** " · 1 file was kept as WAV: <why>" after a move with AIFF instead of WAV on, when a WAV couldn't be converted */
+const ibAiffKept = items => items && items.length ? ' · ' + tn('inbox.aiffKept', items.length) + ': ' + errLine(items[0]) : '';
 async function inboxMove(i, btn) {
   const it = INBOX && INBOX.items[i];
   if (!it) return;
   if (btn) { btn.disabled = true; btn.innerHTML = spin(t(it.action === 'upgrade' ? 'inbox.upgrading' : 'common.moving')); }
   try {
     DATA = await api('/api/inbox-move', { file: it.name, id: it.id, zip: it.zip || undefined });
-    toast(t(it.action === 'upgrade' ? 'inbox.upgraded' : 'common.movedIn', { name: it.name }));
+    toast(t(it.action === 'upgrade' ? 'inbox.upgraded' : 'common.movedIn', { name: (DATA.move_report && DATA.move_report.key) || it.name }) + ibAiffKept(DATA.move_report && DATA.move_report.aiff_kept));
   } catch (e) { toast(t('common.moveFailed', { msg: errText(e) }), true); }
   await loadInbox();
 }
@@ -173,7 +175,7 @@ async function inboxMoveAll() {
   try {
     DATA = await api('/api/inbox-move-all', {});
     const [msg, err] = fileReport(DATA.inbox_report, 'inbox.moveAll.failed', 'inbox.moveAll.done');
-    toast(msg, err);
+    toast(msg + ibAiffKept(DATA.inbox_report && DATA.inbox_report.aiff_kept), err);
   } catch (e) { toast(t('inbox.moveAll.error', { msg: errText(e) }), true); }
   await loadInbox();
 }

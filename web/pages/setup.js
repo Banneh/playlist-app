@@ -1,6 +1,6 @@
 /* Onboarding, part two: "Before we start". Shown once, right after the first library is
-   connected: the downloads folder and auto-move, the target player, subfolder scanning and
-   appearance. Every control saves straight away through the same API calls Settings uses;
+   connected: the downloads folder and auto-move, the target player, subfolder scanning, WAV or
+   AIFF, and appearance. Every control saves straight away through the same API calls Settings uses;
    "Let's go" only remembers that the screen was seen (prefs.setupDone) and hands over to
    the tour. prefs.setupPending is set while it is up, so a quit in between brings it back;
    an install that already had a library never sets either, so it never sees the screen.
@@ -52,6 +52,15 @@ PAGES.setup = {
            <span>${th('setup.folder.subText')}</span></span>
        </label>`);
 
+    // WAV or AIFF: off unless the user turns it on here (or later in Settings)
+    const aiff = suSection('image', 'green', th('setup.aiff.title'), th('setup.aiff.text'),
+      `<label class="st-switch">
+         <input type="checkbox" id="su-aiff" ${S.aiff_auto ? 'checked' : ''}>
+         <span class="st-track" aria-hidden="true"></span>
+         <span class="st-lbl"><b>${esc(t('setup.aiff.switch'))}</b>
+           <span>${th('setup.aiff.switchText')}</span></span>
+       </label>`);
+
     const look = suSection('sun', 'amber', th('setup.look.title'), th('common.theme.text'),
       `<div class="seg" role="radiogroup" aria-label="${esc(t('common.theme.title'))}">
          <button class="${THEME === 'system' ? 'on' : ''}" data-theme="system">${icon('monitor')}${esc(t('common.theme.system'))}</button>
@@ -70,7 +79,7 @@ PAGES.setup = {
       <span class="brand-mark welcome-mark">${icon('settings')}</span>
       <h2>${th('setup.title')}</h2>
       <p class="lead">${th('setup.lead')}</p>
-      <div class="card su-card">${downloads}${player}${folder}${look}${language}</div>
+      <div class="card su-card">${downloads}${player}${folder}${aiff}${look}${language}</div>
       <button class="btn btn-primary btn-lg btn-block su-go" id="su-go">${icon('arrowRight')}${esc(t('setup.go'))}</button>
       <p class="wl-privacy">${icon('lock')}${th('welcome.privacy')}</p>
     </div>`;
@@ -93,6 +102,7 @@ PAGES.setup = {
     on('#su-inbox-save', 'onclick', saveTyped);
     on('#su-inbox', 'onkeydown', e => { if (e.key === 'Enter') { e.preventDefault(); saveTyped(); } });
     on('#su-auto', 'onchange', e => suSave({ auto_move: !!e.target.checked }, t(e.target.checked ? 'setup.downloads.autoOn' : 'setup.downloads.autoOff')));
+    on('#su-aiff', 'onchange', e => suSave({ aiff_auto: !!e.target.checked }, t(e.target.checked ? 'setup.aiff.on' : 'setup.aiff.off')));
     on('#su-device', 'onchange', async e => {
       try { DATA = await api('/api/device', { device: e.target.value }); render(); }
       catch (err) { toast(t('common.saveFailed', { msg: errText(err) }), true); }

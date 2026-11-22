@@ -1,6 +1,11 @@
 /* DJ HQ strings: inbox, Polish. Owner: job B. */
 I18N.add('pl', 'inbox', {
   autoMovedMore: 'Przeniesiono do biblioteki: {names} i jeszcze {n}',
+  aiffKept: {
+    one: '{n} plik został jako WAV',
+    few: '{n} pliki zostały jako WAV',
+    many: '{n} plików zostało jako WAV',
+  },
   exactTip: 'Nazwa pliku pasuje do pozycji na playliście',
   pctTip: 'Jak bardzo nazwa pliku pasuje do pozycji na playliście',
   durTip: 'Długość w porównaniu z utworem na SoundCloud',

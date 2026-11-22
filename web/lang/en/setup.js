@@ -23,6 +23,14 @@ I18N.add('en', 'setup', {
     text: 'Only files directly in the folder count, unless you also want the folders inside it. More folders can be added to the library in Settings.',
     subText: 'Files in subfolders show up as <i>subfolder/file</i>.',
   },
+  aiff: {
+    title: 'WAV or AIFF',
+    text: 'rekordbox shows cover art for AIFF files and not for WAV files. AIFF is the same uncompressed audio at the same size. If you turn this on, WAV files that DJ HQ moves into your library are converted to AIFF. You can change it later in Settings.',
+    switch: 'Convert WAV files to AIFF',
+    switchText: 'Off: files stay as you downloaded them.',
+    on: 'WAV files will be converted to AIFF',
+    off: 'WAV files stay WAV',
+  },
   look: {
     title: 'How it looks',
   },

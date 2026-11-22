@@ -78,6 +78,7 @@ const PATHS = {
   inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
   listMusic: '<path d="M21 15V6"/><path d="M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path d="M12 12H3"/><path d="M16 6H3"/><path d="M12 18H3"/>',
   disc: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="2"/>',
+  image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
   moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
   monitor: '<rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>',
@@ -408,9 +409,42 @@ function safetyNotesHtml() {
     const key = a.why === 'unreadable' ? 'folderUnreadable' : a.why === 'empty' ? 'folderEmpty' : a.why === 'waiting' ? 'folderWaiting' : 'folderMissing';
     out += noteHtml(safetyText(key, { dir: shortPath(a.dir) }),
       `<button class="btn btn-sm" onclick="rescanFolder()" title="${esc(t('app.safety.lookAgainHint'))}">${icon('refresh')}${esc(t('app.safety.lookAgain'))}</button>`
-      + (a.why === 'waiting' ? `<button class="btn btn-sm" onclick="filesReady()" title="${esc(t('app.safety.filesReadyHint'))}">${icon('check')}${esc(t('app.safety.filesReady'))}</button>` : ''), 'amber', 'alert');
+      + (a.why === 'waiting' ? `<button class="btn btn-sm" onclick="filesReady()" title="${esc(t('app.safety.filesReadyHint'))}">${icon('check')}${esc(t('app.safety.filesReady'))}</button>` : '')
+      // the main folder is gone (not an unplugged drive): show DJ HQ where it is now
+      + (folderGone(a) && typeof stChangeMain === 'function' ? `<button class="btn btn-sm st-main-btn" onclick="stChangeMain()" title="${esc(t('app.safety.folderMovedHint'))}" ${ST_MAIN_BUSY ? 'disabled' : ''}>${ST_MAIN_BUSY === 'checking' && !ST_MAIN_DIR ? spin(t('settings.main.checking')) : icon('folder') + esc(t('app.safety.folderMoved'))}</button>` : ''), 'amber', 'alert');
   }
   return out ? `<div class="safety-notes">${out}</div>` : '';
+}
+
+/** a library's main folder that is gone (deleted, renamed, moved), not merely away (an unplugged drive,
+    an unreadable or empty folder, an imported library waiting for its music) */
+const folderGone = a => !!a && a.main && a.why === 'missing' && !a.drive
+  && !((DATA && DATA.folders_away) || []).some(x => x.why === 'waiting');   // a library waiting for its music has no folder yet
+/** the libraries already asked about this session: the popup comes once, "Leave it for later" stays left.
+    Kept in sessionStorage, so a reload of the window (View > Reload) doesn't ask again. */
+const AWAY_ASKED = {
+  key: 'djhq.awayAsked',
+  all() { try { return JSON.parse(sessionStorage.getItem(this.key) || '[]'); } catch { return this.mem; } },
+  mem: [],
+  has(id) { return this.mem.includes(id) || this.all().includes(id); },
+  add(id) { this.mem.push(id); try { sessionStorage.setItem(this.key, JSON.stringify([...new Set([...this.all(), id])])); } catch { /* memory only */ } },
+};
+function askFolderGone() {
+  if (!DATA || !DATA.active || AWAY_ASKED.has(DATA.active) || typeof stChangeMain !== 'function' || document.querySelector('.overlay')) return;
+  if (typeof ST_MAIN_BUSY !== 'undefined' && ST_MAIN_BUSY) return;
+  if ((typeof SETUP !== 'undefined' && SETUP) || (typeof TOUR !== 'undefined' && TOUR)) return;
+  const a = (DATA.folders_away || []).find(folderGone);
+  if (!a) return;
+  const id = DATA.active;
+  AWAY_ASKED.add(id);
+  const lib = (DATA.libraries || []).find(l => l.id === id) || {};
+  dialog({
+    title: th('app.safety.folderGoneTitle', { name: lib.name || '' }),
+    body: `<p>${th('app.safety.folderGoneBody', { dir: shortPath(a.dir) })}</p>`,
+    foot: `<span class="spacer"></span><button class="btn btn-primary" data-close>${esc(t('app.safety.folderGoneLater'))}</button>
+           <button class="btn" data-a="find">${icon('folder')}${esc(t('app.safety.folderGoneFind'))}</button>`,
+    open(dlg, done) { dlg.querySelector('[data-a=find]').onclick = () => done('find'); dlg.querySelector('[data-close]').focus(); },
+  }).then(v => { if (v === 'find' && DATA.active === id) stChangeMain(id); });
 }
 
 /* ---------- render ---------- */
@@ -453,6 +487,8 @@ function render() {
   if (typeof scCaptchaRender === 'function') scCaptchaRender();   // SoundCloud's bot check, on top of every page but Discover
   body.scrollTop = top;
   page.after && page.after();
+  setTimeout(askFolderGone, 0);   // a main folder that is gone: asked once per library and session
+  if (typeof stAiffResume === 'function') setTimeout(stAiffResume, 0);   // a WAV to AIFF run that goes on after a reload, on any page
 }
 /** redraw the page and start at the top (a new search, another chip) */
 function renderTop() { render(); const b = $('#page-body'); if (b) b.scrollTop = 0; }
