@@ -16,7 +16,7 @@ export const OWNED_PLAYLIST = "DJ HQ";
 
 // ---------------- a tolerant, position-keeping XML reader ----------------
 
-interface El {
+export interface El {
   name: string;
   /** offsets: `<` of the start tag, just past its `>`, start of the end tag (= tagEnd when
    *  self-closing), just past the end of the element */
@@ -64,7 +64,7 @@ function parseAttrs(raw: string): Map<string, string> {
 }
 
 /** The element tree with offsets; throws rb_xml_malformed on unbalanced tags. */
-function parse(text: string): El[] {
+export function parse(text: string): El[] {
   const top: El[] = [];
   const stack: El[] = [];
   let i = 0;
@@ -524,14 +524,12 @@ export function checkXmlFile(file: string): void {
   mergeXml(x.text, [{ path: "/DJ HQ check/check.wav", name: "check", artist: "check", genre: "", size: 0, totalTime: 0, key: "8A" }], today());
 }
 
-/** Merge into the file: read it, merge, and only when something changes: read it again
- *  (refuse if it changed meanwhile: rekordbox or Mixed In Key may have written it), copy
- *  it to <file>.backup-YYYYMMDD-HHMMSS next to it, write a temp file beside it and
- *  rename that over the original (a symlink's target is the file changed). */
-export function mergeIntoFile(chosen: string, tracks: RbTrackIn[]): XmlWrite {
-  const { file, bytes, text, bom, st } = readXml(chosen);
-  const res = mergeXml(text, tracks, today());
-  if (!res.changed) return { ...res, file, backup: null };
+type XmlRead = ReturnType<typeof readXml>;
+
+/** Put `next` in the file's place: read it again (refuse if it changed meanwhile), copy it
+ *  to <file>.backup-YYYYMMDD-HHMMSS next to it, write a temp file beside it and rename
+ *  that over the original. Returns the backup's path. */
+function swapIn({ file, bytes, bom, st }: XmlRead, next: string): string {
   const changed = () => Object.assign(new Error("the rekordbox XML changed while DJ HQ was merging into it; nothing was written"), { code: "rb_xml_changed" });
   const again = (() => { try { return fs.readFileSync(file); } catch { return null; } })();
   const st2 = (() => { try { return fs.statSync(file); } catch { return null; } })();
@@ -542,7 +540,7 @@ export function mergeIntoFile(chosen: string, tracks: RbTrackIn[]): XmlWrite {
   const tmp = `${file}.djhq-tmp`;
   const fd = fs.openSync(tmp, "w", st.mode & 0o777);
   try {
-    fs.writeFileSync(fd, (bom ? "\ufeff" : "") + res.text, "utf8");
+    fs.writeFileSync(fd, (bom ? "\ufeff" : "") + next, "utf8");
     try { fs.fsyncSync(fd); } catch { /* ignore */ }
   } finally { fs.closeSync(fd); }
   // nothing was changed after all: no temp file and no extra backup are left behind
@@ -564,5 +562,30 @@ export function mergeIntoFile(chosen: string, tracks: RbTrackIn[]): XmlWrite {
       throw Object.assign(new Error("the rekordbox XML is in use by another program; nothing was written (" + (e2?.code || e2?.message || e2) + ")"), { code: "rb_xml_in_use" });
     }
   }
-  return { ...res, file, backup };
+  return backup;
+}
+
+/** Change the file through `fn` (the text in, the new text out, or null for no change),
+ *  with the same care as a merge. Returns the backup's path, or null when nothing changed. */
+export function rewriteXmlFile(chosen: string, fn: (text: string) => string | null): { file: string; backup: string | null } {
+  const x = readXml(chosen);
+  const next = fn(x.text);
+  if (next == null || next === x.text) return { file: x.file, backup: null };
+  return { file: x.file, backup: swapIn(x, next) };
+}
+/** The file's text (no BOM) and the real path, for a look without writing. */
+export function readXmlText(chosen: string): { file: string; text: string } {
+  const x = readXml(chosen);
+  return { file: x.file, text: x.text };
+}
+
+/** Merge into the file: read it, merge, and only when something changes: read it again
+ *  (refuse if it changed meanwhile: rekordbox or Mixed In Key may have written it), copy
+ *  it to <file>.backup-YYYYMMDD-HHMMSS next to it, write a temp file beside it and
+ *  rename that over the original (a symlink's target is the file changed). */
+export function mergeIntoFile(chosen: string, tracks: RbTrackIn[]): XmlWrite {
+  const x = readXml(chosen);
+  const res = mergeXml(x.text, tracks, today());
+  if (!res.changed) return { ...res, file: x.file, backup: null };
+  return { ...res, file: x.file, backup: swapIn(x, res.text) };
 }
