@@ -17,6 +17,6 @@ backups/
 pipeline.json
 state.json.README.txt
 
-# gate-test scratch (probe output and its throwaway data folder)
-tools/gate-test/out/
-tools/gate-test/data/
+# local gate scratch: test scripts and a saved copy of the gate's page script
+tools/gate-test/
+gate ui preview
