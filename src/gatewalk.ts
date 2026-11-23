@@ -62,12 +62,15 @@ function getWindow(): BrowserWindow {
     height: 900,
     webPreferences: { partition: PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
   });
+  // never heard: the gate page and the players its steps open can autoplay
+  w.webContents.setAudioMuted(true);
   // the gate opens its social/Spotify steps with window.open: let them through, hidden
   w.webContents.setWindowOpenHandler(() => ({
     action: "allow",
     overrideBrowserWindowOptions: { show: false, width: 520, height: 680, autoHideMenuBar: true },
   }));
   w.webContents.on("did-create-window", (child) => {
+    child.webContents.setAudioMuted(true);
     // a Spotify login form means the user has to type something: show that popup, once
     child.webContents.on("did-navigate", (_e, url) => {
       if (/accounts\.spotify\.com\/(pl\/)?login/.test(url) && !child.isVisible()) {

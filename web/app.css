@@ -30,7 +30,7 @@
   --green: #12924f;  --green-soft: rgba(18, 146, 79, .11);  --green-line: rgba(18, 146, 79, .30);
   --red:   #dc2f5c;  --red-soft:   rgba(220, 47, 92, .10);  --red-line:   rgba(220, 47, 92, .30);
   --amber: #b96a00;  --amber-soft: rgba(185, 106, 0, .11);  --amber-line: rgba(185, 106, 0, .32);
-  --blue:  #2461d9;  --blue-soft:  rgba(36, 97, 217, .10);
+  --blue:  #2461d9;  --blue-soft:  rgba(36, 97, 217, .10);  --blue-line: rgba(36, 97, 217, .30);
 
   --shadow-1: 0 1px 2px rgba(16, 24, 40, .05), 0 1px 3px rgba(16, 24, 40, .07);
   --shadow-2: 0 6px 20px rgba(16, 24, 40, .12), 0 1px 3px rgba(16, 24, 40, .08);
@@ -53,7 +53,7 @@
     --green: #3ddc8c; --green-soft: rgba(61, 220, 140, .13); --green-line: rgba(61, 220, 140, .35);
     --red: #ff5f7e;   --red-soft: rgba(255, 95, 126, .13);   --red-line: rgba(255, 95, 126, .35);
     --amber: #ffc23f; --amber-soft: rgba(255, 194, 63, .13); --amber-line: rgba(255, 194, 63, .35);
-    --blue: #67a7ff;  --blue-soft: rgba(103, 167, 255, .13);
+    --blue: #67a7ff;  --blue-soft: rgba(103, 167, 255, .13); --blue-line: rgba(103, 167, 255, .35);
     --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
     --shadow-2: 0 8px 24px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .4);
     --shadow-3: 0 28px 70px rgba(0, 0, 0, .6), 0 4px 14px rgba(0, 0, 0, .4);
@@ -69,7 +69,7 @@
   --green: #3ddc8c; --green-soft: rgba(61, 220, 140, .13); --green-line: rgba(61, 220, 140, .35);
   --red: #ff5f7e;   --red-soft: rgba(255, 95, 126, .13);   --red-line: rgba(255, 95, 126, .35);
   --amber: #ffc23f; --amber-soft: rgba(255, 194, 63, .13); --amber-line: rgba(255, 194, 63, .35);
-  --blue: #67a7ff;  --blue-soft: rgba(103, 167, 255, .13);
+  --blue: #67a7ff;  --blue-soft: rgba(103, 167, 255, .13); --blue-line: rgba(103, 167, 255, .35);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
   --shadow-2: 0 8px 24px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .4);
   --shadow-3: 0 28px 70px rgba(0, 0, 0, .6), 0 4px 14px rgba(0, 0, 0, .4);
@@ -123,6 +123,9 @@ b, strong { font-weight: 600; }
 .btn-ghost:hover { background: var(--surface-2); color: var(--text); }
 .btn-green { background: var(--green-soft); border-color: var(--green-line); color: var(--green); font-weight: 600; box-shadow: none; }
 .btn-green:hover { background: var(--green); border-color: var(--green); color: #fff; }
+/* a Free DL the app walks itself (Hypeddit, DJ_HQ_DOWNLOAD_BYPASS on): blue instead of green */
+.btn-green.btn-hype { background: var(--blue-soft); border-color: var(--blue-line); color: var(--blue); }
+.btn-green.btn-hype:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
 .btn-amber { background: var(--amber-soft); border-color: var(--amber-line); color: var(--amber); font-weight: 600; box-shadow: none; }
 .btn-amber:hover { background: var(--amber); border-color: var(--amber); color: #fff; }
 .btn-accent { background: var(--accent-soft); border-color: transparent; color: var(--accent-text); font-weight: 600; box-shadow: none; }
