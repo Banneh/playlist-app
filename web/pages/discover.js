@@ -138,7 +138,44 @@ function scBarModel() {
       + `<button class="btn btn-ghost btn-sm btn-icon" onclick="go('discover')" title="${esc(t('discover.bottom.openHint'))}" aria-label="${esc(t('common.openOnDiscover'))}">${icon('cloud')}</button>`,
   };
 }
-function scBarRender() { if (typeof plRender === 'function') plRender(); }
+function scBarRender() {
+  if (typeof plRender === 'function') plRender();
+  scMarkRows();
+  clearTimeout(DC.markSoon); DC.markSoon = setTimeout(scMarkRows, 0);   // a list drawn right after this (render()) gets its mark too
+}
+
+/* ---------- the list a track was started from ----------
+   A track started from a cover belongs to the list on screen: its row is marked, and next /
+   previous (N, P, the bar's buttons) go to the row below / above it, as the list shows them now.
+   When that track is no longer on the page, the keys are SoundCloud's own next / previous again. */
+const scRowArts = () => [...document.querySelectorAll('#page-body .art[data-url]')].filter(a => a.dataset.url && a.offsetParent !== null);
+/** the SoundCloud track the bar has now: the one starting, else the one playing or paused there */
+const scBarUrl = () => DC.loading ? DC.loading.url : SC.now && !DC.dismissed ? SC.now.url : '';
+function scMarkRows() {
+  const cur = APP.sc && !(typeof PLAYER !== 'undefined' && PLAYER.path) ? scBarUrl() : '';
+  document.querySelectorAll('.art[data-url]').forEach(a => {
+    const row = a.closest('.tr'); if (!row) return;
+    row.classList.toggle('sc-now', !!cur && dcSameUrl(a.dataset.url, cur));
+  });
+}
+/** next (1) or previous (-1) track of the list on screen; false when the list has no say */
+function scListStep(dir) {
+  if (!APP.sc || (PAGE === 'discover' && DC.active) || (typeof PLAYER !== 'undefined' && PLAYER.path)) return false;
+  const arts = scRowArts(); if (!arts.length) return false;
+  const at = url => url ? arts.findIndex(a => dcSameUrl(a.dataset.url, url)) : -1;
+  let i = at(scBarUrl());
+  if (i < 0) i = at(DC.listLast);   // SoundCloud moved on by itself: the list goes on from the last track it started
+  if (i < 0) return false;
+  let j = i + dir;
+  while (arts[j] && dcSameUrl(arts[j].dataset.url, arts[i].dataset.url)) j += dir;
+  const a = arts[j];
+  if (!a) { toast(t(dir > 0 ? 'discover.toast.listEnd' : 'discover.toast.listStart')); return true; }
+  scPlayBg(a.dataset.url, { title: a.dataset.title, artist: a.dataset.artist, art: a.dataset.art });
+  (a.closest('.tr') || a).scrollIntoView({ block: 'nearest' });
+  return true;
+}
+/** next / previous, from a key or the bar: the list on screen first, SoundCloud's own queue otherwise */
+function dcStep(dir) { if (!scListStep(dir)) dcPlayer(dir > 0 ? 'next' : 'prev'); }
 /** a file from disk starts playing: SoundCloud pauses (a track still starting is called off) and
  *  leaves the bar to the file, until it is played again */
 function scYield() {
@@ -168,6 +205,7 @@ function scPlayBg(url, meta) {
   if (SC.captcha) return toast(scCaptchaMsg(), true);   // it would never start: the check comes first
   DC.dismissed = false;
   DC.loading = { url, meta: meta || null, at: Date.now() };
+  DC.listLast = url;
   DC.epoch = (DC.epoch || 0) + 1; SC.start = null;   // a status asked for before this click says nothing about this track
   if (typeof PLAYER !== 'undefined' && PLAYER.path) stopPlayer();   // one thing plays at a time, in one bar
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // Space goes to the player, not the cover
@@ -204,8 +242,8 @@ function dcKey(key) {
   };
   switch (act) {
     case 'toggle': dcPlayer('toggle'); break;
-    case 'next': dcPlayer('next'); break;
-    case 'prev': dcPlayer('prev'); break;
+    case 'next': dcStep(1); break;
+    case 'prev': dcStep(-1); break;
     case 'back': dcPlayer('seek', -10); break;
     case 'fwd': dcPlayer('seek', 10); break;
     case 'add':

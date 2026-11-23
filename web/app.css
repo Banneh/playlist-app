@@ -426,6 +426,9 @@ html.mac-inset .page-head { padding-top: 30px; }
 .tr.dim .t-title, .tr.dim .t-sub { color: var(--text-3); }
 .tr.dim .art { opacity: .6; }
 .tr-edit { background: var(--accent-soft) !important; }
+/* the row of the track SoundCloud is playing from this list (pages/discover.js): a quiet mark */
+.tr.sc-now { background: color-mix(in srgb, var(--accent) 6%, transparent); box-shadow: inset 2px 0 0 var(--accent); }
+.tr.sc-now .t-title { color: var(--accent-text); }
 .table.compact .tr { min-height: 52px; }
 
 .num { color: var(--text-3); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }

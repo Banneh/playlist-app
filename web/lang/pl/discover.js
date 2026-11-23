@@ -62,6 +62,8 @@ I18N.add('pl', 'discover', {
     notStarted: 'SoundCloud nie uruchomił utworu. Otwórz Discover, żeby zobaczyć dlaczego',
     unreachable: 'Nie udało się połączyć z SoundCloud: {msg}',
     nothingPlaying: 'Jeszcze nic nie gra',
+    listEnd: 'To był ostatni utwór na tej liście',
+    listStart: 'To pierwszy utwór na tej liście',
     nothingToPlay: 'Na tej stronie nie ma jeszcze nic do odtworzenia',
     signInToAdd: 'Zaloguj się na SoundCloud poniżej, aby dodawać utwory',
     signInToLike: 'Zaloguj się na SoundCloud poniżej, aby polubić utwory',
@@ -147,6 +149,6 @@ I18N.add('pl', 'discover', {
       name: 'Okładka',
       text: 'Kliknij ją, żeby posłuchać utworu: gra na SoundCloud w DJ HQ, a ty zostajesz na liście. Steruje nim pasek na dole. <b>Otwieranie utworów</b> w Ustawieniach przełącza to na przeglądarkę.',
     },
-    missingTip: 'Kliknij okładkę, żeby najpierw posłuchać utworu bez opuszczania listy. <b>Odtwórz</b> i <b>Otwórz na Discover</b> są też w menu ⋯ każdego wiersza.',
+    missingTip: 'Kliknij okładkę, żeby najpierw posłuchać utworu bez opuszczania listy. <kbd>N</kbd> i <kbd>P</kbd> odtwarzają potem następny i poprzedni utwór z listy. <b>Odtwórz</b> i <b>Otwórz na Discover</b> są też w menu ⋯ każdego wiersza.',
   },
 });

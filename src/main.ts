@@ -151,11 +151,18 @@ const scOnSite = (url: string) => /^https:\/\/(www\.)?soundcloud\.com\//.test(ur
 /** Open another soundcloud.com page through the site's own router (a press on a link, which it
  *  turns into an in-page navigation): no reload, so it takes a fraction of a second and whatever
  *  is playing plays on. The play buttons of the page being left are marked for a few seconds, so
- *  the track starter below never presses one of them while the new page is still being drawn. */
+ *  the track starter below never presses one of them while the new page is still being drawn.
+ *  The new track page (in its frame, see scStartJs) keeps its elements and only fills them anew,
+ *  so there the title of the page being left is what is remembered. */
 const scRouteJs = (url: string) => `(() => {
   ${SC_PRESS_JS}
   if (!document.body || document.readyState === 'loading') return null;
   document.querySelectorAll('.sc-button-play, .blockedTrack, .missingListenHero').forEach((x) => { x.__djhqStale = Date.now(); });
+  const left = [];
+  for (const f of document.querySelectorAll('iframe.webiIframe')) {
+    try { const h = f.contentDocument.querySelector('h1'); if (h) left.push(h.textContent); } catch {}
+  }
+  window.__djhqLeft = { at: Date.now(), h1: left };
   const u = new URL(${JSON.stringify(url)});
   const a = document.createElement('a');
   a.href = u.pathname + u.search + u.hash;
@@ -168,22 +175,75 @@ const scRouteJs = (url: string) => `(() => {
 /** One step of starting the track whose page is open: press its big play button and say what
  *  happened. "playing": the button shows pause, so SoundCloud is playing this track; "gone": the
  *  page says the track is not there; "wait": the page is not drawn yet, or a press was made a moment
- *  ago and gets time to take (a second press would pause it again). */
+ *  ago and gets time to take (a second press would pause it again).
+ *  SoundCloud has two track pages. The old one is part of the page itself (.sc-button-play). The
+ *  new one (signed-in accounts, late 2026) is drawn in a frame of the same site, iframe.webiIframe
+ *  at /n/<path>, with generated class names: there the button is the only one next to the title
+ *  (an h1 that is no link), and the page of a track that is not there has the artist's name as a
+ *  linked h1 above a list of other tracks, whose play buttons must never be pressed instead. */
 const scStartJs = (url: string, ms: number) => `(() => {
   ${SC_PRESS_JS}
   const fresh = (x) => !(x.__djhqStale && Date.now() - x.__djhqStale < 3000);
   if ([...document.querySelectorAll('.blockedTrack, .missingListenHero')].some(fresh)) return 'gone';
-  const here = decodeURI(location.pathname).replace(/\\/+$/, '').toLowerCase();
+  const norm = (p) => decodeURI(p).replace(/\\/+$/, '').toLowerCase();
+  const want = ${JSON.stringify(scPath(url))};
   // the page of this track (after 4 s also the page SoundCloud redirected a renamed track to)
-  if (here !== ${JSON.stringify(scPath(url))} && ${ms} < 4000) return 'wait';
+  if (norm(location.pathname) !== want && ${ms} < 4000) return 'wait';
+  const now = Date.now();
   const b = [...document.querySelectorAll('.soundTitle__playButtonHero .sc-button-play, .fullHero .sc-button-play, .l-listen-hero .sc-button-play, .sc-button-play.playButton')]
     .find((x) => fresh(x) && !x.closest('.playControls') && !x.classList.contains('sc-button-disabled'));
-  if (!b) return 'wait';
-  if (b.classList.contains('sc-button-pause')) return 'playing';
-  const now = Date.now();
-  if (window.__djhqPressed && now - window.__djhqPressed < 2500) return 'wait';
+  if (b) {
+    if (b.classList.contains('sc-button-pause')) return 'playing';
+    if (window.__djhqPressed && now - window.__djhqPressed < 2500) return 'wait';
+    window.__djhqPressed = now;
+    press(b);
+    return 'pressed';
+  }
+  // the new track page, in its frame
+  let hero = null, gone = false;
+  for (const f of document.querySelectorAll('iframe.webiIframe')) {
+    let d = null;
+    try { d = f.contentDocument; } catch {}
+    if (!d || !d.body || !f.getBoundingClientRect().width) continue;
+    if (norm(d.location.pathname.replace(/^\\/n(?=\\/)/, '')) !== want && ${ms} < 4000) continue;
+    // while it loads a page the frame shows the title and button of another one, its own address
+    // already changed; the document's title is empty until the page asked for is drawn
+    if (!d.title) continue;
+    const h = d.querySelector('h1');
+    if (!h) continue;
+    // still the page that was left (its address changes before it is drawn anew)
+    const left = window.__djhqLeft;
+    if (left && now - left.at < 8000 && left.h1.includes(h.textContent)) continue;
+    if (h.closest('a')) { gone = true; continue; }
+    for (let e = h.parentElement, i = 0; e && i < 4 && !hero; e = e.parentElement, i++) {
+      const bs = e.querySelectorAll('button');
+      if (!bs.length) continue;
+      if (bs.length === 1 && bs[0].querySelector('svg') && !bs[0].textContent.trim() && !bs[0].disabled) hero = bs[0];
+      break;
+    }
+    if (hero) break;
+  }
+  if (!hero) {
+    // "not there" has to hold for a second: the frame may still show the page it is leaving
+    if (!gone) { window.__djhqGone = 0; return 'wait'; }
+    if (!window.__djhqGone) window.__djhqGone = now;
+    return now - window.__djhqGone > 1000 ? 'gone' : 'wait';
+  }
+  window.__djhqGone = 0;
+  // its label is in the user's language, so what tells play from pause is SoundCloud's player bar:
+  // playing, with this track in it (the bar's link may lack the artist, so the track's own part counts)
+  const slug = (p) => norm(p).split('/').pop();
+  const t = document.querySelector('.playbackSoundBadge__titleLink');
+  const p = document.querySelector('.playControls__play');
+  const inBar = !!t && slug(new URL(t.href, location.href).pathname) === slug(want);
+  if (inBar && p && p.classList.contains('playing')) return 'playing';
+  // a press made a moment ago gets time to take; longer when the track is in the bar and loading.
+  // One that did not take (the page was still wiring itself up) is made again
+  const since = now - (window.__djhqPressed || 0);
+  if (since < 2500 || (inBar && hero.__djhqFor === want && since < 8000)) return 'wait';
   window.__djhqPressed = now;
-  press(b);
+  hero.__djhqFor = want;
+  press(hero);
   return 'pressed';
 })()`;
 
@@ -191,6 +251,8 @@ const scStartJs = (url: string, ms: number) => `(() => {
  *  bottom bar shows its spinner until this says the track plays (or could not be started) */
 let scStart: { url: string; state: "starting" | "playing" | "failed" | "gone" } | null = null;
 let scGoSeq = 0;
+/** the bar's broken link of the track playing now, and the address it stands for (see nowPlaying) */
+let scBarFix: { bad: string; good: string } | null = null;
 const SC_START_MS = 20000;
 
 /** open a page in the view and, when asked, start the track on it */
@@ -325,7 +387,7 @@ const sc: ScView = {
   url() { return scView ? scView.webContents.getURL() : ""; },
   async nowPlaying() {
     // the player bar at the bottom of soundcloud.com; class names are SoundCloud's and may change
-    return scEval<{ url: string; title: string; artist: string; playing: boolean; at: number; of: number }>(`(() => {
+    const now = await scEval<{ url: string; title: string; artist: string; playing: boolean; at: number; of: number }>(`(() => {
       const badge = document.querySelector('.playbackSoundBadge');
       const t = badge && (badge.querySelector('.playbackSoundBadge__titleLink') || badge.querySelector('a[href][title]:not(.playbackSoundBadge__avatar)'));
       if (!t) return null;
@@ -338,6 +400,17 @@ const sc: ScView = {
                url: t.href, title: t.getAttribute('title') || t.textContent.trim(), artist: a ? (a.getAttribute('title') || a.textContent.trim()) : '',
                playing: !!(p && p.classList.contains('playing')) };
     })()`);
+    // a track started from SoundCloud's new track page can sit in the bar with a link that has
+    // "undefined" for the artist: the page it was started from has the real address
+    if (now && /\/\/[^/]+\/undefined\//.test(now.url)) {
+      const slug = (u: string) => scPath(u).split("/").pop();
+      if (scBarFix?.bad !== now.url) {
+        const real = [scStart?.url, scView?.webContents.getURL()].find((u) => !!u && scOnSite(u) && slug(u) === slug(now.url));
+        scBarFix = real ? { bad: now.url, good: real.split(/[?#]/)[0] } : null;
+      }
+      if (scBarFix) now.url = scBarFix.good;
+    }
+    return now;
   },
   starting() { return scStart; },
   captcha: scCaptcha,

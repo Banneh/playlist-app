@@ -78,8 +78,8 @@ function plEnsure() {
   const isSc = () => !PLAYER.path;
   const blur = fn => e => { e.currentTarget.blur(); fn(); };   // Space stays with the player, not the button
   box.querySelector('#pl-toggle').onclick = blur(() => isSc() ? dcPlayer('toggle') : togglePlay());
-  box.querySelector('#pl-prev').onclick = blur(() => dcPlayer('prev'));
-  box.querySelector('#pl-next').onclick = blur(() => dcPlayer('next'));
+  box.querySelector('#pl-prev').onclick = blur(() => dcStep(-1));
+  box.querySelector('#pl-next').onclick = blur(() => dcStep(1));
   box.querySelector('#pl-close').onclick = () => isSc() ? scBarClose() : stopPlayer();
   box.querySelector('#pl-meta').onclick = () => { if (isSc()) go('discover'); };
   box.querySelector('#pl-mute').onclick = () => { a.muted = !a.muted; plMute(); };

@@ -64,6 +64,8 @@ I18N.add('en', 'discover', {
     notStarted: 'SoundCloud didn’t start the track. Open Discover to see why',
     unreachable: 'Couldn’t reach SoundCloud: {msg}',
     nothingPlaying: 'Nothing is playing yet',
+    listEnd: 'That was the last track of this list',
+    listStart: 'This is the first track of this list',
     nothingToPlay: 'Nothing to play on this page yet',
     signInToAdd: 'Sign in on SoundCloud below to add tracks',
     signInToLike: 'Sign in on SoundCloud below to like tracks',
@@ -149,6 +151,6 @@ I18N.add('en', 'discover', {
       name: 'Artwork',
       text: 'Click it to hear the track: it plays on SoundCloud inside DJ HQ while you stay on the list. The bar at the bottom controls it. <b>Opening tracks</b> in Settings switches that to your browser.',
     },
-    missingTip: 'Click a cover to hear the track first, without leaving the list. <b>Play</b> and <b>Open on Discover</b> sit in every row’s ⋯ menu as well.',
+    missingTip: 'Click a cover to hear the track first, without leaving the list. <kbd>N</kbd> and <kbd>P</kbd> then play the next and the previous track of the list. <b>Play</b> and <b>Open on Discover</b> sit in every row’s ⋯ menu as well.',
   },
 });
