@@ -233,7 +233,9 @@ not available, Esc closes.
   undoes any manual status.
 - The **⋯** at the end of a row opens the track on SoundCloud, copies its
   links, matches a file by hand, or lets you fix the artist and title.
-- Click the artwork to open the track on SoundCloud.
+- Click the artwork to hear the track on SoundCloud without leaving the list.
+  The row of the playing track is marked, and `N` and `P` play the next and the
+  previous track of the list (see [Discover](#discover-soundcloud-inside-the-app)).
 
 <p align="center"><img src="docs/screens/status-menu.png" width="420" alt="The status menu: Have, Missing, Not available on SoundCloud now, or back to automatic"></p>
 
@@ -307,7 +309,7 @@ bar or the SoundCloud page (as long as you aren't typing in a field):
 | --- | --- |
 | `Space` | play / pause |
 | `←` `→` | 10 seconds back / forward |
-| `N` `P` | next / previous track in SoundCloud's queue |
+| `N` `P` | next / previous track: in SoundCloud's queue on Discover, in the list on screen for a track started from a list |
 | `A` | add the playing track to the playlist (to your Likes for a Likes library) |
 | `L` | like / unlike it |
 
@@ -315,7 +317,11 @@ Discover's player also serves the rest of the app. Click a track's cover on
 any list and it starts playing on SoundCloud while you stay on the list; a bar
 at the bottom of the window shows the track with play/pause, previous and
 next, the heart and **Add to playlist**, and its **Discover** button opens the
-page the track is on. The same keys work there. Leaving Discover while
+page the track is on. The same keys work there, and next and previous follow
+the list you are looking at: the row of the playing track is marked, `N` plays
+the row below it and `P` the row above, in the order the list shows right now.
+When that track is not on the page, they go through SoundCloud's own queue.
+Leaving Discover while
 something plays keeps it playing, and the bar takes over; its **×** pauses and
 hides it. The **⋯** menu of a row offers **Play**, **Open on Discover** and
 **Related tracks on Discover** as well. A small arrow that appears next to the
@@ -493,6 +499,14 @@ values.
    same.
 
 <p align="center"><img src="docs/screens/export-dialog.png" width="480" alt="The export dialog with the file path and the three rekordbox import steps"></p>
+
+**Fix cues…**, next to Export XML, is for cue points that Mixed In Key wrote
+into a rekordbox XML one beat late, on the 2 of rekordbox's bar. It compares
+them with the beatgrids of the tracks rekordbox has analysed, shows how many
+would move, and moves each of those one beat earlier, to the 1. Cue points on
+any other beat stay where they are, and the file as it was is kept next to it.
+Afterwards import the tracks from the *rekordbox xml* node again (*Import To
+Collection*, answer **Yes**).
 
 The **Files needing attention** list underneath shows the files that still
 need tags or conversion, each with its artwork and a play button.

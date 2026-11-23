@@ -237,7 +237,9 @@ między utworami, N odkłada utwór jako niedostępny, Esc zamyka.
   ustawiony ręcznie.
 - **⋯** na końcu wiersza otwiera utwór na SoundCloud, kopiuje jego linki,
   ręcznie dopasowuje plik albo pozwala poprawić wykonawcę i tytuł.
-- Kliknij okładkę, żeby otworzyć utwór na SoundCloud.
+- Kliknij okładkę, żeby posłuchać utworu na SoundCloud bez opuszczania listy.
+  Wiersz grającego utworu jest zaznaczony, a `N` i `P` odtwarzają następny
+  i poprzedni utwór z listy (zobacz [Discover](#discover-soundcloud-w-aplikacji)).
 
 <p align="center"><img src="docs/screens/status-menu.png" width="420" alt="Menu statusu: Mam, Brak, Teraz niedostępny na SoundCloud albo powrót do automatycznego"></p>
 
@@ -312,7 +314,7 @@ tekstowym):
 | --- | --- |
 | `Spacja` | odtwórz / pauza |
 | `←` `→` | 10 sekund wstecz / do przodu |
-| `N` `P` | następny / poprzedni utwór w kolejce SoundCloud |
+| `N` `P` | następny / poprzedni utwór: na Discover w kolejce SoundCloud, a dla utworu uruchomionego z listy na liście widocznej na ekranie |
 | `A` | dodaj grający utwór do playlisty (w bibliotece polubień: do polubień) |
 | `L` | polub go / cofnij polubienie |
 
@@ -321,7 +323,11 @@ na dowolnej liście, a zacznie grać na SoundCloud, podczas gdy ty zostajesz na
 liście; pasek na dole okna pokazuje utwór z przyciskami odtwórz/pauza,
 poprzedni i następny, sercem i **Dodaj do playlisty**, a jego przycisk
 **Discover** otwiera stronę, na której jest utwór. Działają tam te same
-klawisze. Wyjście z Discover w trakcie odtwarzania nie przerywa muzyki,
+klawisze, a następny i poprzedni trzymają się listy, na którą patrzysz:
+wiersz grającego utworu jest zaznaczony, `N` odtwarza wiersz pod nim, a `P`
+wiersz nad nim, w kolejności, w jakiej lista jest teraz wyświetlona. Gdy tego
+utworu nie ma na stronie, przechodzą po kolejce SoundCloud.
+Wyjście z Discover w trakcie odtwarzania nie przerywa muzyki,
 a sterowanie przejmuje pasek; jego **×** pauzuje i ukrywa odtwarzanie. Menu
 **⋯** wiersza ma też **Odtwórz**, **Otwórz na Discover** i **Podobne utwory na
 Discover**. Mała strzałka, która pojawia się obok tytułu po najechaniu,
@@ -511,6 +517,14 @@ biorą twoje wartości.
    playlisty; ścieżka pliku się nie zmienia.
 
 <p align="center"><img src="docs/screens/export-dialog.png" width="480" alt="Okno eksportu ze ścieżką pliku i trzema krokami importu w rekordbox"></p>
+
+**Popraw cue…**, obok Eksportuj XML, jest dla punktów cue, które Mixed In Key
+zapisał w pliku XML rekordbox o jedno uderzenie za późno, na „2” taktu
+rekordbox. Porównuje je z siatkami bitów utworów, które rekordbox już
+przeanalizował, pokazuje, ile z nich się przesunie, i przesuwa każdy o jedno
+uderzenie wcześniej, na „1”. Punkty cue na innych uderzeniach zostają na
+miejscu, a plik sprzed zmiany zostaje obok. Potem zaimportuj utwory z węzła
+*rekordbox xml* jeszcze raz (*Import To Collection*, odpowiedz **Yes**).
 
 Lista **Pliki wymagające uwagi** poniżej pokazuje pliki, które wciąż wymagają
 tagów albo konwersji, każdy z okładką i przyciskiem odtwarzania.
