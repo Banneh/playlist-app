@@ -42,6 +42,10 @@ I18N.add('en', 'settings', {
     reset: 'Use the default folder',
     folderPh: 'Type another folder…',
     autoMoveHint: 'Only a file whose name matches a playlist track exactly and whose length matches is moved. Files you already have are never replaced. The Downloads page shows what moved.',
+    dlMailPh: 'you@gmail.com',
+    dlMailHint: 'The green Free DL button on a Hypeddit link is walked in the background: the gate’s steps are skipped and this address is filled into an email step. The file lands in the folder above. Gates turn down “test@…”-style addresses, so if yours is refused a plausible name is invented instead — leave it empty to always invent one.',
+    dlMailSaved: 'Download email saved: {email}',
+    dlMailCleared: 'Download email cleared',
   },
 
   // the refresh interval card

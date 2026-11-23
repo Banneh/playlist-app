@@ -64,6 +64,13 @@ I18N.add('en', 'app', {
     reavailableMore: 'Back in Missing after a link appeared: {names} and {n} more',
   },
 
+  // the green Free DL button on a Hypeddit link (walked in the background)
+  freedl: {
+    saved: 'Downloaded: {name}',
+    noFile: 'The gate handed out no file — opening it in the browser',
+    failed: 'Free download failed: {msg}',
+  },
+
   // the page head
   head: {
     search: 'Search artist or title…',

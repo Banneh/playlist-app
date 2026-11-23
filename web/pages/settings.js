@@ -72,7 +72,12 @@ PAGES.settings = {
          <span class="st-track" aria-hidden="true"></span>
          <span class="st-lbl"><b>${esc(t('common.autoMove'))}</b>
            <span>${th('settings.inbox.autoMoveHint')}</span></span>
-       </label>`);
+       </label>${APP.dl_bypass ? `
+       <div class="fieldrow st-inboxrow">
+         <input class="input" id="st-dlmail" type="email" value="${esc(S.dl_email || '')}" placeholder="${esc(t('settings.inbox.dlMailPh'))}" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')stSaveDlMail()">
+         <button class="btn" onclick="stSaveDlMail()">${icon('check')}${esc(t('common.save'))}</button>
+       </div>
+       <span class="faint">${th('settings.inbox.dlMailHint')}</span>` : ''}`);
 
     const A = DATA.aiff || { on: !!S.aiff_auto, wav: 0 };
     const aiff = stCard('image', 'green', esc(t('settings.aiff.title')),
@@ -264,6 +269,12 @@ async function stSaveInbox() {
   if (!p) { if (el) el.focus(); return; }
   await stSave({ inbox_dir: p }, t('common.watchingDownloads', { dir: shortPath(p) }));
   if (typeof loadInbox === 'function') loadInbox({ quiet: true });
+}
+async function stSaveDlMail() {
+  const el = $('#st-dlmail');
+  const v = (el && el.value || '').trim();
+  try { await stSave({ dl_email: v }, v ? t('settings.inbox.dlMailSaved', { email: v }) : t('settings.inbox.dlMailCleared')); }
+  catch { if (el) el.focus(); }
 }
 async function stBrowseInbox() {
   try {

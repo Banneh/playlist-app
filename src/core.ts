@@ -151,7 +151,9 @@ export interface AppState {
   /** user settings (see getSettings) */
   settings?: { auto_move?: boolean; refresh_min?: number; like_on_add?: boolean; sc_open?: "discover" | "browser"; do_all?: DoAll;
                /** WAV files DJ HQ moves into a library become AIFF files (wavToAiff); off by default */
-               aiff_auto?: boolean };
+               aiff_auto?: boolean;
+               /** the address the automated Hypeddit free download fills into a gate's email step */
+               dl_email?: string };
   /** probe results for audio inside zips in the downloads folder: "<zip path>|<entry>|<size>" -> [dur, fmt, tags] */
   zip_cache?: Record<string, [number, [string, number, number], [string, string, string]]>;
   /** "<lib id>:<track id>" -> ms when a file for the track first turned up (0 = predates tracking) */
@@ -327,6 +329,7 @@ export function getSettings(): any {
     like_on_add: !!s.like_on_add,
     sc_open: s.sc_open === "browser" ? "browser" : "discover",
     aiff_auto: !!s.aiff_auto,
+    dl_email: s.dl_email || "",
     data_dir: DATA_DIR,
     ...doAllStatus(),
   };
@@ -338,6 +341,13 @@ export function getSettings(): any {
  *  Read once at start: changing it needs a restart. */
 export const DO_ALL_FEATURE = /^(1|true|yes|on)$/i.test(
   String(process.env.DJ_HQ_DO_ALL_FEATURE_ENABLED ?? process.env.dj_hq_do_all_feature_enabled ?? "").trim());
+
+/** The feature switch for the background Hypeddit free download: the Free DL button walks the
+ *  gate, the Settings email field and /api/free-download exist only when the environment has
+ *  DJ_HQ_DOWNLOAD_BYPASS=true (also 1 / yes / on; the lower-case name works too). Read once at
+ *  start: changing it needs a restart. */
+export const DOWNLOAD_BYPASS = /^(1|true|yes|on)$/i.test(
+  String(process.env.DJ_HQ_DOWNLOAD_BYPASS ?? process.env.dj_hq_download_bypass ?? "").trim());
 
 /** The "Do everything" settings with defaults, and what keeps it from running, as stable
  *  codes. Only cheap existence checks: this runs on every view. */
@@ -444,6 +454,7 @@ function patchDoAll(p: any): void {
  *  like_on_add?: boolean (Discover: also like a track when adding it to the playlist),
  *  sc_open?: "discover" | "browser" (where SoundCloud links open; the desktop app defaults to Discover),
  *  aiff_auto?: boolean (WAV files moved into the library become AIFF files),
+ *  dl_email?: string (the address the automated Hypeddit free download fills into a gate's email step),
  *  do_all?: a partial DoAll (the "Do everything" setup; see patchDoAll)} */
 export async function setSettings(data: any): Promise<any> {
   const s = STATE.settings || (STATE.settings = {});
@@ -458,6 +469,11 @@ export async function setSettings(data: any): Promise<any> {
   if ("auto_move" in data) s.auto_move = !!data.auto_move;
   if ("like_on_add" in data) s.like_on_add = !!data.like_on_add;
   if ("aiff_auto" in data) s.aiff_auto = !!data.aiff_auto;
+  if ("dl_email" in data) {
+    const v = String(data.dl_email || "").trim();
+    if (v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) throw appError("bad_email", "that isn't an email address", { email: v });
+    if (v) s.dl_email = v; else delete s.dl_email;
+  }
   if ("sc_open" in data) s.sc_open = data.sc_open === "browser" ? "browser" : "discover";
   if ("do_all" in data) patchDoAll(data.do_all);
   if ("refresh_min" in data) {
@@ -1563,6 +1579,9 @@ const BUY_WORDS = /\bbuy|purchase|pre-?order|out now|available|support|shop|stre
 function hostOf(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; }
 }
+
+/** A Hypeddit download gate: the only host the automated free download knows how to walk. */
+export const isHypeddit = (url: string) => /(^|\.)hypeddit\.com$/i.test(hostOf(url));
 
 /** Candidate "get the track here" links in a description: [url, its line, the
  *  line before it]. Socials/streaming are dropped; scheme-less URLs only count
@@ -3519,7 +3538,7 @@ ${lists.join("\n")}
 
 // ---------------- downloads inbox ----------------
 
-const inboxDir = () => STATE.inbox_dir || path.join(os.homedir(), "Downloads");
+export const inboxDir = () => STATE.inbox_dir || path.join(os.homedir(), "Downloads");
 
 
 /** Audio inside the zip files of the downloads folder (album purchases): each

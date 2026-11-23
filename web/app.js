@@ -152,6 +152,39 @@ async function api(path, body) {
 }
 const busy = () => INFLIGHT > 0 || EDIT_ID !== null || !!document.querySelector('.overlay') || (typeof TOUR !== 'undefined' && !!TOUR);
 
+/* ---------- the green Free DL button: a Hypeddit gate is walked in the background ---------- */
+/** true for a link the app can walk itself (a Hypeddit gate, and only with the DJ_HQ_DOWNLOAD_BYPASS
+ *  switch on); everything else still opens in the browser */
+const isHypeddit = (url) => { if (!APP.dl_bypass) return false; try { return /(^|\.)hypeddit\.com$/i.test(new URL(url).hostname.replace(/^www\./, '')); } catch { return false; } };
+
+/** Walk a Hypeddit gate in the app's hidden window: the gate's skip steps are taken, the email
+ *  step is filled from Settings, and the file lands in the downloads folder. The button shows a
+ *  spinner while it runs. Returns false when the link is not one the app can walk. */
+async function freeDownload(url, btn) {
+  if (!isHypeddit(url)) return false;
+  if (btn) { btn.classList.add('busy'); btn.dataset.was = btn.innerHTML; btn.innerHTML = '<span class="spin"></span>'; }
+  try {
+    const r = await api('/api/free-download', { url });
+    if (r.unsupported) return false;   // no Electron window (headless): let the browser have it
+    if (r.file) toast(t('app.freedl.saved', { name: r.file.split(/[\\/]/).pop() }));
+    else { toast(t('app.freedl.noFile')); window.open(url, '_blank', 'noopener'); }
+  } catch (e) {
+    toast(t('app.freedl.failed', { msg: e.message }), true);
+    window.open(url, '_blank', 'noopener');   // the gate did not work out: let the user have it
+  } finally {
+    if (btn) { btn.classList.remove('busy'); if (btn.dataset.was) btn.innerHTML = btn.dataset.was; }
+  }
+  return true;
+}
+
+// one listener for every Free DL button that carries data-freedl (the playlist rows)
+document.addEventListener('click', (e) => {
+  const a = e.target.closest && e.target.closest('a[data-freedl]');
+  if (!a || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  freeDownload(a.dataset.freedl, a);
+});
+
 /* ---------- playlist refresh: on launch, every 15 min while visible, on demand ---------- */
 /** the sidebar's status line; give a function (() => t(…)) to have it follow a language change (sayStatus) */
 let STATUS_FN = null;
@@ -607,7 +640,7 @@ function libraryMenu(anchor) {
 }
 
 /* ---------- updates: a daily look at the latest GitHub release ---------- */
-let APP = { version: '', platform: '', arch: '', packaged: false, do_all: false };
+let APP = { version: '', platform: '', arch: '', packaged: false, do_all: false, dl_bypass: false };
 let UPDATE = null;   // { version, url, page, asset } once a newer release is known
 const UPD_KEY = 'updateDismissed';
 const RELEASES_API = 'https://api.github.com/repos/Banneh/playlist-app/releases/latest';

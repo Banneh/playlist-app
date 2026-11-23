@@ -42,6 +42,10 @@ I18N.add('pl', 'settings', {
     reset: 'Użyj domyślnego folderu',
     folderPh: 'Wpisz inny folder…',
     autoMoveHint: 'Przenoszony jest tylko plik, którego nazwa dokładnie odpowiada utworowi z playlisty i którego długość się zgadza. Pliki, które już masz, nigdy nie są zastępowane. Strona Pobrane pokazuje, co zostało przeniesione.',
+    dlMailPh: 'ty@gmail.com',
+    dlMailHint: 'Zielony przycisk Free DL przy linku Hypeddit jest przechodzony w tle: kroki bramki są pomijane, a ten adres jest wpisywany w krok z e-mailem. Plik trafia do folderu powyżej. Bramki odrzucają adresy w stylu „test@…”, więc jeśli twój zostanie odrzucony, podstawiony zostanie wymyślony, prawdopodobny adres — zostaw puste, aby zawsze go wymyślać.',
+    dlMailSaved: 'Zapisano e-mail do pobierania: {email}',
+    dlMailCleared: 'Wyczyszczono e-mail do pobierania',
   },
 
   // the refresh interval card

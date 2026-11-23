@@ -16,3 +16,7 @@ djhq.db-journal
 backups/
 pipeline.json
 state.json.README.txt
+
+# gate-test scratch (probe output and its throwaway data folder)
+tools/gate-test/out/
+tools/gate-test/data/

@@ -3,8 +3,11 @@
  *  The Discover page embeds soundcloud.com in a WebContentsView that keeps its
  *  own session (persist:soundcloud), so the user signs in once and stays in. */
 import { app, BrowserWindow, dialog, Menu, nativeTheme, session, shell, systemPreferences, WebContentsView } from "electron";
+import * as fs from "fs";
 import * as path from "path";
 import * as core from "./core";
+import * as gatewalk from "./gatewalk";
+import * as hypeddit from "./hypeddit";
 import { IN_USE_TEXT, PickKind, ScRect, ScView, startServer } from "./server";
 import { Lang, mainLang, mt } from "./lang";
 
@@ -509,6 +512,24 @@ function axTrusted(prompt: boolean): boolean {
   return false;
 }
 
+// ---------------- automated free download (Hypeddit) ----------------
+
+/** Get a Hypeddit gate's file into the downloads folder without the user seeing a page.
+ *
+ *  Two ways, in order: the plain-HTTP walk (src/hypeddit.ts) — fast, no window, and it covers
+ *  the ordinary email/social gates — and, when that gate hands out nothing, a hidden window
+ *  that drives the gate's own script (src/gatewalk.ts), which is the only way through a gate
+ *  with a Spotify step. Resolves with the saved path, or null when neither got a file (the
+ *  caller then falls back to opening the page in the browser). */
+async function freeDownload(url: string, email: string): Promise<{ file: string | null }> {
+  if (!core.isHypeddit(url)) throw core.appError("not_hypeddit", "not a Hypeddit link");
+  const viaHttp = await hypeddit.freeDownload(url, email).catch(() => ({ file: null as string | null }));
+  if (viaHttp.file) return viaHttp;
+  const viaWindow = await gatewalk.walk(url, email).catch(() => null);
+  return { file: viaWindow };
+}
+
+
 app.whenReady().then(async () => {
   let server: Awaited<ReturnType<typeof startServer>>;
   try {
@@ -528,6 +549,7 @@ app.whenReady().then(async () => {
       reveal: (p) => shell.showItemInFolder(p),
       packaged: app.isPackaged,
       sc,
+      freeDl: freeDownload,
       prefsChanged: buildMenu,
     });
   } catch (e: any) {

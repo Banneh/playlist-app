@@ -68,6 +68,13 @@ I18N.add('pl', 'app', {
     reavailableMore: 'Z powrotem na stronie Brakujące (pojawił się link): {names} i jeszcze {n}',
   },
 
+  // zielony przycisk Free DL przy linku Hypeddit (przechodzony w tle)
+  freedl: {
+    saved: 'Pobrano: {name}',
+    noFile: 'Bramka nie wydała pliku — otwieram ją w przeglądarce',
+    failed: 'Nie udało się pobrać za darmo: {msg}',
+  },
+
   // the page head
   head: {
     search: 'Szukaj utworu…',

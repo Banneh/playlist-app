@@ -15,7 +15,10 @@ function linkBtn(r, kind) {
   const title = l.sc_dl ? t('tags.link.scDownload') : l.title;
   const fmt = l.fmt === 'lossless' ? t('tags.link.fmtLossless') : l.fmt;
   const tip = `${title ? title + ' · ' : ''}${l.host}${fmt ? ' · ' + fmt : ''}`;
-  return `<a class="btn btn-sm ${kind === 'free' ? 'btn-green' : 'btn-amber'}${kind === 'free' && !hasLink(r, 'buy') ? '' : ' first'}" href="${esc(l.url)}" target="_blank" rel="noopener" title="${esc(tip)}">${
+  // a Hypeddit free link is walked in the background (see freeDownload in app.js); the href stays
+  // so a middle click or a right click → "open in browser" still works
+  const dl = kind === 'free' && isHypeddit(l.url) ? ` data-freedl="${esc(l.url)}"` : '';
+  return `<a class="btn btn-sm ${kind === 'free' ? 'btn-green' : 'btn-amber'}${kind === 'free' && !hasLink(r, 'buy') ? '' : ' first'}" href="${esc(l.url)}" target="_blank" rel="noopener"${dl} title="${esc(tip)}">${
     icon(kind === 'free' ? 'download' : 'bag')}${esc(t(kind === 'free' ? 'tags.link.free' : 'tags.link.buy'))}</a>`;   // the server's label is english
 }
 

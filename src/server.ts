@@ -32,6 +32,9 @@ export interface ServerOpts {
   packaged?: boolean;
   /** the embedded SoundCloud view behind the Discover page (Electron only) */
   sc?: ScView;
+  /** walk a Hypeddit gate in a hidden window and save the file into the downloads folder;
+   *  {file: null} when the gate handed out nothing (Electron only) */
+  freeDl?: (url: string, email: string) => Promise<{ file: string | null }>;
   /** called after the page saved its prefs (Electron: the menu follows Settings → Language) */
   prefsChanged?: () => void;
 }
@@ -244,7 +247,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
       if (req.url === "/api/app") {
         let version = "";
         try { version = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || ""; } catch {}
-        return json({ version, platform: process.platform, arch: process.arch, packaged: !!opts.packaged, sc: !!opts.sc, do_all: core.DO_ALL_FEATURE });
+        return json({ version, platform: process.platform, arch: process.arch, packaged: !!opts.packaged, sc: !!opts.sc, do_all: core.DO_ALL_FEATURE, dl_bypass: core.DOWNLOAD_BYPASS });
       }
       // static UI assets (web/app.css, web/app.js, web/pages/*.js)
       const rel = decodeURIComponent((req.url || "/").split("?")[0]);
@@ -359,6 +362,10 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/find":     return route(() => core.findTrack(data));
           case "/api/found":    return route(() => core.setFound(data));
           case "/api/find-all": return route(() => core.findAll());
+          // not queued: a gate can take a minute and touches no library file
+          case "/api/free-download": return opts.freeDl && core.DOWNLOAD_BYPASS
+            ? direct(() => opts.freeDl!(String(data.url || ""), String(data.email || core.getSettings().dl_email || "")))
+            : json({ unsupported: true });
           case "/api/inbox":          return route(() => core.inboxView());
           case "/api/inbox-move":     return route(() => core.inboxMove(data));
           case "/api/inbox-find":     return route(() => core.inboxFind(data));
