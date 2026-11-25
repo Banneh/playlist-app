@@ -142,16 +142,79 @@ PAGES.settings = {
 
     const doAll = typeof daSettingsCard === 'function' ? daSettingsCard() : '';   // pages/doall.js
     const config = typeof cfSettingsCard === 'function' ? cfSettingsCard() : '';  // pages/config.js: export / import
+    const rekordbox = stRbxCard();
 
     const group = key => `<h3 class="st-group">${esc(t(key))}</h3>`;
     return `<div class="st-list">
       ${group('settings.group.collection')}${collection}${downloads}${aiff}${backups}
       ${group('settings.group.playlist')}${playlist}
-      ${group('settings.group.integrations')}${account}${links}${bandcamp}${doAll}${config}
+      ${group('settings.group.integrations')}${rekordbox}${account}${links}${bandcamp}${doAll}${config}
       ${group('settings.group.app')}${refresh}${appearance}${language}${about}</div>`;
   },
+  onShow: () => stRbxLoad(),
   after: () => stAiffResume(),
 };
+
+/* ---------- the rekordbox connection (Integrations) ---------- */
+let ST_RBX = null;   // last /api/rekordbox status; null until the page asked
+async function stRbxLoad() {
+  try { ST_RBX = await api('/api/rekordbox', { op: 'status' }); } catch (e) { ST_RBX = { error: errText(e) }; }
+  if (PAGE === 'settings') render();
+}
+function stRbxCard() {
+  const s = ST_RBX;
+  const lines = [];
+  let controls = '';
+  if (!s) lines.push(esc(t('settings.rbx.checking')));
+  else if (s.error) lines.push(esc(s.error));
+  else {
+    if (!s.driver) lines.push(esc(t('settings.rbx.noDriver')));
+    else if (!s.db_found) lines.push(esc(t('settings.rbx.noDb')));
+    else lines.push(esc(t(s.running ? 'settings.rbx.dbRunning' : 'settings.rbx.dbFound')));
+    if (s.on && s.pending) lines.push(esc(tn('settings.rbx.pending', s.pending)));
+    if (s.on && s.last) lines.push(esc(s.last.error ? t('settings.rbx.lastFailed', { msg: s.last.error }) : tn('settings.rbx.lastAdded', s.last.added)));
+    controls = `<label class="st-switch">
+        <input type="checkbox" ${s.on ? 'checked' : ''} ${s.driver && s.db_found ? '' : 'disabled'} onchange="stRbxToggle(this)">
+        <span class="st-track" aria-hidden="true"></span>
+        <span class="st-lbl"><b>${esc(t('settings.rbx.on'))}</b>
+          <span>${th('settings.rbx.onHint')}</span></span>
+      </label>
+      ${s.on && s.pending ? `<button class="btn btn-sm" onclick="stRbxFlush(this)">${icon('folderIn')}${esc(t('settings.rbx.flush'))} ${badge(s.pending)}</button>` : ''}
+      ${s.backup ? `<button class="btn btn-sm" onclick="stRbxRestore()" title="${esc(t('settings.rbx.restoreHint', { file: s.backup }))}">${icon('undo')}${esc(t('settings.rbx.restore'))}</button>` : ''}`;
+  }
+  return stCard('disc', 'blue', esc(t('settings.rbx.title')), th('settings.rbx.text'),
+    `<div class="st-path-row st-wide"><span class="faint">${lines.join(' · ')}</span></div>${controls}`);
+}
+async function stRbxToggle(el) {
+  const on = !!el.checked;
+  try {
+    ST_RBX = await api('/api/rekordbox', { op: 'set', on });
+    render();
+    toast(t(on ? 'settings.rbx.toastOn' : 'settings.rbx.toastOff'));
+  } catch (e) { el.checked = !on; toast(t('common.saveFailed', { msg: errText(e) }), true); }
+}
+async function stRbxFlush(btn) {
+  if (btn) { btn.disabled = true; btn.innerHTML = spin(''); }
+  try {
+    ST_RBX = await api('/api/rekordbox', { op: 'flush' });
+    const r = ST_RBX.result || { added: [], skipped: [], errors: [] };
+    toast(tn('settings.rbx.flushed', r.added.length) + (r.errors.length ? ' · ' + esc(r.errors[0].error) : ''), !!r.errors.length);
+  } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
+  render();
+}
+async function stRbxRestore() {
+  const ok = await uiConfirm({
+    title: t('settings.rbx.restoreTitle'),
+    body: `<p>${th('settings.rbx.restoreBody')}</p>`,
+    ok: t('settings.rbx.restore'), danger: true, icon: 'undo', safe: true,
+  });
+  if (!ok) return;
+  try {
+    ST_RBX = await api('/api/rekordbox', { op: 'restore' });
+    render();
+    toast(t('settings.rbx.restored', { file: ST_RBX.restored || '' }));
+  } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
+}
 
 /* ---------- the Collection card (roots, default move target, rescan) ---------- */
 function stCollectionCard() {

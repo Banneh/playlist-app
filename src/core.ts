@@ -189,7 +189,10 @@ export interface AppState {
                /** days until a track not found there is looked up again; 0 = never (default 14) */
                bandcamp_days?: number;
                /** the address the automated Hypeddit free download fills into a gate's email step */
-               dl_email?: string };
+               dl_email?: string;
+               /** the rekordbox collection connection (src/rekordbox.ts): the switch and the
+                *  files moved in that still wait to be written into rekordbox's database */
+               rekordbox?: { on?: boolean; pending?: string[] } };
   /** probe results for audio inside zips in the downloads folder: "<zip path>|<entry>|<size>" -> [dur, fmt, tags] */
   zip_cache?: Record<string, [number, [string, number, number], [string, string, string]]>;
   /** "<lib id>:<track id>" -> ms when a file for the track first turned up (0 = predates tracking) */
@@ -4139,6 +4142,11 @@ export function moveDest(lib: Library | null): string | null {
   try { return resolveMoveDest(lib, undefined).dir; } catch { return null; }
 }
 
+/** Called with the final path of every file a move put into the collection (src/rekordbox.ts
+ *  queues it for the rekordbox collection). Never throws into the move. */
+let RB_HOOK: ((p: string) => void) | null = null;
+export function setRbHook(fn: ((p: string) => void) | null): void { RB_HOOK = fn; }
+
 export async function inboxMoveOne(data: any): Promise<{ key: string; path: string; track_id: number | null; aiff?: { ok: boolean; item?: ErrorItem } }> {
   const lib = requireLib();
   const name = path.basename(String(data.file || ""));
@@ -4205,7 +4213,8 @@ export async function inboxMoveOne(data: any): Promise<{ key: string; path: stri
                                user: String(found.user || ""), dur: Number(found.dur) || 0 };
   }
   saveState();
-  return { key, path: at, track_id: tid ? Number(tid) : null, ...(aiff ? { aiff } : {}) };   // the main folder's files are keyed by name
+  if (RB_HOOK) try { RB_HOOK(at); } catch { /* never the move's problem */ }
+  return { key, path: at, track_id: tid ? Number(tid) : null, ...(aiff ? { aiff } : {}) };
 }
 
 /** Search SoundCloud for a download that matches nothing in the playlist:

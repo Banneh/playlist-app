@@ -15,6 +15,7 @@ import { cueFixRoute } from "./cuefix";
 import { remapExport } from "./aiff";
 import { aifAsWav } from "./aifplay";
 import * as watch from "./watch";
+import * as rekordbox from "./rekordbox";
 
 export interface ServerOpts {
   dataDir: string;
@@ -84,6 +85,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
   core.init(opts.dataDir, !!opts.pickFolder, !!opts.reveal);
   core.setScTransport(opts.sc ? opts.sc.api : null);
   watch.start();
+  rekordbox.init();
 
   // file-mutating actions run one at a time
   let queue: Promise<any> = Promise.resolve();
@@ -373,6 +375,8 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/collection":      return route(async () => { const v = await core.collectionOp(data); watch.sync(); return v; });
           case "/api/collection/view": return route(() => core.collectionView());
           case "/api/move-targets":    return direct(async () => ({ targets: core.moveTargets(data.under ? String(data.under) : undefined) }));
+          // the rekordbox connection: status polls are cheap, the writes guard themselves (closed rekordbox, backup, additive only)
+          case "/api/rekordbox":       return direct(() => rekordbox.op(data));
           case "/api/override": return route(() => core.setOverride(data));
           case "/api/edit":     return route(() => core.setEdit(data));
           case "/api/assign":   return route(() => core.setAssign(data));
