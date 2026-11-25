@@ -455,9 +455,17 @@ values.
 
    When a file already has the same name in a different spelling (capitals,
    punctuation), the file's spelling stays. When it has a different artist or
-   title of its own, **Write tags** first lists those files, each with what is
-   in the file and what would be written, and you choose **Write DJ HQ's
-   names**, **Keep the files' names** or Cancel. Names you typed yourself are
+   title in its tags, **Write tags** first lists those files, each with what is
+   in the tags now and what would be written, and you choose for the whole list:
+   - **Keep the files' tags**: the artist and title in the tags stay, and DJ HQ
+     shows them from now on too. A missing artist or title is filled in, and
+     the genre becomes the playlist name.
+   - **Write DJ HQ's tags**: the artist, title and genre from DJ HQ replace the
+     ones in the tags.
+   - **Cancel**: nothing is written.
+
+   Only the tags change, the files on disk are never renamed or moved. To
+   decide one by one, use **Check names** first. Names you typed yourself are
    written exactly as typed, without asking, and so is a name you kept in
    **Check names** while it showed the file's other name.
 

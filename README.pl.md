@@ -470,10 +470,19 @@ biorą twoje wartości.
    wystarcza.
 
    Gdy plik ma już tę samą nazwę zapisaną inaczej (wielkie litery,
-   interpunkcja), zostaje pisownia z pliku. Gdy ma własnego, innego wykonawcę
+   interpunkcja), zostaje pisownia z pliku. Gdy ma w tagach innego wykonawcę
    lub tytuł, **Zapisz tagi** najpierw wypisuje te pliki, każdy z tym, co jest
-   w pliku, i tym, co zostałoby zapisane, a ty wybierasz **Zapisz nazwy z DJ
-   HQ**, **Zostaw nazwy z plików** albo Anuluj. Nazwy wpisane przez ciebie są
+   teraz w tagach, i tym, co zostałoby zapisane, a ty wybierasz dla całej listy:
+   - **Zostaw tagi z plików**: wykonawca i tytuł w tagach zostają, a DJ HQ też
+     będzie je odtąd pokazywać. Brakujący wykonawca lub tytuł zostanie
+     uzupełniony, a gatunkiem stanie się nazwa playlisty.
+   - **Zapisz tagi z DJ HQ**: wykonawca, tytuł i gatunek z DJ HQ zastąpią te w
+     tagach.
+   - **Anuluj**: nic nie zostanie zapisane.
+
+   Zmieniają się tylko tagi, pliki na dysku nigdy nie zmieniają nazwy ani
+   miejsca. Aby decydować o każdym osobno, użyj najpierw okna **Sprawdź
+   nazwy**. Nazwy wpisane przez ciebie są
    zapisywane dokładnie tak, jak je wpisano, bez pytania. Tak samo nazwa
    zostawiona w oknie **Sprawdź nazwy**, gdy pokazywało ono inną nazwę z pliku.
 

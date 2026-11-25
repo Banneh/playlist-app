@@ -387,7 +387,7 @@ function tagAllAsk(n, differ, hand, left) {
     ok: t('tags.writeTags'), icon: 'tag', safe: true,
   });
 }
-/** "in the file → will be written" per file; resolves 'replace', 'keep' or null (cancel).
+/** "in the tags now / from DJ HQ" per file, with what each choice does (tags only, no file is renamed); resolves 'replace', 'keep' or null (cancel).
    With only names the user chose there is nothing to decide: Write tags or Cancel. */
 function tagReplaceAsk(list) {
   const ask = list.filter(x => !x.hand), hand = list.filter(x => x.hand);
@@ -400,7 +400,7 @@ function tagReplaceAsk(list) {
   return dialog({
     title: esc(ask.length ? tn('tags.replaceAsk.title', ask.length) : tn('tags.replaceAsk.handTitle', hand.length)),
     sub: th(ask.length ? 'tags.replaceAsk.text' : 'tags.replaceAsk.handText'), wide: true,
-    body: `<div class="tr-scroll">${rows(ask)}${hand.length ? `<h4 class="tr-head">${esc(t('tags.replaceAsk.handHead'))}</h4>${rows(hand)}` : ''}</div>`,
+    body: `${ask.length ? `<ul class="tr-help"><li>${th('tags.replaceAsk.keepHelp')}</li><li>${th('tags.replaceAsk.replaceHelp')}</li></ul>${ask.length > 1 ? `<p class="tr-all">${th('tags.replaceAsk.allHelp')}</p>` : ''}` : ''}<div class="tr-scroll">${rows(ask)}${hand.length ? `<h4 class="tr-head">${esc(t('tags.replaceAsk.handHead'))}</h4>${rows(hand)}` : ''}</div>`,
     foot: `<button class="btn" data-close>${esc(t('common.cancel'))}</button><span class="spacer"></span>
            ${ask.length ? `<button class="btn" data-a="replace">${icon('tag')}${esc(t('tags.replaceAsk.replace'))}</button>
            <button class="btn btn-primary" data-a="keep">${icon('check')}${esc(t('tags.replaceAsk.keep'))}</button>`

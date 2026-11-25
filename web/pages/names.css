@@ -19,6 +19,10 @@
 .nc-usefile { flex-shrink: 0; margin-left: 4px; }
 /* Write tags: files whose own name would be replaced (pages/playlist.js tagReplaceAsk) */
 .tr-scroll { max-height: min(52vh, 420px); overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+.dlg-body .tr-help { margin: 0 0 8px; padding-left: 20px; color: var(--text-2); font-size: 13px; }
+.dlg-body .tr-help li + li { margin-top: 4px; }
+.dlg-body .tr-help b { color: var(--text); }
+.dlg-body .tr-all { margin-bottom: 10px; font-size: 13px; }
 .tr-list { display: flex; flex-direction: column; gap: 8px; }
 .tr-row { border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 10px; min-width: 0; }
 .tr-file { display: flex; gap: 6px; align-items: center; font-size: 11.5px; color: var(--text-3); min-width: 0; }

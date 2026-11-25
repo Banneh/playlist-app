@@ -82,29 +82,32 @@ I18N.add('en', 'tags', {
     other: 'Tagged {n} files, so rekordbox will show the right names',
   },
   keptNames: {
-    one: '{n} file has a different name of its own and was left as it is. Check names shows it.',
-    other: '{n} files have a different name of their own and were left as they are. Check names shows them.',
+    one: '{n} file has a different artist or title in its tags and was left as it is. Check names shows it.',
+    other: '{n} files have a different artist or title in their tags and were left as they are. Check names shows them.',
   },
   keptOwn: {
-    one: '{n} file kept its own name.',
-    other: '{n} files kept their own names.',
+    one: '{n} file kept the artist and title in its tags.',
+    other: '{n} files kept the artist and title in their tags.',
   },
   replaceAsk: {
     title: {
-      one: '{n} file already has a different name',
-      other: '{n} files already have a different name',
+      one: '{n} file has a different artist or title in its tags',
+      other: '{n} files have a different artist or title in their tags',
     },
-    text: 'DJ HQ’s name would replace the artist or title these files carry now. Choose which names they keep.',
-    inFile: 'In the file',
-    willWrite: 'Will be written',
+    text: 'Choose which artist and title the tags of these files get. Only tags change: the files are not renamed or moved.',
+    keepHelp: '<b>Keep the files’ tags</b>: the artist and title in the tags stay, and DJ HQ shows them from now on too. A missing artist or title is filled in, and the genre becomes the playlist name.',
+    replaceHelp: '<b>Write DJ HQ’s tags</b>: the artist, title and genre from DJ HQ replace the ones in the tags.',
+    allHelp: 'Your choice covers every file in this list. To decide one by one, cancel and use <b>Check names</b>.',
+    inFile: 'In the tags now',
+    willWrite: 'From DJ HQ',
     handTitle: {
       one: '{n} file gets a name you chose',
       other: '{n} files get a name you chose',
     },
-    handText: 'These files carry a different artist or title now. You typed the new name in or kept it in Check names, so it is written over theirs.',
+    handText: 'These files have a different artist or title in their tags now. The files are not renamed. You typed the new name in or kept it in Check names, so it is written over theirs.',
     handHead: 'Names you chose (written without asking)',
-    replace: 'Write DJ HQ’s names',
-    keep: 'Keep the files’ names',
+    replace: 'Write DJ HQ’s tags',
+    keep: 'Keep the files’ tags',
   },
   all: {
     title: {
@@ -119,8 +122,8 @@ I18N.add('en', 'tags', {
       other: 'Names already in the files stay as they are, except in <b>{n} files</b>, which get the names you set in DJ HQ.',
     },
     differ: {
-      one: '<b>{n} file</b> has a different name of its own: you choose next what happens to it.',
-      other: '<b>{n} files</b> have a different name of their own: you choose next what happens to them.',
+      one: '<b>{n} file</b> has a different artist or title in its tags: you choose next what happens to it.',
+      other: '<b>{n} files</b> have a different artist or title in their tags: you choose next what happens to them.',
     },
     leftAsk: {
       one: '<b>{n} file</b> is left as it is: its tags can’t be written again without losing something.',
