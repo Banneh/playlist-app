@@ -29,32 +29,10 @@ PAGES.settings = {
     const libName = esc(lib.name || DATA.playlist || t('settings.lib.fallbackName'));
     const isLikes = /\/likes\/?$/.test(DATA.playlist_url || '');
 
-    const dirs = lib.dirs || (lib.dir ? [lib.dir] : []);
-    const folderRows = dirs.map((d, i) => `<div class="st-path-row">
-         <div class="path" title="${esc(d)}">${icon('folder')}<span>${esc(shortPath(d))}</span>${i === 0 && dirs.length > 1 ? tag(t('settings.lib.mainTag'), 'outline', '', t('settings.lib.mainHint')) : ''}</div>
-         ${i > 0 ? `<button class="btn btn-sm btn-ghost st-make-main" onclick="stMakeMain(${JSON.stringify(d).replace(/"/g, '&quot;')})" title="${esc(t('settings.lib.makeMainHint'))}" data-dir="${esc(d)}" ${ST_MAIN_BUSY ? 'disabled' : ''}>${ST_MAIN_BUSY === 'checking' && ST_MAIN_DIR === d ? spin(t('settings.main.checking')) : icon('folder') + esc(t('settings.lib.makeMain'))}</button>
-                    <button class="btn btn-sm" onclick="stRemoveFolder(${JSON.stringify(d).replace(/"/g, '&quot;')})" title="${esc(t('settings.lib.removeFolderHint'))}">${icon('x')}${esc(t('common.remove'))}</button>`
-                 : `<button class="btn btn-sm st-main-btn" id="st-change-main" onclick="stChangeMain()" title="${esc(t('settings.lib.changeMainHint'))}" ${ST_MAIN_BUSY ? 'disabled' : ''}>${ST_MAIN_BUSY && ST_MAIN_DIR === null ? spin(t('settings.main.checking')) : icon('folder') + esc(t('settings.lib.changeMain'))}</button>`}
-       </div>`).join('');
-    const libText = 'settings.lib.' + (dirs.length > 1 ? 'textMany' : 'textOne') + (isLikes ? 'Likes' : '');
-    const library = stCard('folder', '', th('settings.lib.title', { name: I18N.raw(`<span class="st-name">${libName}</span>`) }),
-      th(libText),
-      `${folderRows}
-       <div class="fieldrow st-inboxrow">
-         <input class="input" id="st-folder" placeholder="${esc(t('settings.lib.addFolderPh'))}" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')stAddFolder()">
-         ${DATA.can_pick ? `<button class="btn" onclick="stBrowseFolder()">${icon('folder')}${esc(t('common.browse'))}</button>` : ''}
-         <button class="btn" onclick="stAddFolder()">${icon('plus')}${esc(t('settings.lib.addFolder'))}</button>
-       </div>
-       <label class="st-switch">
-         <input type="checkbox" id="st-sub" ${lib.subfolders ? 'checked' : ''} onchange="stToggleSubfolders(this)">
-         <span class="st-track" aria-hidden="true"></span>
-         <span class="st-lbl"><b>${esc(t('common.subfolders'))}</b>
-           <span>${th('settings.lib.subfoldersHint')}</span></span>
-       </label>
-       ${DATA.playlist_url ? `<button class="btn btn-sm" onclick="scOpen(DATA.playlist_url)">${icon(scInApp() ? 'cloud' : 'external')}${esc(t(isLikes ? 'common.openLikesSc' : 'common.openPlaylistSc'))}</button>` : ''}
-       <button class="btn btn-sm" onclick="stChangeLink()" title="${esc(t('settings.lib.changeLinkHint'))}">${icon('link')}${esc(t('common.changeLink'))}</button>
-       <button class="btn btn-sm" onclick="uiAddLibrary()">${icon('plus')}${esc(t('common.addAnotherLibrary'))}</button>
-       <button class="btn btn-sm btn-danger" onclick="removeLibrary()">${icon('trash')}${esc(t('common.removeThisLibrary'))}</button>`);
+    const collection = stCollectionCard();
+    const playlist = stCard('listMusic', '', th('settings.pl.title', { name: I18N.raw(`<span class="st-name">${libName}</span>`) }),
+      th(isLikes ? 'settings.pl.textLikes' : 'settings.pl.text'),
+      stPlaylistControls(lib, isLikes));
 
     const inboxShown = esc(shortPath(S.inbox_dir || S.inbox_default || '~/Downloads'));
     const downloads = stCard('inbox', 'blue', esc(t('settings.inbox.title')),
@@ -165,10 +143,68 @@ PAGES.settings = {
     const doAll = typeof daSettingsCard === 'function' ? daSettingsCard() : '';   // pages/doall.js
     const config = typeof cfSettingsCard === 'function' ? cfSettingsCard() : '';  // pages/config.js: export / import
 
-    return `<div class="st-list">${library}${account}${links}${bandcamp}${downloads}${aiff}${doAll}${refresh}${appearance}${language}${backups}${config}${about}</div>`;
+    const group = key => `<h3 class="st-group">${esc(t(key))}</h3>`;
+    return `<div class="st-list">
+      ${group('settings.group.collection')}${collection}${downloads}${aiff}${backups}
+      ${group('settings.group.playlist')}${playlist}
+      ${group('settings.group.integrations')}${account}${links}${bandcamp}${doAll}${config}
+      ${group('settings.group.app')}${refresh}${appearance}${language}${about}</div>`;
   },
   after: () => stAiffResume(),
 };
+
+/* ---------- the Collection card (roots, default move target, rescan) ---------- */
+function stCollectionCard() {
+  const coll = DATA.collection || { roots: [] };
+  const rootRows = coll.roots.map(r => `<div class="st-path-row">
+       <div class="path" title="${esc(r.path)}">${icon('folder')}<span>${esc(shortPath(r.path))}</span>${r.subfolders ? tag(t('common.subfolders'), 'outline', '', t('settings.coll.subOnTag')) : ''}</div>
+       <label class="st-switch st-switch-sm" title="${esc(t('settings.coll.subHint'))}">
+         <input type="checkbox" ${r.subfolders ? 'checked' : ''} onchange="stRootSub('${esc(r.id)}', this)">
+         <span class="st-track" aria-hidden="true"></span>
+         <span class="st-lbl"><span>${esc(t('common.subfolders'))}</span></span>
+       </label>
+       <button class="btn btn-sm" onclick="stRemoveRoot('${esc(r.id)}', ${JSON.stringify(r.path).replace(/"/g, '&quot;')})" title="${esc(t('settings.coll.removeHint'))}">${icon('x')}${esc(t('common.remove'))}</button>
+     </div>`).join('');
+  const target = coll.move_target || '';
+  return stCard('folder', 'green', esc(t('settings.coll.title')), th('settings.coll.text'),
+    `${rootRows || `<p class="faint">${th('settings.coll.none')}</p>`}
+     <div class="fieldrow st-inboxrow">
+       <input class="input" id="st-root" placeholder="${esc(t('settings.coll.addPh'))}" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')stAddRoot()">
+       ${DATA.can_pick ? `<button class="btn" onclick="stBrowseRoot()">${icon('folder')}${esc(t('common.browse'))}</button>` : ''}
+       <button class="btn" onclick="stAddRoot()">${icon('plus')}${esc(t('settings.coll.add'))}</button>
+     </div>
+     <div class="st-path-row st-wide"><span class="faint">${esc(t('settings.coll.target'))}</span>
+       <div class="path" title="${esc(target)}">${icon('folderIn')}<span>${esc(target ? shortPath(target) : t('settings.coll.targetAuto'))}</span></div>
+       <button class="btn btn-sm" onclick="stPickMoveTarget()" title="${esc(t('settings.coll.targetHint'))}">${icon('folder')}${esc(t('common.change'))}</button>
+       ${target ? `<button class="btn btn-sm btn-ghost" onclick="stClearMoveTarget()">${icon('undo')}${esc(t('settings.coll.targetClear'))}</button>` : ''}
+     </div>
+     <button class="btn btn-sm" onclick="rescanFolder()">${icon('refresh')}${esc(t('app.libMenu.rescan'))}</button>`);
+}
+
+/* ---------- the Playlist card's controls (also the gear dialog next to the playlist switcher) ---------- */
+function stPlaylistControls(lib, isLikes) {
+  const target = lib.target || '';
+  return `${DATA.playlist_url ? `<button class="btn btn-sm" onclick="scOpen(DATA.playlist_url)">${icon(scInApp() ? 'cloud' : 'external')}${esc(t(isLikes ? 'common.openLikesSc' : 'common.openPlaylistSc'))}</button>` : ''}
+     <button class="btn btn-sm" onclick="stChangeLink()" title="${esc(t('settings.lib.changeLinkHint'))}">${icon('link')}${esc(t('common.changeLink'))}</button>
+     <div class="st-path-row st-wide"><span class="faint">${esc(t('settings.pl.target'))}</span>
+       <div class="path" title="${esc(target)}">${icon('folderIn')}<span>${esc(target ? shortPath(target) : t('settings.pl.targetNone'))}</span></div>
+       <button class="btn btn-sm" onclick="stPickPlTarget()" title="${esc(t('settings.pl.targetHint'))}">${icon('folder')}${esc(t('common.change'))}</button>
+       ${target ? `<button class="btn btn-sm btn-ghost" onclick="stClearPlTarget()">${icon('undo')}${esc(t('settings.pl.targetClear'))}</button>` : ''}
+     </div>
+     <button class="btn btn-sm" onclick="uiAddLibrary()">${icon('plus')}${esc(t('common.addAnotherLibrary'))}</button>
+     <button class="btn btn-sm btn-danger" onclick="removeLibrary()">${icon('trash')}${esc(t('common.removeThisLibrary'))}</button>`;
+}
+/** the gear next to the playlist switcher: the playlist's own settings in one dialog */
+function plSettingsDialog() {
+  const lib = (DATA.libraries || []).find(l => l.id === DATA.active) || {};
+  const isLikes = /\/likes\/?$/.test(DATA.playlist_url || '');
+  return dialog({
+    title: th('settings.pl.title', { name: I18N.raw(`<span class="st-name">${esc(lib.name || '')}</span>`) }),
+    sub: th(isLikes ? 'settings.pl.textLikes' : 'settings.pl.text'),
+    body: `<div class="st-controls pl-dlg">${stPlaylistControls(lib, isLikes)}</div>`,
+    foot: `<span class="spacer"></span><button class="btn btn-primary" data-close>${esc(t('common.close'))}</button>`,
+  });
+}
 
 /* ---------- actions ---------- */
 async function stLibrary(body, msg) {
@@ -182,33 +218,60 @@ async function stLibrary(body, msg) {
     return false;
   }
 }
-async function stAddFolder() {
-  const el = $('#st-folder');
+/* ---------- collection actions ---------- */
+async function stCollection(body, msg) {
+  try {
+    DATA = await api('/api/collection', body);
+    if (typeof COLL !== 'undefined') COLL = null;   // the collection browser reloads next time
+    render();
+    if (msg) toast(msg);
+    return true;
+  } catch (e) {
+    toast(t('common.libraryChangeFailed', { msg: errText(e) }), true);
+    return false;
+  }
+}
+async function stAddRoot() {
+  const el = $('#st-root');
   const p = (el && el.value || '').trim();
   if (!p) { if (el) el.focus(); return; }
-  await stLibrary({ op: 'add_folder', dir: p }, t('settings.toast.scanningToo', { dir: shortPath(p) }));
+  await stCollection({ op: 'add_root', dir: p }, t('settings.toast.scanningToo', { dir: shortPath(p) }));
 }
-async function stBrowseFolder() {
+async function stBrowseRoot() {
   try {
     const r = await api('/api/pick-folder', {});
-    if (r.path) await stLibrary({ op: 'add_folder', dir: r.path }, t('settings.toast.scanningToo', { dir: shortPath(r.path) }));
+    if (r.path) await stCollection({ op: 'add_root', dir: r.path }, t('settings.toast.scanningToo', { dir: shortPath(r.path) }));
   } catch (e) { toast(t('common.pickerFailed', { msg: errText(e) }), true); }
 }
-async function stRemoveFolder(dir) {
+async function stRemoveRoot(id, dir) {
   const ok = await uiConfirm({
     title: t('settings.removeFolder.title', { dir: shortPath(dir) }),
     body: `<p>${th('settings.removeFolder.body')}</p>`,
     ok: t('settings.removeFolder.ok'), danger: true, icon: 'x',
   });
   if (!ok) return;
-  if (!await stLibrary({ op: 'remove_folder', dir })) return;
+  if (!await stCollection({ op: 'remove_root', id })) return;
   const r = DATA.remove_report || {};
   toast(r.lost_count ? tn('settings.toast.folderRemovedLost', r.lost_count) : t('settings.toast.folderRemoved'));
 }
-async function stToggleSubfolders(el) {
+async function stRootSub(id, el) {
   const on = !!el.checked;
-  const ok = await stLibrary({ op: 'subfolders', on }, t(on ? 'settings.toast.subfoldersOn' : 'settings.toast.subfoldersOff'));
+  const ok = await stCollection({ op: 'subfolders', id, on }, t(on ? 'settings.toast.subfoldersOn' : 'settings.toast.subfoldersOff'));
   if (!ok) { el.checked = !on; render(); }
+}
+async function stPickMoveTarget() {
+  const dest = await ibPickDest();
+  if (dest) await stCollection({ op: 'set_move_target', dir: dest }, t('settings.coll.targetSet', { dir: shortPath(dest) }));
+}
+async function stClearMoveTarget() {
+  await stCollection({ op: 'set_move_target', dir: '' }, t('settings.coll.targetCleared'));
+}
+async function stPickPlTarget() {
+  const dest = await ibPickDest();
+  if (dest) await stLibrary({ op: 'set_target', dir: dest }, t('settings.pl.targetSet', { dir: shortPath(dest) }));
+}
+async function stClearPlTarget() {
+  await stLibrary({ op: 'set_target', dir: '' }, t('settings.pl.targetCleared'));
 }
 /* the library's SoundCloud link: the new one is fetched first, the old one stays if that fails */
 function stChangeLink() {
@@ -382,73 +445,6 @@ function stTypePath({ title, ph, next, value = '' }) {
     },
   });
 }
-/** a folder change being chosen or previewed: true while the picker, the preview request or its
-    dialog is open (the Change… and Folder moved… buttons are busy, a second click does nothing) */
-let ST_MAIN_BUSY = false;
-/** the extra folder whose Make main folder button started the change (its button shows the spinner), else null */
-let ST_MAIN_DIR = null;
-/** the Change…, Folder moved… and Make main folder buttons as they are drawn now: busy (a spinner) or not */
-function stMainBtns() {
-  for (const b of document.querySelectorAll('.st-main-btn')) {
-    if (!b.dataset.idle) b.dataset.idle = b.innerHTML;
-    b.disabled = !!ST_MAIN_BUSY;
-    b.innerHTML = ST_MAIN_BUSY === 'checking' && ST_MAIN_DIR === null ? spin(t('settings.main.checking')) : b.dataset.idle;
-  }
-  for (const b of document.querySelectorAll('.st-make-main')) {
-    b.disabled = !!ST_MAIN_BUSY;
-    b.innerHTML = ST_MAIN_BUSY === 'checking' && b.dataset.dir === ST_MAIN_DIR ? spin(t('settings.main.checking')) : icon('folder') + esc(t('settings.lib.makeMain'));
-  }
-}
-/** Make main folder on an extra folder's row: the two folders swap roles (the preview first, Cancel is the default) */
-async function stMakeMain(dir) {
-  if (ST_MAIN_BUSY) return;
-  ST_MAIN_BUSY = true; ST_MAIN_DIR = dir; stMainBtns();
-  try { await stMainAsk(dir); }
-  finally { ST_MAIN_BUSY = false; ST_MAIN_DIR = null; stMainBtns(); }
-}
-/** choose the folder (the picker, or a typed path), then the preview and the change */
-async function stChangeMain(libId) {
-  if (ST_MAIN_BUSY) return;
-  ST_MAIN_BUSY = true; stMainBtns();
-  try {
-    let dir = null;
-    if (DATA.can_pick) {
-      try { dir = (await api('/api/pick-folder', {})).path; }
-      catch (e) { return toast(t('common.pickerFailed', { msg: errText(e) }), true); }
-    } else dir = await stTypePath({ title: t('settings.main.typeTitle'), ph: t('settings.main.typePh'), next: t('settings.main.typeNext') });
-    if (dir) return await stMainAsk(dir, libId);
-  } finally { ST_MAIN_BUSY = false; stMainBtns(); }
-}
-/** the preview (nothing changes until OK; Cancel is the default) and then the change */
-async function stMainAsk(dir, libId) {
-  toast(t('settings.main.checking'));
-  ST_MAIN_BUSY = 'checking'; stMainBtns();   // the preview looks at every file of the folder: seconds
-  const id = libId || DATA.active;
-  let res;
-  try { res = await api('/api/library', { op: 'set_dir', dir, id }); }
-  catch (e) { return toast(t('settings.main.failed', { msg: errText(e) }), true); }
-  finally { ST_MAIN_BUSY = true; stMainBtns(); }
-  const c = res.confirm;
-  if (!c) { DATA = res; render(); return; }
-  const lose = c.lose || [], more = (c.lose_count || 0) - Math.min(12, lose.length);
-  const body = `<p>${c.swap ? th('settings.main.swapP1', { old: shortPath(c.from) }) : th('settings.main.p1')}</p>
-    <p>${th(c.from_away ? 'settings.main.countsAway' : 'settings.main.counts', { before: I18N.num(c.before), after: I18N.num(c.after) })}</p>
-    ${c.empty ? `<p>${th('settings.main.empty')}</p>` : ''}
-    ${c.pins && c.pins.other_ext ? `<p>${tnh('settings.main.otherExt', c.pins.other_ext)}</p>` : ''}
-    ${c.lose_count ? `<p class="art-left-head">${tnh('settings.main.loseHead', c.lose_count)}</p>
-      <ul class="art-left">${lose.slice(0, 12).map(x => `<li>${esc(x.artist ? x.artist + ' - ' + x.title : x.title)}</li>`).join('')}${more > 0 ? `<li>${esc(tn('settings.main.more', more))}</li>` : ''}</ul>`
-      : `<p>${th('settings.main.loseNone')}</p>`}`;
-  const ok = await uiConfirm({ title: t(c.swap ? 'settings.main.swapTitle' : 'settings.main.title', { dir: shortPath(c.dir) }), body,
-    ok: t(c.swap ? 'settings.main.swapOk' : 'settings.main.ok'), icon: 'folder', safe: true });
-  if (!ok) return toast(t('settings.main.notChanged'));
-  try {
-    DATA = await api('/api/library', { op: 'set_dir', dir, id, confirm: true });
-    render();
-    toast(c.swap ? t('settings.main.swapDone', { dir: shortPath(c.dir), old: shortPath(c.from) }) : t('settings.main.done', { dir: shortPath(dir) }));
-    if (typeof loadInbox === 'function') loadInbox({ quiet: true });
-  } catch (e) { toast(t('settings.main.failed', { msg: errText(e) }), true); }
-}
-
 /* ---------- AIFF instead of WAV ---------- */
 /** the conversion run while it goes: null, or {done, total} (kept here so a redraw keeps the count) */
 let ST_AIFF = null, ST_AIFF_LOOKED = false, ST_AIFF_ASKING = false;

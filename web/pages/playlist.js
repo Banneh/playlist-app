@@ -53,15 +53,20 @@ function fileIssueTags(r, convertTip) {
 const keyTag = r => r.key ? tag(r.key, 'outline', '', t(r.pn ? 'tags.keyTipPn' : 'tags.keyTip')) : '';
 
 function fileLine(r) {
-  if (!r.file) return r.manual_match
-    ? `<div class="t-file link" onclick="openAssign(${r.id})" title="${esc(t('tags.noFileByHandTip'))}">${icon('pin')}<span class="fn">${esc(t('tags.noFileByHand'))}</span></div>` : '';
+  if (!r.file) {
+    if (r.manual_match) return `<div class="t-file link" onclick="openAssign(${r.id})" title="${esc(t('tags.noFileByHandTip'))}">${icon('pin')}<span class="fn">${esc(t('tags.noFileByHand'))}</span></div>`;
+    // a fresh download waiting in the inbox already matches this track
+    if (r.in_inbox) return `<div class="t-file ib-pending link" onclick="go('inbox')" title="${esc(t('tags.inInboxTip'))}">${icon('inbox')}<span class="fn">${esc(t('tags.inInbox', { name: r.in_inbox.name }))}</span></div>`;
+    return '';
+  }
   const tags = [];
   if (r.manual_match) tags.push(tag(t('tags.matchedByHand'), '', 'pin', t('tags.matchedByHandTip')));
   else if (r.score !== null && r.score < 0.995) tags.push(tag(t('tags.pctMatch', { pct: Math.round(r.score * 100) }), 'outline', '', t('tags.pctMatchTip')));
   tags.push(...fileIssueTags(r));
   if (r.upgrade) tags.push(tag(t('tags.lossless'), 'accent', 'arrowUp', t('tags.losslessTip')));
   if (r.key) tags.push(keyTag(r));
-  return `<div class="t-file">${playBtn(filePath(r, r.file), r.title, r.artist) || `<span class="ic">${icon('music')}</span>`}<span class="fn link" onclick="openAssign(${r.id})" title="${esc(t('tags.fileTip', { file: r.file }))}">${esc(r.file)}</span>${
+  const disp = r.file_disp || r.file;
+  return `<div class="t-file">${playBtn(filePath(r, r.file), r.title, r.artist) || `<span class="ic">${icon('music')}</span>`}<span class="fn link" onclick="openAssign(${r.id})" title="${esc(t('tags.fileTip', { file: r.file }))}">${esc(disp)}</span>${
     tags.length ? `<span class="tags">${tags.join('')}</span>` : ''}</div>`;
 }
 
@@ -217,8 +222,8 @@ function openAssign(id) {
   const fileTo = {};   // file name -> track currently holding it
   DATA.tracks.forEach(x => { if (x.file) fileTo[x.file] = x; });
   const want = `${tr.artist} ${tr.title}`;
-  const files = (DATA.local_files || []).map(f => ({ ...f, s: nameScore(f.name, want) + (tr.file === f.name ? 2 : 0) }))
-    .sort((a, b) => b.s - a.s || a.name.localeCompare(b.name));
+  const files = (DATA.local_files || []).map(f => ({ ...f, disp: f.disp || f.name, s: nameScore(f.disp || f.name, want) + (tr.file === f.name ? 2 : 0) }))
+    .sort((a, b) => b.s - a.s || (a.disp).localeCompare(b.disp));
   dialog({
     title: th('playlist.assign.title'),
     sub: th('playlist.assign.sub', { name: (tr.artist ? tr.artist + ' - ' : '') + tr.title, dur: tr.dur }),
@@ -231,10 +236,10 @@ function openAssign(id) {
       const list = dlg.querySelector('#af-list');
       const paint = q => {
         q = (q || '').toLowerCase();
-        list.innerHTML = files.filter(f => !q || f.name.toLowerCase().includes(q)).map(f => {
+        list.innerHTML = files.filter(f => !q || f.disp.toLowerCase().includes(q)).map(f => {
           const cur = tr.file === f.name, other = !cur && fileTo[f.name];
-          return `<button class="opt${cur ? ' cur' : other ? ' taken' : ''}" data-f="${esc(f.name)}">${playBtn(filePath(f, f.name), f.name, '').replace('play-btn', 'play-btn lead') || icon('music', 'lead')}
-            <span class="opt-main"><span class="fn">${esc(f.name)}</span>
+          return `<button class="opt${cur ? ' cur' : other ? ' taken' : ''}" data-f="${esc(f.name)}">${playBtn(filePath(f, f.name), f.disp, '').replace('play-btn', 'play-btn lead') || icon('music', 'lead')}
+            <span class="opt-main"><span class="fn" title="${esc(f.name)}">${esc(f.disp)}</span>
             <span class="fi">${cur ? tag(t('playlist.assign.current'), 'accent', 'check') : other ? tag(t('playlist.assign.matchedTo', { num: other.n, title: other.title }), 'warn', 'link') : tag(t('playlist.assign.unmatched'), '')}</span></span>
             <span class="dur">${esc(f.dur)}</span></button>`;
         }).join('') || emptyHtml({ ico: 'search', title: th('tags.empty.noFiles'), text: th('playlist.assign.shorter') });
@@ -441,6 +446,7 @@ PAGES.missing = {
     const withLink = DATA.tracks.filter(r => !r.have && !r.na && r.links.length).length;
     return DATA.missing
       ? [tnh('playlist.missing.toGet', DATA.missing), withLink ? th('playlist.missing.withLink', { n: I18N.num(withLink) }) : '',
+         DATA.in_inbox ? tnh('playlist.missing.inInbox', DATA.in_inbox) : '',
          DATA.na_count ? tnh('playlist.missing.na', DATA.na_count) : ''].filter(Boolean).join(' · ')
       : th('playlist.missing.allHere');
   },
@@ -490,11 +496,7 @@ PAGES.have = {
     let rows = DATA.tracks.filter(r => r.have && matchesQ(r, q));
     rows = rows.filter(r => haveFilter(r));
     LAST_ROWS = rows;
-    // files that need the same work but aren't in the playlist live on another page: say so
-    const strays = HFILTER === 'tags' ? (DATA.extras || []).filter(f => f.tagged === false).length
-                 : HFILTER === 'convert' ? (DATA.extras || []).filter(f => f.incompat).length : 0;
-    const strayLine = strays ? `<div class="note-line"><span>${tnh(HFILTER === 'tags' ? 'playlist.have.strayTags' : 'playlist.have.strayConvert', strays)}</span><button class="btn btn-sm btn-ghost" onclick="go('extras')">${
-      icon('folder')}${esc(t('app.nav.extras'))}</button></div>` : '';
+    const strayLine = '';   // files outside the playlist live in the collection browser now
     // tracks without a file have names to check too: the review covers them all
     const nameLine = HFILTER === 'names' && DATA.name_checks ? `<div class="note-line"><span>${
       tnh('playlist.have.names', DATA.name_checks)}</span><button class="btn btn-sm btn-ghost" onclick="openCheckNames('check')">${icon('alert')}${esc(t('names.title'))}</button></div>` : '';

@@ -16,7 +16,8 @@ const ncTip = r => ncWhy(r) ? t('names.tip', { why: ncWhy(r) }) : t('names.tipPl
 
 /* ---------- the list ---------- */
 const ncTracks = () => DATA.tracks || [];
-const ncExtras = () => DATA.extras || [];
+/** files outside the playlist come from the collection browser, once it has loaded */
+const ncExtras = () => (typeof COLL !== 'undefined' && COLL && !COLL.error && COLL.files) ? COLL.files.filter(f => !(f.in || []).length) : [];
 /** items are { k: 't', id } for a playlist track and { k: 'x', name } for a file not in it */
 function ncList(scope) {
   const pick = r => scope === 'all' || r.check_name;

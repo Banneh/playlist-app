@@ -158,13 +158,22 @@ export function buildExport(opts: { leaveLinksOut?: boolean; theme?: unknown }):
   const dropped = { pins: 0, edits: 0, found: 0 };
   const orphans: Record<string, TrackRec> = {};
   const track = (lib: Library, tid: string) => recs.get(lib)!.tracks[tid] || (recs.get(lib)!.tracks[tid] = {});
-  // a pin belongs to the library whose folder holds the file (a track can be in two playlists)
+  // a pin belongs to the library whose folder holds the file (a track can be in two playlists).
+  // Pins are absolute paths since the collection model: they go into the file as the
+  // library-relative key of the legacy folder that holds them (the migration kept those
+  // folders on the library), and a pin under no exported folder is dropped and counted.
   for (const [tid, file] of Object.entries(S.assigned)) {
     const hs = holders.get(tid) || [];
     if (!hs.length) { dropped.pins++; continue; }   // the view drops it too: the track is in no playlist
-    const owner = (file && hs.find((l) => listing.get(l)!.keys.has(file))) || hs[0];
+    let key = file;
+    if (file && path.isAbsolute(file)) {
+      const rel = relKeyOf(file, libs);
+      if (!rel) { dropped.pins++; continue; }
+      key = rel.key;
+    }
+    const owner = (key && hs.find((l) => listing.get(l)!.keys.has(key))) || hs[0];
     const r = track(owner, tid);
-    r.file = file;
+    r.file = key;
     if (S.by_hand[tid]) r.by_hand = true;
   }
   // per-track marks go to every library that has the track

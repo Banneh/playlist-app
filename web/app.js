@@ -607,7 +607,7 @@ const NAV = [   // labels are keys (app.nav.*), looked up when the sidebar is dr
   { sec: 'app.nav.secLibrary' },
   { id: 'new', label: 'app.nav.new', icon: 'sparkles', count: () => DATA.new_count, kind: () => DATA.new_count ? 'accent' : '' },
   { id: 'inbox', label: 'app.nav.inbox', icon: 'inbox', count: () => INBOX ? INBOX.items.length : '', kind: () => INBOX && INBOX.items.length ? 'accent' : '', hideZero: true },
-  { id: 'extras', label: 'app.nav.extras', icon: 'folder', count: () => DATA.extras.length },
+  { id: 'collection', label: 'app.nav.collection', icon: 'folder', count: () => DATA.local_count || 0 },
   { sec: 'app.nav.secPlayer' },
   { id: 'prepare', label: 'app.nav.prepare', icon: 'disc', count: () => (DATA.untagged || 0) + (DATA.incompatible || 0), kind: () => 'soft', hideZero: true },
 ];
@@ -653,15 +653,15 @@ function safetyNotesHtml() {
     out += noteHtml(safetyText(key, { dir: shortPath(a.dir) }),
       `<button class="btn btn-sm" onclick="rescanFolder()" title="${esc(t('app.safety.lookAgainHint'))}">${icon('refresh')}${esc(t('app.safety.lookAgain'))}</button>`
       + (a.why === 'waiting' ? `<button class="btn btn-sm" onclick="filesReady()" title="${esc(t('app.safety.filesReadyHint'))}">${icon('check')}${esc(t('app.safety.filesReady'))}</button>` : '')
-      // the main folder is gone (not an unplugged drive): show DJ HQ where it is now
-      + (folderGone(a) && typeof stChangeMain === 'function' ? `<button class="btn btn-sm st-main-btn" onclick="stChangeMain()" title="${esc(t('app.safety.folderMovedHint'))}" ${ST_MAIN_BUSY ? 'disabled' : ''}>${ST_MAIN_BUSY === 'checking' && !ST_MAIN_DIR ? spin(t('settings.main.checking')) : icon('folder') + esc(t('app.safety.folderMoved'))}</button>` : ''), 'amber', 'alert');
+      // the folder is gone (not an unplugged drive): its row in Settings is where it can be fixed
+      + (folderGone(a) ? `<button class="btn btn-sm" onclick="go('settings')" title="${esc(t('app.safety.folderMovedHint'))}">${icon('folder')}${esc(t('app.safety.folderMoved'))}</button>` : ''), 'amber', 'alert');
   }
   return out ? `<div class="safety-notes">${out}</div>` : '';
 }
 
-/** a library's main folder that is gone (deleted, renamed, moved), not merely away (an unplugged drive,
+/** a collection folder that is gone (deleted, renamed, moved), not merely away (an unplugged drive,
     an unreadable or empty folder, an imported library waiting for its music) */
-const folderGone = a => !!a && a.main && a.why === 'missing' && !a.drive
+const folderGone = a => !!a && a.why === 'missing' && !a.drive
   && !((DATA && DATA.folders_away) || []).some(x => x.why === 'waiting');   // a library waiting for its music has no folder yet
 /** the libraries already asked about this session: the popup comes once, "Leave it for later" stays left.
     Kept in sessionStorage, so a reload of the window (View > Reload) doesn't ask again. */
@@ -673,8 +673,7 @@ const AWAY_ASKED = {
   add(id) { this.mem.push(id); try { sessionStorage.setItem(this.key, JSON.stringify([...new Set([...this.all(), id])])); } catch { /* memory only */ } },
 };
 function askFolderGone() {
-  if (!DATA || !DATA.active || AWAY_ASKED.has(DATA.active) || typeof stChangeMain !== 'function' || document.querySelector('.overlay')) return;
-  if (typeof ST_MAIN_BUSY !== 'undefined' && ST_MAIN_BUSY) return;
+  if (!DATA || !DATA.active || AWAY_ASKED.has(DATA.active) || document.querySelector('.overlay')) return;
   if ((typeof SETUP !== 'undefined' && SETUP) || (typeof TOUR !== 'undefined' && TOUR)) return;
   const a = (DATA.folders_away || []).find(folderGone);
   if (!a) return;
@@ -687,7 +686,7 @@ function askFolderGone() {
     foot: `<span class="spacer"></span><button class="btn btn-primary" data-close>${esc(t('app.safety.folderGoneLater'))}</button>
            <button class="btn" data-a="find">${icon('folder')}${esc(t('app.safety.folderGoneFind'))}</button>`,
     open(dlg, done) { dlg.querySelector('[data-a=find]').onclick = () => done('find'); dlg.querySelector('[data-close]').focus(); },
-  }).then(v => { if (v === 'find' && DATA.active === id) stChangeMain(id); });
+  }).then(v => { if (v === 'find' && DATA.active === id) go('settings'); });
 }
 
 /* ---------- render ---------- */
@@ -739,9 +738,13 @@ function renderTop() { render(); const b = $('#page-body'); if (b) b.scrollTop =
 function renderSidebar() {
   const libs = DATA.libraries || [];
   const sel = $('#lib');
-  sel.innerHTML = libs.map(l => `<option value="${esc(l.id)}" ${l.id === DATA.active ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
-  $('#lib-name').classList.toggle('single', libs.length < 2);
-  sel.title = libs.length > 1 ? t('app.lib.switch') : (libs[0] ? libs[0].name : '');
+  sel.innerHTML = libs.map(l => `<option value="${esc(l.id)}" ${l.id === DATA.active ? 'selected' : ''}>${esc(l.name)}</option>`).join('')
+    + `<option value="__add">${esc(t('app.lib.addOption'))}</option>`;
+  sel.value = DATA.active || '';
+  $('#lib-name').classList.remove('single');   // the dropdown always opens: it carries "Add a playlist"
+  sel.title = t('app.lib.switch');
+  const gear = $('#btn-plsettings');
+  if (gear) gear.hidden = !libs.length;
   const arts = DATA.ready ? [...new Set(DATA.tracks.map(tr => tr.art).filter(Boolean))].slice(0, 4) : [];
   $('#mosaic').className = 'mosaic' + (arts.length < 4 ? ' one' : '');
   $('#mosaic').innerHTML = arts.length >= 4 ? arts.map(a => `<img src="${esc(a)}" alt="">`).join('')
@@ -751,10 +754,10 @@ function renderSidebar() {
   $('#lib-sub').textContent = DATA.ready ? t('app.lib.haveOf', { have: I18N.num(have), n: I18N.num(n) }) : t('app.lib.notFetched');
   $('#lib-bar').style.width = pct + '%';
   $('#lib-pct').textContent = DATA.ready ? pct + '%' : '';
-  const active = libs.find(l => l.id === DATA.active);
-  const dirs = active ? (active.dirs || [active.dir]) : [];
-  $('#lib-dir').textContent = !active ? '' : dirs.length > 1 ? t('app.lib.dirMore', { dir: shortPath(active.dir), n: I18N.num(dirs.length - 1) }) : shortPath(active.dir);
-  $('#lib-dir').title = dirs.join('\n') + (active && active.subfolders ? '\n' + t('app.lib.withSubfolders') : '');
+  const roots = (DATA.collection && DATA.collection.roots) || [];
+  $('#lib-dir').textContent = !roots.length ? t('app.lib.noRoots')
+    : roots.length > 1 ? t('app.lib.dirMore', { dir: shortPath(roots[0].path), n: I18N.num(roots.length - 1) }) : shortPath(roots[0].path);
+  $('#lib-dir').title = roots.map(r => r.path + (r.subfolders ? ' (' + t('common.subfolders').toLowerCase() + ')' : '')).join('\n');
 
   $('#nav').innerHTML = NAV.map(it => {
     if (it.sec) return `<div class="nav-sec">${esc(t(it.sec))}</div>`;
@@ -929,9 +932,15 @@ async function boot() {
   $('#q').oninput = e => { Q = e.target.value; renderTop(); };
   $('#btn-refresh').onclick = manualRefresh;
   $('#lib').onchange = async e => {
+    if (e.target.value === '__add') {   // the last entry of the dropdown: a new playlist
+      e.target.value = DATA && DATA.active || '';
+      return void (typeof uiAddLibrary === 'function' && uiAddLibrary());
+    }
     try { DATA = await api('/api/library', { op: 'select', id: e.target.value }); EDIT_ID = null; render(); bandcampRun(); if (typeof loadInbox === 'function') loadInbox(); }
     catch (err) { toast(t('common.error', { msg: errText(err) }), true); }
   };
+  const gear = $('#btn-plsettings');
+  if (gear) gear.onclick = e => { e.stopPropagation(); typeof plSettingsDialog === 'function' && plSettingsDialog(); };
   $('#btn-libmenu').onclick = e => { e.stopPropagation(); libraryMenu(e.currentTarget); };
   $('#btn-queue').onclick = e => { e.stopPropagation(); qToggle(e.currentTarget); };
   $('#btn-addlib').onclick = () => typeof uiAddLibrary === 'function' && uiAddLibrary();

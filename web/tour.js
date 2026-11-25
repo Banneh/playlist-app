@@ -23,7 +23,7 @@ const TOUR_STEPS = () => [
   ...(typeof APP !== 'undefined' && APP.sc ? [{ id: 'discover', target: '.nav-item[data-page="discover"]', place: 'right' }] : []),
   { id: 'new', page: 'new', target: '#page-body .tr', fallback: '.nav-item[data-page="new"]', place: 'bottom' },
   { id: 'inbox', page: 'inbox', target: '#page-body .tr .ib-act', fallback: '.nav-item[data-page="inbox"]', place: 'left' },
-  { id: 'extras', page: 'extras', target: '#page-body .tr .cell .btn', fallback: '.nav-item[data-page="extras"]', place: 'left' },
+  { id: 'extras', page: 'collection', target: '#page-body .tr .cell .btn', fallback: '.nav-item[data-page="collection"]', place: 'left' },
   { id: 'prepare', page: 'prepare', target: '#page-body .cards', fallback: '.nav-item[data-page="prepare"]', place: 'top' },
   ...(typeof APP !== 'undefined' && APP.do_all ? [{ id: 'doall', page: 'prepare', target: '#page-body .da-card', fallback: '#page-body .cards', place: 'bottom' }] : []),
   { id: 'refresh', page: 'missing', target: '#btn-refresh', place: 'bottom' },
@@ -60,9 +60,10 @@ function startTour({ intro = false } = {}) {
 /* Swap in the sample data (first real step) and put the real data back (end). */
 function tourEnterDemo() {
   const t = TOUR; if (!t || t.demo) return;
-  t.snap = { DATA, INBOX, PAGE, Q, MFILTER, HFILTER };
+  t.snap = { DATA, INBOX, COLL: typeof COLL !== 'undefined' ? COLL : null, PAGE, Q, MFILTER, HFILTER };
   t.demo = true;
   DATA = demoView(); INBOX = demoInbox();
+  if (typeof demoCollection === 'function') COLL = demoCollection();
   Q = ''; MFILTER = 'all'; HFILTER = 'all';
   const q = document.querySelector('#q'); if (q) q.value = '';
   PAGE = 'missing';
@@ -72,6 +73,7 @@ function tourLeaveDemo(t) {
   if (!t || !t.demo) return;
   const s = t.snap; t.demo = false; t.snap = null;
   DATA = s.DATA; INBOX = s.INBOX; PAGE = s.PAGE; Q = s.Q; MFILTER = s.MFILTER; HFILTER = s.HFILTER;
+  if (typeof COLL !== 'undefined') COLL = s.COLL;
   const q = document.querySelector('#q'); if (q) q.value = Q;
   if (DATA) render();   // with no library the welcome screen comes back by itself
 }

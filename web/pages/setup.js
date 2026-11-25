@@ -43,10 +43,11 @@ PAGES.setup = {
       `<div class="select-wrap st-select"><select id="su-device" aria-label="${esc(t('setup.player.label'))}">${
         (DATA.devices || []).map(d => `<option value="${esc(d.id)}"${d.id === DATA.device ? ' selected' : ''}>${esc(d.label)}</option>`).join('')}</select></div>`);
 
+    const root = ((DATA.collection && DATA.collection.roots) || [])[0] || {};
     const folder = suSection('folder', 'green', th('setup.folder.title'), th('setup.folder.text'),
-      `<div class="st-path-row"><div class="path" title="${esc(lib.dir || '')}">${icon('folder')}<span>${esc(shortPath(lib.dir || ''))}</span></div></div>
+      `<div class="st-path-row"><div class="path" title="${esc(root.path || '')}">${icon('folder')}<span>${esc(shortPath(root.path || ''))}</span></div></div>
        <label class="st-switch">
-         <input type="checkbox" id="su-sub" ${lib.subfolders ? 'checked' : ''}>
+         <input type="checkbox" id="su-sub" ${root.subfolders ? 'checked' : ''}>
          <span class="st-track" aria-hidden="true"></span>
          <span class="st-lbl"><b>${esc(t('common.subfolders'))}</b>
            <span>${th('setup.folder.subText')}</span></span>
@@ -109,7 +110,9 @@ PAGES.setup = {
     });
     on('#su-sub', 'onchange', async e => {
       const want = !!e.target.checked;
-      try { DATA = await api('/api/library', { op: 'subfolders', on: want }); render(); }
+      const root = ((DATA.collection && DATA.collection.roots) || [])[0];
+      if (!root) return;
+      try { DATA = await api('/api/collection', { op: 'subfolders', id: root.id, on: want }); render(); }
       catch (err) { toast(t('common.libraryChangeFailed', { msg: errText(err) }), true); render(); }
     });
     // both redraw the screen: an open, typed Downloads path is kept across it

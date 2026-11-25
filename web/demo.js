@@ -81,6 +81,7 @@ function demoView() {
   const have = tracks.filter(x => x.have).length;
   const playlist = t('demo.playlist');
   return {
+    collection: { roots: [{ id: 'r1', path: DEMO_LIB.dir, subfolders: false }], move_target: null, last_target: null },
     libraries: [{ ...DEMO_LIB, name: t('demo.library') }], active: DEMO_LIB.id,
     device: 'xdj-700', devices: DEMO_DEVICES,
     backups: 0, backup_dir: DEMO_DATA_DIR + '/originals/demo', can_pick: false, can_reveal: false,
@@ -129,4 +130,24 @@ function demoInbox() {
     ],
     others: 1, already: 0,
   };
+}
+
+/** A fake /api/collection/view result, built from the sample view's files. */
+function demoCollection() {
+  const v = typeof DATA === 'object' && DATA && DATA.collection ? DATA : demoView();
+  const root = DEMO_LIB.dir;
+  const files = [];
+  for (const x of v.tracks || []) {
+    if (!x.file) continue;
+    files.push({ name: root + '/' + x.file, disp: x.file, base: x.file, path: root + '/' + x.file, root: 'r1',
+      dur: x.dur, lossy: !!x.lossy, incompat: x.incompat || null, artist: x.artist, title: x.title,
+      edited: false, check_name: false, tagged: x.tagged !== false, key: null, pn: null,
+      in: [{ lib: 'demo', name: t('demo.library'), track: (x.artist ? x.artist + ' - ' : '') + x.title }], unmatched: false, found: null });
+  }
+  for (const f of v.extras || [])
+    files.push({ ...f, disp: f.name, base: f.name, path: root + '/' + f.name, root: 'r1', key: null, pn: null, in: [], unmatched: !f.found });
+  files.forEach((f, i) => { f.n = i + 1; });
+  return { roots: [{ id: 'r1', path: root, subfolders: false }], folders_away: [], files,
+    total: files.length, unmatched: files.filter(f => f.unmatched).length,
+    untagged: files.filter(f => f.tagged === false).length, incompatible: files.filter(f => f.incompat).length, error: null };
 }

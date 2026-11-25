@@ -51,10 +51,80 @@ function ibRow(it) {
           tag(t('inbox.oldKept'), 'warn', 'history', t('inbox.oldKeptTip'))}</span></div>` : ''}
       </div>
       <span class="dur">${esc(it.dur)}</span>
-      <div class="cell r"><button class="btn btn-sm ${up ? 'btn-green' : 'btn-accent'} ib-act" onclick="inboxMove(${i}, this)" title="${
-        esc(t(up ? 'inbox.upgradeTip' : 'inbox.moveTip'))}">${
-        up ? icon('arrowUp') + esc(t('tags.upgrade')) : icon('folderIn') + esc(t('tags.moveIn'))}</button></div>
+      <div class="cell r ib-acts"><button class="btn btn-sm ${up ? 'btn-green' : 'btn-accent'} ib-act" onclick="inboxMove(${i}, this)" title="${
+        esc(t(up ? 'inbox.upgradeTip' : 'inbox.moveTip', { dir: ibDestShort() }))}">${
+        up ? icon('arrowUp') + esc(t('tags.upgrade')) : icon('folderIn') + esc(t('tags.moveIn'))}</button><button class="btn btn-sm btn-ghost btn-icon" onclick="ibMoveTo(${i}, false, this)" title="${esc(t('inbox.moveToTip'))}">${icon('chevronDown')}</button></div>
     </div>`;
+}
+
+/** where a plain Move lands right now (the playlist's folder, the last pick, the default, the first root) */
+function ibDest() {
+  const lib = (DATA.libraries || []).find(l => l.id === DATA.active) || {};
+  const c = DATA.collection || { roots: [] };
+  return lib.target || c.last_target || c.move_target || (c.roots[0] && c.roots[0].path) || '';
+}
+const ibDestShort = () => shortPath(ibDest());
+
+/** pick a destination folder of the collection: the roots, their subfolders one level at a
+    time (expand with the chevron); resolves an absolute path or null */
+function ibPickDest() {
+  return dialog({
+    title: th('inbox.dest.title'),
+    sub: th('inbox.dest.sub'),
+    body: `<div class="optlist" id="dest-list"><div class="empty ex-wait">${spin('')}</div></div>`,
+    foot: `<span class="spacer"></span><button class="btn" data-close>${esc(t('common.cancel'))}</button>`,
+    open(dlg, done) {
+      const list = dlg.querySelector('#dest-list');
+      let rows = [];   // { path, name, depth, has_dirs, expanded }
+      const paint = () => {
+        list.innerHTML = rows.map((r, i) => `<div class="opt dest-row" data-i="${i}" style="padding-left:${10 + r.depth * 22}px">
+            ${r.has_dirs ? `<span class="btn btn-ghost btn-sm btn-icon dest-x" data-x="${i}">${icon(r.expanded ? 'chevronDown' : 'chevronRight')}</span>` : `<span class="ic">${icon('folder')}</span>`}
+            <span class="opt-main"><span class="fn" title="${esc(r.path)}">${esc(r.name)}</span></span>
+            <span class="tag tag-outline dest-pick">${esc(t('inbox.dest.pick'))}</span>
+          </div>`).join('') || emptyHtml({ ico: 'folder', title: th('coll.noRootsTitle'), text: th('coll.noRootsText') });
+        list.querySelectorAll('.dest-row').forEach(el => el.onclick = e => {
+          const i = +el.dataset.i;
+          if (e.target.closest('.dest-x')) return expand(i);
+          done(rows[i].path);
+        });
+      };
+      const expand = async i => {
+        const r = rows[i];
+        if (r.expanded) {   // fold: drop the deeper rows under it
+          let j = i + 1;
+          while (j < rows.length && rows[j].depth > r.depth) j++;
+          rows.splice(i + 1, j - i - 1);
+          r.expanded = false;
+          return paint();
+        }
+        try {
+          const res = await api('/api/move-targets', { under: r.path });
+          const kids = ((res.targets && res.targets[0] && res.targets[0].dirs) || []).map(d => ({ path: d.path, name: d.name, depth: r.depth + 1, has_dirs: d.has_dirs, expanded: false }));
+          rows.splice(i + 1, 0, ...kids);
+          r.expanded = true;
+          paint();
+        } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
+      };
+      api('/api/move-targets', {}).then(res => {
+        rows = (res.targets || []).map(tr => ({ path: tr.path, name: tr.name, depth: 0, has_dirs: (tr.dirs || []).length > 0, expanded: false }));
+        paint();
+      }, e => { list.innerHTML = emptyHtml({ ico: 'alert', title: th('coll.failedTitle'), text: errHtml(e) }); });
+    },
+  });
+}
+
+/** Move to a chosen folder: the picker, then the move (matched rows and unmatched ones) */
+async function ibMoveTo(i, other, btn) {
+  const it = other ? ibUnmatched()[i] : (INBOX && INBOX.items[i]);
+  if (!it) return;
+  const dest = await ibPickDest();
+  if (!dest) return;
+  if (btn) btn.disabled = true;
+  try {
+    DATA = await api('/api/inbox-move', { file: it.name, zip: it.zip || undefined, ...(other ? {} : { id: it.id }), dest });
+    toast(t('common.movedIn', { name: it.name }) + ' · ' + shortPath(dest));
+  } catch (e) { toast(t('common.moveFailed', { msg: errText(e) }), true); }
+  await loadInbox();
 }
 
 /* ---------- a download that matches nothing in the playlist ---------- */
@@ -78,7 +148,8 @@ function ibOtherRow(it) {
       <span class="dur">${esc(it.dur)}</span>
       <div class="cell r ib-acts">
         <button class="btn btn-sm btn-accent" onclick="ibFind(${i})" title="${esc(t('inbox.findTip'))}">${icon('search')}${esc(t('tags.findOnSc'))}</button>
-        <button class="btn btn-sm btn-ghost" onclick="ibMoveOther(${i}, this)" title="${esc(t('inbox.moveOtherTip'))}">${icon('folderIn')}${esc(t('inbox.move'))}</button>
+        <button class="btn btn-sm btn-ghost" onclick="ibMoveOther(${i}, this)" title="${esc(t('inbox.moveOtherTip', { dir: ibDestShort() }))}">${icon('folderIn')}${esc(t('inbox.move'))}</button>
+        <button class="btn btn-sm btn-ghost btn-icon" onclick="ibMoveTo(${i}, true, this)" title="${esc(t('inbox.moveToTip'))}">${icon('chevronDown')}</button>
       </div>
     </div>`;
 }
