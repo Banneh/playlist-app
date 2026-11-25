@@ -25,7 +25,8 @@ export const UA =
 export interface Device { label: string; wavBits: number; srs: number[]; flac: boolean; alac: boolean; wext?: boolean; }
 const HI = [44100, 48000, 88200, 96000], STD = [44100, 48000];
 export const DEVICES: Record<string, Device> = {
-  "xdj-700":     { label: "XDJ-700 / XDJ-1000 / CDJ-2000NXS", wavBits: 24, srs: STD, flac: false, alac: false, wext: true },
+  // 16-bit WAV and AIFF only: the owner's XDJ-700 refused 24-bit files, although the manual lists 24-bit
+  "xdj-700":     { label: "XDJ-700 / XDJ-1000 / CDJ-2000NXS", wavBits: 16, srs: STD, flac: false, alac: false, wext: true },
   "xdj-xz":      { label: "XDJ-XZ / XDJ-RX3", wavBits: 24, srs: STD, flac: true, alac: false, wext: true },
   "xdj-1000mk2": { label: "XDJ-1000MK2", wavBits: 24, srs: STD, flac: true, alac: true, wext: true },
   "nxs2":        { label: "CDJ-2000NXS2", wavBits: 24, srs: HI, flac: true, alac: true, wext: true },

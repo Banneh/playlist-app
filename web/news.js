@@ -8,6 +8,7 @@
    Globals used by app.js and settings.js: openNews(), maybeShowNews(). */
 const NEWS_KEY = 'newsSeen';
 const NEWS = [   // newest first: [version, release date]
+  ['2.3.1', '2026-11-25'],
   ['2.3.0', '2026-11-25'],
   ['2.2.1', '2026-11-25'],
   ['2.2.0', '2026-11-25'],

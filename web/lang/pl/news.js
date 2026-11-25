@@ -6,11 +6,14 @@ I18N.add('pl', 'news', {
   subSince: 'Twoja poprzednia wersja to {version}. Oto, co się od niej zmieniło. Tę listę otworzysz ponownie z menu ⋯.',
   menu: 'Co nowego…',
   v: {
+    '2_3_1': {
+      i1: 'XDJ-700, XDJ-1000 i CDJ-2000NXS znów są ograniczone do 16-bitowych WAV i AIFF: XDJ-700 w praktyce odrzuca pliki 24-bitowe, choć instrukcja je wymienia. Konwertuj zamienia pliki 24-bitowe na 16-bitowe dla tych odtwarzaczy.',
+    },
     '2_3_0': {
       i1: '<b>Co nowego</b>: po aktualizacji DJ HQ pokazuje, co zmieniło się w każdej wersji. Cała lista jest w menu ⋯ i w Ustawieniach.',
       i2: '<b>FLAC i ALAC</b>: Konwertuj dopasowuje je do twojego odtwarzacza. Odtwarzacz, który czyta dany format, dostaje go w głębi i częstotliwości, jakie przyjmuje. Ten, który go w ogóle nie czyta, dostaje plik AIFF z tymi samymi nazwami, tonacją i okładką; tak samo jest z OGG. Podgląd odtwarza też pliki ALAC.',
       i3: '<b>Nagłówek WAV</b>: odtwarzacze Pioneer często odrzucają 24-bitowe pliki WAV z nagłówkiem WAVE_FORMAT_EXTENSIBLE, także te z Bandcampu. Takie pliki dostają znacznik, Konwertuj zapisuje zwykły nagłówek bez ruszania dźwięku, a każdy plik WAV zapisany przez DJ HQ dostaje zwykły nagłówek.',
-      i4: '<b>Odtwarzacze według instrukcji Pioneera</b>: XDJ-700, XDJ-1000 i CDJ-2000NXS przyjmują 24-bitowe WAV i AIFF, a XDJ-XZ / XDJ-RX3, XDJ-1000MK2 i OPUS-QUAD mają własne pozycje. Jeśli grasz na XDJ-XZ, wybierz go ponownie na stronie Przygotuj na odtwarzacz.',
+      i4: '<b>Odtwarzacze według instrukcji Pioneera</b>: XDJ-XZ / XDJ-RX3, XDJ-1000MK2 i OPUS-QUAD mają własne pozycje. Jeśli grasz na XDJ-XZ, wybierz go ponownie na stronie Przygotuj na odtwarzacz.',
       i5: 'Pierścień obok <b>Zadań</b> pokazuje postęp trwających zadań i po ich zakończeniu zmienia się w zielony znaczek.',
     },
     '2_2_1': {

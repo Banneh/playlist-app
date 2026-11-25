@@ -461,11 +461,12 @@ biorą twoje wartości.
 ![Strona Przygotuj na odtwarzacz: docelowy odtwarzacz, tagi, zgodność, eksport do rekordbox i pliki, które jeszcze czegoś wymagają](docs/screens/prepare.png)
 
 1. **Wybierz swój odtwarzacz** na górze. Kroki poniżej zależą od tego, co on
-   odtwarza, według instrukcji Pioneera:
+   odtwarza, według instrukcji Pioneera (dla XDJ-700 obowiązuje 16 bitów: w
+   praktyce odrzuca pliki 24-bitowe):
 
    | Odtwarzacz | WAV, AIFF | FLAC | ALAC | Najwyższa częstotliwość |
    | --- | --- | --- | --- | --- |
-   | XDJ-700 / XDJ-1000 / CDJ-2000NXS | do 24 bitów | nie | nie | 48 kHz |
+   | XDJ-700 / XDJ-1000 / CDJ-2000NXS | 16 bitów | nie | nie | 48 kHz |
    | XDJ-XZ / XDJ-RX3 | do 24 bitów | tak | nie | 48 kHz |
    | XDJ-1000MK2 | do 24 bitów | tak | tak | 48 kHz |
    | CDJ-2000NXS2 | do 24 bitów | tak | tak | 96 kHz |

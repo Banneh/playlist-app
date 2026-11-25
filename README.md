@@ -445,11 +445,12 @@ values.
 ![The Prepare for player page: target player, tags, compatibility, rekordbox export and the files that still need something](docs/screens/prepare.png)
 
 1. **Pick your player** at the top. Everything below adapts to what it can
-   play, as Pioneer's manuals list it:
+   play, as Pioneer's manuals list it (the XDJ-700 is held to 16-bit: in
+   practice it refuses 24-bit files):
 
    | Player | WAV, AIFF | FLAC | ALAC | Highest rate |
    | --- | --- | --- | --- | --- |
-   | XDJ-700 / XDJ-1000 / CDJ-2000NXS | up to 24-bit | no | no | 48 kHz |
+   | XDJ-700 / XDJ-1000 / CDJ-2000NXS | 16-bit | no | no | 48 kHz |
    | XDJ-XZ / XDJ-RX3 | up to 24-bit | yes | no | 48 kHz |
    | XDJ-1000MK2 | up to 24-bit | yes | yes | 48 kHz |
    | CDJ-2000NXS2 | up to 24-bit | yes | yes | 96 kHz |
