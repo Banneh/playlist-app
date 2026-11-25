@@ -6,6 +6,7 @@
    POST /api/library. */
 
 /* refresh intervals in minutes; texts under settings.interval.label.<minutes> / .saved.<minutes> */
+const ST_BC_DAYS = [1, 3, 7, 14, 30, 0];
 const ST_INTERVALS = [5, 15, 30, 60, 120];
 
 function stBytes(n) { return I18N.bytes(n); }
@@ -128,6 +129,18 @@ PAGES.settings = {
            </label>`}`
         : `<button class="btn btn-sm btn-primary" onclick="dcOpen('https://soundcloud.com/signin')">${icon('cloud')}${esc(t('common.signInDiscover'))}</button>`);
 
+    const bandcamp = stCard('bag', 'amber', esc(t('settings.bandcamp.title')), th('settings.bandcamp.text'),
+      `<label class="st-switch">
+         <input type="checkbox" id="st-bandcamp" ${S.bandcamp ? 'checked' : ''} onchange="stToggleBandcamp(this)">
+         <span class="st-track" aria-hidden="true"></span>
+         <span class="st-lbl"><b>${esc(t('settings.bandcamp.on'))}</b>
+           <span>${th('settings.bandcamp.hint')}</span></span>
+       </label>
+       <div class="st-path-row st-wide"><span>${esc(t('settings.bandcamp.again'))}</span>
+         <div class="select-wrap st-select"><select id="st-bcdays" aria-label="${esc(t('settings.bandcamp.again'))}" ${S.bandcamp ? '' : 'disabled'} onchange="stBandcampDays(this.value)">${
+           ST_BC_DAYS.map(v => `<option value="${v}"${S.bandcamp_days === v ? ' selected' : ''}>${esc(t('settings.bandcamp.days.' + v))}</option>`).join('')}</select></div>
+         <button class="btn btn-sm" ${S.bandcamp ? '' : 'disabled'} onclick="stBandcampNow()" title="${esc(t('settings.bandcamp.nowHint'))}">${icon('search')}${esc(t('settings.bandcamp.now'))}</button></div>`);
+
     const links = !APP.sc ? '' : stCard('play', '', esc(t('settings.links.title')),
       th('settings.links.text'),
       `<div class="seg" role="radiogroup" aria-label="${esc(t('settings.links.label'))}">
@@ -151,7 +164,7 @@ PAGES.settings = {
     const doAll = typeof daSettingsCard === 'function' ? daSettingsCard() : '';   // pages/doall.js
     const config = typeof cfSettingsCard === 'function' ? cfSettingsCard() : '';  // pages/config.js: export / import
 
-    return `<div class="st-list">${library}${account}${links}${downloads}${aiff}${doAll}${refresh}${appearance}${language}${backups}${config}${about}</div>`;
+    return `<div class="st-list">${library}${account}${links}${bandcamp}${downloads}${aiff}${doAll}${refresh}${appearance}${language}${backups}${config}${about}</div>`;
   },
   after: () => stAiffResume(),
 };
@@ -269,6 +282,18 @@ async function stSaveInbox() {
   if (!p) { if (el) el.focus(); return; }
   await stSave({ inbox_dir: p }, t('common.watchingDownloads', { dir: shortPath(p) }));
   if (typeof loadInbox === 'function') loadInbox({ quiet: true });
+}
+async function stToggleBandcamp(el) {
+  await stSave({ bandcamp: el.checked }, t(el.checked ? 'settings.bandcamp.toastOn' : 'settings.bandcamp.toastOff'));
+  bandcampRun();
+}
+async function stBandcampDays(v) {
+  await stSave({ bandcamp_days: Number(v) }, t('settings.bandcamp.daysSaved', { when: t('settings.bandcamp.days.' + v) }));
+  bandcampRun();   // a shorter time can make some due at once
+}
+async function stBandcampNow() {
+  const p = await bandcampRun({ force: true });
+  if (!p || !p.running) toast(t('settings.bandcamp.nothing'));
 }
 async function stSaveDlMail() {
   const el = $('#st-dlmail');
@@ -472,7 +497,7 @@ async function stAiffConvert() {
   stAiffFollow(true);
   const stop = followRun(p => stAiffShow(p));   // pages/playlist.js: GET /api/tag/progress
   try {
-    DATA = await api('/api/aiff', {});
+    DATA = await qTask(t('app.queue.aiff'), () => api('/api/aiff', {}), { run: true });
     stAiffFollow(false);
     stAiffToast(DATA.aiff_report);
   } catch (e) { stAiffFollow(false); toast(t('settings.aiff.failed', { msg: errText(e) }), true); }

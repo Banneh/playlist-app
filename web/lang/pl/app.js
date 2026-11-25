@@ -68,10 +68,40 @@ I18N.add('pl', 'app', {
     reavailableMore: 'Z powrotem na stronie Brakujące (pojawił się link): {names} i jeszcze {n}',
   },
 
+  // Kolejka: ikona zadań w nagłówku i lista bieżących oraz ostatnich zadań
+  queue: {
+    title: 'Zadania',
+    empty: 'Nic jeszcze nie działało. Pobieranie, zapis tagów, okładki i konwersje pojawią się tutaj.',
+    clear: 'Wyczyść zakończone',
+    running: 'W toku',
+    done: 'Gotowe',
+    failed: 'Nie udało się: {msg}',
+    noFile: 'nie przyszedł żaden plik, otwarto w przeglądarce',
+    download: 'Pobieranie: {name}',
+    tags: 'Zapis tagów: {lib}',
+    art: 'Dodawanie okładek: {lib}',
+    aiff: 'Konwersja plików WAV do AIFF',
+    convert: 'Konwersja plików dla odtwarzaczy',
+    restore: 'Przywracanie oryginalnych plików',
+    moveAll: 'Przenoszenie pobranych do: {lib}',
+    lib: 'biblioteka',
+    bandcamp: 'Szukanie utworów na Bandcamp',
+    bandcampFound: { one: 'znaleziono {n} utwór', few: 'znaleziono {n} utwory', many: 'znaleziono {n} utworów' },
+    bandcampStopped: 'Bandcamp poprosił o przerwę, DJ HQ dokończy później.',
+  },
+
+  // the Bandcamp search's card
+  bc: {
+    title: 'Szukam na Bandcamp: {n} z {total}',
+    hide: 'Ukryj, szukanie trwa dalej',
+    end: 'Koniec szukania na Bandcamp: {found}',
+  },
+
   // zielony przycisk Free DL przy linku Hypeddit (przechodzony w tle)
   freedl: {
     saved: 'Pobrano: {name}',
     noFile: 'Bramka nie wydała pliku — otwieram ją w przeglądarce',
+    noFileDirect: 'Nie przyszedł żaden plik (może być prywatny albo usunięty). Strona otwiera się w przeglądarce',
     failed: 'Nie udało się pobrać za darmo: {msg}',
   },
 

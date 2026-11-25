@@ -171,7 +171,7 @@ async function ppConvert() {
   if (!ok) return;
   ppBusy('#pp-convert', t('prepare.converting'));
   try {
-    DATA = await api('/api/convert', {});
+    DATA = await qTask(t('app.queue.convert'), () => api('/api/convert', {}));
     const [msg, err] = fileReport(DATA.convert_report, 'prepare.convertFailed', 'prepare.convertDone');
     toast(msg, err);
   } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
@@ -188,7 +188,7 @@ async function ppRestore() {
   if (!ok) return;
   ppBusy('#pp-restore', t('prepare.restoring'));
   try {
-    DATA = await api('/api/restore', {});
+    DATA = await qTask(t('app.queue.restore'), () => api('/api/restore', {}));
     const [msg, err] = fileReport(DATA.restore_report, 'prepare.restoreFailed', 'prepare.restoreDone');
     toast(msg, err);
   } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }

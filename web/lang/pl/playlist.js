@@ -9,6 +9,17 @@ I18N.add('pl', 'playlist', {
   },
   menu: {
     match: 'Dopasuj do pliku lokalnego…',
+    bandcamp: 'Szukaj na Bandcamp',
+    bandcampHint: 'Od razu szuka tego utworu na Bandcamp, najpierw po wykonawcy, potem po tytule',
+    bandcampNo: 'Zły utwór z Bandcamp',
+    bandcampNoHint: 'Usuwa link znaleziony przez DJ HQ i nie proponuje już tej strony dla tego utworu',
+  },
+  bandcamp: {
+    looking: 'Szukam na Bandcamp…',
+    task: 'Bandcamp: {name}',
+    none: 'Nie ma na Bandcamp',
+    found: 'Znaleziono na Bandcamp: {title}',
+    rejected: 'Usunięto link do Bandcamp',
   },
   resetTip: 'Przywróć wartości z SoundCloud',
   resetDone: 'Przywrócono wartości z SoundCloud',

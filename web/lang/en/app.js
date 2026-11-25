@@ -64,10 +64,40 @@ I18N.add('en', 'app', {
     reavailableMore: 'Back in Missing after a link appeared: {names} and {n} more',
   },
 
+  // the Queue: the head's tasks icon and its list of running and recent tasks
+  queue: {
+    title: 'Tasks',
+    empty: 'Nothing has run yet. Downloads, tag writing, cover art and conversions show up here.',
+    clear: 'Clear finished',
+    running: 'In progress',
+    done: 'Done',
+    failed: 'Failed: {msg}',
+    noFile: 'no file came back, opened in the browser',
+    download: 'Downloading {name}',
+    tags: 'Writing tags to {lib}',
+    art: 'Adding cover art to {lib}',
+    aiff: 'Converting WAV files to AIFF',
+    convert: 'Converting files for the players',
+    restore: 'Restoring the original files',
+    moveAll: 'Moving downloads into {lib}',
+    lib: 'your library',
+    bandcamp: 'Looking for tracks on Bandcamp',
+    bandcampFound: { one: '{n} track found', other: '{n} tracks found' },
+    bandcampStopped: 'Bandcamp asked for a break, DJ HQ goes on later.',
+  },
+
+  // the Bandcamp search's card
+  bc: {
+    title: 'Searching Bandcamp: {n} of {total}',
+    hide: 'Hide, the search goes on',
+    end: 'Bandcamp search done: {found}',
+  },
+
   // the green Free DL button on a Hypeddit link (walked in the background)
   freedl: {
     saved: 'Downloaded: {name}',
     noFile: 'The gate handed out no file — opening it in the browser',
+    noFileDirect: 'No file came back (it may be private or deleted). The page opens in your browser',
     failed: 'Free download failed: {msg}',
   },
 

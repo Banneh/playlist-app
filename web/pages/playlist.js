@@ -7,6 +7,9 @@ let MFILTER = 'all', HFILTER = 'all', LAST_ROWS = [];   // sub-filters of Missin
 const hasLink = (r, kind) => (r.links || []).some(l => l.kind === kind);
 const matchesQ = (r, q) => !q || (r.artist + ' ' + r.title + ' ' + (r.user || '') + ' ' + (r.file || '')).toLowerCase().includes(q);
 
+/** a link DJ HQ downloads as it is; SoundCloud's button needs the session of the Discover page (desktop app) */
+const isDirect = l => !!l.direct && (l.direct !== 'soundcloud' || !!APP.sc);
+
 /* ---------- the track row ---------- */
 function linkBtn(r, kind) {
   const l = (r.links || []).find(x => x.kind === kind);
@@ -14,12 +17,20 @@ function linkBtn(r, kind) {
   // soundcloud's own download button and the format word 'lossless' come from the server in english
   const title = l.sc_dl ? t('tags.link.scDownload') : l.title;
   const fmt = l.fmt === 'lossless' ? t('tags.link.fmtLossless') : l.fmt;
-  const tip = `${title ? title + ' · ' : ''}${l.host}${fmt ? ' · ' + fmt : ''}`;
-  // a Hypeddit free link is walked in the background (see freeDownload in app.js); the href stays
+  const tip = `${title ? title + ' · ' : ''}${l.host}${fmt ? ' · ' + fmt : ''}${isDirect(l) ? ' · ' + t('tags.link.direct') : ''}${l.found ? ' · ' + t('tags.link.found') : ''}`;
+  // a direct file or a Hypeddit free link is fetched in the background (see freeDownload in app.js); the href stays
   // so a middle click or a right click → "open in browser" still works
-  const dl = kind === 'free' && isHypeddit(l.url) ? ` data-freedl="${esc(l.url)}"` : '';
+  const own = kind === 'free' && (isDirect(l) || isHypeddit(l.url));
+  const dl = own ? ` data-freedl="${esc(l.url)}"${isDirect(l) ? ` data-direct="${r.id}"` : ''} data-name="${esc([r.artist, r.title].filter(Boolean).join(' - '))}"` : '';
   return `<a class="btn btn-sm ${kind === 'free' ? 'btn-green' : 'btn-amber'}${kind === 'free' && !hasLink(r, 'buy') ? '' : ' first'}${dl ? ' btn-hype' : ''}" href="${esc(l.url)}" target="_blank" rel="noopener"${dl} title="${esc(tip)}">${
     icon(kind === 'free' ? 'download' : 'bag')}${esc(t(kind === 'free' ? 'tags.link.free' : 'tags.link.buy'))}</a>`;   // the server's label is english
+}
+
+/** a row without any link: being looked up on Bandcamp, or looked up and not there */
+function bcRow(r) {
+  if (bcPending(r.id)) return BC.now_id === r.id ? `<span class="bc-row"><span class="spin"></span>${esc(t('tags.link.searching'))}</span>`
+    : `<span class="bc-row" title="${esc(t('tags.link.queuedTip'))}">${esc(t('tags.link.queued'))}</span>`;
+  return r.bc_at ? `<span class="bc-row" title="${esc(t('tags.link.notFoundTip', { date: I18N.date ? I18N.date(r.bc_at) : new Date(r.bc_at).toLocaleDateString() }))}">${esc(t('tags.link.notFound'))}</span>` : '';
 }
 
 /** the server's reason a file won't play ("24-bit", "88.2 kHz", "OGG unsupported") in the app's language */
@@ -98,7 +109,7 @@ function trackRow(r) {
       </div>
       <span class="dur">${esc(r.dur)}</span>
       <div class="cell">${statusPill(r)}</div>
-      <div class="get">${!r.have || r.upgrade ? linkBtn(r, 'buy') + linkBtn(r, 'free') : ''}</div>
+      <div class="get">${!r.have || r.upgrade ? linkBtn(r, 'buy') + linkBtn(r, 'free') || bcRow(r) : ''}</div>
       <button class="btn btn-ghost btn-sm btn-icon more" onclick="rowMenu(this, ${r.id})" title="${esc(t('common.more'))}">${icon('more')}</button>
     </div>`;
 }
@@ -146,7 +157,28 @@ function rowMenu(anchor, id) {
     ...scMenuItems(r.url, { title: r.title, artist: r.artist, art: r.art }, true),
   ];
   for (const l of r.links || []) items.push({ label: t(l.kind === 'free' ? 'tags.menu.copyFree' : 'tags.menu.copyBuy', { host: l.host }), icon: 'copy', onclick: () => copyText(l.url, t('common.linkCopied')) });
+  items.push('-', { label: t('playlist.menu.bandcamp'), icon: 'search', hint: t('playlist.menu.bandcampHint'), onclick: () => bandcampFind(id) });
+  if ((r.links || []).some(l => l.found)) items.push({ label: t('playlist.menu.bandcampNo'), icon: 'x', hint: t('playlist.menu.bandcampNoHint'), onclick: () => bandcampReject(id) });
   showMenu(anchor, items, { align: 'right' });
+}
+
+async function bandcampFind(id) {
+  const r = DATA.tracks.find(x => x.id === id); if (!r) return;
+  toast(t('playlist.bandcamp.looking'));
+  try {
+    const f = await qTask(t('playlist.bandcamp.task', { name: [r.artist, r.title].filter(Boolean).join(' - ') }), async (task) => {
+      const f = await api('/api/bandcamp/find', { id });
+      task.msg = f.found ? f.title : t('playlist.bandcamp.none');
+      return f;
+    }, { quiet: true });
+    if (!f.found) return void toast(t('playlist.bandcamp.none'));
+    DATA = await api('/api/rescan', {}); render();
+    toast(t('playlist.bandcamp.found', { title: f.title }));
+  } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
+}
+async function bandcampReject(id) {
+  try { DATA = await api('/api/bandcamp/reject', { id }); render(); toast(t('playlist.bandcamp.rejected')); }
+  catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
 }
 
 /* ---------- inline edit ---------- */
@@ -270,7 +302,7 @@ async function writeTagsAsking(all, progress) {
       body = { ...base, ...(how === 'keep' ? { keep_file: true, seen } : { replace: true, seen }) };
     }
     if (all && progress) stop = followRun(progress);
-    DATA = await api('/api/tag', body);
+    DATA = await qTask(t('app.queue.tags', { lib: qLib() }), () => api('/api/tag', body), { run: !!all });
     tagToast(DATA.tag_report);
   } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
   finally { if (stop) stop(); }
@@ -281,7 +313,7 @@ function followRun(progress) {
   let on = true;
   progress({ done: 0, total: 0 });
   const poll = setInterval(() => fetch('/api/tag/progress').then(r => r.json())
-    .then(p => { if (p.running && on) progress(p); }, () => {}), 700);
+    .then(p => { if (p.running && on) { progress(p); qProgress(p); } }, () => {}), 700);
   return () => { on = false; clearInterval(poll); };
 }
 /** Add cover art (Prepare): a preview, one confirmation, then the run with `progress` and one toast */
@@ -292,7 +324,7 @@ async function addArtAsking(progress) {
     if (!pv.writes) return void toast(t('tags.art.none'));
     if (!await artAsk(pv)) return;
     if (progress) stop = followRun(progress);
-    DATA = await api('/api/art', {});
+    DATA = await qTask(t('app.queue.art', { lib: qLib() }), () => api('/api/art', {}), { run: true });
     artToast(DATA.art_report);
   } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
   finally { if (stop) stop(); }

@@ -34,6 +34,22 @@ I18N.add('pl', 'settings', {
     makeMainHint: 'Użyj tego folderu jako folderu głównego. Obecny folder główny zostanie w bibliotece jako dodatkowy folder. Żadne pliki nie są przenoszone.',
   },
 
+  // the Bandcamp card
+  bandcamp: {
+    title: 'Bandcamp',
+    text: 'Utwory, których brakuje albo które masz tylko w pliku stratnym, są wyszukiwane na Bandcamp, jeśli wgrywający nie podał do nich linku do sklepu.',
+    on: 'Szukaj na Bandcamp w tle',
+    hint: 'Wykonawca i tytuł tych utworów są wysyłane do Bandcamp, bez otwierania okna. Utwory bez żadnego linku idą pierwsze.',
+    again: 'Ponów szukanie nieznalezionych utworów',
+    now: 'Szukaj teraz',
+    nowHint: 'Od razu szuka wszystkich utworów bez dobrego linku, także tych, których wcześniej nie było',
+    nothing: 'Każdy utwór ma już dobry link',
+    daysSaved: 'Ponowne szukanie na Bandcamp: {when}',
+    days: { 1: 'codziennie', 3: 'co 3 dni', 7: 'co tydzień', 14: 'co 2 tygodnie', 30: 'co miesiąc', 0: 'nigdy' },
+    toastOn: 'Włączono szukanie na Bandcamp',
+    toastOff: 'Wyłączono szukanie na Bandcamp',
+  },
+
   // the Downloads card
   inbox: {
     title: 'Pobrane',

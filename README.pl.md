@@ -202,18 +202,30 @@ ma w twoim folderze, z linkami, pod którymi go zdobędziesz.
 
 - **Za darmo** to darmowe pobieranie: bramka w stylu Hypeddit, plik
   udostępniony na Dysku Google albo w Dropboksie, albo przycisk pobierania
-  samego SoundCloud.
+  samego SoundCloud. Niebieski przycisk pobiera od razu, bez przeglądarki:
+  pliki z Dysku i Dropboksa, linki wprost do pliku audio oraz przycisk
+  SoundCloud po zalogowaniu na Discover.
 - **Kup** to sklep: Bandcamp, Beatport, Juno, Traxsource i podobne. Gdy utwór
   ma oba linki, „Kup” jest pierwszy, bo sklepy sprzedają pliki bezstratne,
   a darmowe pobieranie to często MP3. Najedź na przycisk, żeby zobaczyć, dokąd
   prowadzi.
+- **Szukanie na Bandcamp.** Gdy wgrywający nie podał linku do sklepu, DJ HQ
+  szuka utworu na Bandcamp w tle: najpierw strona wykonawcy, potem tytuł.
+  Liczą się tylko strony wykonawcy, wgrywającego i wytwórni, nigdy cudze.
+  Utwory bez żadnego linku idą pierwsze, postęp widać w okienku w rogu,
+  a przycisk pojawia się w wierszu od razu po znalezieniu linku. Do Bandcamp
+  wysyłany jest wykonawca i tytuł. W Ustawienia > Bandcamp wyłączysz szukanie,
+  ustawisz, jak często ponawiać je dla nieznalezionych utworów (od codziennie
+  do co miesiąc albo nigdy), i znajdziesz **Szukaj teraz**. **⋯ > Zły utwór
+  z Bandcamp** usuwa nietrafiony link, **⋯ > Szukaj na Bandcamp** szuka jednego
+  utworu ponownie.
 
 **Jak przejść przez listę**
 
 1. Zawęź listę filtrami nad nią: utwory z darmowym pobieraniem, z linkiem do
    sklepu albo bez żadnego linku.
-2. Kliknij **Za darmo** albo **Kup**. Link otworzy się w przeglądarce; plik
-   jak zwykle trafi do folderu Pobrane.
+2. Kliknij **Za darmo** albo **Kup**. Link otworzy się w przeglądarce
+   (niebieski przycisk pobiera sam); plik jak zwykle trafi do folderu Pobrane.
 3. Gdy pobierze się kilka plików, przejdź na pasku bocznym do **Pobrane**
    i stamtąd przenieś je do biblioteki (zobacz niżej).
 
@@ -691,7 +703,7 @@ nowej bazy danych.
   właściwy plik albo *Bez pliku*. Status pozwala ręcznie ustawić Mam albo
   Brak.
 - **Utwór nie ma przycisku Za darmo ani Kup.** Wgrywający nie ustawił linku do
-  zakupu i nie podał go w opisie. Menu **⋯** nadal otwiera utwór na
+  zakupu i nie podał go w opisie, a na Bandcamp utworu nie znaleziono. Menu **⋯** nadal otwiera utwór na
   SoundCloud.
 - **Znajdź na SoundCloud nic nie znajduje.** Spróbuj krótszego tekstu i usuń
   część z remiksem. Niektórych wersji w ogóle nie ma na SoundCloud; **⋯ >

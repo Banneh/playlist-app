@@ -479,11 +479,11 @@ if (typeof GUIDES !== 'undefined') {
   if (s2 && Array.isArray(s2.tips) && s2.tips.length > 2) Object.defineProperty(s2.tips, 2, { get: () => th('discover.guide.missingTip'), enumerable: true, configurable: true });
 }
 /** toasts can't be seen under the native view: the bar shows them instead */
-function dcToast(msg, isErr) {
+function dcToast(msg, isErr, ms) {
   if (PAGE !== 'discover' || !DC.active) return false;
   DC.msg = { text: msg, err: !!isErr };
   clearTimeout(DC.msgTimer);
-  DC.msgTimer = setTimeout(() => { DC.msg = null; dcRenderBar(); }, isErr ? 6000 : 3200);
+  DC.msgTimer = setTimeout(() => { DC.msg = null; dcRenderBar(); }, ms || (isErr ? 6000 : 3200));
   dcRenderBar();
   return true;
 }

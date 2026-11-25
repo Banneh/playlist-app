@@ -34,6 +34,22 @@ I18N.add('en', 'settings', {
     makeMainHint: 'Use this folder as the main folder. The current main folder stays in the library as an extra folder. No files are moved.',
   },
 
+  // the Bandcamp card
+  bandcamp: {
+    title: 'Bandcamp',
+    text: 'Tracks you are missing, or only have as a lossy file, are looked up on Bandcamp when the uploader gave no shop link to them.',
+    on: 'Search Bandcamp in the background',
+    hint: 'The artist and title of those tracks are sent to Bandcamp, without opening a window. Tracks without any link come first.',
+    again: 'Look again for tracks that were not found',
+    now: 'Search now',
+    nowHint: 'Looks for every track without a good link right away, also the ones not found before',
+    nothing: 'Every track has a good link already',
+    daysSaved: 'Tracks not found on Bandcamp are looked up again: {when}',
+    days: { 1: 'every day', 3: 'every 3 days', 7: 'every week', 14: 'every 2 weeks', 30: 'every month', 0: 'never' },
+    toastOn: 'Bandcamp search on',
+    toastOff: 'Bandcamp search off',
+  },
+
   // the Downloads card
   inbox: {
     title: 'Downloads',

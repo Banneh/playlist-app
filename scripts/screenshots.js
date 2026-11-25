@@ -142,7 +142,7 @@ fs.writeFileSync(path.join(DATA, "state.json"), JSON.stringify({
                 playlist: { title: PLAYLIST, url: "https://soundcloud.com/you/sets/trance-selection", tracks },
                 seen_mark: now - 3 * DAY, acq_init: true }],
   active: "lib1", dur_cache: {}, overrides: {}, edits: {}, assigned, found, na: {}, acquired, client_id: null, device: "xdj-700",
-  settings: { auto_move: false, refresh_min: 15 },
+  settings: { auto_move: false, refresh_min: 15, bandcamp: false },
 }));
 fs.writeFileSync(path.join(DATA, "prefs.json"), JSON.stringify({ tourDone: true, theme: "light" }));
 

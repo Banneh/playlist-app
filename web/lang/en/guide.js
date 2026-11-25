@@ -34,8 +34,8 @@ I18N.add('en', 'guide', {
     lead: 'Every playlist track that isn’t in your folder yet, with the links to get it. You will spend most of your time on this list.',
     s1: {
       h: 'Getting a track',
-      i1: { name: 'Free DL', text: 'A free download: a Hypeddit-style gate, a Drive or Dropbox share, or SoundCloud’s own download button. Often an MP3.' },
-      i2: { name: 'Buy', text: 'A shop: Bandcamp, Beatport, Juno, Traxsource and friends. Listed first when a track has both, because shops sell lossless files. Hover a button to see where it goes.' },
+      i1: { name: 'Free DL', text: 'A free download: a Hypeddit-style gate, a Drive or Dropbox share, or SoundCloud’s own download button. Often an MP3. A blue button downloads right here, without the browser: Drive and Dropbox files, and SoundCloud’s button when you are signed in on Discover.' },
+      i2: { name: 'Buy', text: 'A shop: Bandcamp, Beatport, Juno, Traxsource and friends. Listed first when a track has both, because shops sell lossless files. When the uploader gave no link, DJ HQ looks on Bandcamp by itself. If it found the wrong track, remove the link in the ⋯ menu. Hover a button to see where it goes.' },
       i3: { name: 'Work through', text: 'One track at a time: artwork, the links, and a watch on your Downloads folder. Open the link, grab the file, and when it lands DJ HQ offers <b>Move into library</b> and steps on. Enter opens the link, the arrow keys step, N parks the track as not available, Esc closes.' },
       i4: { name: 'Copy links', text: 'Puts every track on screen on your clipboard, one per line: artist and title, a tab, then the link. Handy for a shopping session in the browser.' },
     },

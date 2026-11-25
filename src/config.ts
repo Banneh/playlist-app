@@ -179,6 +179,8 @@ export function buildExport(opts: { leaveLinksOut?: boolean; theme?: unknown }):
   if (typeof s.refresh_min === "number") settings.refresh_min = s.refresh_min;
   if (typeof s.like_on_add === "boolean") settings.like_on_add = s.like_on_add;
   if (typeof s.aiff_auto === "boolean") settings.aiff_auto = s.aiff_auto;
+  if (s.bandcamp === false) settings.bandcamp = false;
+  if (core.BANDCAMP_DAYS.includes(s.bandcamp_days ?? -1)) settings.bandcamp_days = s.bandcamp_days;
   if (s.sc_open) settings.sc_open = s.sc_open;
   const machine: any = {};
   if (S.inbox_dir) machine.inbox_dir = S.inbox_dir;
@@ -547,7 +549,7 @@ export async function apply(data: any, opts: { jobActive: boolean }): Promise<an
   };
   const next: any = {
     libraries: [], active: null, dur_cache: {}, zip_cache: { ...(S.zip_cache || {}) }, overrides: {}, edits: {}, assigned: {}, by_hand: {},
-    found: {}, na: {}, acquired: {}, settings: {}, client_id: S.client_id ?? null, device: S.device,
+    found: {}, na: {}, acquired: {}, settings: {}, bandcamp: { ...(S.bandcamp || {}) }, client_id: S.client_id ?? null, device: S.device,
   };
   const report: any = { libraries: [], backups: [], machine_used: false, notes: [...p.notes] };
   const put = <T>(map: Record<string, T>, k: string, v: T) => { if (!(k in map)) map[k] = v; };
@@ -619,6 +621,8 @@ export async function apply(data: any, opts: { jobActive: boolean }): Promise<an
   if (core.REFRESH_CHOICES.includes(fs_.refresh_min)) st.refresh_min = fs_.refresh_min;
   if (typeof fs_.like_on_add === "boolean") st.like_on_add = fs_.like_on_add;
   if (typeof fs_.aiff_auto === "boolean") st.aiff_auto = fs_.aiff_auto;
+  if (fs_.bandcamp === false) st.bandcamp = false;
+  if (core.BANDCAMP_DAYS.includes(fs_.bandcamp_days)) st.bandcamp_days = fs_.bandcamp_days;
   if (fs_.sc_open === "discover" || fs_.sc_open === "browser") st.sc_open = fs_.sc_open;
   if (S.settings?.do_all) st.do_all = S.settings.do_all;
   if (S.inbox_dir) next.inbox_dir = S.inbox_dir;

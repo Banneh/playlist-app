@@ -51,8 +51,8 @@ function getSession(): Session {
   return ses;
 }
 
-/** The hidden window the gate is walked in. Kept between downloads: the session cookies then
- *  survive and a second download is faster. */
+/** The hidden window the gate is walked in. Made on demand and closed once a file is in (the
+ *  session cookies live in the partition, so they survive). */
 function getWindow(): BrowserWindow {
   if (win && !win.isDestroyed()) return win;
   getSession();
@@ -194,6 +194,7 @@ export async function walk(url: string, email: string): Promise<string | null> {
   pending = p;
   if (prev) prev.resolve(prev.file);
   const t = setTimeout(() => resolve(p.file), TIMEOUT_MS);
+  let file: string | null = null;
   try {
     await w.webContents.loadURL(url);
     await new Promise((r) => setTimeout(r, 1500));
@@ -203,9 +204,21 @@ export async function walk(url: string, email: string): Promise<string | null> {
     const verdict = await w.webContents.executeJavaScript(WALK_JS(email), true).catch(() => "stuck");
     if (process.env.DJHQ_DL_DEBUG) console.log("[gate] verdict", verdict);
     if (verdict !== "pressed") return null;
-    return await done;
+    file = await done;
+    return file;
   } finally {
     clearTimeout(t);
     if (pending === p) pending = null;
+    // got the file and no other walk took the window over: close it and the popups it opened
+    // (the partition keeps the cookies and the Spotify login, so the next walk starts fresh)
+    if (file && !pending) closeAll();
   }
+}
+
+/** Close the walker's window and every popup the gate opened in its session. */
+function closeAll(): void {
+  for (const b of BrowserWindow.getAllWindows()) {
+    if (!b.isDestroyed() && b.webContents.session === ses) b.destroy();
+  }
+  win = null;
 }

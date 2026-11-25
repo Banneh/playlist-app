@@ -34,8 +34,8 @@ I18N.add('pl', 'guide', {
     lead: 'Każdy utwór z playlisty, którego jeszcze nie ma w twoim folderze, z linkami, pod którymi go zdobędziesz. Na tej liście spędzisz najwięcej czasu.',
     s1: {
       h: 'Jak zdobyć utwór',
-      i1: { name: 'Za darmo', text: 'Darmowe pobieranie: bramka w stylu Hypeddit, plik udostępniony na Dysku Google albo w Dropboksie, albo przycisk pobierania samego SoundCloud. Często plik MP3.' },
-      i2: { name: 'Kup', text: 'Sklep: Bandcamp, Beatport, Juno, Traxsource i podobne. Gdy utwór ma oba linki, ten jest pierwszy, bo sklepy sprzedają pliki bezstratne. Najedź na przycisk, żeby zobaczyć, dokąd prowadzi.' },
+      i1: { name: 'Za darmo', text: 'Darmowe pobieranie: bramka w stylu Hypeddit, plik udostępniony na Dysku Google albo w Dropboksie, albo przycisk pobierania samego SoundCloud. Często plik MP3. Niebieski przycisk pobiera od razu, bez przeglądarki: pliki z Dysku i Dropboksa oraz przycisk SoundCloud, po zalogowaniu na Discover.' },
+      i2: { name: 'Kup', text: 'Sklep: Bandcamp, Beatport, Juno, Traxsource i podobne. Gdy utwór ma oba linki, ten jest pierwszy, bo sklepy sprzedają pliki bezstratne. Jeśli wgrywający nie podał linku, DJ HQ sam szuka na Bandcamp. Gdy znajdzie zły utwór, usuń link w menu ⋯. Najedź na przycisk, żeby zobaczyć, dokąd prowadzi.' },
       i3: { name: 'Przejdź po kolei', text: 'Jeden utwór naraz: okładka, linki i obserwowanie folderu Pobrane. Otwórz link, pobierz plik, a gdy się pojawi, DJ HQ zaproponuje <b>Przenieś do biblioteki</b> i przejdzie dalej. Enter otwiera link, strzałki przechodzą między utworami, N odkłada utwór jako niedostępny, Esc zamyka.' },
       i4: { name: 'Kopiuj linki', text: 'Kopiuje do schowka każdy utwór widoczny na ekranie, po jednym w wierszu: wykonawcę i tytuł, tabulator, a potem link. Przydaje się na zakupy w przeglądarce.' },
     },

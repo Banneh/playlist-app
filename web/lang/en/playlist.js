@@ -10,6 +10,17 @@ I18N.add('en', 'playlist', {
   },
   menu: {
     match: 'Match to a local file…',
+    bandcamp: 'Search Bandcamp',
+    bandcampHint: 'Looks for this track on Bandcamp now, by the artist first and then by the title',
+    bandcampNo: 'Wrong Bandcamp track',
+    bandcampNoHint: 'Removes the link DJ HQ found and never offers that page for this track again',
+  },
+  bandcamp: {
+    looking: 'Searching Bandcamp…',
+    task: 'Bandcamp: {name}',
+    none: 'Not found on Bandcamp',
+    found: 'Found on Bandcamp: {title}',
+    rejected: 'Bandcamp link removed',
   },
   resetTip: 'Back to the SoundCloud values',
   resetDone: 'Back to the SoundCloud values',

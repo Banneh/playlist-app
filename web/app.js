@@ -12,7 +12,7 @@
        onShow:  () => {},                  // optional, runs when the page is navigated to
        onHide:  () => {},                  // optional, runs when another page takes over
        onCover: (on) => {},                // optional, a menu or dialog is open (true) / closed again
-       toast:   (msg, isErr) => bool,      // optional, show feedback itself (return true to swallow the toast)
+       toast:   (msg, isErr, ms) => bool,      // optional, show feedback itself (return true to swallow the toast)
      };
 
    Everything here is global on purpose: markup uses inline onclick handlers. */
@@ -47,6 +47,7 @@ const spin = (text) => `<span class="spin"></span>${text ? ' ' + esc(text) : ''}
 const PATHS = {
   headphones: '<path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  tasks: '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
   folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
   folderIn: '<path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/><path d="M2 13h10"/><path d="m9 16 3-3-3-3"/>',
@@ -117,14 +118,15 @@ const emptyHtml = ({ ico = 'music', kind = '', title = '', text = '', acts = '' 
   `<div class="empty"><div class="eico ${kind}">${icon(ico)}</div>${title ? `<h4>${title}</h4>` : ''}${text ? `<p>${text}</p>` : ''}${acts ? `<div class="acts">${acts}</div>` : ''}</div>`;
 
 /* ---------- toast ---------- */
-function toast(msg, isErr) {
+/** ms: how long it stays (default 2.6 s, an error 5 s) */
+function toast(msg, isErr, ms) {
   const pg = PAGES[PAGE];
-  if (pg && pg.toast && pg.toast(msg, isErr)) return;
+  if (pg && pg.toast && pg.toast(msg, isErr, ms)) return;
   const el = $('#toast');
   el.innerHTML = `${icon(isErr ? 'alert' : 'checkCircle')}<span>${esc(msg)}</span>`;
   el.classList.toggle('err', !!isErr); el.classList.add('show');
   clearTimeout(el._h);
-  el._h = setTimeout(() => el.classList.remove('show'), isErr ? 5000 : 2600);
+  el._h = setTimeout(() => el.classList.remove('show'), ms || (isErr ? 5000 : 2600));
 }
 
 /* ---------- API ---------- */
@@ -152,25 +154,120 @@ async function api(path, body) {
 }
 const busy = () => INFLIGHT > 0 || EDIT_ID !== null || !!document.querySelector('.overlay') || (typeof TOUR !== 'undefined' && !!TOUR);
 
+/* ---------- the Queue: running and recent tasks (the head's tasks icon) ----------
+   qTask(label, fn, {run}) runs fn(task) and lists it as In progress, then Done or Failed; a task
+   finished while the window is in the background also raises a system notification. {run: true}
+   marks an every-file run, whose done/total comes from followRun (pages/playlist.js). fn may set
+   task.status = 'failed' and task.msg itself (a run that worked but has nothing to show). */
+let QUEUE = [], Q_SEQ = 0, Q_RUN = null, Q_UNSEEN = 0;
+/* opts.quiet: a background task nobody pressed a button for: no notification, no dot */
+async function qTask(label, fn, opts = {}) {
+  const task = { id: ++Q_SEQ, label, status: 'running', started: Date.now(), done: 0, total: 0, msg: '' };
+  QUEUE.unshift(task);
+  if (QUEUE.length > 40) QUEUE.length = 40;
+  if (opts.run) Q_RUN = task;
+  qRender();
+  try {
+    const r = await fn(task);
+    if (task.status === 'running') task.status = 'done';
+    return r;
+  } catch (e) {
+    task.status = 'failed'; task.msg = errText(e);
+    throw e;
+  } finally {
+    task.ended = Date.now();
+    if (Q_RUN === task) Q_RUN = null;
+    if (!qPanel() && !opts.quiet) Q_UNSEEN++;
+    qRender();
+    if (!opts.quiet) qNotify(task);
+  }
+}
+/** a run's progress from GET /api/tag/progress (followRun) */
+function qProgress(p) { if (Q_RUN && p && p.total) { Q_RUN.done = p.done; Q_RUN.total = p.total; qRender(); } }
+/** the active library's name, for task labels */
+const qLib = () => ((DATA && DATA.libraries || []).find(l => l.id === DATA.active) || {}).name || t('app.queue.lib');
+const qPanel = () => (MENU && MENU.classList.contains('qpanel')) ? MENU : null;
+function qNotify(task) {
+  if (document.hasFocus() || typeof Notification === 'undefined') return;
+  try {
+    new Notification(task.label, { body: task.status === 'failed' ? t('app.queue.failed', { msg: task.msg }) : t('app.queue.done'), silent: false });
+  } catch { /* no notifications here */ }
+}
+function qRowHtml(q) {
+  const ic = q.status === 'running' ? '<span class="spin"></span>' : icon(q.status === 'failed' ? 'xCircle' : 'checkCircle');
+  const when = I18N.time ? I18N.time(q.ended || q.started) : new Date(q.ended || q.started).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const st = q.status === 'running'
+    ? t('app.queue.running') + (q.total ? ` · ${q.done} / ${q.total}` : '')
+    : q.status === 'failed' ? t('app.queue.failed', { msg: q.msg }) : t('app.queue.done') + (q.msg ? ' · ' + q.msg : '');
+  const bar = q.status === 'running' && q.total ? `<div class="q-bar"><i style="width:${Math.round(100 * q.done / q.total)}%"></i></div>` : '';
+  return `<div class="q-row ${q.status}"><span class="q-ic">${ic}</span><div class="q-main"><div class="q-label" title="${esc(q.label)}">${esc(q.label)}</div>
+    <div class="q-st"><span>${esc(st)}</span><span class="q-when">${esc(when)}</span></div>${bar}</div></div>`;
+}
+function qPanelHtml() {
+  const fin = QUEUE.some(q => q.status !== 'running');
+  return `<div class="q-head"><b>${esc(t('app.queue.title'))}</b><span class="spacer"></span>${
+    fin ? `<button class="btn btn-ghost btn-sm" onclick="qClear()">${esc(t('app.queue.clear'))}</button>` : ''}</div>
+    <div class="q-list">${QUEUE.length ? QUEUE.map(qRowHtml).join('') : `<div class="q-empty">${esc(t('app.queue.empty'))}</div>`}</div>`;
+}
+function qRender() {
+  const b = $('#btn-queue');
+  if (b) {
+    const run = QUEUE.filter(q => q.status === 'running').length;
+    const badge = b.querySelector('.q-badge');
+    badge.textContent = run || '';
+    badge.className = 'q-badge' + (run ? ' on' : Q_UNSEEN ? ' dot' : '');
+    b.classList.toggle('busy-q', !!run);
+  }
+  const m = qPanel();
+  if (m) m.innerHTML = qPanelHtml();
+}
+function qClear() { QUEUE = QUEUE.filter(q => q.status === 'running'); qRender(); }
+function qToggle(anchor) {
+  if (qPanel()) return closeMenu();
+  closeMenu();
+  const m = document.createElement('div'); m.className = 'menu qpanel'; m._anchor = anchor;
+  m.innerHTML = qPanelHtml();
+  document.body.appendChild(m);
+  const r = anchor.getBoundingClientRect();
+  m.style.left = Math.max(8, Math.min(r.right - m.offsetWidth, window.innerWidth - 8 - m.offsetWidth)) + 'px';
+  m.style.top = (r.bottom + 6) + 'px';
+  anchor.setAttribute('aria-expanded', 'true');
+  MENU = m;
+  coverNative(true);
+  Q_UNSEEN = 0; qRender();
+  requestAnimationFrame(() => m.classList.add('show'));
+}
+
 /* ---------- the green Free DL button: a Hypeddit gate is walked in the background ---------- */
 /** true for a link the app can walk itself (a Hypeddit gate, and only with the DJ_HQ_DOWNLOAD_BYPASS
  *  switch on); everything else still opens in the browser */
 const isHypeddit = (url) => { if (!APP.dl_bypass) return false; try { return /(^|\.)hypeddit\.com$/i.test(new URL(url).hostname.replace(/^www\./, '')); } catch { return false; } };
 
-/** Walk a Hypeddit gate in the app's hidden window: the gate's skip steps are taken, the email
- *  step is filled from Settings, and the file lands in the downloads folder. The button shows a
- *  spinner while it runs. Returns false when the link is not one the app can walk. */
-async function freeDownload(url, btn) {
-  if (!isHypeddit(url)) return false;
+/** Download a free link into the downloads folder without a browser. A direct link (Drive, Dropbox,
+ *  an audio file, SoundCloud's download button; opts.id is its track) is fetched as it is. A Hypeddit
+ *  gate is walked in the app's hidden window: the gate's skip steps are taken and the email step is
+ *  filled from Settings. The button shows a spinner while it runs. Returns false when the link is not
+ *  one the app can get itself. */
+async function freeDownload(url, btn, opts = {}) {
+  const id = opts.id || (btn && btn.dataset.direct) || '';
+  if (!id && !isHypeddit(url)) return false;
+  if (btn && btn.classList.contains('busy')) return true;
   if (btn) { btn.classList.add('busy'); btn.dataset.was = btn.innerHTML; btn.innerHTML = '<span class="spin"></span>'; }
+  let name = opts.name || (btn && btn.dataset.name);
+  if (!name) try { name = decodeURIComponent(url.split(/[?#]/)[0].split('/').filter(Boolean).pop() || url); } catch { name = url; }
   try {
-    const r = await api('/api/free-download', { url });
+    const r = await qTask(t('app.queue.download', { name }), async (task) => {
+      const r = id ? await api('/api/direct-download', { id, url }) : await api('/api/free-download', { url });
+      if (r.file) task.msg = r.file.split(/[\\/]/).pop();
+      else if (!r.unsupported) { task.status = 'failed'; task.msg = t('app.queue.noFile'); }
+      return r;
+    });
     if (r.unsupported) return false;   // no Electron window (headless): let the browser have it
-    if (r.file) toast(t('app.freedl.saved', { name: r.file.split(/[\\/]/).pop() }));
-    else { toast(t('app.freedl.noFile')); window.open(url, '_blank', 'noopener'); }
+    if (r.file) toast(t('app.freedl.saved', { name: r.file.split(/[\\/]/).pop() }), false, 8000);
+    else { toast(t(id ? 'app.freedl.noFileDirect' : 'app.freedl.noFile')); window.open(url, '_blank', 'noopener'); }
   } catch (e) {
-    toast(t('app.freedl.failed', { msg: e.message }), true);
-    window.open(url, '_blank', 'noopener');   // the gate did not work out: let the user have it
+    toast(t('app.freedl.failed', { msg: errText(e) }), true);
+    window.open(url, '_blank', 'noopener');   // it did not work out: let the user have the page
   } finally {
     if (btn) { btn.classList.remove('busy'); if (btn.dataset.was) btn.innerHTML = btn.dataset.was; }
   }
@@ -184,6 +281,80 @@ document.addEventListener('click', (e) => {
   e.preventDefault();
   freeDownload(a.dataset.freedl, a);
 });
+
+/* ---------- the Bandcamp search: tracks without a good link are looked up in the background ----------
+   The server does the work (src/bandcamp.ts), tracks without any link first. Here: a card in the corner
+   while it runs (hidden with its x until the next run), a "Searching" mark on the rows, and every link in
+   its row as soon as it is found. Plain fetch, not api(): a background run must not count as busy. */
+let BC = null, BC_ON = false, BC_HIDE = false;   // the last progress; followed right now; card closed for this run
+const bcPending = id => !!(BC && BC.running && BC.pending.includes(id));
+async function bandcampRun({ force = false } = {}) {
+  if (!DATA || !DATA.ready || (DATA.settings && !DATA.settings.bandcamp)) return null;
+  try {
+    const run = await fetch('/api/bandcamp/start', { method: 'POST', body: JSON.stringify({ force }) }).then(r => r.json());
+    if (!run.running || BC_ON) return run;   // nothing to do, or it joined the run followed already
+    BC_ON = true; BC_HIDE = false;
+    qTask(t('app.queue.bandcamp'), bcFollow, { quiet: true }).catch(() => {}).finally(() => { BC_ON = false; });
+    return run;
+  } catch { return null; }   // the server is closing, or offline: the next refresh tries again
+}
+async function bcFollow(task) {
+  const get = () => fetch('/api/bandcamp/progress').then(r => r.json());
+  let miss = 0;
+  try {
+    for (;;) {
+      let p;
+      try { p = await get(); miss = 0; } catch (e) { if (++miss > 5) throw e; await new Promise(r => setTimeout(r, 2000)); continue; }
+      const was = BC; BC = p;
+      task.done = p.done; task.total = p.total; qRender(); bcCard();
+      bcRows(was);
+      if (!p.running) break;
+      await new Promise(r => setTimeout(r, 1500));
+    }
+    task.msg = tn('app.queue.bandcampFound', BC.found);
+    if (BC.error) { task.status = 'failed'; task.msg = t('app.queue.bandcampStopped') + ' ' + task.msg; }
+    if (!BC_HIDE) toast(BC.error ? t('app.queue.bandcampStopped') : t('app.bc.end', { found: task.msg }), false, 6000);
+  } finally {
+    if (BC) BC.running = false;
+    bcCard();
+    bcRows(null);
+  }
+}
+/** put the found links into the rows; redraw when something on them changed and the user is not mid-action */
+let BC_DIRTY = false;
+function bcRows(was) {
+  if (!DATA || !DATA.tracks) return;
+  const rows = new Map(DATA.tracks.map(r => [r.id, r]));
+  for (const [id, links] of Object.entries(BC.links || {})) {
+    const r = rows.get(+id);
+    if (r && JSON.stringify(r.links) !== JSON.stringify(links)) { r.links = links; BC_DIRTY = true; }
+  }
+  if (!was || was.running !== BC.running || was.pending.join() !== BC.pending.join() || was.now_id !== BC.now_id && (bcPending(BC.now_id) || was.pending.includes(was.now_id))) {
+    for (const id of was ? was.pending : []) { const r = rows.get(id); if (r && !BC.pending.includes(id) && BC.running) r.bc_at = Date.now(); }
+    BC_DIRTY = true;
+  }
+  bcFlush();
+}
+function bcFlush() {
+  if (!BC_DIRTY) return;
+  if (!busy() && !MENU) { BC_DIRTY = false; return render(); }
+  if (!BC.running) setTimeout(bcFlush, 3000);   // the run is over: no further tick brings it
+}
+function bcCard() {
+  let el = $('#bc-card');
+  if (!BC || !BC.running || BC_HIDE) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div'); el.id = 'bc-card'; el.setAttribute('role', 'status');
+    el.innerHTML = `<span class="spin"></span><div class="bc-main"><b></b><div class="bc-now"></div><div class="q-bar"><i></i></div></div>
+      <button class="btn btn-ghost btn-sm btn-icon">${icon('x')}</button>`;
+    el.querySelector('button').onclick = () => { BC_HIDE = true; bcCard(); };
+    document.body.appendChild(el);
+  }
+  el.querySelector('button').title = t('app.bc.hide');
+  el.querySelector('b').textContent = t('app.bc.title', { n: I18N.num(BC.done), total: I18N.num(BC.total) }) + ' · ' + tn('app.queue.bandcampFound', BC.found);
+  el.querySelector('.bc-now').textContent = BC.now;
+  el.querySelector('i').style.width = Math.round(100 * BC.done / Math.max(1, BC.total)) + '%';
+}
 
 /* ---------- playlist refresh: on launch, every 15 min while visible, on demand ---------- */
 /** the sidebar's status line; give a function (() => t(…)) to have it follow a language change (sayStatus) */
@@ -228,6 +399,7 @@ async function refreshPlaylist({ manual = false } = {}) {
     const fresh = await api('/api/refresh', {});
     DATA = fresh; LAST_OK = Date.now(); LAST_ERR = '';
     if (manual || !busy()) render();
+    bandcampRun();
     if (typeof loadInbox === 'function') loadInbox();     // new downloads may have landed meanwhile
     const unread = unreadableNote(fresh.fetch_report);
     setCheckedStatus(fresh.fetch_report);
@@ -718,10 +890,11 @@ async function boot() {
   $('#q').oninput = e => { Q = e.target.value; renderTop(); };
   $('#btn-refresh').onclick = manualRefresh;
   $('#lib').onchange = async e => {
-    try { DATA = await api('/api/library', { op: 'select', id: e.target.value }); EDIT_ID = null; render(); if (typeof loadInbox === 'function') loadInbox(); }
+    try { DATA = await api('/api/library', { op: 'select', id: e.target.value }); EDIT_ID = null; render(); bandcampRun(); if (typeof loadInbox === 'function') loadInbox(); }
     catch (err) { toast(t('common.error', { msg: errText(err) }), true); }
   };
   $('#btn-libmenu').onclick = e => { e.stopPropagation(); libraryMenu(e.currentTarget); };
+  $('#btn-queue').onclick = e => { e.stopPropagation(); qToggle(e.currentTarget); };
   $('#btn-addlib').onclick = () => typeof uiAddLibrary === 'function' && uiAddLibrary();
   $('#btn-theme').onclick = e => { e.stopPropagation(); themeMenu(e.currentTarget); };
   $('#btn-settings').onclick = () => go('settings');

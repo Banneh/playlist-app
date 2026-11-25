@@ -173,7 +173,7 @@ async function inboxMoveAll() {
   const b = $('#ib-moveall');
   if (b) { b.disabled = true; b.innerHTML = spin(t('common.moving')); }
   try {
-    DATA = await api('/api/inbox-move-all', {});
+    DATA = await qTask(t('app.queue.moveAll', { lib: qLib() }), () => api('/api/inbox-move-all', {}));
     const [msg, err] = fileReport(DATA.inbox_report, 'inbox.moveAll.failed', 'inbox.moveAll.done');
     toast(msg + ibAiffKept(DATA.inbox_report && DATA.inbox_report.aiff_kept), err);
   } catch (e) { toast(t('inbox.moveAll.error', { msg: errText(e) }), true); }

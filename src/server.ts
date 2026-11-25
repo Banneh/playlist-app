@@ -7,6 +7,8 @@ import * as http from "http";
 import * as path from "path";
 import * as core from "./core";
 import * as config from "./config";
+import * as bandcamp from "./bandcamp";
+import * as directdl from "./directdl";
 import * as pipeline from "./pipeline";
 import { platformApps } from "./extapps";
 import { cueFixRoute } from "./cuefix";
@@ -204,6 +206,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
       if (req.url === "/api/prefs") return json(readPrefs());
       if (req.url === "/api/do-all/status") return json(pipeline.status());   // never builds the view
       if (req.url === "/api/tag/progress") return json(core.TAG_RUN);   // not queued: polled while the run holds the queue
+      if (req.url === "/api/bandcamp/progress") return json(bandcamp.RUN);
       if (req.url === "/api/state/raw") {   // the saved data as state.json of DJ HQ 1.7 and older (support, going back)
         if (!localHost(req)) return send(403, "text/plain", "forbidden");   // it carries private links and paths
         return void enqueue(async () => JSON.stringify(core.STATE)).then((text) => {
@@ -366,6 +369,13 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/free-download": return opts.freeDl && core.DOWNLOAD_BYPASS
             ? direct(() => opts.freeDl!(String(data.url || ""), String(data.email || core.getSettings().dl_email || "")))
             : json({ unsupported: true });
+          // not queued either: a public Drive / Dropbox file or SoundCloud's own download button
+          case "/api/direct-download": return direct(() => directdl.download(data.id, String(data.url || ""),
+            async () => opts.sc ? opts.sc.token() : null));
+          // the Bandcamp search only reads files' names; it writes its findings to the saved data
+          case "/api/bandcamp/start":  return direct(() => bandcamp.start({ force: !!data.force }));
+          case "/api/bandcamp/find":   return direct(() => bandcamp.findOne(data.id));
+          case "/api/bandcamp/reject": return route(() => core.bandcampReject(data));
           case "/api/inbox":          return route(() => core.inboxView());
           case "/api/inbox-move":     return route(() => core.inboxMove(data));
           case "/api/inbox-find":     return route(() => core.inboxFind(data));

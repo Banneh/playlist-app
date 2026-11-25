@@ -199,17 +199,28 @@ This is the list you'll spend the most time in: every track from the playlist
 that isn't in your folder, with the links to get it.
 
 - **Free DL** is a free download: a Hypeddit-style gate, a Drive or Dropbox
-  share, or SoundCloud's own download button.
+  share, or SoundCloud's own download button. A blue button downloads right
+  here, without the browser: Drive and Dropbox files, links straight to an
+  audio file, and SoundCloud's button when you are signed in on Discover.
 - **Buy** is a shop: Bandcamp, Beatport, Juno, Traxsource and similar shops. When a
   track has both, Buy comes first, because shops sell lossless files and free
   downloads are often MP3s. Hover a button to see where it goes.
+- **Bandcamp search.** When the uploader gave no shop link, DJ HQ looks for the
+  track on Bandcamp in the background: the artist's page first, then the title.
+  Only the artist's or uploader's own page and labels count, never a stranger's.
+  Tracks without any link come first, a card in the corner shows the progress, and
+  the button appears in the row as soon as a link is found. It sends the artist
+  and title to Bandcamp. Settings > Bandcamp switches it off, sets how often tracks
+  that were not found are tried again (every day to every month, or never), and
+  has **Search now**. **⋯ > Wrong Bandcamp track** removes a link that is not the
+  right one, **⋯ > Search Bandcamp** looks one track up again.
 
 **To work through the list**
 
 1. Use the chips above the list to narrow it down: tracks with a free download,
    with a shop link, or with no link at all.
-2. Click **Free DL** or **Buy**. The link opens in your browser; the file ends
-   up in your Downloads folder as usual.
+2. Click **Free DL** or **Buy**. The link opens in your browser (a blue button
+   downloads by itself); the file ends up in your Downloads folder as usual.
 3. Switch to **Downloads** in the sidebar once a few files have landed, and
    move them into your library from there (see below).
 
@@ -662,7 +673,7 @@ them into a new database.
   file, or choose *No file*. The status pill lets you set Have or Missing by
   hand.
 - **No Free DL or Buy button on a track.** The uploader set no purchase link
-  and wrote none in the description. The **⋯** menu still opens the track on
+  and wrote none in the description, and the track was not found on Bandcamp. The **⋯** menu still opens the track on
   SoundCloud.
 - **Find on SoundCloud finds nothing.** Try shorter search text and drop the
   remix part. Some edits aren't on SoundCloud at all; **⋯ > Search on
@@ -811,6 +822,8 @@ npm run dist        # build installers locally into release/
 | `web/guide.js` | the Guide panel behind the ? button, one entry per page |
 | `web/pages/setup.js` | the "Before we start" screen shown once after the first library |
 | `web/player.js` | the preview player |
+| `src/bandcamp.ts` | the Bandcamp search: artist pages first, then the title, over plain HTTP |
+| `src/directdl.ts` | free downloads that need no page (Drive, Dropbox, audio files, SoundCloud's button) |
 | `src/zip.ts` | minimal zip reader for Bandcamp downloads |
 | `src/config.ts` | configuration export and import: the file format, its checks, re-pointing the library folders, the backup before an import |
 | `web/pages/config.js` | the Export / Import configuration dialogs and their Settings card |
@@ -882,7 +895,7 @@ bodies are JSON.
 | `POST /api/rescan` | | rescan the library folders |
 | `POST /api/library` | `{op: "add", dir, url}` · `{op: "select", id}` · `{op: "remove", id}` · `{op: "add_folder", dir}` · `{op: "remove_folder", dir}` · `{op: "subfolders", on}` · `{op: "set_url", url, confirm?}` · `{op: "files_ready"}` · `{op: "set_dir", dir, confirm?}` | manage libraries, their folders and their SoundCloud link (the folder ops, `set_url`, `set_dir` and `files_ready` take an optional `id`, default: the active library; `files_ready` ends an imported library's wait for its music; `set_dir` makes another folder the main folder, moving no files: without `confirm` it changes nothing and answers `{confirm: {dir, from, from_away, files, empty, before, after, lose, lose_count, gain, pins, records}}`, with it the view carries `main_report`; matches, edits and found tracks follow their files, also to the same name with another audio extension; for one of the library's extra folders the two folders swap roles, `swap: true` in the plan and in `main_report`; `remove_folder` moves a pin or record of a file in that folder to the one file of the same name left in the library, also with another extension, and the view carries `remove_report: {dir, followed, before, after, lost, lost_count}`). `folders_away` entries carry `main: true` for the main folder and `drive: true` when its drive isn't mounted. The view carries `link_missing` for a library imported without its link (`/api/refresh` then refuses with that code) and `folders_away` entries with `why: "waiting"` while an imported library waits for its files. `add` and `set_url` add `fetch_report: {unreadable}`, `set_url` also `{same, of, had}`; a new link that misses tracks the library had changes nothing and answers `{confirm: report}` until it is sent again with `confirm: true` |
 | `POST /api/device` | `{device}` | target player (`xdj-700`, `nxs2`, `cdj-3000`, `cdj-3000x`) |
-| `POST /api/settings` | `{inbox_dir?, auto_move?, refresh_min?, like_on_add?, sc_open?, aiff_auto?}` | downloads folder (`""` = default), auto-move, check interval in minutes, like-on-add, where SoundCloud links open (`"discover"` or `"browser"`), whether WAV files moved into the library become AIFF files (the move's view carries `move_report: {key, aiff_kept}`, Move all's `inbox_report` has `aiff_kept`) |
+| `POST /api/settings` | `{inbox_dir?, auto_move?, refresh_min?, like_on_add?, sc_open?, aiff_auto?, bandcamp?, bandcamp_days?}` | downloads folder (`""` = default), auto-move, check interval in minutes, like-on-add, where SoundCloud links open (`"discover"` or `"browser"`), whether WAV files moved into the library become AIFF files (the move's view carries `move_report: {key, aiff_kept}`, Move all's `inbox_report` has `aiff_kept`) |
 | `POST /api/config/export-info` | | what the export dialog warns about: libraries with private links, folders that are away, `can_save` (not a view) |
 | `POST /api/config/export` | `{leave_links_out?}` | Electron: a save dialog, then `{path}` or `{canceled}`; headless answers `unsupported` (not a view) |
 | `GET /api/config/export?leave_links_out=1` | | the configuration file as a download (only for `Host` 127.0.0.1 / localhost) |
@@ -897,6 +910,10 @@ bodies are JSON.
 | `POST /api/override` | `{id, status: "have" \| "missing" \| "na" \| null}` | status override / not available now |
 | `POST /api/assign` | `{id, file}` (`""` = no file, `null` = automatic) | pin a file to a track |
 | `POST /api/edit` | `{id, artist, title}` or `{file, artist, title}` | artist/title edit (track or local file) |
+| `POST /api/direct-download` | `{id, url}` | fetch one of that track's own links (Drive, Dropbox, an audio file, SoundCloud's button) into the downloads folder; answers `{file}`, null when a page came back (not a view, not queued) |
+| `POST /api/bandcamp/start` · `GET /api/bandcamp/progress` | `{force?}` | look for the active library's tracks without a good link, in the background (new ones join a run; `force`: also those not found before): `{running, done, total, found, error, now, now_id, paused_until, pending, links}` (not a view, not queued) |
+| `POST /api/bandcamp/find` | `{id}` | look one track up now; answers `{found, title?}` (not a view, not queued) |
+| `POST /api/bandcamp/reject` | `{id}` | the found link is not this track: removed, and that page is not offered again |
 | `POST /api/seen` | | mark all as seen |
 | `POST /api/tag` | `{preview?, replace?, keep_file?, seen?, all?}` | write tags (adds `tag_report`; files whose own different name would be replaced are left and listed in `kept` unless `replace`, or `keep_file` makes their names hand edits first; both apply only to the previewed replaces whose `sig` is in `seen`); `preview` writes nothing and answers `{writes, replaces}`; `all` takes every library file, tagged or not (preview and `tag_report` add `left`: tagged files whose rewrite would lose something; `tag_report` also `all`, `total` and `changed`: files that changed on disk during the run), one run at a time: meanwhile every `/api/tag`, convert, restore and clean-backups is refused with code `tag_running` |
 | `GET /api/tag/progress` | | `{running, kind, done, total, report}` of the `all` run or of `/api/art` (`kind` `tags`, `art` or `aiff`; not queued; `report`: the last run's `tag_report` or `art_report`) |

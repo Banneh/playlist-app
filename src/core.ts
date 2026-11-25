@@ -15,7 +15,7 @@ import { checkXmlFile } from "./rbxml";
 import * as store from "./store";
 
 const AUDIO_EXT = [".wav", ".mp3", ".aiff", ".aif", ".flac", ".m4a", ".ogg"];
-const UA =
+export const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 
@@ -146,12 +146,20 @@ export interface AppState {
   found: Record<string, Found>;
   /** "not available now": track id -> the links it had when marked; cleared when they change */
   na: Record<string, { sig: string; at: number }>;
+  /** what Bandcamp has for a track (see bandcamp.ts), by track id; without a url: looked up at `at`
+   *  under the name `sig` and not found. `free`: a free download there. `no`: pages the user said
+   *  are not this track */
+  bandcamp?: Record<string, { at: number; sig: string; v?: number; url?: string; title?: string; free?: true; no?: string[] }>;
   /** folder watched for fresh downloads; default ~/Downloads */
   inbox_dir?: string;
   /** user settings (see getSettings) */
   settings?: { auto_move?: boolean; refresh_min?: number; like_on_add?: boolean; sc_open?: "discover" | "browser"; do_all?: DoAll;
                /** WAV files DJ HQ moves into a library become AIFF files (wavToAiff); off by default */
                aiff_auto?: boolean;
+               /** look for missing tracks on Bandcamp in the background; on unless false */
+               bandcamp?: boolean;
+               /** days until a track not found there is looked up again; 0 = never (default 14) */
+               bandcamp_days?: number;
                /** the address the automated Hypeddit free download fills into a gate's email step */
                dl_email?: string };
   /** probe results for audio inside zips in the downloads folder: "<zip path>|<entry>|<size>" -> [dur, fmt, tags] */
@@ -243,6 +251,7 @@ export function withDefaults(st: any): AppState {
   st.by_hand = st.by_hand || {};
   st.found = st.found || {};
   st.na = st.na || {};
+  st.bandcamp = st.bandcamp || {};
   st.acquired = st.acquired || {};
   st.settings = st.settings || {};
   st.zip_cache = st.zip_cache || {};
@@ -319,6 +328,8 @@ export function writeFileAtomic(p: string, text: string): void {
   }
 }
 
+/** Settings > Bandcamp: how often a track that was not found is looked up again (days, 0 = never) */
+export const BANDCAMP_DAYS = [1, 3, 7, 14, 30, 0];
 export const REFRESH_CHOICES = [5, 15, 30, 60, 120];
 /** What the Settings page shows and edits. inbox_dir is kept top-level for older state files. */
 export function getSettings(): any {
@@ -330,6 +341,8 @@ export function getSettings(): any {
     sc_open: s.sc_open === "browser" ? "browser" : "discover",
     aiff_auto: !!s.aiff_auto,
     dl_email: s.dl_email || "",
+    bandcamp: s.bandcamp !== false,
+    bandcamp_days: BANDCAMP_DAYS.includes(s.bandcamp_days ?? -1) ? s.bandcamp_days : 14,
     data_dir: DATA_DIR,
     ...doAllStatus(),
   };
@@ -469,6 +482,12 @@ export async function setSettings(data: any): Promise<any> {
   if ("auto_move" in data) s.auto_move = !!data.auto_move;
   if ("like_on_add" in data) s.like_on_add = !!data.like_on_add;
   if ("aiff_auto" in data) s.aiff_auto = !!data.aiff_auto;
+  if ("bandcamp_days" in data) {
+    const n = Number(data.bandcamp_days);
+    if (!BANDCAMP_DAYS.includes(n)) throw appError("bad_request", "the Bandcamp interval must be one of " + BANDCAMP_DAYS.join(", ") + " days");
+    s.bandcamp_days = n;
+  }
+  if ("bandcamp" in data) { if (data.bandcamp) delete s.bandcamp; else s.bandcamp = false; }
   if ("dl_email" in data) {
     const v = String(data.dl_email || "").trim();
     if (v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) throw appError("bad_email", "that isn't an email address", { email: v });
@@ -1283,7 +1302,7 @@ function sim(a: string, b: string): number {
  *  ("[LIMITED FREE DL]", "( FREE DL )", "[FREE-DL]", "(Free DL <3)"), only those words
  *  when the bracket also credits a remix ("(KLOUD Edit FREE DL)"), a bare one at the
  *  end ("… FREE DL", "… - Free Download"), "[CRS123]". Catalogue codes elsewhere stay. */
-function cleanTitle(s: string): string {
+export function cleanTitle(s: string): string {
   return s
     .replace(/\s*([\[\(])([^\]\)]*\bfree[\s_-]*(?:dl|download)\b[^\]\)]*)([\]\)])/gi, (_, o, x, c) => {
       const rest = x.replace(/\s*[-|:]?\s*\bfree[\s_-]*(dl|download)\b\s*!*/gi, " ").trim();
@@ -1326,11 +1345,11 @@ type NameConf = "high" | "medium" | "low";
 interface Named { artist: string; title: string; conf: NameConf; why: string; }
 
 /** lowercase letters and digits only, accents dropped ("TØM" -> "tøm", "E.T." -> "et") */
-const nameTokens = (s: string): string[] =>
+export const nameTokens = (s: string): string[] =>
   s.toLowerCase().normalize("NFKD").replace(/\p{M}+/gu, "").split(/[^\p{L}\p{N}]+/u).filter(Boolean);
-const compact = (s: string) => nameTokens(s).join("");
+export const compact = (s: string) => nameTokens(s).join("");
 /** "A, B & C x D vs E aka F feat. G" -> its names */
-const nameParts = (s: string): string[] =>
+export const nameParts = (s: string): string[] =>
   s.split(/\s*(?:,|&|(?<=\s)x(?=\s)|\bvs\.?(?=\s)|\baka\b|\band\b|\bfeat\.?(?=\s)|\bft\.?(?=\s)|\bfeaturing\b)\s*/i)
     .map((p) => p.trim()).filter(Boolean);
 
@@ -1568,15 +1587,15 @@ function extraArtistTitle(f: LocalFile): [string, string] {
 // ---------------- purchase / free-download links ----------------
 
 /** Download gates and file hosts: a link there is a free download whatever it's called. */
-const FREE_HOSTS = /(^|\.)(hypeddit\.com|droploud\.com|downloadgater\.com|gaterush\.me|gatekit\.pro|toneden\.io|drive\.google\.com|dropbox\.com|wetransfer\.com|we\.tl|mega\.nz|mediafire\.com|1drv\.ms)$/i;
+const FREE_HOSTS = /(^|\.)(hypeddit\.com|droploud\.com|downloadgater\.com|gaterush\.me|gatekit\.pro|toneden\.io|fangate\.eu|powergate\.me|pumpyoursound\.com|drive\.google\.com|dropbox\.com|wetransfer\.com|we\.tl|mega\.nz|mediafire\.com|1drv\.ms)$/i;
 /** Shops, and smart links that fan out to shops/streaming. */
 const SHOP_HOSTS = /(^|\.)(bandcamp\.com|beatport\.com|junodownload\.com|traxsource\.com|lnk\.to|ffm\.to|fanlink\.to|bfan\.link|hyperfollow\.com|push\.fm|smarturl\.it|lnk\.site|ditto\.fm|orcd\.co|found\.ee|li\.sten\.to|songwhip\.com|song\.link|album\.link|linkfire\.com|lnkfi\.re)$/i;
 /** Socials, streaming, profile hubs: never where you get the file. */
-const NOISE_HOSTS = /(^|\.)(instagram\.com|facebook\.com|fb\.com|twitter\.com|x\.com|tiktok\.com|youtube\.com|youtu\.be|spotify\.com|apple\.com|deezer\.com|tidal\.com|soundcloud\.com|snd\.sc|linktr\.ee|linksr\.io|lnk\.bio|beacons\.ai|ra\.co|discord\.gg|discord\.com|t\.me|telegram\.me|patreon\.com|mixcloud\.com|twitch\.tv|threads\.net|managerone\.io|amazon\.com|shazam\.com)$/i;
+const NOISE_HOSTS = /(^|\.)(instagram\.com|facebook\.com|fb\.com|twitter\.com|x\.com|tiktok\.com|youtube\.com|youtu\.be|spotify\.com|spotify\.link|paypal\.com|paypal\.me|ko-fi\.com|buymeacoffee\.com|gofundme\.com|komi\.io|apple\.com|deezer\.com|tidal\.com|soundcloud\.com|snd\.sc|linktr\.ee|linksr\.io|lnk\.bio|beacons\.ai|ra\.co|discord\.gg|discord\.com|t\.me|telegram\.me|patreon\.com|mixcloud\.com|twitch\.tv|threads\.net|managerone\.io|amazon\.com|shazam\.com)$/i;
 const FREE_WORDS = /\bfree\b|\bdl\b|download|gratis/i;
 const BUY_WORDS = /\bbuy|purchase|pre-?order|out now|available|support|shop|stream/i;
 
-function hostOf(url: string): string {
+export function hostOf(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; }
 }
 
@@ -1596,8 +1615,15 @@ export function extractLinks(desc: string): [string, string, string][] {
     let m: RegExpExecArray | null;
     while ((m = re.exec(line))) {
       let url = m[0].replace(/[.,;:!?]+$/, "");
-      const host = m[2].toLowerCase();
-      if (NOISE_HOSTS.test(host)) continue;
+      let host = m[2].toLowerCase();
+      // SoundCloud's redirect around a link, copied into a description
+      if (/^(gate\.sc|exit\.sc)$/.test(host)) {
+        let to = "";
+        try { to = new URL(m[1] ? url : "https://" + url).searchParams.get("url") || ""; } catch { /* not a link */ }
+        if (!/^https?:\/\//i.test(to)) continue;
+        url = to; host = hostOf(to); m[1] = "https://";
+      }
+      if (NOISE_HOSTS.test(host) || /^https?:\/\/docs\.google\.com\/forms\//i.test(url)) continue;
       if (!m[1]) {
         if (!FREE_HOSTS.test(host) && !SHOP_HOSTS.test(host)) continue;
         url = "https://" + url;
@@ -1629,6 +1655,31 @@ export interface BuyLink {
   fmt: string | null;
   /** SoundCloud's own download button (its title is the english "Download on SoundCloud"; the ui says it in its language) */
   sc_dl?: boolean;
+  /** the file can be downloaded without a page (see directdl.ts) */
+  direct?: DirectKind;
+  /** found by the Bandcamp search, not given by the uploader */
+  found?: boolean;
+}
+
+export type DirectKind = "drive" | "dropbox" | "file" | "soundcloud";
+/** The id of a file shared on Google Drive ("" for a folder or anything else) */
+export function driveFileId(url: string): string {
+  let u: URL;
+  try { u = new URL(url); } catch { return ""; }
+  if (!/^(drive|docs)\.google\.com$/i.test(u.hostname)) return "";
+  const id = /^\/(?:a\/[^/]+\/)?(?:u\/\d+\/)?file\/(?:u\/\d+\/)?d\/([\w-]{10,})/.exec(u.pathname)?.[1]
+    || (/^\/(?:u\/\d+\/)?(?:open|uc)$/.test(u.pathname) ? u.searchParams.get("id") || "" : "");
+  return /^[\w-]{10,}$/.test(id) ? id : "";
+}
+/** What DJ HQ downloads itself: one file on Drive or Dropbox, or an https link straight to audio or a zip */
+export function directKind(url: string): Exclude<DirectKind, "soundcloud"> | null {
+  let u: URL;
+  try { u = new URL(url); } catch { return null; }
+  if (driveFileId(url)) return "drive";
+  if (/(^|\.)dropbox\.com$/i.test(u.hostname)) return /^\/(s|scl\/fi)\//i.test(u.pathname) ? "dropbox" : null;
+  // a name with a dot that is no IP address: never something on this computer or its network
+  return u.protocol === "https:" && !u.port && /\.(wav|mp3|aiff?|flac|zip)$/i.test(u.pathname)
+    && /\.[a-z]{2,}$/i.test(u.hostname) && !/\.(local|localhost|internal|lan|home)$/i.test(u.hostname) ? "file" : null;
 }
 
 const FMT_WORDS: [RegExp, string][] = [
@@ -1641,24 +1692,30 @@ function fmtHint(words: string, host: string): string | null {
   return BANDCAMP.test(host) ? "lossless" : null; // Bandcamp buyers pick WAV / FLAC / AIFF
 }
 
-/** Preference within a kind: Bandcamp over other shops over smart links; a
- *  free download known to be lossless over unknown over known MP3. */
+/** an artist's Bandcamp page, not a release on it */
+const bandcampRoot = (url: string) => { try { return !/^\/(track|album)\//i.test(new URL(url).pathname); } catch { return true; } };
+/** Preference within a kind: a Bandcamp release over other shops over smart links over a bare
+ *  Bandcamp page; a free download known to be lossless over unknown over known MP3, and one
+ *  without a gate over one behind a gate (unless only the gate is known to be lossless). */
 function linkRank(l: BuyLink): number {
   if (l.kind === "buy")
-    return BANDCAMP.test(l.host) ? 3 : /(^|\.)(beatport|junodownload|traxsource)\.com$/i.test(l.host) ? 2 : 1;
-  return l.fmt === "MP3" ? 0 : l.fmt ? 2 : 1;
+    return BANDCAMP.test(l.host) ? (bandcampRoot(l.url) ? 0 : 3) : /(^|\.)(beatport|junodownload|traxsource)\.com$/i.test(l.host) ? 2 : 1;
+  return l.direct ? (l.fmt === "MP3" ? 1.5 : l.fmt ? 4 : 3) : l.fmt === "MP3" ? 0 : l.fmt ? 2 : 1;
 }
 
 /** Where to get the track, at most one buy and one free link: the uploader's
- *  purchase button, links found in the description, then SoundCloud's own
- *  download button; within a kind the better-ranked link wins. Buy sorts
+ *  purchase button, links found in the description, SoundCloud's own
+ *  download button, then what the Bandcamp search found; within a kind the better-ranked link wins. Buy sorts
  *  first: shops sell lossless files, free downloads are often MP3. */
 export function trackLinks(t: PlTrack): BuyLink[] {
   const out: BuyLink[] = [];
-  const add = (url: string, kind: "free" | "buy", title: string, host: string, scDl = false) => {
+  const add = (url: string, kind: "free" | "buy", title: string, host: string, scDl = false, found = false) => {
     if (out.some((o) => o.url === url)) return;
     const l: BuyLink = { url, kind, label: kind === "free" ? "Free DL" : "Buy", title, host, fmt: fmtHint(title, host) };
     if (scDl) l.sc_dl = true;
+    if (found) l.found = true;
+    const direct = scDl ? "soundcloud" : kind === "free" ? directKind(url) : null;
+    if (direct) l.direct = direct;
     const i = out.findIndex((o) => o.kind === kind);
     if (i < 0) out.push(l);
     else if (linkRank(l) > linkRank(out[i])) out[i] = l;
@@ -1681,7 +1738,79 @@ export function trackLinks(t: PlTrack): BuyLink[] {
     add(url, kind, ctx.slice(0, 80), host);
   }
   if (t.sc_dl && t.url) add(t.url, "free", "Download on SoundCloud", "soundcloud.com", true);
+  const bc = bandcampFound(t.id);
+  if (bc?.url) add(bc.url, bc.free ? "free" : "buy", bc.title || "", hostOf(bc.url), false, true);
   return out.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "buy" ? -1 : 1));
+}
+
+/** One of a track's links, by its address: the only thing a download request may name. The track
+ *  is one of a library's, or of the likes list. `name`: a file name for a server that gives none. */
+export function knownLink(id: string, url: string): { id: number; url: string; name: string; link: BuyLink } | null {
+  const t = [...STATE.libraries.flatMap((l) => l.playlist?.tracks || []), ...(likesSnap?.tracks || [])].find((x) => String(x.id) === id);
+  const link = t && trackLinks(t).find((l) => l.url === url);
+  if (!t || !link) return null;
+  const nm = artistTitle(t);
+  return { id: t.id, url: t.url, name: [nm.artist, nm.title].filter(Boolean).join(" - "), link };
+}
+/** Where SoundCloud's download button gets the file (signed in; a short-lived address) */
+export async function scDownloadUrl(token: string, id: number, trackUrl: string): Promise<string> {
+  const secret = scSecret(trackUrl);
+  const r = await scFetch("GET", `tracks/${id}/download${secret ? "?secret_token=" + encodeURIComponent(secret) : ""}`, token);
+  const u = String(r?.redirectUri || "");
+  if (!/^https:\/\//i.test(u)) throw appError("sc_no_download", "SoundCloud gave no file for this track");
+  return u;
+}
+/** The links on an uploader's SoundCloud profile */
+export async function scProfileLinks(profile: string): Promise<string[]> {
+  if (!profile) return [];
+  const u = await scFetch("GET", "resolve?url=" + encodeURIComponent(profile));
+  if (u?.kind !== "user" || typeof u.id !== "number") return [];
+  const list = await scFetch("GET", `users/soundcloud:users:${u.id}/web-profiles`);
+  return Array.isArray(list) ? list.map((x: any) => String(x?.url || "")).filter(Boolean) : [];
+}
+
+/** The active library's tracks worth a Bandcamp search: missing ones (not found links that are
+ *  good already) and lossy files, newest first; with an id that track alone, whatever it has. */
+export async function bandcampWanted(id?: string): Promise<{ id: number; artist: string; title: string; names: string[]; dur: number; prio: number; profile: string; hosts: string[] }[]> {
+  const lib = requireLib();
+  const view = await buildView(lib);
+  const rows = new Map<number, any>((view.tracks || []).map((r: any) => [r.id, r]));
+  const out = [];
+  for (const t of lib.playlist?.tracks || []) {
+    const r = rows.get(t.id);
+    if (!r || (id !== undefined && String(t.id) !== id)) continue;
+    const good = (r.links as BuyLink[]).some((l) => (l.kind === "buy" && linkRank(l) >= 2) || (l.found && l.kind === "free"));
+    if (id === undefined && (good || (r.have && !r.lossy))) continue;
+    const slug = /soundcloud\.com\/([^/?#]+)/i.exec(t.url || "")?.[1] || "";
+    const names = [...new Set([...nameParts(r.artist), r.artist, ...uploaderNames(t)].map((n: string) => n.trim()).filter((n) => compact(n)))];
+    const hosts = [...new Set([t.buy_url || "", ...(t.desc_links || []).map((d) => d[0])].map(hostOf).filter((h) => /\.bandcamp\.com$/i.test(h)))];
+    out.push({ row: r, w: { id: t.id, artist: r.artist, title: r.title, names, dur: t.dur, prio: r.have ? 2 : r.links.length ? 1 : 0, profile: slug ? "https://soundcloud.com/" + slug : "", hosts } });
+  }
+  return out.sort((a, b) => Number(a.row.have) - Number(b.row.have) || (b.row.added || 0) - (a.row.added || 0)).map((x) => x.w);
+}
+/** the rules a Bandcamp page has to pass (bandcamp.ts): findings made under older ones don't count and are looked up again */
+export const BANDCAMP_RULES = 2;
+export function bandcampFound(id: number) {
+  const r = STATE.bandcamp?.[String(id)];
+  return r?.url && r.v === BANDCAMP_RULES ? r : null;
+}
+/** the links a track of any library has now */
+export function linksOf(id: number): BuyLink[] {
+  for (const l of STATE.libraries) { const t = l.playlist?.tracks.find((x) => x.id === id); if (t) return trackLinks(t); }
+  return [];
+}
+export const bandcampNo = (id: number, url: string) => !!STATE.bandcamp?.[String(id)]?.no?.includes(url);
+/** "Not this track" on a link the Bandcamp search found: that page is never offered for it again */
+export async function bandcampReject(data: any): Promise<any> {
+  const tid = String(data.id), rec = STATE.bandcamp?.[tid];
+  if (rec?.url) {
+    const t = activeLib()?.playlist?.tracks.find((x) => String(x.id) === tid);
+    STATE.bandcamp![tid] = { at: Date.now(), sig: rec.sig, v: BANDCAMP_RULES, no: [...(rec.no || []), rec.url].slice(-20) };
+    // a track marked not available stays so: the link went away because the user said so
+    if (STATE.na[tid] && t) STATE.na[tid].sig = linksSig(trackLinks(t));
+    saveState();
+  }
+  return buildView();
 }
 
 const linksSig = (ls: BuyLink[]) => ls.map((l) => l.url).sort().join("|");
@@ -2372,7 +2501,7 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
              dur: fmtDur(t.dur), url: t.url, art: t.art,
              have, na, auto: !!m, file: m ? m[0] : null, path: m ? fmap.get(m[0])!.path : null,
              score: m && m[1] >= 0 ? Math.min(1, m[1]) : null,
-             pinned: manual.has(t.id), manual_match: manual.has(t.id) && !!STATE.by_hand[t.id], links, lossy, upgrade,
+             pinned: manual.has(t.id), manual_match: manual.has(t.id) && !!STATE.by_hand[t.id], links, bc_at: STATE.bandcamp?.[String(t.id)]?.v === BANDCAMP_RULES ? STATE.bandcamp[String(t.id)].at : 0, lossy, upgrade,
              added: t.added || 0, is_new: (t.added || 0) > (lib.seen_mark || 0),
              acquired, is_new_file: acquired > (lib.seen_mark || 0),
              tagged, incompat, key, pn, override: o || null, edited: hand, ...(plan ? { tag_plan: plan } : {}),

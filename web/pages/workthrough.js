@@ -53,7 +53,9 @@ function wtBack() { if (WT && WT.i > 0) wtGoto(WT.i - 1); }
 
 function wtOpenLink() {
   const tr = wtCurrent(); if (!tr || !tr.links.length) return;
-  window.open(tr.links[0].url, '_blank', 'noopener');
+  const l = tr.links[0];
+  if (isDirect(l) || (l.kind === 'free' && isHypeddit(l.url))) freeDownload(l.url, null, { id: isDirect(l) ? tr.id : '', name: [tr.artist, tr.title].filter(Boolean).join(' - ') });
+  else window.open(l.url, '_blank', 'noopener');
   WT.opened = true;
   wtStatus();
 }
