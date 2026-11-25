@@ -32,7 +32,7 @@ function lkHaveLine(r) {
   if (!h) return '';
   const tags = [tag(t('likes.inLib', { lib: h.lib }), 'ok', 'check', t('likes.inLibTip'))];
   if (h.score !== null && h.score < 0.995) tags.push(tag(t('tags.pctMatch', { pct: Math.round(h.score * 100) }), 'outline', '', t('likes.matchTip')));
-  if (h.lossy) tags.push(tag('MP3', '', '', t('tags.lossyTip')));
+  if (h.lossy) tags.push(tag('MP3', 'mono', '', t('tags.lossyTip')));
   return `<div class="t-file">${playBtn(h.path, r.title, r.artist) || `<span class="ic">${icon('music')}</span>`}<span class="fn" title="${esc(h.file)}">${esc(h.file)}</span><span class="tags">${tags.join('')}</span></div>`;
 }
 function lkRow(r) {

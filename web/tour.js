@@ -105,7 +105,7 @@ function tourShow() {
     t.spot.style.cssText = `left:${window.innerWidth / 2}px;top:${window.innerHeight / 2}px;width:0;height:0;border-radius:0`;
     const hasLib = !!(DATA && (DATA.libraries || []).length);
     t.card.className = 'tour-card intro';
-    t.card.innerHTML = `<span class="brand-mark">${icon('headphones')}</span>
+    t.card.innerHTML = `<span class="brand-mark">${logoSvg()}</span>
       <h4>${th('tour.intro.title')}</h4>
       <p>${th(hasLib ? 'tour.intro.textLib' : 'tour.intro.text')}</p>
       <div class="tour-acts"><button class="btn" data-a="skip">${th('common.notNow')}</button><button class="btn btn-primary" data-a="next">${icon('sparkles')}${th('common.showMeAround')}</button></div>`;

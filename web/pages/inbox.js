@@ -130,7 +130,7 @@ async function ibMoveTo(i, other, btn) {
 /* ---------- a download that matches nothing in the playlist ---------- */
 /** MP3 · from a zip */
 const ibFileTags = it => [
-  it.lossy ? tag('MP3', '', '', t('tags.lossyTip')) : '',
+  it.lossy ? tag('MP3', 'mono', '', t('tags.lossyTip')) : '',
   it.zip ? tag(t('inbox.fromZip', { zip: it.zip }), 'info', 'folder', t('inbox.fromZipTip')) : '',
 ];
 function ibOtherRow(it) {

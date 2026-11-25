@@ -2,9 +2,6 @@
 I18N.add('en', 'app', {
   // sidebar navigation (page names; other pages may use these)
   nav: {
-    secPlaylist: 'Playlist',
-    secLibrary: 'Library',
-    secPlayer: 'Player',
     all: 'All tracks',
     missing: 'Missing',
     have: 'Have',

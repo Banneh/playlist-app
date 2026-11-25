@@ -22,7 +22,10 @@ function linkBtn(r, kind) {
   // so a middle click or a right click → "open in browser" still works
   const own = kind === 'free' && (isDirect(l) || isHypeddit(l.url));
   const dl = own ? ` data-freedl="${esc(l.url)}"${isDirect(l) ? ` data-direct="${r.id}"` : ''} data-name="${esc([r.artist, r.title].filter(Boolean).join(' - '))}"` : '';
-  return `<a class="btn btn-sm ${kind === 'free' ? 'btn-green' : 'btn-amber'}${kind === 'free' && !hasLink(r, 'buy') ? '' : ' first'}${dl ? ' btn-hype' : ''}" href="${esc(l.url)}" target="_blank" rel="noopener"${dl} title="${esc(tip)}">${
+  // a Free DL the app fetches itself stays blue (information); other Free DLs are the accent-soft
+  // "get it" pad; Buy is a neutral button with the bag
+  const cls = kind === 'free' ? (own ? 'btn-green btn-hype' : 'btn-green btn-get') : '';
+  return `<a class="btn btn-sm ${cls}${kind === 'free' && !hasLink(r, 'buy') ? '' : ' first'}" href="${esc(l.url)}" target="_blank" rel="noopener"${dl} title="${esc(tip)}">${
     icon(kind === 'free' ? 'download' : 'bag')}${esc(t(kind === 'free' ? 'tags.link.free' : 'tags.link.buy'))}</a>`;   // the server's label is english
 }
 
@@ -47,7 +50,7 @@ function fileIssueTags(r, convertTip) {
   const tags = [];
   if (r.tagged === false) tags.push(tag(t('tags.needsTags'), 'warn', 'tag', t('tags.needsTagsTip')));
   if (r.incompat) tags.push(tag(t('tags.convert', { codec: incompatText(r.incompat) }), 'warn', 'sliders', r.incompat === 'WAV header' ? t('tags.wavHeaderTip') : convertTip || t('tags.convertTip')));
-  if (r.lossy) tags.push(tag('MP3', '', '', t('tags.lossyTip')));
+  if (r.lossy) tags.push(tag('MP3', 'mono', '', t('tags.lossyTip')));
   return tags;
 }
 const keyTag = r => r.key ? tag(r.key, 'outline', '', t(r.pn ? 'tags.keyTipPn' : 'tags.keyTip')) : '';
@@ -115,7 +118,7 @@ function trackRow(r) {
       </div>
       <span class="dur">${esc(r.dur)}</span>
       <div class="cell">${statusPill(r)}</div>
-      <div class="get">${!r.have || r.upgrade ? linkBtn(r, 'buy') + linkBtn(r, 'free') || bcRow(r) : ''}</div>
+      <div class="get">${!r.have || r.upgrade ? (linkBtn(r, 'buy') + linkBtn(r, 'free')) || bcRow(r) || `<span class="nolink">${esc(t('tags.link.none'))}</span>` : ''}</div>
       <button class="btn btn-ghost btn-sm btn-icon more" onclick="rowMenu(this, ${r.id})" title="${esc(t('common.more'))}">${icon('more')}</button>
     </div>`;
 }
@@ -269,7 +272,7 @@ function tagNote() {
   const n = DATA.untagged || 0;
   if (!n) return '';
   return noteHtml(tnh('playlist.tagNote', n),
-    `<button class="btn btn-sm btn-primary" onclick="tagFromList(this)" title="${esc(t('playlist.tagNoteTip'))}">${icon('tag')}${esc(t('tags.writeTags'))} ${badge(n)}</button>
+    `<button class="btn btn-sm" onclick="tagFromList(this)" title="${esc(t('playlist.tagNoteTip'))}">${icon('tag')}${esc(t('tags.writeTags'))} ${badge(n)}</button>
      <button class="btn btn-sm btn-ghost" onclick="HFILTER='tags';go('have')" title="${esc(t('playlist.showThemTip'))}">${esc(t('playlist.showThem'))}</button>`,
     'amber', 'tag');
 }
@@ -426,10 +429,10 @@ const theadHtml = () => `<div class="thead"><span class="num">#</span><span></sp
 function trackTable(rows, emptyOpts) {
   return `<div class="table">${theadHtml()}${rows.length ? rows.map(trackRow).join('') : emptyHtml(emptyOpts)}</div>`;
 }
-/** filter chips: items are [value, label key, count, icon] */
+/** the filter rail: single-select chips drawn as one segmented control; items are [value, label key, count, icon] */
 function chipsHtml(varName, cur, items) {
-  return items.map(([k, label, n, ico]) =>
-    `<button class="chip${cur === k ? ' on' : ''}" onclick="${varName}='${k}';renderTop()">${ico ? icon(ico) : ''}${esc(t(label))}<span class="n">${n}</span></button>`).join('');
+  return `<div class="chips" role="radiogroup">` + items.map(([k, label, n, ico]) =>
+    `<button class="chip${cur === k ? ' on' : ''}" role="radio" aria-checked="${cur === k}" onclick="${varName}='${k}';renderTop()">${ico ? icon(ico) : ''}${esc(t(label))}<span class="n">${n}</span></button>`).join('') + '</div>';
 }
 /** empty-state options; title and text are keys */
 const emptyOf = (ico, title, text, kind) => ({ ico, kind: kind || '', title: th(title), text: th(text) });
@@ -441,7 +444,7 @@ const missingFilter = r => MFILTER === 'all' ? true : MFILTER === 'free' ? hasLi
 
 PAGES.missing = {
   title: () => t('app.nav.missing'),
-  actions: () => DATA.missing ? `<button class="btn" onclick="openWorkThrough()" title="${esc(t('playlist.missing.workThroughTip'))}">${icon('play')}${esc(t('playlist.missing.workThrough'))}</button>` : '',
+  actions: () => DATA.missing ? `<button class="btn btn-primary" onclick="openWorkThrough()" title="${esc(t('playlist.missing.workThroughTip'))}">${icon('play')}${esc(t('playlist.missing.workThrough'))}</button>` : '',
   sub: () => {
     const withLink = DATA.tracks.filter(r => !r.have && !r.na && r.links.length).length;
     return DATA.missing

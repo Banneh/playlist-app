@@ -6,6 +6,13 @@ I18N.add('en', 'news', {
   subSince: 'Your last version was {version}. Here is what changed since then. You can open this list again from the ⋯ menu.',
   menu: 'What’s new…',
   v: {
+    '3_0_0': {
+      i1: '<b>One collection, many playlists</b>: DJ HQ now watches a set of folders of your choice and every playlist matches its tracks against all of them. Folders no longer belong to a playlist, so several playlists can share one music folder tree, and files can lie wherever you keep them. Your folders and matches moved over by themselves, with a backup made first.',
+      i2: '<b>Collection page</b>: every file of your folders in one place, with the playlists that use it, and filters for files in no playlist, files that need tags and files to convert. Fresh downloads show on their track as "in the downloads folder" before you move them, and moving lets you pick the destination folder.',
+      i3: '<b>rekordbox connection</b>: files you move into the collection can be added to your rekordbox collection by themselves. Switched on in Settings > Integrations; writes happen only while rekordbox is closed, with a backup of its database first.',
+      i4: '<b>A new look</b>: three color palettes (Cue, Waveform, Afterhours) and a new logo. Pick yours in Settings > Appearance.',
+      i5: 'The sidebar follows the way a track travels: <b>Dig, Get, Crate, Ready</b>.',
+    },
     '2_3_1': {
       i1: 'The XDJ-700, XDJ-1000 and CDJ-2000NXS are held to 16-bit WAV and AIFF again: the XDJ-700 refuses 24-bit files in practice, although the manual lists them. Convert turns 24-bit files into 16-bit ones for these players.',
     },

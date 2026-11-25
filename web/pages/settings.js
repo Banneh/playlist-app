@@ -77,7 +77,8 @@ PAGES.settings = {
         ST_INTERVALS.map(v => `<option value="${v}"${(S.refresh_min || 15) === v ? ' selected' : ''}>${esc(t('settings.interval.label.' + v))}</option>`).join('')}</select></div>`);
 
     const appearance = stCard('sun', 'amber', esc(t('common.theme.title')), th('common.theme.text'),
-      `<div class="seg" role="radiogroup" aria-label="${esc(t('common.theme.title'))}">
+      `${paletteCardsHtml()}
+       <div class="seg" role="radiogroup" aria-label="${esc(t('common.theme.title'))}">
          <button class="${THEME === 'system' ? 'on' : ''}" onclick="stTheme('system')">${icon('monitor')}${esc(t('common.theme.system'))}</button>
          <button class="${THEME === 'light' ? 'on' : ''}" onclick="stTheme('light')">${icon('sun')}${esc(t('common.theme.light'))}</button>
          <button class="${THEME === 'dark' ? 'on' : ''}" onclick="stTheme('dark')">${icon('moon')}${esc(t('common.theme.dark'))}</button>

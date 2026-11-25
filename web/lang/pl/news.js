@@ -6,6 +6,13 @@ I18N.add('pl', 'news', {
   subSince: 'Twoja poprzednia wersja to {version}. Oto, co się od niej zmieniło. Tę listę otworzysz ponownie z menu ⋯.',
   menu: 'Co nowego…',
   v: {
+    '3_0_0': {
+      i1: '<b>Jedna kolekcja, wiele playlist</b>: DJ HQ obserwuje teraz wybrane przez Ciebie foldery, a każda playlista dopasowuje swoje utwory do wszystkich plików, które w nich są. Foldery nie należą już do playlisty, więc kilka playlist może dzielić jedno drzewo folderów, a pliki mogą leżeć tam, gdzie je trzymasz. Twoje foldery i dopasowania przeniosły się same, z kopią zapasową zrobioną wcześniej.',
+      i2: '<b>Strona Kolekcja</b>: wszystkie pliki Twoich folderów w jednym miejscu, z playlistami, które z nich korzystają, oraz filtrami plików spoza playlist, plików bez tagów i plików do konwersji. Świeże pobrania pokazują się przy swoim utworze jako "w folderze pobranych", zanim je przeniesiesz, a przy przenoszeniu wybierzesz folder docelowy.',
+      i3: '<b>Połączenie z rekordboxem</b>: pliki przenoszone do kolekcji mogą same dopisywać się do kolekcji rekordboxa. Włączysz to w Ustawieniach, w Integracjach; zapis odbywa się tylko przy zamkniętym rekordboxie, z kopią jego bazy zrobioną wcześniej.',
+      i4: '<b>Nowy wygląd</b>: trzy palety kolorów (Cue, Waveform, Afterhours) i nowe logo. Swoją wybierzesz w Ustawieniach, w Wyglądzie.',
+      i5: 'Pasek boczny układa się tak, jak wędruje utwór: <b>Dig, Get, Crate, Ready</b>.',
+    },
     '2_3_1': {
       i1: 'XDJ-700, XDJ-1000 i CDJ-2000NXS znów są ograniczone do 16-bitowych WAV i AIFF: XDJ-700 w praktyce odrzuca pliki 24-bitowe, choć instrukcja je wymienia. Konwertuj zamienia pliki 24-bitowe na 16-bitowe dla tych odtwarzaczy.',
     },

@@ -157,7 +157,7 @@ app.whenReady().then(async () => {
   const port = server.address().port;
   const win = new BrowserWindow({
     width: 1240, height: 808, useContentSize: true, show: false,
-    backgroundColor: "#f4f5f7", webPreferences: { backgroundThrottling: false },
+    backgroundColor: "#f2f2ef", webPreferences: { backgroundThrottling: false },
   });
   const wc = win.webContents;
   wc.setAudioMuted(true);

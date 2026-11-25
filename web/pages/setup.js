@@ -63,7 +63,8 @@ PAGES.setup = {
        </label>`);
 
     const look = suSection('sun', 'amber', th('setup.look.title'), th('common.theme.text'),
-      `<div class="seg" role="radiogroup" aria-label="${esc(t('common.theme.title'))}">
+      `${paletteCardsHtml()}
+       <div class="seg" role="radiogroup" aria-label="${esc(t('common.theme.title'))}">
          <button class="${THEME === 'system' ? 'on' : ''}" data-theme="system">${icon('monitor')}${esc(t('common.theme.system'))}</button>
          <button class="${THEME === 'light' ? 'on' : ''}" data-theme="light">${icon('sun')}${esc(t('common.theme.light'))}</button>
          <button class="${THEME === 'dark' ? 'on' : ''}" data-theme="dark">${icon('moon')}${esc(t('common.theme.dark'))}</button>
@@ -77,7 +78,7 @@ PAGES.setup = {
     return `
     <div class="wl-topbar"></div>
     <div class="welcome-box su-box">
-      <span class="brand-mark welcome-mark">${icon('settings')}</span>
+      <span class="brand-mark welcome-mark">${logoSvg()}</span>
       <h2>${th('setup.title')}</h2>
       <p class="lead">${th('setup.lead')}</p>
       <div class="card su-card">${downloads}${player}${folder}${aiff}${look}${language}</div>

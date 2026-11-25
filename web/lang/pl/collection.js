@@ -27,6 +27,16 @@ I18N.add('pl', 'app', {
   },
 });
 I18N.add('pl', 'common', { change: 'Zmień…' });
+I18N.add('pl', 'app', {
+  pal: {
+    title: 'Paleta',
+    cueDesc: 'Grafit i pomarańcz przycisku CUE. Zielone jest to, co już masz.',
+    waveDesc: 'Granat z elektrycznym cyjanem. Najspokojniejsza na długie przygotowania.',
+    uvDesc: 'Fiolet z gorącą magentą, jak światło UV w klubie.',
+  },
+  nav: { secDig: 'Dig', secGet: 'Get', secCrate: 'Crate', secReady: 'Ready' },
+});
+I18N.add('pl', 'tags', { link: { none: 'Brak linku' } });
 I18N.add('pl', 'tags', {
   inInbox: 'W folderze pobranych: {name}',
   inInboxTip: 'Świeżo pobrany plik tego utworu czeka w folderze pobranych. Otwórz Pobrane, żeby przenieść go do kolekcji',

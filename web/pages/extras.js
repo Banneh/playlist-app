@@ -217,10 +217,10 @@ PAGES.collection = {
       ['tags', 'tags.needsTags', fs.filter(f => f.tagged === false).length, 'tag'],
       ['convert', 'playlist.have.chip.convert', fs.filter(f => !!f.incompat).length, 'sliders']];
     const roots = COLL.roots.length > 1 ? COLL.roots.map(r => [r.id, null, fs.filter(f => f.root === r.id).length, 'folder', r.path]) : [];
-    return chips.map(([k, label, n, ico]) =>
-      `<button class="chip${CFILTER === k ? ' on' : ''}" onclick="CFILTER='${k}';renderTop()">${ico ? icon(ico) : ''}${esc(t(label))}<span class="n">${n}</span></button>`).join('')
+    return '<div class="chips" role="radiogroup">' + chips.map(([k, label, n, ico]) =>
+      `<button class="chip${CFILTER === k ? ' on' : ''}" role="radio" aria-checked="${CFILTER === k}" onclick="CFILTER='${k}';renderTop()">${ico ? icon(ico) : ''}${esc(t(label))}<span class="n">${n}</span></button>`).join('')
       + roots.map(([k, , n, ico, p]) =>
-      `<button class="chip${CFILTER === k ? ' on' : ''}" onclick="CFILTER='${esc(k)}';renderTop()" title="${esc(p)}">${icon(ico)}${esc(p.split(/[\\/]/).pop())}<span class="n">${n}</span></button>`).join('');
+      `<button class="chip${CFILTER === k ? ' on' : ''}" role="radio" aria-checked="${CFILTER === k}" onclick="CFILTER='${esc(k)}';renderTop()" title="${esc(p)}">${icon(ico)}${esc(p.split(/[\\/]/).pop())}<span class="n">${n}</span></button>`).join('') + '</div>';
   },
   get search() { return t('coll.search'); },
   body: q => {

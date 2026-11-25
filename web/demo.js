@@ -3,14 +3,10 @@
    fresh install with no library connected. tour.js swaps DATA / INBOX for these
    objects while the tour runs and restores the real ones afterwards. */
 
-/* 80×80 artwork: a two-colour gradient with the track's initials, as an inline SVG data URI */
+/* 80×80 artwork: a solid, slightly muted colour with the track's initials, as an inline SVG data URI */
 function demoArt(initials, hue) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
-    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="hsl(${hue},72%,58%)"/><stop offset="1" stop-color="hsl(${(hue + 48) % 360},70%,32%)"/>
-    </linearGradient></defs>
-    <rect width="80" height="80" fill="url(#g)"/>
-    <circle cx="62" cy="18" r="22" fill="rgba(255,255,255,.12)"/>
+    <rect width="80" height="80" fill="hsl(${hue},38%,40%)"/>
     <text x="40" y="49" font-family="Helvetica Neue,Helvetica,Arial,sans-serif" font-size="26" font-weight="700"
           fill="rgba(255,255,255,.92)" text-anchor="middle" letter-spacing="1">${initials}</text>
   </svg>`;

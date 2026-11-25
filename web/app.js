@@ -478,8 +478,9 @@ function showMenu(anchor, items, opts = {}) {
   const m = document.createElement('div'); m.className = 'menu'; m._anchor = anchor;
   m.innerHTML = items.map((it, i) => it === '-' ? '<div class="menu-sep"></div>'
     : it.header ? `<div class="menu-label">${esc(it.label)}</div>`
+    // a checkable item (one with a `checked` key) carries a LED on the left, lit when chosen
     : `<button class="menu-item${it.danger ? ' danger' : ''}${it.checked ? ' checked' : ''}" data-i="${i}"${it.disabled ? ' disabled' : ''}${it.hint ? ` title="${esc(it.hint)}"` : ''}>${
-        it.icon ? icon(it.icon) : '<span class="ic"></span>'}<span>${esc(it.label)}</span>${it.checked ? icon('check', 'check') : ''}</button>`).join('');
+        'checked' in it ? '<span class="led"></span>' : ''}${it.icon ? icon(it.icon) : 'checked' in it ? '' : '<span class="ic"></span>'}<span>${esc(it.label)}</span></button>`).join('');
   m.querySelectorAll('.menu-item').forEach(b => b.onclick = e => { e.stopPropagation(); const it = items[+b.dataset.i]; closeMenu(); it.onclick && it.onclick(); });
   document.body.appendChild(m);
   const r = anchor.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight;
@@ -559,20 +560,77 @@ function setPref(key, value) {
   fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [key]: value }) }).catch(() => {});
 }
 
-/* ---------- theme ---------- */
-const THEME_KEY = 'djhq-theme';
-let THEME = 'system';
-try { THEME = localStorage.getItem(THEME_KEY) || 'system'; } catch {}   // instant, before prefs arrive
+/* ---------- appearance: palette + mode ----------
+   Three palettes (cue, wave, uv), each in light and dark. JS resolves the mode and puts
+   data-palette / data-mode on <html>; the CSS tokens select on those attributes, so the
+   same rules also paint the palette preview cards. */
+const THEME_KEY = 'djhq-theme', PAL_KEY = 'djhq-palette';
+const PALETTES = ['cue', 'wave', 'uv'];
+let THEME = 'system', PALETTE = 'cue';
+try {   // instant, before prefs arrive
+  THEME = localStorage.getItem(THEME_KEY) || 'system';
+  PALETTE = localStorage.getItem(PAL_KEY) || 'cue';
+} catch {}
+const MODE_MQ = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null;
+const resolvedMode = () => THEME === 'light' || THEME === 'dark' ? THEME : (MODE_MQ && MODE_MQ.matches ? 'dark' : 'light');
 function applyTheme() {
   const root = document.documentElement;
-  if (THEME === 'light' || THEME === 'dark') root.setAttribute('data-theme', THEME);
-  else root.removeAttribute('data-theme');
+  root.setAttribute('data-palette', PALETTES.includes(PALETTE) ? PALETTE : 'cue');
+  root.setAttribute('data-mode', resolvedMode());
+  root.removeAttribute('data-theme');
+  // preview cards show each palette in the mode on screen right now
+  document.querySelectorAll('.pal-prev[data-mode]').forEach(p => p.setAttribute('data-mode', resolvedMode()));
 }
+if (MODE_MQ && MODE_MQ.addEventListener) MODE_MQ.addEventListener('change', () => { if (THEME === 'system') applyTheme(); });
 function setTheme(v) {
   THEME = v; try { localStorage.setItem(THEME_KEY, v); } catch {}
   setPref('theme', v);
   applyTheme(); renderSidebarFoot();
 }
+function setPalette(v) {
+  if (!PALETTES.includes(v)) v = 'cue';
+  PALETTE = v; try { localStorage.setItem(PAL_KEY, v); } catch {}
+  setPref('palette', v);
+  applyTheme();
+  if (DATA) render();
+  renderSidebarFoot();
+}
+
+/* the Cue mark: a waveform split by the playhead, with a cue marker, on a rounded pad */
+function logoSvg(cls) {
+  return `<svg class="logo${cls ? ' ' + cls : ''}" viewBox="0 0 64 64" role="img" aria-label="DJ HQ">
+  <rect class="logo-pad" width="64" height="64" rx="14"/>
+  <g class="logo-ink">
+    <rect x="9.75" y="26" width="4.5" height="12" rx="2.25"/>
+    <rect x="17.75" y="20" width="4.5" height="24" rx="2.25"/>
+    <rect x="25.75" y="14" width="4.5" height="36" rx="2.25"/>
+    <rect x="35.25" y="18" width="4.5" height="28" rx="2.25" fill-opacity=".38"/>
+    <rect x="42.75" y="23" width="4.5" height="18" rx="2.25" fill-opacity=".38"/>
+    <rect x="50.25" y="27" width="4.5" height="10" rx="2.25" fill-opacity=".38"/>
+    <rect x="31.6" y="12" width="2.4" height="43" rx="1.2"/>
+    <path d="M27 8.5 H38.6 L32.8 15 Z"/>
+  </g>
+</svg>`;
+}
+
+/* the palette picker, shared by the setup screen and Settings > Appearance */
+const PAL_INFO = [['cue', 'Cue', 'app.pal.cueDesc'], ['wave', 'Waveform', 'app.pal.waveDesc'], ['uv', 'Afterhours', 'app.pal.uvDesc']];
+function paletteCardsHtml() {
+  const mode = resolvedMode();
+  return `<div class="pal-grid" role="radiogroup" aria-label="${esc(t('app.pal.title'))}">` + PAL_INFO.map(([id, name, desc]) => `
+    <button class="pal-card" role="radio" aria-checked="${PALETTE === id}" data-pal="${id}" onclick="setPalette('${id}')">
+      <span class="pal-prev" data-palette="${id}" data-mode="${mode}" aria-hidden="true">
+        <span class="pv-sb">${logoSvg('pv-logo')}<span class="pv-nav on"></span><span class="pv-nav"></span></span>
+        <span class="pv-main">
+          <span class="pv-row"><span class="pv-art"></span><span class="pv-lines"><span class="pv-t"></span><span class="pv-s"></span></span><span class="pv-led"></span><span class="pv-get"></span></span>
+          <span class="pv-cta"></span>
+        </span>
+      </span>
+      <span class="pal-name"><span class="led"></span>${esc(name)}</span>
+      <span class="pal-desc">${esc(t(desc))}</span>
+    </button>`).join('') + '</div>';
+}
+applyTheme();   // as early as the script runs; boot() syncs with the saved prefs after
 
 /* ---------- language ----------
    PREFS.lang: 'auto' (the computer's language; also when absent) | 'en' | 'pl'. See i18n.js. */
@@ -596,19 +654,20 @@ function applyLang(redraw) {
   if (typeof plRender === 'function') { if (typeof PLAYER !== 'undefined') PLAYER.ui = {}; plRender(); }   // the bar redraws only what changed: forget it all
 }
 
-/* ---------- navigation ---------- */
+/* ---------- navigation: in the order a track travels (Dig, Get, Crate, Ready) ---------- */
 const NAV = [   // labels are keys (app.nav.*), looked up when the sidebar is drawn
-  { sec: 'app.nav.secPlaylist' },
-  { id: 'all', label: 'app.nav.all', icon: 'listMusic', count: () => DATA.tracks.length },
-  { id: 'missing', label: 'app.nav.missing', icon: 'download', count: () => DATA.missing, kind: () => DATA.missing ? '' : 'soft' },
-  { id: 'have', label: 'app.nav.have', icon: 'checkCircle', count: () => DATA.have },
+  { id: 'new', label: 'app.nav.new', icon: 'sparkles', spark: true, count: () => DATA.new_count, kind: () => DATA.new_count ? 'accent' : '' },
+  { sec: 'app.nav.secDig', n: 1, when: () => !!APP.sc },
   { id: 'discover', label: 'app.nav.discover', icon: 'cloud', count: () => '', when: () => !!APP.sc },
   { id: 'likes', label: 'app.nav.likes', icon: 'heart', count: () => typeof LIKES !== 'undefined' && LIKES && LIKES.tracks ? LIKES.missing : '', hideZero: true, when: () => !!APP.sc },
-  { sec: 'app.nav.secLibrary' },
-  { id: 'new', label: 'app.nav.new', icon: 'sparkles', count: () => DATA.new_count, kind: () => DATA.new_count ? 'accent' : '' },
+  { sec: 'app.nav.secGet', n: 2 },
+  { id: 'missing', label: 'app.nav.missing', icon: 'download', count: () => DATA.missing, kind: () => DATA.missing ? '' : 'soft' },
   { id: 'inbox', label: 'app.nav.inbox', icon: 'inbox', count: () => INBOX ? INBOX.items.length : '', kind: () => INBOX && INBOX.items.length ? 'accent' : '', hideZero: true },
+  { sec: 'app.nav.secCrate', n: 3 },
+  { id: 'all', label: 'app.nav.all', icon: 'listMusic', count: () => DATA.tracks.length },
+  { id: 'have', label: 'app.nav.have', icon: 'checkCircle', count: () => DATA.have },
   { id: 'collection', label: 'app.nav.collection', icon: 'folder', count: () => DATA.local_count || 0 },
-  { sec: 'app.nav.secPlayer' },
+  { sec: 'app.nav.secReady', n: 4 },
   { id: 'prepare', label: 'app.nav.prepare', icon: 'disc', count: () => (DATA.untagged || 0) + (DATA.incompatible || 0), kind: () => 'soft', hideZero: true },
 ];
 function go(page) {
@@ -760,12 +819,16 @@ function renderSidebar() {
   $('#lib-dir').title = roots.map(r => r.path + (r.subfolders ? ' (' + t('common.subfolders').toLowerCase() + ')' : '')).join('\n');
 
   $('#nav').innerHTML = NAV.map(it => {
-    if (it.sec) return `<div class="nav-sec">${esc(t(it.sec))}</div>`;
+    if (it.sec) return it.when && !it.when() ? '' : `<div class="nav-sec"><span class="n">${it.n}</span><span class="lbl-sec">${esc(t(it.sec))}</span></div>`;
     if (it.when && !it.when()) return '';
     const c = DATA.ready ? it.count() : '';
     const show = c !== '' && c !== undefined && !(it.hideZero && !c);
     const label = t(it.label);
-    return `<button class="nav-item${PAGE === it.id ? ' on' : ''}" data-page="${it.id}" onclick="go('${it.id}')" title="${esc(label)}${show ? ' · ' + c : ''}">${icon(it.icon)}<span class="lbl">${esc(label)}</span>${
+    // the wide sidebar shows a LED per row (lit on the current page or an accent count);
+    // the narrow rail keeps the icon. New keeps its sparkles in the accent color.
+    const lit = PAGE === it.id || (it.kind && it.kind() === 'accent');
+    return `<button class="nav-item${PAGE === it.id ? ' on' : ''}" data-page="${it.id}" onclick="go('${it.id}')" title="${esc(label)}${show ? ' · ' + c : ''}">${
+      icon(it.icon, it.spark ? 'nav-spark' : '')}${it.spark ? '' : `<span class="led${lit ? ' lit' : ''}"></span>`}<span class="lbl">${esc(label)}</span>${
       show ? badge(c, it.kind ? it.kind() : '') : ''}</button>`;
   }).join('');
   renderSidebarFoot();
@@ -777,6 +840,9 @@ function renderSidebarFoot() {
 }
 function themeMenu(anchor) {
   showMenu(anchor, [
+    { label: t('app.pal.title'), header: true },
+    ...PAL_INFO.map(([id, name]) => ({ label: name, checked: PALETTE === id, onclick: () => setPalette(id) })),
+    '-',
     { label: t('common.theme.title'), header: true },
     { label: t('app.theme.followSystem'), icon: 'monitor', checked: THEME === 'system', onclick: () => setTheme('system') },
     { label: t('common.theme.light'), icon: 'sun', checked: THEME === 'light', onclick: () => setTheme('light') },
@@ -910,7 +976,7 @@ function dismissUpdate() {
 /* ---------- global actions: refresh button, search, keyboard ---------- */
 async function manualRefresh() {
   const b = $('#btn-refresh'), old = b.innerHTML;
-  b.disabled = true; b.innerHTML = spin(t('app.head.refreshing'));
+  b.disabled = true; b.innerHTML = spin();   // icon-only: the spinner alone
   await refreshPlaylist({ manual: true });
   b.disabled = false; b.innerHTML = old;
   I18N.applyDom(b);   // the language may have changed while it ran
@@ -928,6 +994,7 @@ async function boot() {
   I18N.init(PREFS.lang); applyLang(false);
   setStatus(() => t('app.status.checking'));
   if (PREFS.theme && PREFS.theme !== THEME) { THEME = PREFS.theme; try { localStorage.setItem(THEME_KEY, THEME); } catch {} applyTheme(); }
+  if (PREFS.palette && PALETTES.includes(PREFS.palette) && PREFS.palette !== PALETTE) { PALETTE = PREFS.palette; try { localStorage.setItem(PAL_KEY, PALETTE); } catch {} applyTheme(); }
   if (/[?&]titlebar=inset/.test(location.search)) document.documentElement.classList.add('mac-inset');
   $('#q').oninput = e => { Q = e.target.value; renderTop(); };
   $('#btn-refresh').onclick = manualRefresh;

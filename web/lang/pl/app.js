@@ -2,9 +2,6 @@
 I18N.add('pl', 'app', {
   // sidebar navigation (page names; other pages may use these)
   nav: {
-    secPlaylist: 'Playlista',
-    secLibrary: 'Biblioteka',
-    secPlayer: 'Odtwarzacz',
     all: 'Wszystkie utwory',
     missing: 'Brakujące',
     have: 'Mam',

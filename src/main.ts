@@ -570,8 +570,9 @@ app.whenReady().then(async () => {
     height: 840,
     minWidth: 900,
     minHeight: 600,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#0f1116" : "#f4f5f7",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#0c0c0e" : "#f2f2ef",   // Cue, so no flash of other colors
     title: "DJ HQ",
+    icon: path.join(__dirname, "..", "web", "icon.png"),   // Windows and Linux; macOS uses build/icon.png
     // macOS: the window chrome blends into the sidebar (traffic lights over it)
     ...(mac ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 16, y: 18 } } : {}),
   });

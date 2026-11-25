@@ -28,6 +28,16 @@ I18N.add('en', 'app', {
   },
 });
 I18N.add('en', 'common', { change: 'Change…' });
+I18N.add('en', 'app', {
+  pal: {
+    title: 'Palette',
+    cueDesc: 'Graphite and CUE-button orange. Green for what you have.',
+    waveDesc: 'Blue-black with electric cyan. The calmest for long prep sessions.',
+    uvDesc: 'Violet-black with hot magenta, like UV light in the club.',
+  },
+  nav: { secDig: 'Dig', secGet: 'Get', secCrate: 'Crate', secReady: 'Ready' },
+});
+I18N.add('en', 'tags', { link: { none: 'No link yet' } });
 I18N.add('en', 'tags', {
   inInbox: 'In the downloads folder: {name}',
   inInboxTip: 'A fresh download for this track is waiting in the downloads folder. Open Downloads to move it into the collection',

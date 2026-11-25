@@ -74,7 +74,7 @@ PAGES.prepare = {
           <div class="pp-num">${c ? `<button class="big link" onclick="HFILTER='convert';go('have')" title="${esc(t('prepare.showOnHave'))}">${c}<small>${tnh('prepare.compat.toConvert', c)}</small></button>` : tag(t('prepare.compat.ready'), 'ok', 'check')}</div>
           <p>${c ? (dev.label ? tnh('prepare.compat.wontPlay', c, { player: dev.label }) : tnh('prepare.compat.wontPlayAny', c)) + ' ' : ''}${th('prepare.compat.text')}</p>
           <div class="card-acts">
-            <button class="btn ${c ? 'btn-primary' : ''}" id="pp-convert" onclick="ppConvert()" ${c && !PP_ALL ? '' : 'disabled'} title="${esc(PP_ALL ? errText({ code: ppRunCode() }) : t(c ? 'prepare.compat.convertTip' : 'prepare.compat.allOkTip'))}">${icon('sliders')}${esc(t('prepare.compat.convert'))}${c ? ` ${badge(c)}` : ''}</button>
+            <button class="btn" id="pp-convert" onclick="ppConvert()" ${c && !PP_ALL ? '' : 'disabled'} title="${esc(PP_ALL ? errText({ code: ppRunCode() }) : t(c ? 'prepare.compat.convertTip' : 'prepare.compat.allOkTip'))}">${icon('sliders')}${esc(t('prepare.compat.convert'))}${c ? ` ${badge(c)}` : ''}</button>
             <button class="btn" id="pp-restore" onclick="ppRestore()" ${b && !PP_ALL ? '' : 'disabled'} title="${esc(PP_ALL ? errText({ code: ppRunCode() }) : t(b ? 'prepare.compat.restoreTip' : 'prepare.compat.noRestoreTip'))}">${icon('history')}${esc(t('prepare.compat.restore'))}${b ? ` ${badge(b)}` : ''}</button>
           </div>
         </div>

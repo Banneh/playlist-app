@@ -101,7 +101,7 @@ PAGES.welcome = {
     <div class="wl-topbar"></div>
     <button class="btn btn-ghost btn-sm btn-icon wl-theme" id="wl-theme" title="${esc(t('common.theme.title') + ' · ' + t('common.lang.title'))}" onclick="wlThemeMenu(this)">${wlThemeIcon()}</button>
     <div class="welcome-box">
-      <span class="brand-mark welcome-mark">${icon('headphones')}</span>
+      <span class="brand-mark welcome-mark">${logoSvg()}</span>
       <h2>${th('welcome.title')}</h2>
       <p class="lead">${th('welcome.lead')}</p>
       <form class="card wl-form" id="wl-form" novalidate>
