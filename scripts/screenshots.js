@@ -144,7 +144,7 @@ fs.writeFileSync(path.join(DATA, "state.json"), JSON.stringify({
   active: "lib1", dur_cache: {}, overrides: {}, edits: {}, assigned, found, na: {}, acquired, client_id: null, device: "xdj-700",
   settings: { auto_move: false, refresh_min: 15, bandcamp: false },
 }));
-fs.writeFileSync(path.join(DATA, "prefs.json"), JSON.stringify({ tourDone: true, theme: "light" }));
+fs.writeFileSync(path.join(DATA, "prefs.json"), JSON.stringify({ tourDone: true, theme: "light", newsSeen: require("../package.json").version }));
 
 // ---------------- the screens ----------------
 

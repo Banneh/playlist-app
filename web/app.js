@@ -803,6 +803,7 @@ function libraryMenu(anchor) {
     { label: t('app.libMenu.exportXml'), icon: 'upload', onclick: () => typeof exportXml === 'function' ? exportXml() : go('prepare') },
     '-',
     { label: t('common.showMeAround'), icon: 'sparkles', hint: t('common.showMeAroundHint'), onclick: () => typeof startTour === 'function' && startTour() },
+    { label: t('news.menu'), icon: 'history', onclick: () => typeof openNews === 'function' && openNews() },
     { label: t('app.libMenu.checkUpdates'), icon: 'refresh', hint: APP.version ? t('app.libMenu.thisVersion', { version: APP.version }) : '', onclick: () => checkForUpdates({ manual: true }) },
     { label: t('app.libMenu.settings'), icon: 'settings', onclick: () => go('settings') },
     '-',
@@ -914,6 +915,7 @@ async function boot() {
     if (APP.sc && typeof dcPoll === 'function') dcPoll();
     if (typeof daBoot === 'function') daBoot();   // a Do everything run that is going (or was cut off) shows on its button
     if (typeof maybeStartTour === 'function') setTimeout(maybeStartTour, 600);
+    if (typeof maybeShowNews === 'function') setTimeout(maybeShowNews, 900);   // after an update; waits for the tour
     setTimeout(() => checkForUpdates(), 4000);
     setInterval(() => checkForUpdates(), 24 * 60 * 60 * 1000);
     await refreshPlaylist({ manual: !DATA.ready });   // first run with no snapshot: report errors loudly

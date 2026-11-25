@@ -1,0 +1,70 @@
+/* DJ HQ strings: news, English (the source). What's new: the changes of every version (news.js). */
+I18N.add('en', 'news', {
+  title: 'What’s new',
+  titleAfter: 'What’s new in DJ HQ {version}',
+  subAll: 'The changes of every version. You have DJ HQ {version}.',
+  subSince: 'Your last version was {version}. Here is what changed since then. You can open this list again from the ⋯ menu.',
+  menu: 'What’s new…',
+  v: {
+    '2_3_0': {
+      i1: '<b>What’s new</b>: after an update DJ HQ shows what changed in each version. The whole list is in the ⋯ menu and in Settings.',
+    },
+    '2_2_1': {
+      i1: '<b>Write tags</b> explains both choices when a file has a different artist or title in its tags. Only tags change, files are never renamed.',
+    },
+    '2_2_0': {
+      i1: '<b>Bandcamp search</b>: DJ HQ looks for missing tracks without a shop link on Bandcamp in the background. Settings > Bandcamp switches it off.',
+      i2: '<b>Downloads without the browser</b>: a blue Free DL button gets Drive and Dropbox files, links straight to an audio file and SoundCloud’s own downloads right in the app.',
+    },
+    '2_1_1': {
+      i1: 'Tracks start from the lists again on SoundCloud’s new track page.',
+      i2: '<kbd>N</kbd> and <kbd>P</kbd> play the next and the previous track of the list on screen, and the playing row is marked.',
+    },
+    '2_1_0': {
+      i1: '<b>AIFF instead of WAV</b>: convert your WAV files, or every new one, to AIFF with the same audio. rekordbox shows artwork in AIFF files, and an updated rekordbox export keeps your cue points.',
+      i2: '<b>Add cover art</b> puts the SoundCloud artwork into files that have no picture.',
+      i3: '<b>Main folder</b>: choose another main folder for a library, or swap it with one of its extra folders. Your matches stay.',
+      i4: '<b>CDJ-3000X</b> is a player of its own and takes 32-bit files.',
+      i5: '<b>Fix cues</b> moves cue points that Mixed In Key wrote one beat late in a rekordbox XML.',
+      i6: 'The preview plays AIFF files.',
+    },
+    '2_0_1': {
+      i1: '<b>Write tags</b> keeps the spelling a file already has and asks before it replaces a different name.',
+      i2: '<b>Write tags in every file</b> repairs tags that another app damaged or removed.',
+      i3: 'WAV files get their tags in the part rekordbox reads, also after another app dropped it.',
+    },
+    '2_0_0': {
+      i1: '<b>English and Polish</b>: DJ HQ follows your system language, and Settings > Language changes it.',
+      i2: '<b>Private playlists</b> work through their share link, and <b>Change link</b> points a library at another playlist.',
+      i3: '<b>Export and import configuration</b> moves your setup to another computer or keeps it as a backup.',
+      i4: '<b>Check names</b> goes through names where artist and title may be the wrong way round.',
+      i5: 'Writing tags keeps the key and energy from Mixed In Key, comments and cover art. The key goes into the rekordbox export.',
+      i6: 'One player bar for SoundCloud and your files, with a seek line.',
+      i7: 'Your data is now kept in a database, so a crash or power cut does not lose what was already saved.',
+    },
+    '1_7_0': {
+      i1: 'Click a cover to play the track on SoundCloud without leaving the list.',
+      i2: 'Downloads that match no track can be moved in, or found on SoundCloud and added to the playlist.',
+      i3: 'Lists no longer jump to the top when the playlist is checked.',
+    },
+    '1_6_0': {
+      i1: 'Keys for the Discover player: Space, the arrows, <kbd>N</kbd>, <kbd>P</kbd>, <kbd>A</kbd> and <kbd>L</kbd>.',
+      i2: 'Coming back from Discover lands where you left the list.',
+    },
+    '1_5_0': {
+      i1: '<b>Discover</b>: SoundCloud inside the app, with one click to add or like a track.',
+      i2: '<b>Your Likes</b> checks the tracks you liked on SoundCloud against your libraries.',
+      i3: 'The <b>Guide</b> behind the ? button explains every page.',
+    },
+    '1_4_0': {
+      i1: '<b>Settings</b> page, with the option to move exact matches into the library automatically.',
+      i2: '<b>Work through</b> takes the missing tracks one at a time.',
+      i3: 'Bandcamp zips in Downloads are read and unpacked, and a library can follow your SoundCloud Likes.',
+      i4: 'Play buttons preview your files in the app.',
+    },
+    '1_3_0': {
+      i1: 'The theme and a skipped tour are remembered between starts.',
+      i2: 'Write tags is also on the playlist pages, next to the number of files that need it.',
+    },
+  },
+});

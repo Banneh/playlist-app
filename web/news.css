@@ -1,0 +1,7 @@
+/* the What's new dialog (news.js) */
+.nw { padding-bottom: 4px; }
+.nw-ver + .nw-ver { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line-2); }
+.nw-ver h4 { display: flex; align-items: baseline; gap: 10px; font-size: 14px; font-weight: 700; }
+.nw-ver h4 span { font-size: 12px; font-weight: 400; color: var(--text-3); }
+.nw-ver ul { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; color: var(--text-2); }
+.nw-ver li b { color: var(--text); font-weight: 600; }

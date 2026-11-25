@@ -141,6 +141,10 @@ dole paska bocznego pojawia się mała informacja z przyciskiem **Pobierz** dla
 twojego komputera. Zainstaluj nową wersję w miejsce starej; biblioteka i ustawienia
 zostają tam, gdzie były. **⋯ > Sprawdź aktualizacje…** sprawdza od razu.
 
+Pierwsze uruchomienie po aktualizacji pokazuje, co się zmieniło, wersja po wersji,
+od tej, która była wcześniej. **⋯ > Co nowego…** (także w Ustawieniach) pokazuje całą
+listę w dowolnej chwili.
+
 ## Pierwsze kroki
 
 ![Ekran powitalny prosi o folder z muzyką i link do playlisty](docs/screens/welcome.png)

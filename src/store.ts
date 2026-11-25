@@ -36,6 +36,9 @@ const SCHEMA_VERSION = 1;
 const APP_ID = 1145717841;   // "DJHQ"
 const APP_VERSION: string = (() => { try { return require("../package.json").version || "0"; } catch { return "0"; } })();
 
+/** the last version that kept its data in state.json */
+const PRE_DB_VERSION = "1.7.0";
+
 /** STATE's id-keyed maps: one row per own key. dur_cache and zip_cache are caches (safe to empty). */
 const MAPS = ["assigned", "by_hand", "overrides", "edits", "found", "na", "acquired", "dur_cache", "zip_cache"];
 /** the tables a save diffs, in the order rows are built */
@@ -603,6 +606,14 @@ export function open(dataDir: string, withDefaults: (st: any) => any): OpenResul
   try {
     tx(() => {
       metaSet("opened_at", new Date().toISOString());
+      // What's new: the version whose changes were seen last. Missing the first time: the version
+      // that used this database before (PRE_DB_VERSION for an imported state.json, which names
+      // none); a new database starts at the running version, so a new user gets no list.
+      if (prefs.newsSeen === undefined && !prefsHeld) {
+        const next = { ...prefs, newsSeen: (stateDoc ? PRE_DB_VERSION : existed && metaGet("last_app_version")) || APP_VERSION };
+        writePrefs(next, false);
+        prefs = next;
+      }
       if (metaGet("last_app_version") !== APP_VERSION) metaSet("last_app_version", APP_VERSION);
     });
   } catch (e: any) {

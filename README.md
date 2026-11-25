@@ -142,6 +142,9 @@ small notice appears at the bottom of the sidebar with a **Download** button
 for your computer. Install the new version over the old one; your library and
 settings stay where they are. **⋯ > Check for updates…** checks right away.
 
+The first start after an update lists what changed, version by version, since the
+one you had. **⋯ > What's new…** (also in Settings) shows the whole list any time.
+
 ## Getting started
 
 ![The welcome screen asks for your music folder and a playlist link](docs/screens/welcome.png)
@@ -827,6 +830,7 @@ npm run dist        # build installers locally into release/
 | `web/pages/` | one file per page |
 | `web/pages/discover.js` · `web/pages/likes.js` | the embedded SoundCloud page and Your Likes (desktop app only) |
 | `web/tour.js` · `web/demo.js` | the guided tour and its sample data |
+| `web/news.js` | What's new: the list of versions and the dialog after an update; the texts are in `web/lang/*/news.js` |
 | `web/guide.js` | the Guide panel behind the ? button, one entry per page |
 | `web/pages/setup.js` | the "Before we start" screen shown once after the first library |
 | `web/player.js` | the preview player |
@@ -865,7 +869,7 @@ Every text lives in `web/lang/<language>/<area>.js`, one `I18N.add(lang, area,
 {…})` call per file: `common`, `err` (the server's error codes), `app`,
 `player`, `welcome`, `setup`, `tags`, `playlist`, `likes`, `inbox`, `extras`,
 `workthrough`, `names`, `prepare`, `settings`, `config`, `discover`,
-`guide`, `tour` and `demo`. Strings are plain text with `{placeholders}` and,
+`guide`, `tour`, `news` and `demo`. Strings are plain text with `{placeholders}` and,
 where needed, `<b>`, `<i>`, `<kbd>` and `<br>` (nothing else is let through).
 A plural is an object of forms (`one`/`other` in English, `one`/`few`/`many`
 in Polish). The server keeps answering in English with a `code`; the UI
@@ -944,6 +948,10 @@ bodies are JSON.
 | `POST /api/sc/show` · `/hide` · `/bounds` · `/nav` · `/signout` | | the embedded SoundCloud view (Electron only) |
 
 ### Releases
+
+Add the new version to `NEWS` in `web/news.js` and its texts to
+`web/lang/en/news.js` and `web/lang/pl/news.js`, then bump `version` in
+`package.json` and `package-lock.json`.
 
 Pushing a `v*` tag makes GitHub Actions build the installers on macOS (Apple
 Silicon and Intel), Windows and Linux and publish them to the Releases page.

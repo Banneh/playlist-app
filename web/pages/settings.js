@@ -157,6 +157,7 @@ PAGES.settings = {
     const about = stCard('info', '', `DJ HQ ${esc(APP.version || '')}`,
       th('settings.about.text'),
       `<button class="btn btn-sm" onclick="checkForUpdates({ manual: true })">${icon('refresh')}${esc(t('settings.about.checkUpdates'))}</button>
+       <button class="btn btn-sm" onclick="openNews()">${icon('history')}${esc(t('news.menu'))}</button>
        <button class="btn btn-sm" onclick="startTour()" title="${esc(t('common.showMeAroundHint'))}">${icon('sparkles')}${esc(t('common.showMeAround'))}</button>
        <div class="st-path-row st-wide"><span class="faint">${esc(t('settings.about.dataFolder'))}</span><div class="path" title="${esc(S.data_dir || '')}">${icon('folder')}<span>${esc(shortPath(S.data_dir || ''))}</span></div></div>
        <div class="st-path-row st-wide"><button class="btn btn-sm" onclick="stRawExport()" title="${esc(t('settings.about.rawHint'))}">${icon('download')}${esc(t('settings.about.rawExport'))}</button><span class="faint" style="flex-shrink: 1; min-width: 0">${th('settings.about.rawHint')}</span></div>`);
