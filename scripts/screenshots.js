@@ -55,14 +55,10 @@ const PLAYLIST = "Trance Selection";
 const DAY = 24 * 60 * 60 * 1000;
 const now = Date.now();
 
-/** 80×80 artwork: a two-colour gradient with the track's initials (same look as the tour). */
+/** 80×80 artwork: a solid, slightly muted colour with the track's initials (same look as the tour). */
 function art(initials, hue) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
-    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="hsl(${hue},72%,58%)"/><stop offset="1" stop-color="hsl(${(hue + 48) % 360},70%,32%)"/>
-    </linearGradient></defs>
-    <rect width="80" height="80" fill="url(#g)"/>
-    <circle cx="62" cy="18" r="22" fill="rgba(255,255,255,.12)"/>
+    <rect width="80" height="80" fill="hsl(${hue},38%,40%)"/>
     <text x="40" y="49" font-family="Helvetica Neue,Helvetica,Arial,sans-serif" font-size="26" font-weight="700"
           fill="rgba(255,255,255,.92)" text-anchor="middle" letter-spacing="1">${initials}</text>
   </svg>`;
@@ -216,7 +212,12 @@ app.whenReady().then(async () => {
   await esc();
   await js(`setTheme('dark');`);
   await shot("missing-dark");
-  await js(`setTheme('light');`);
+  // the other two palettes, one shot each (the README shows Cue)
+  await js(`setPalette('wave');`);
+  await shot("missing-waveform");
+  await js(`setPalette('uv');`);
+  await shot("missing-afterhours");
+  await js(`setPalette('cue'); setTheme('light');`);
 
   await js(`openWorkThrough();`);
   await sleep(900);
@@ -241,7 +242,8 @@ app.whenReady().then(async () => {
   await sleep(2500);   // the inbox scan probes the downloads (zip entries included)
   await shot("downloads");
 
-  await js(`go('extras');`);
+  await js(`go('collection');`);
+  await sleep(1200);   // the collection view loads on show
   await shot("not-in-playlist");
   // the find dialog, with prepared SoundCloud results instead of a live search
   await js(`
@@ -251,7 +253,7 @@ app.whenReady().then(async () => {
       { id: 900202, url: 'https://soundcloud.com/live-jams/jam-3', title: 'Jam 3', user: 'Live Jams', dur: 455, score: 0.62, name: 0.55, dur_diff: -37, in_playlist: null },
       { id: 900203, url: 'https://soundcloud.com/radio-u/live-jam', title: 'Live Jam (Radio Mix)', user: 'Radio U', dur: 221, score: 0.51, name: 0.51, dur_diff: -271, in_playlist: null },
     ] };
-    openFind(DATA.extras.findIndex(f => !f.found));`);
+    openFind(COLL.files.findIndex(f => f.unmatched && !f.found));`);
   await sleep(600);
   await shot("find-dialog", await box(".dialog", 40));
   await esc();
