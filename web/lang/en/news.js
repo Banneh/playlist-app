@@ -8,6 +8,10 @@ I18N.add('en', 'news', {
   v: {
     '2_3_0': {
       i1: '<b>What’s new</b>: after an update DJ HQ shows what changed in each version. The whole list is in the ⋯ menu and in Settings.',
+      i2: '<b>FLAC and ALAC</b>: Convert makes them fit your player. A player that reads the format keeps it, at the depth and rate it takes. One that can’t read it at all gets an AIFF file with the same names, key and cover, and so does OGG. The preview plays ALAC files too.',
+      i3: '<b>WAV header</b>: Pioneer players often refuse 24-bit WAV files whose header is WAVE_FORMAT_EXTENSIBLE, Bandcamp downloads among them. Such files get a tag, Convert writes the plain header without touching the audio, and every WAV DJ HQ writes gets the plain header.',
+      i4: '<b>Players as Pioneer’s manuals list them</b>: the XDJ-700, XDJ-1000 and CDJ-2000NXS take 24-bit WAV and AIFF, and the XDJ-XZ / XDJ-RX3, XDJ-1000MK2 and OPUS-QUAD have their own entries. If you play on an XDJ-XZ, pick it again on Prepare for player.',
+      i5: 'A ring next to <b>Tasks</b> shows how far running tasks are and turns into a green check when they finish.',
     },
     '2_2_1': {
       i1: '<b>Write tags</b> explains both choices when a file has a different artist or title in its tags. Only tags change, files are never renamed.',

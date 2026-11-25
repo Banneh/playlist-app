@@ -150,7 +150,7 @@ function ppAllResume() {
   PP_ALL_LOOKED = true;
   const get = () => fetch('/api/tag/progress').then(r => r.json());
   get().then(async p => {
-    if (!p.running || p.kind === 'aiff' || PP_ALL || PP_ALL_ASKING) return;   // a WAV to AIFF run is followed in Settings
+    if (!p.running || p.kind === 'aiff' || p.kind === 'convert' || PP_ALL || PP_ALL_ASKING) return;   // a WAV to AIFF run is followed in Settings, a conversion by its own button
     PP_ALL = p; render();
     while (p.running) { await new Promise(r => setTimeout(r, 700)); p = await get().catch(() => p); if (p.running) ppAllShow(p); }
     PP_ALL = null;
@@ -171,9 +171,11 @@ async function ppConvert() {
   if (!ok) return;
   ppBusy('#pp-convert', t('prepare.converting'));
   try {
-    DATA = await qTask(t('app.queue.convert'), () => api('/api/convert', {}));
+    const stop = followRun(() => {});   // the Tasks ring counts the files (pages/playlist.js)
+    try { DATA = await qTask(t('app.queue.convert'), () => api('/api/convert', {}), { run: true }); } finally { stop(); }
     const [msg, err] = fileReport(DATA.convert_report, 'prepare.convertFailed', 'prepare.convertDone');
-    toast(msg, err);
+    const aiff = (DATA.convert_report || {}).aiff || 0;
+    toast(aiff ? msg.replace(/[.!]?$/, '.') + ' ' + tn('prepare.convertAiff', aiff) : msg, err);
   } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
   render();
 }

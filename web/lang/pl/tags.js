@@ -26,6 +26,8 @@ I18N.add('pl', 'tags', {
   bits: { one: '{n} bit', few: '{n} bity', many: '{n} bitów' },
   unsupported: 'format {codec} nieobsługiwany',
   unknownFormat: 'nieznany format',
+  wavHeader: 'nagłówek WAV',
+  wavHeaderTip: 'Odtwarzacze Pioneer często odrzucają ten nagłówek WAV (WAVE_FORMAT_EXTENSIBLE). Konwertuj zapisuje zwykły nagłówek, a dźwięk zostaje bez zmian',
   convertTip: 'Wybrany odtwarzacz nie odtworzy go w tej postaci',
   lossyTip: 'Plik stratny',
   lossless: 'Dostępny bezstratny',

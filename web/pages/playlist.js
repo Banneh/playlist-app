@@ -37,6 +37,7 @@ function bcRow(r) {
 function incompatText(s) {
   let m = /^(\d+)-bit$/.exec(s); if (m) return tn('tags.bits', +m[1]);
   m = /^([\d.]+) kHz$/.exec(s); if (m) return I18N.num(+m[1]) + ' kHz';
+  if (s === 'WAV header') return t('tags.wavHeader');
   m = /^(\S+) unsupported$/.exec(s); if (m) return m[1] === 'UNKNOWN' ? t('tags.unknownFormat') : t('tags.unsupported', { codec: m[1] });
   return s;
 }
@@ -45,7 +46,7 @@ function incompatText(s) {
 function fileIssueTags(r, convertTip) {
   const tags = [];
   if (r.tagged === false) tags.push(tag(t('tags.needsTags'), 'warn', 'tag', t('tags.needsTagsTip')));
-  if (r.incompat) tags.push(tag(t('tags.convert', { codec: incompatText(r.incompat) }), 'warn', 'sliders', convertTip || t('tags.convertTip')));
+  if (r.incompat) tags.push(tag(t('tags.convert', { codec: incompatText(r.incompat) }), 'warn', 'sliders', r.incompat === 'WAV header' ? t('tags.wavHeaderTip') : convertTip || t('tags.convertTip')));
   if (r.lossy) tags.push(tag('MP3', '', '', t('tags.lossyTip')));
   return tags;
 }

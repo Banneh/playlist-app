@@ -246,6 +246,65 @@ export interface KeyInfo {
   /** version of the ID3v2 tag read (2, 3, 4; 0 = none): a picture is only added to a v2.3/2.4 one.
    *  -4: a v2.4 tag unsynchronised as a whole, which pictureTag can't carry frame by frame */
   ver?: number;
+  /** WAV only: its fmt chunk is WAVE_FORMAT_EXTENSIBLE for plain integer PCM in mono or stereo,
+   *  which Pioneer players up to the CDJ-3000 often refuse although the format itself is one they play */
+  ext?: boolean;
+}
+
+/** The fmt chunk of a RIFF/WAVE file: WAVE_FORMAT_EXTENSIBLE (0xFFFE) whose sub-format is integer
+ *  PCM (GUID 00000001-0000-0010-8000-00aa00389b71) with one or two channels; then `plain` is the
+ *  16-byte WAVE_FORMAT_PCM chunk with the same channels, rate, block align and container bits. */
+function extensiblePcm(fd: number, riff: NonNullable<ReturnType<typeof walkChunks>>): { plain: Buffer } | null {
+  if (riff.be) return null;
+  const c = riff.chunks.find((x) => x.id === "fmt ");
+  if (!c || c.size < 40) return null;
+  const b = readAt(fd, c.off, 40);
+  if (b.length < 40 || b.readUInt16LE(0) !== 0xfffe || b.readUInt16LE(16) < 22) return null;
+  const ch = b.readUInt16LE(2), bits = b.readUInt16LE(14);
+  if (ch < 1 || ch > 2 || bits % 8 || bits < 8 || bits > 32) return null;
+  if (b.toString("hex", 24, 40) !== "0100000000001000800000aa00389b71") return null;
+  const plain = Buffer.from(b.subarray(0, 16));
+  plain.writeUInt16LE(1, 0);
+  return { plain };
+}
+
+/** Copy a WAV whose fmt chunk is WAVE_FORMAT_EXTENSIBLE integer PCM (see extensiblePcm) to `dst`
+ *  with the plain 16-byte WAVE_FORMAT_PCM chunk instead: the same samples and every other chunk
+ *  byte for byte, in the same order. false (nothing written) for any other file. */
+export function plainPcmCopy(src: string, dst: string): boolean {
+  const fd = fs.openSync(src, "r");
+  let out = -1;
+  try {
+    const riff = walkChunks(fd);
+    const e = riff && extensiblePcm(fd, riff);
+    if (!riff || !e) return false;
+    out = fs.openSync(dst, "w");
+    let at = 0;
+    const put = (b: Buffer) => { fs.writeSync(out, b, 0, b.length, at); at += b.length; };
+    put(Buffer.from("RIFF\0\0\0\0WAVE", "latin1"));
+    const buf = Buffer.alloc(4 * 1024 * 1024);
+    for (const c of riff.chunks) {
+      const data = c.id === "fmt " ? e.plain : null;
+      const n = data ? data.length : c.size;
+      const head = Buffer.alloc(8);
+      head.write(c.id, 0, "latin1"); head.writeUInt32LE(n, 4);
+      put(head);
+      if (data) put(data);
+      else for (let done = 0; done < n;) {
+        const k = fs.readSync(fd, buf, 0, Math.min(buf.length, n - done), c.off + done);
+        if (k <= 0) throw new Error("the file ended early");
+        fs.writeSync(out, buf, 0, k, at); at += k; done += k;
+      }
+      if (n % 2) put(Buffer.from([0]));
+    }
+    if (at - 8 > 0xffffffff) throw Object.assign(new Error("file too large for its format (4 GB)"), { code: "file_too_large" });
+    const size = Buffer.alloc(4); size.writeUInt32LE(at - 8, 0);
+    fs.writeSync(out, size, 0, 4, 4);
+    return true;
+  } finally {
+    fs.closeSync(fd);
+    if (out >= 0) fs.closeSync(out);
+  }
 }
 
 /** IART / INAM of a WAV's LIST/INFO chunk (the last one, as with the ID3 chunk);
@@ -298,7 +357,7 @@ export function readKeyInfo(p: string): KeyInfo {
     const pn = riff ? riff.chunks.some((c) => c.id === "PLTN") || mark
       : path.extname(p).toLowerCase() === ".mp3" ? mark : null;
     const ver = !t ? 0 : t.head.ver === 4 && t.head.flags & 0x80 ? -4 : t.head.ver;
-    return riff && !riff.be ? { key, pn, info: readInfo(fd, riff), id3: names, pic, ver } : { key, pn, pic, ver };
+    return riff && !riff.be ? { key, pn, info: readInfo(fd, riff), id3: names, pic, ver, ext: !!extensiblePcm(fd, riff) } : { key, pn, pic, ver };
   } catch {
     return { key: null, pn: null };
   } finally {

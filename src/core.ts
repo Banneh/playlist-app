@@ -9,7 +9,7 @@ import * as os from "os";
 import * as path from "path";
 import { execFile, ChildProcess } from "child_process";
 import { buildId3v23, carriedFrames, carriedChunks, appendChunks, prependTag, copyAfterTag, readKeyInfo, id3Version, infoFields, id3Names, rewriteLosses,
-         pictureTag, replaceTagChunk, rawTagFrames, apicFrame, otherChunks, infoAsFrames } from "./id3";
+         pictureTag, replaceTagChunk, rawTagFrames, apicFrame, otherChunks, infoAsFrames, plainPcmCopy, Frame } from "./id3";
 import { listEntries, extractEntry, ZipEntry } from "./zip";
 import { checkXmlFile } from "./rbxml";
 import * as store from "./store";
@@ -19,17 +19,20 @@ export const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 
-export interface Device { label: string; wavBits: number; srs: number[]; flac: boolean; }
+/** What a player reads, from Pioneer's manuals: WAV and AIFF (and FLAC and ALAC where it has them,
+ *  with the same limits) up to `wavBits` at the rates in `srs`; MP3 and AAC at 32, 44.1 or 48 kHz.
+ *  `wext`: it often refuses a WAV with a WAVE_FORMAT_EXTENSIBLE header (every player up to the CDJ-3000). */
+export interface Device { label: string; wavBits: number; srs: number[]; flac: boolean; alac: boolean; wext?: boolean; }
+const HI = [44100, 48000, 88200, 96000], STD = [44100, 48000];
 export const DEVICES: Record<string, Device> = {
-  "xdj-700":  { label: "XDJ-700 / XDJ-1000 / CDJ-2000NXS", wavBits: 16,
-                srs: [44100, 48000], flac: false },
-  "nxs2":     { label: "CDJ-2000NXS2 / XDJ-XZ", wavBits: 24,
-                srs: [44100, 48000, 88200, 96000], flac: true },
-  "cdj-3000": { label: "CDJ-3000", wavBits: 24,
-                srs: [44100, 48000, 88200, 96000], flac: true },
-  // 32-bit WAV and AIFF (integer and float) play on the 3000X: seen on the owner's player, not in a spec sheet
-  "cdj-3000x": { label: "CDJ-3000X", wavBits: 32,
-                srs: [44100, 48000, 88200, 96000], flac: true },
+  "xdj-700":     { label: "XDJ-700 / XDJ-1000 / CDJ-2000NXS", wavBits: 24, srs: STD, flac: false, alac: false, wext: true },
+  "xdj-xz":      { label: "XDJ-XZ / XDJ-RX3", wavBits: 24, srs: STD, flac: true, alac: false, wext: true },
+  "xdj-1000mk2": { label: "XDJ-1000MK2", wavBits: 24, srs: STD, flac: true, alac: true, wext: true },
+  "nxs2":        { label: "CDJ-2000NXS2", wavBits: 24, srs: HI, flac: true, alac: true, wext: true },
+  "cdj-3000":    { label: "CDJ-3000 / OPUS-QUAD", wavBits: 24, srs: HI, flac: true, alac: true, wext: true },
+  // 32-bit WAV and AIFF (integer and float) play on the 3000X: seen on the owner's player, not in a spec sheet.
+  // ffmpeg writes every such WAV with a WAVE_FORMAT_EXTENSIBLE header, so the 3000X reads that header too.
+  "cdj-3000x":   { label: "CDJ-3000X", wavBits: 32, srs: HI, flac: true, alac: true },
 };
 
 // ---------------- ffmpeg binaries ----------------
@@ -123,7 +126,7 @@ export interface Library {
 // (entries written before the key was read have five elements, and older ones lack the
 // later fields: scanFolder adds those from the file's tags alone, without a new ffprobe run)
 type CacheEntry = [number, number, number, [string, number, number], [string, string, string],
-  [string | null, boolean | null, ([string, string] | null)?, ([string, string] | null)?, boolean?, number?]?];
+  [string | null, boolean | null, ([string, string] | null)?, ([string, string] | null)?, boolean?, number?, boolean?]?];
 
 export interface AppState {
   libraries: Library[];
@@ -1087,14 +1090,15 @@ async function probe(p: string): Promise<{ dur: number; fmt: [string, number, nu
   try {
     const r = await run(FFPROBE, ["-v", "error", "-select_streams", "a:0",
       "-show_entries",
-      "stream=codec_name,sample_rate,bits_per_sample:stream_tags=artist,title,genre:format=duration:format_tags=artist,title,genre",
+      "stream=codec_name,sample_rate,bits_per_sample,bits_per_raw_sample:stream_tags=artist,title,genre:format=duration:format_tags=artist,title,genre",
       "-of", "json", p], 30000);
     const j = JSON.parse(r.stdout);
     const s = j.streams?.[0] || {};
     const tags = { ...(j.format?.tags || {}), ...(s.tags || {}) };
     return {
       dur: parseFloat(j.format?.duration || "0") || 0,
-      fmt: [s.codec_name || "", parseInt(s.sample_rate || "0", 10) || 0, s.bits_per_sample || 0],
+      // FLAC and ALAC give their depth only as bits_per_raw_sample
+      fmt: [s.codec_name || "", parseInt(s.sample_rate || "0", 10) || 0, Number(s.bits_per_sample) || Number(s.bits_per_raw_sample) || 0],
       tags: [lookupTag(tags, "artist"), lookupTag(tags, "title"), lookupTag(tags, "genre")],
     };
   } catch {
@@ -1102,17 +1106,19 @@ async function probe(p: string): Promise<{ dur: number; fmt: [string, number, nu
   }
 }
 
-export function compatReason(fmt: [string, number, number], devKey: string): string | null {
+/** Why a file won't play on the player (null: it plays): "24-bit", "96 kHz", "FLAC unsupported",
+ *  or "WAV header" for a WAV that is fine apart from its WAVE_FORMAT_EXTENSIBLE header (`wext`). */
+export function compatReason(fmt: [string, number, number], devKey: string, wext = false): string | null {
   const [codec, sr, bits] = fmt;
-  const d = DEVICES[devKey];
-  if (codec.startsWith("pcm")) {
+  const d = DEVICES[devKey] || DEVICES["xdj-700"];
+  if ((codec === "flac" && !d.flac) || (codec === "alac" && !d.alac)) return codec.toUpperCase() + " unsupported";
+  if (codec.startsWith("pcm") || codec === "flac" || codec === "alac") {
     if (bits && bits > d.wavBits) return `${bits}-bit`;
     if (sr && !d.srs.includes(sr)) return `${sr / 1000} kHz`;
-    return null;
+    return wext && d.wext ? "WAV header" : null;
   }
   if (codec === "mp3" || codec === "aac")
     return !sr || [32000, 44100, 48000].includes(sr) ? null : `${sr / 1000} kHz`;
-  if (codec === "flac" && d.flac) return null;
   return (codec || "unknown").toUpperCase() + " unsupported";
 }
 
@@ -1127,10 +1133,12 @@ interface LocalFile { name: string; base: string; path: string; dur: number; fmt
   /** a WAV's ID3 chunk [artist, title] ("" each when absent); undefined for other formats */
   id3?: [string, string] | null;
   /** the ID3 tag holds a picture, and that tag's version (0: none) */
-  pic?: boolean; tagv?: number; }
+  pic?: boolean; tagv?: number;
+  /** a WAV with a WAVE_FORMAT_EXTENSIBLE header (readKeyInfo's ext) */
+  wext?: boolean; }
 
-const keyEntry = (k: ReturnType<typeof readKeyInfo>): [string | null, boolean | null, [string, string] | null, [string, string] | null, boolean, number] =>
-  [k.key, k.pn, k.info ? [k.info.artist, k.info.title] : null, k.id3 ? [k.id3.artist, k.id3.title] : null, !!k.pic, k.ver || 0];
+const keyEntry = (k: ReturnType<typeof readKeyInfo>): [string | null, boolean | null, [string, string] | null, [string, string] | null, boolean, number, boolean] =>
+  [k.key, k.pn, k.info ? [k.info.artist, k.info.title] : null, k.id3 ? [k.id3.artist, k.id3.title] : null, !!k.pic, k.ver || 0, !!k.ext];
 
 async function refreshCache(p: string): Promise<void> {
   const st = fs.statSync(p);
@@ -1223,13 +1231,14 @@ async function scanFolder(d: string, recursive = false, sweep = false): Promise<
       seen.add(p);
       const wav = path.extname(f).toLowerCase() === ".wav";
       const c = cache[p] as CacheEntry | undefined;
-      if (!c || c[0] !== st.size || c[1] !== Math.floor(st.mtimeMs / 1000) || c.length < 5)
+      // a FLAC or ALAC probed before its depth was read (bits_per_raw_sample) is probed once more
+      if (!c || c[0] !== st.size || c[1] !== Math.floor(st.mtimeMs / 1000) || c.length < 5 || (!c[3][2] && /^(flac|alac)$/.test(c[3][0])))
         await refreshCache(p);
-      else if (c.length < 6 || (c[5]?.length ?? 0) < 6) c[5] = keyEntry(readKeyInfo(p));   // once per older entry
+      else if (c.length < 6 || (c[5]?.length ?? 0) < 7) c[5] = keyEntry(readKeyInfo(p));   // once per older entry
       const en = cache[p] as CacheEntry;
       files.push({ name: rel + f, base: f, path: p, dur: en[2], fmt: en[3], tags: en[4],
                    key: en[5]?.[0] ?? null, pn: en[5]?.[1] ?? null, pic: !!en[5]?.[4], tagv: en[5]?.[5] ?? 0,
-                   ...(wav ? { info: en[5]?.[2] ?? null, id3: en[5]?.[3] ?? null } : {}) });
+                   ...(wav ? { info: en[5]?.[2] ?? null, id3: en[5]?.[3] ?? null, wext: !!en[5]?.[6] } : {}) });
     }
   };
   const away = folderTrouble(d);
@@ -1917,6 +1926,7 @@ async function writeTags(p: string, artist: string, title: string, genre: string
     else if (own)
       appendChunks(tmp, [{ id: ext === ".wav" ? "id3 " : "ID3 ", data: mergedTag(p, ia, it, genre) },
                          ...carriedChunks(p, true, true)]);
+    if (ext === ".wav") plainWav(tmp);
     if ((await audioMd5(tmp)) !== md5) throw appError("audio_would_change", "audio data would change, left untouched");
     await keepFileMeta(p, tmp);
     fs.renameSync(tmp, p);   // in here: a rename that fails (a locked file) leaves no copy behind
@@ -2484,7 +2494,7 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
       artWhy = artReason(f, t.art, tagged);
       differs = fileDiffers(f, a, ti);
       if (!tagged || opts.plans) plan = tagPlan(f, a, ti, handFields(ed), keptOver(ed, confirmed, differs));
-      incompat = compatReason(f.fmt, dev);
+      incompat = compatReason(f.fmt, dev, f.wext);
       lossy = LOSSY.test(f.fmt[0]);
       key = f.key ?? null; pn = f.pn ?? null;
     }
@@ -2520,7 +2530,7 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
     const fnd = STATE.found["x:" + f.path];
     const tagged = isTagged(f, xa, xt, genre, handFields(ed)), differs = fileDiffers(f, xa, xt);
     const look = nameLook(nm, ed, hand, confirmed, differs);
-    return { name: f.name, path: f.path, incompat: compatReason(f.fmt, dev), dur: fmtDur(Math.round(f.dur)), lossy: LOSSY.test(f.fmt[0]),
+    return { name: f.name, path: f.path, incompat: compatReason(f.fmt, dev, f.wext), dur: fmtDur(Math.round(f.dur)), lossy: LOSSY.test(f.fmt[0]),
              artist: xa, title: xt, edited: hand, ...differs,
              name_conf: nm.conf, name_why: look.why, name_ok: confirmed, check_name: look.check,
              tagged, ...(tagged && !opts.plans ? {} : { tag_plan: tagPlan(f, xa, xt, handFields(ed), keptOver(ed, confirmed, differs)) }),
@@ -2544,7 +2554,7 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
     name_checks: rows.filter((r) => r.check_name).length + extras.filter((e) => e.check_name).length,
     untagged: rows.filter((r) => r.tagged === false).length
             + extras.filter((e) => e.tagged === false).length,
-    incompatible: files.filter((f) => compatReason(f.fmt, dev)).length,
+    incompatible: files.filter((f) => compatReason(f.fmt, dev, f.wext)).length,
     local_count: files.length,
     art: artCounts(rows, extras.length),
     aiff: { on: !!STATE.settings?.aiff_auto, wav: files.filter((f) => path.extname(f.name).toLowerCase() === ".wav").length },
@@ -2575,15 +2585,17 @@ function tagTodo(view: any, all = false): TagTodo[] {
  *  /api/tag (and convert / restore) is refused (tagIdle), not queued behind it for minutes. */
 /** Add cover art (addArt) is the other every-file run and shares this, `kind` saying which goes. */
 /** Convert WAV files to AIFF (aiffAll) is the third, kind "aiff". */
-export const TAG_RUN: { running: boolean; kind: "tags" | "art" | "aiff"; done: number; total: number; report: any } =
+/** Convert (Prepare for player) is the fourth, kind "convert". */
+export const TAG_RUN: { running: boolean; kind: "tags" | "art" | "aiff" | "convert"; done: number; total: number; report: any } =
   { running: false, kind: "tags", done: 0, total: 0, report: null };
 export function tagIdle(): void {
   if (TAG_RUN.running && TAG_RUN.kind === "art") throw appError("art_running", "pictures are being added to the files; wait until that is done");
   if (TAG_RUN.running && TAG_RUN.kind === "aiff") throw appError("aiff_running", "WAV files are being converted to AIFF; wait until that is done");
+  if (TAG_RUN.running && TAG_RUN.kind === "convert") throw appError("convert_running", "files are being converted for the player; wait until that is done");
   if (TAG_RUN.running) throw appError("tag_running", "tags are being written in every file; wait until that is done");
 }
 /** claimed by the route before the run is queued, so a second click finds it taken */
-export function claimTagRun(kind: "tags" | "art" | "aiff" = "tags"): void {
+export function claimTagRun(kind: "tags" | "art" | "aiff" | "convert" = "tags"): void {
   tagIdle();
   Object.assign(TAG_RUN, { running: true, kind, done: 0, total: 0, report: null });
 }
@@ -2797,23 +2809,59 @@ export async function unprocessedFiles(): Promise<string[]> {
   return (await scanLocal(lib)).filter((f) => f.pn === false || !f.key).map((f) => f.name);
 }
 
+/** The rate a file goes to for a player: its own when the player takes it, else the highest the
+ *  player takes in the same family (44.1 or 48 kHz multiples) that is not above it. */
+function targetRate(sr: number, dev: Device): number {
+  if (!sr || dev.srs.includes(sr)) return sr || 44100;
+  const fam = sr % 48000 === 0 ? 48000 : 44100;
+  const ok = dev.srs.filter((x) => x % fam === 0 && x <= sr);
+  return ok.length ? Math.max(...ok) : fam;
+}
+/** A temp WAV with a WAVE_FORMAT_EXTENSIBLE header (ffmpeg writes one for more than 16 bits or
+ *  48 kHz) gets the plain PCM header Pioneer players read; the samples and other chunks stay. */
+function plainWav(tmp: string): void {
+  const t2 = staleGone(tmp + ".tmp.wav");
+  try { if (plainPcmCopy(tmp, t2)) fs.renameSync(t2, tmp); } finally { doneTmp(t2); }
+}
+
+/** Convert every file of the active library that won't play on the player (compatReason):
+ *  - WAV and AIFF in place, with the same name and length, so rekordbox keeps hot cues, grids and
+ *    analysis: a lower depth or rate where needed, and a WAV that is only refused for its
+ *    WAVE_FORMAT_EXTENSIBLE header gets the plain one (the samples copied byte for byte);
+ *  - FLAC and ALAC on a player that reads them, in place in the same format (depth or rate);
+ *  - anything the player can't read at all (FLAC, ALAC, OGG, an MP3 or AAC at an odd rate) becomes
+ *    an AIFF next to it (toAiff): the name changes, so rekordbox needs its export updated.
+ *  The untouched original goes to the backups first; Restore originals brings it back. The run is
+ *  claimed by the route (claimTagRun("convert")), so GET /api/tag/progress counts its files. */
 export async function convertAll(): Promise<any> {
-  // Convert every incompatible local PCM file in place (same path & duration ->
-  // rekordbox keeps hot cues / grid / analysis). Originals backed up first.
+  try {
+    const view = await convertRun();
+    TAG_RUN.report = view.convert_report;
+    return view;
+  } finally { TAG_RUN.running = false; }
+}
+async function convertRun(): Promise<any> {
   const lib = requireLib();
   const devKey = DEVICES[STATE.device] ? STATE.device : "xdj-700";
   const dev = DEVICES[devKey];
   const bdir = backupDir(lib);
-  let done = 0;
+  let done = 0, aiff = 0;
   const errors: string[] = [], error_items: ErrorItem[] = [];
-  for (const f of await scanLocal(lib)) {
-    if (!compatReason(f.fmt, devKey)) continue;
+  const fail = (name: string, e: any) => { errors.push(`${name}: ${e.message}`); error_items.push(errItem(name, e)); };
+  const todo = (await scanLocal(lib)).filter((f) => compatReason(f.fmt, devKey, f.wext));
+  TAG_RUN.total = todo.length;
+  for (const f of todo) {
+    TAG_RUN.done++;   // counted as it starts: the ring shows the file being worked on
+    const why = compatReason(f.fmt, devKey, f.wext)!;
     const [codec, sr, bits] = f.fmt;
     const ext = path.extname(f.name).toLowerCase();
-    if (!codec.startsWith("pcm") || ![".wav", ".aiff", ".aif"].includes(ext)) {
-      const msg = `${codec || "unknown"} needs a manual convert (extension would change and rekordbox would lose cues)`;
-      errors.push(`${f.name}: ${msg}`);
-      error_items.push(errItem(f.name, codec ? appError("convert_manual", msg, { codec }) : appError("convert_manual_unknown", msg)));
+    const pcm = codec.startsWith("pcm") && [".wav", ".aiff", ".aif"].includes(ext);
+    const same = (codec === "flac" && dev.flac && ext === ".flac") || (codec === "alac" && dev.alac && ext === ".m4a");
+    const newSr = targetRate(sr, dev), newBits = Math.min(bits || 16, dev.wavBits);
+    if (!codec) { fail(f.name, appError("convert_manual_unknown", "this format can't be read, so it was left as it is")); continue; }
+    if (!pcm && !same) {
+      try { await toAiff(lib, f, newSr, /^(pcm|flac|alac)/.test(codec) ? newBits : 16); aiff++; done++; }
+      catch (e: any) { fail(f.name, e); }
       continue;
     }
     const tmp = liveTmp(f.path + ".tmp" + ext);
@@ -2821,40 +2869,158 @@ export async function convertAll(): Promise<any> {
       const bpath = path.join(bdir, ...f.name.split("/"));
       fs.mkdirSync(path.dirname(bpath), { recursive: true });
       if (!fs.existsSync(bpath)) copyPreservingTimes(f.path, bpath);
-      const [artist, title, genre] = f.tags;
-      const newSr = dev.srs.includes(sr) ? sr : sr % 48000 === 0 ? 48000 : 44100;
-      const newBits = Math.min(bits || 16, dev.wavBits);
-      const isAiff = ext === ".aiff" || ext === ".aif";
-      const acodec = `pcm_s${newBits <= 16 ? 16 : 24}${isAiff ? "be" : "le"}`;
-      const args = ["-y", "-v", "error", "-i", f.path, "-map", "0:a",
-                    "-c:a", acodec, "-ar", String(newSr), "-map_metadata", "-1"];
-      if (!isAiff) args.push(...metaArgs(artist, title, genre)); // RIFF INFO, as writeTags
-      args.push(tmp);
-      const r = await run(FFMPEG, args, 600000);
-      if (r.code !== 0) throw appError("ffmpeg_failed", "ffmpeg: " + r.stderr.slice(0, 200), { error: r.stderr.slice(0, 200) });
-      if (Math.abs((await probeDuration(tmp)) - f.dur) > 0.5)
-        throw appError("duration_changed", "duration changed after convert, aborted");
-      // The ID3 tag (rekordbox reads it) keeps every frame: key, energy, comments.
-      // Platinum Notes' marker (PLTN chunk, or GEOB frame) is kept too: its processing
-      // is in the samples and survives a change of bit depth or rate, and without the
-      // marker it would process the file a second time. Peak chunks are dropped, cue
-      // and loop positions only when the sample rate changes.
-      const tag = mergedTag(f.path, artist, title, genre);
-      const keep = carriedChunks(f.path, false, newSr === sr);
-      appendChunks(tmp, tag.length > 10 ? [{ id: isAiff ? "ID3 " : "id3 ", data: tag }, ...keep] : keep);
+      if (why === "WAV header") {
+        // only the header: the samples and every chunk byte for byte
+        if (!plainPcmCopy(f.path, tmp)) throw appError("convert_header_failed", "the WAV header could not be rewritten");
+        if ((await audioMd5(tmp)) !== (await audioMd5(f.path))) throw appError("audio_would_change", "audio data would change, left untouched");
+      } else if (same) {
+        // FLAC / ALAC in their own format; tags and the cover go along
+        const s32 = newBits > 16, args = ["-y", "-v", "error", "-nostdin", "-i", f.path, "-map", "0:a:0", "-map", "0:v?", "-c:v", "copy",
+          "-map_metadata", "0", "-c:a", codec, "-sample_fmt", codec === "flac" ? (s32 ? "s32" : "s16") : (s32 ? "s32p" : "s16p"),
+          ...(s32 ? ["-bits_per_raw_sample", String(newBits)] : []), "-ar", String(newSr), tmp];
+        const r = await run(FFMPEG, args, 600000);
+        if (r.code !== 0) throw appError("ffmpeg_failed", "ffmpeg: " + r.stderr.slice(0, 200), { error: r.stderr.slice(0, 200) });
+        if (Math.abs((await probeDuration(tmp)) - f.dur) > 0.5) throw appError("duration_changed", "duration changed after convert, aborted");
+      } else {
+        const [artist, title, genre] = f.tags;
+        const isAiff = ext === ".aiff" || ext === ".aif";
+        const acodec = `pcm_s${newBits <= 16 ? 16 : newBits <= 24 ? 24 : 32}${isAiff ? "be" : "le"}`;
+        const args = ["-y", "-v", "error", "-i", f.path, "-map", "0:a",
+                      "-c:a", acodec, "-ar", String(newSr), "-map_metadata", "-1"];
+        if (!isAiff) args.push(...metaArgs(artist, title, genre)); // RIFF INFO, as writeTags
+        args.push(tmp);
+        const r = await run(FFMPEG, args, 600000);
+        if (r.code !== 0) throw appError("ffmpeg_failed", "ffmpeg: " + r.stderr.slice(0, 200), { error: r.stderr.slice(0, 200) });
+        if (Math.abs((await probeDuration(tmp)) - f.dur) > 0.5)
+          throw appError("duration_changed", "duration changed after convert, aborted");
+        // The ID3 tag (rekordbox reads it) keeps every frame: key, energy, comments.
+        // Platinum Notes' marker (PLTN chunk, or GEOB frame) is kept too: its processing
+        // is in the samples and survives a change of bit depth or rate, and without the
+        // marker it would process the file a second time. Peak chunks are dropped, cue
+        // and loop positions only when the sample rate changes.
+        const tag = mergedTag(f.path, artist, title, genre);
+        const keep = carriedChunks(f.path, false, newSr === sr);
+        appendChunks(tmp, tag.length > 10 ? [{ id: isAiff ? "ID3 " : "id3 ", data: tag }, ...keep] : keep);
+        if (!isAiff) plainWav(tmp);
+      }
+      await keepFileMeta(f.path, tmp);
       fs.renameSync(tmp, f.path);
       await refreshCache(f.path);
       done++;
     } catch (e: any) {
       if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
-      errors.push(`${f.name}: ${e.message}`);
-      error_items.push(errItem(f.name, e));
+      fail(f.name, e);
     } finally { LIVE_TMP.delete(tmp); }
   }
   saveState();
   const view = await buildView();
-  view.convert_report = { done, errors, error_items, backup_dir: bdir };
+  view.convert_report = { done, aiff, errors, error_items, backup_dir: bdir };
   return view;
+}
+
+/** An ALAC file as a WAV the in-app preview can play (Chromium has no ALAC decoder): decoded once
+ *  into a folder in the system's temp folder, where the last few stay; null when the file is not
+ *  ALAC (AAC in an .m4a plays as it is) or can't be decoded. The file itself is only read. */
+const PREVIEW_DIR = path.join(os.tmpdir(), "djhq-preview");
+export async function previewAs(p: string): Promise<string | null> {
+  if (path.extname(p).toLowerCase() !== ".m4a") return null;
+  const c = STATE.dur_cache[p] as CacheEntry | undefined;
+  const codec = c?.[3]?.[0] || (await probe(p)).fmt[0];
+  if (codec !== "alac") return null;
+  const st = fs.statSync(p);
+  const out = path.join(PREVIEW_DIR, require("crypto").createHash("sha1").update(`${p}|${st.size}|${st.mtimeMs}`).digest("hex").slice(0, 20) + ".wav");
+  if (fs.existsSync(out)) { try { fs.utimesSync(out, new Date(), new Date()); } catch { /* ignore */ } return out; }
+  fs.mkdirSync(PREVIEW_DIR, { recursive: true });
+  const part = out + ".part.wav";
+  const r = await run(FFMPEG, ["-y", "-v", "error", "-nostdin", "-i", p, "-map", "0:a:0", "-c:a", "pcm_s16le", part], 120000);
+  if (r.code !== 0) { try { fs.unlinkSync(part); } catch { /* none */ } return null; }
+  fs.renameSync(part, out);
+  // the three played last stay
+  try {
+    const old = fs.readdirSync(PREVIEW_DIR).filter((n) => n.endsWith(".wav") && !n.endsWith(".part.wav"))
+      .map((n) => path.join(PREVIEW_DIR, n)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+    for (const q of old.slice(3)) fs.unlinkSync(q);
+  } catch { /* another DJ HQ may be tidying too */ }
+  return out;
+}
+
+/** The AIFF a file of another format becomes ("X.flac" > "X.aif"), and one of that name already there. */
+const asAiffKey = (key: string) => key.replace(/\.[^./]+$/, ".aif");
+const asAiffThere = (p: string) => [".aif", ".aiff", ".AIF", ".AIFF"].some((e) => fs.existsSync(p.replace(/\.[^./\\]+$/, e)));
+
+/** The names, key and a few more tags of any file (FLAC and OGG keep them as Vorbis comments,
+ *  M4A as iTunes atoms), and its front cover, for the ID3 tag of the AIFF it becomes. */
+async function sourceTags(p: string, picOut: string): Promise<{ frames: Frame[]; artist: string; title: string; genre: string; key: string }> {
+  const r = await run(FFPROBE, ["-v", "error", "-show_entries", "format_tags:stream_tags", "-of", "json", p], 30000);
+  let tags: Record<string, string> = {};
+  try { const j = JSON.parse(r.stdout); tags = { ...(j.streams?.[0]?.tags || {}), ...(j.format?.tags || {}) }; } catch { /* none */ }
+  const get = (...ks: string[]) => { for (const k of ks) { const v = lookupTag(tags, k).trim(); if (v) return v; } return ""; };
+  const text = (id: string, v: string): Frame => ({ id, data: Buffer.concat([Buffer.from([0x01, 0xff, 0xfe]), Buffer.from(v, "utf16le"), Buffer.from([0, 0])]) });
+  const frames: Frame[] = [];
+  const key = get("initialkey", "key", "tkey");
+  if (key) frames.push(text("TKEY", key));
+  const album = get("album"); if (album) frames.push(text("TALB", album));
+  const bpm = get("bpm", "tbpm", "tmpo"); if (/^\d+(\.\d+)?$/.test(bpm)) frames.push(text("TBPM", String(Math.round(Number(bpm)))));
+  const year = /^\d{4}/.exec(get("date", "year", "tyer"))?.[0]; if (year) frames.push(text("TYER", year));
+  // the cover: the first picture stream, copied as it is
+  const pr = await run(FFMPEG, ["-y", "-v", "error", "-nostdin", "-i", p, "-an", "-map", "0:v:0", "-c", "copy", "-f", "image2", picOut], 30000);
+  try {
+    if (pr.code === 0) {
+      const img = fs.readFileSync(picOut), mime = pictureMime(img);
+      if (mime) frames.push({ id: "APIC", data: Buffer.concat([Buffer.from([0x00]), Buffer.from(mime + "\0", "latin1"), Buffer.from([0x03, 0x00]), img]) });
+    }
+  } catch { /* no picture */ } finally { try { fs.unlinkSync(picOut); } catch { /* none */ } }
+  return { frames, artist: get("artist"), title: get("title"), genre: get("genre"), key };
+}
+
+/** One file the player can't read (FLAC, ALAC, OGG, an MP3 or AAC at an odd rate) becomes an AIFF
+ *  next to it: `bits` deep at `sr` (the same samples when neither changes, checked by their MD5),
+ *  with an ID3v2.3 tag written by DJ HQ (names, key, album, BPM, year, the cover). Then the AIFF
+ *  takes the file's place, the original goes to the backups (Restore originals puts it back and
+ *  moves the AIFF out, as for a WAV made AIFF), and what DJ HQ remembers follows it; aiff_from
+ *  records it, so Update a rekordbox export points the tracks at the AIFF. Returns the new key. */
+async function toAiff(lib: Library, f: LocalFile, sr: number, bits: number): Promise<string> {
+  const key = f.name, src = f.path;
+  if (asAiffThere(src)) throw appError("aiff_exists", "an AIFF file with this name is already there, so the file was left alone");
+  const before = await probeAudio(src);
+  if (!before) throw appError("convert_manual_unknown", "this format can't be read, so it was left as it is");
+  const newKey = asAiffKey(key), dst = libPath(lib, newKey);
+  const tmp = staleGone(dst + ".tmp.aif");
+  const depth = bits <= 16 ? 16 : bits <= 24 ? 24 : 32;
+  const exact = sr === before.sr && depth === before.bits && /^(pcm|flac|alac)/.test(before.codec);
+  try {
+    const r = await run(FFMPEG, ["-y", "-v", "error", "-nostdin", "-i", src, "-map", "0:a:0", "-c:a", `pcm_s${depth}be`, "-ar", String(sr),
+      "-map_metadata", "-1", "-write_id3v2", "0", "-fflags", "+bitexact", tmp], 600000);
+    if (r.code !== 0) throw appError("ffmpeg_failed", "ffmpeg: " + r.stderr.slice(0, 200), { error: r.stderr.slice(0, 200) });
+    const t = await sourceTags(src, dst + ".cover");
+    const tag = buildId3v23(t.artist, t.title, t.genre, t.frames);
+    if (tag.length > 10) appendChunks(tmp, [{ id: "ID3 ", data: tag }]);
+    const after = await probeAudio(tmp);
+    const bad = (why: string) => appError("aiff_check_failed", "the AIFF copy did not come out as planned, so the file was kept: " + why, { why });
+    if (!after || after.sr !== sr || after.bits !== depth || after.ch !== before.ch || Math.abs(after.dur - before.dur) > 0.1) throw bad("format");
+    if (exact && (await pcmMd5(src)) !== (await pcmMd5(tmp))) throw bad("audio");
+    if (t.key && readKeyInfo(tmp).key !== t.key) throw bad("tag");
+    await keepFileMeta(src, tmp);
+    if (fs.existsSync(dst)) throw appError("aiff_exists", "an AIFF file with this name is already there, so the file was left alone");
+    fs.renameSync(tmp, dst);
+  } catch (e) {
+    doneTmp(tmp);
+    throw e;
+  } finally { LIVE_TMP.delete(tmp); }
+  try {
+    const bpath = path.join(backupDir(lib), ...key.split("/"));
+    fs.mkdirSync(path.dirname(bpath), { recursive: true });
+    backupMove(src, fs.existsSync(bpath) ? replacedName(lib, path.basename(src)) : bpath);
+  } catch (e: any) {
+    try { fs.unlinkSync(dst); } catch { /* ignore */ }
+    throw appError("aiff_backup_failed", "the original could not be moved to the backups, so it was kept and the AIFF copy was removed: " + String(e?.message || e), { error: String(e?.code || e?.message || e) });
+  }
+  renameRecords(lib, key, newKey);
+  lib.aiff_from = { ...(lib.aiff_from || {}), [key]: newKey };
+  delete STATE.dur_cache[src];
+  await refreshCache(dst);
+  saveState();
+  return newKey;
 }
 
 // ---------------- WAV to AIFF ----------------

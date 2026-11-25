@@ -28,6 +28,8 @@ I18N.add('en', 'tags', {
   bits: { one: '{n}-bit', other: '{n}-bit' },
   unsupported: '{codec} not supported',
   unknownFormat: 'unknown format',
+  wavHeader: 'WAV header',
+  wavHeaderTip: 'Pioneer players often refuse this WAV header (WAVE_FORMAT_EXTENSIBLE). Convert gives the file the plain one: the audio stays as it is',
   convertTip: 'Not playable on the selected player as-is',
   lossyTip: 'Lossy file',
   lossless: 'Lossless available',

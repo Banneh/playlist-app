@@ -445,9 +445,22 @@ values.
 ![The Prepare for player page: target player, tags, compatibility, rekordbox export and the files that still need something](docs/screens/prepare.png)
 
 1. **Pick your player** at the top. Everything below adapts to what it can
-   play: the XDJ-700 and XDJ-1000 only take 16-bit WAV at 44.1 or 48 kHz, while
-   the CDJ-2000NXS2, XDJ-XZ, CDJ-3000 and CDJ-3000X also play 24-bit, 96 kHz and FLAC,
-   and the CDJ-3000X plays 32-bit files too.
+   play, as Pioneer's manuals list it:
+
+   | Player | WAV, AIFF | FLAC | ALAC | Highest rate |
+   | --- | --- | --- | --- | --- |
+   | XDJ-700 / XDJ-1000 / CDJ-2000NXS | up to 24-bit | no | no | 48 kHz |
+   | XDJ-XZ / XDJ-RX3 | up to 24-bit | yes | no | 48 kHz |
+   | XDJ-1000MK2 | up to 24-bit | yes | yes | 48 kHz |
+   | CDJ-2000NXS2 | up to 24-bit | yes | yes | 96 kHz |
+   | CDJ-3000 / OPUS-QUAD | up to 24-bit | yes | yes | 96 kHz |
+   | CDJ-3000X | up to 32-bit | yes | yes | 96 kHz |
+
+   MP3 and AAC play on all of them at 32, 44.1 or 48 kHz. Pioneer players
+   up to the CDJ-3000 often refuse a WAV whose header is WAVE_FORMAT_EXTENSIBLE
+   (common in 24-bit downloads, Bandcamp's among them), although the audio
+   itself is fine: such a file gets a **WAV header** tag. DJ HQ writes the plain header into every
+   WAV it writes.
 2. **Write tags** writes the artist and title into every file where they are
    missing or differ from the names DJ HQ shows, the way rekordbox reads them
    (it is strict about WAV files). The genre becomes the playlist name.
@@ -510,8 +523,14 @@ values.
    on a row does the same for one track.
 3. **Convert** turns files your player can't play into ones it can, in place:
    same file name, same length, so rekordbox keeps your hot cues and beat
-   grids. The originals are backed up first, and **Restore originals** puts
-   them back whenever you like.
+   grids. A WAV with only the header problem gets the plain header, and its
+   audio is copied byte for byte. A FLAC or ALAC file at a depth or rate the
+   player can't take stays in its format. A format the player can't read at
+   all (FLAC, ALAC or OGG on some players, an MP3 at an odd rate) becomes an
+   AIFF file with the same names, key and cover; since its name changes,
+   update your rekordbox export afterwards with **Update a rekordbox export…**
+   in Settings > AIFF instead of WAV. The originals are backed up first, and
+   **Restore originals** puts them back whenever you like.
 4. **Export XML…** writes a rekordbox playlist with every matched file and
    shows you how to import it. In rekordbox: *Preferences > Advanced >
    Database > rekordbox xml*, browse to the file once; a *rekordbox xml* item

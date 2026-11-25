@@ -162,7 +162,7 @@ const busy = () => INFLIGHT > 0 || EDIT_ID !== null || !!document.querySelector(
 let QUEUE = [], Q_SEQ = 0, Q_RUN = null, Q_UNSEEN = 0;
 /* opts.quiet: a background task nobody pressed a button for: no notification, no dot */
 async function qTask(label, fn, opts = {}) {
-  const task = { id: ++Q_SEQ, label, status: 'running', started: Date.now(), done: 0, total: 0, msg: '' };
+  const task = { id: ++Q_SEQ, label, status: 'running', started: Date.now(), done: 0, total: 0, msg: '', quiet: !!opts.quiet };
   QUEUE.unshift(task);
   if (QUEUE.length > 40) QUEUE.length = 40;
   if (opts.run) Q_RUN = task;
@@ -193,8 +193,45 @@ function qNotify(task) {
     new Notification(task.label, { body: task.status === 'failed' ? t('app.queue.failed', { msg: task.msg }) : t('app.queue.done'), silent: false });
   } catch { /* no notifications here */ }
 }
+/** a ring that fills with `p` (0..1), or turns as a spinner when p is null */
+function qRing(p) {
+  const C = 50.27;   // 2 * pi * 8
+  return `<svg class="q-ring${p === null ? ' turn' : ''}" viewBox="0 0 20 20" aria-hidden="true"><circle class="bg" cx="10" cy="10" r="8"/>`
+    + `<circle class="fg" cx="10" cy="10" r="8" stroke-dasharray="${p === null ? '14 ' + C : C}" stroke-dashoffset="${p === null ? 0 : (C * (1 - p)).toFixed(2)}"/></svg>`;
+}
+/* The indicator next to the Tasks button: while tasks run, a ring that fills with their progress
+   (a turning one while none can tell how far it is), then a green check (a red mark when one
+   failed) for a few seconds. A click opens the list. Background tasks nobody started by hand
+   (the Bandcamp search) show the ring but no check. */
+let Q_IND = { on: false, since: 0, timer: 0 };
+function qIndicator() {
+  const el = $('#q-ind'); if (!el) return;
+  if (!el.onclick) el.onclick = e => { e.stopPropagation(); qToggle($('#btn-queue')); };
+  const run = QUEUE.filter(q => q.status === 'running');
+  if (run.length) {
+    clearTimeout(Q_IND.timer);
+    if (!Q_IND.on) Q_IND = { on: true, since: Date.now(), timer: 0 };
+    const known = run.filter(q => q.total), done = known.reduce((a, q) => a + q.done, 0), total = known.reduce((a, q) => a + q.total, 0);
+    const p = total ? Math.min(1, done / total) : null;
+    el.className = 'q-ind run';
+    el.innerHTML = qRing(p) + (p === null ? '' : `<span class="q-pct">${I18N.num(Math.floor(p * 100))}%</span>`);
+    el.title = run.length === 1 ? run[0].label + (total ? ` · ${done} / ${total}` : '') : tn('app.queue.nRunning', run.length);
+    el.hidden = false;
+    return;
+  }
+  if (!Q_IND.on) return;
+  Q_IND.on = false;
+  const ended = QUEUE.filter(q => q.ended && q.ended >= Q_IND.since && !q.quiet);
+  if (!ended.length) { el.hidden = true; return; }
+  const failed = ended.some(q => q.status === 'failed');
+  el.className = 'q-ind ' + (failed ? 'fail' : 'ok');
+  el.innerHTML = icon(failed ? 'xCircle' : 'checkCircle');
+  el.title = failed ? t('app.queue.someFailed') : t('app.queue.allDone');
+  el.hidden = false;
+  Q_IND.timer = setTimeout(() => { el.classList.add('out'); Q_IND.timer = setTimeout(() => { if (!Q_IND.on) el.hidden = true; }, 400); }, failed ? 10000 : 5000);
+}
 function qRowHtml(q) {
-  const ic = q.status === 'running' ? '<span class="spin"></span>' : icon(q.status === 'failed' ? 'xCircle' : 'checkCircle');
+  const ic = q.status === 'running' ? (q.total ? qRing(Math.min(1, q.done / q.total)) : qRing(null)) : icon(q.status === 'failed' ? 'xCircle' : 'checkCircle');
   const when = I18N.time ? I18N.time(q.ended || q.started) : new Date(q.ended || q.started).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const st = q.status === 'running'
     ? t('app.queue.running') + (q.total ? ` · ${q.done} / ${q.total}` : '')
@@ -220,6 +257,7 @@ function qRender() {
   }
   const m = qPanel();
   if (m) m.innerHTML = qPanelHtml();
+  qIndicator();
 }
 function qClear() { QUEUE = QUEUE.filter(q => q.status === 'running'); qRender(); }
 function qToggle(anchor) {

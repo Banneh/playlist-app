@@ -159,7 +159,7 @@ export function remapExport(file: string, libs: Library[]): RemapReport {
       idMap.set(t.id, dup.id);
       locMap.set(t.loc, dup.loc);
       rep.own_cues++;
-      if (/\.wav$/i.test(t.p) && /\.aiff?$/i.test(now)) aiffy = true;
+      if (/\.(wav|flac|m4a|ogg|mp3)$/i.test(t.p) && /\.aiff?$/i.test(now)) aiffy = true;
       continue;
     }
     // an entry at the new path already (rekordbox added the AIFF without cues): left out, its spelling used
@@ -180,7 +180,7 @@ export function remapExport(file: string, libs: Library[]): RemapReport {
     remappedIds.add(t.id);
     remappedT.push({ id: t.id, loc });
     rep.remapped++;
-    if (/\.wav$/i.test(t.p) && /\.aiff?$/i.test(now)) { rep.wav_to_aiff++; aiffy = true; }
+    if (/\.(wav|flac|m4a|ogg|mp3)$/i.test(t.p) && /\.aiff?$/i.test(now)) { rep.wav_to_aiff++; aiffy = true; }
     if (fold(path.dirname(now)) !== fold(path.dirname(t.p))) rep.folder_moved++;
     const n = (t.text.match(/<POSITION_MARK\b/g) || []).length;
     rep.cues += n;

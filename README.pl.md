@@ -461,9 +461,22 @@ biorą twoje wartości.
 ![Strona Przygotuj na odtwarzacz: docelowy odtwarzacz, tagi, zgodność, eksport do rekordbox i pliki, które jeszcze czegoś wymagają](docs/screens/prepare.png)
 
 1. **Wybierz swój odtwarzacz** na górze. Kroki poniżej zależą od tego, co on
-   odtwarza: XDJ-700 i XDJ-1000 przyjmują tylko 16-bitowe pliki WAV
-   44,1 albo 48 kHz, a CDJ-2000NXS2, XDJ-XZ, CDJ-3000 i CDJ-3000X odtwarzają też 24 bity,
-   96 kHz i FLAC, a CDJ-3000X także pliki 32-bitowe.
+   odtwarza, według instrukcji Pioneera:
+
+   | Odtwarzacz | WAV, AIFF | FLAC | ALAC | Najwyższa częstotliwość |
+   | --- | --- | --- | --- | --- |
+   | XDJ-700 / XDJ-1000 / CDJ-2000NXS | do 24 bitów | nie | nie | 48 kHz |
+   | XDJ-XZ / XDJ-RX3 | do 24 bitów | tak | nie | 48 kHz |
+   | XDJ-1000MK2 | do 24 bitów | tak | tak | 48 kHz |
+   | CDJ-2000NXS2 | do 24 bitów | tak | tak | 96 kHz |
+   | CDJ-3000 / OPUS-QUAD | do 24 bitów | tak | tak | 96 kHz |
+   | CDJ-3000X | do 32 bitów | tak | tak | 96 kHz |
+
+   MP3 i AAC grają na każdym z nich przy 32, 44,1 albo 48 kHz. Odtwarzacze
+   Pioneer aż po CDJ-3000 często odrzucają plik WAV z nagłówkiem WAVE_FORMAT_EXTENSIBLE
+   (częstym w 24-bitowych plikach, także z Bandcampu), choć sam dźwięk jest
+   w porządku: taki plik dostaje znacznik **nagłówek WAV**. Każdy plik WAV,
+   który zapisuje DJ HQ, dostaje zwykły nagłówek.
 2. **Zapisz tagi** zapisuje wykonawcę i tytuł tak, jak odczytuje je rekordbox
    (przy plikach WAV jest wymagający), w każdym pliku, w którym ich brakuje
    albo różnią się od nazw pokazywanych przez DJ HQ. Gatunkiem staje się
@@ -531,8 +544,16 @@ biorą twoje wartości.
 3. **Konwertuj** zamienia pliki, których twój odtwarzacz nie odtworzy, na
    takie, które odtworzy, w tym samym miejscu: ta sama nazwa pliku, ta sama
    długość, więc rekordbox zachowuje twoje punkty hot cue i siatki beatów.
-   Oryginały są najpierw zapisywane w kopii zapasowej, a **Przywróć
-   oryginały** przywraca je, kiedy chcesz.
+   Plik WAV, któremu przeszkadza tylko nagłówek, dostaje zwykły nagłówek, a
+   dźwięk jest kopiowany bajt w bajt. Plik FLAC albo ALAC o głębi lub
+   częstotliwości, której odtwarzacz nie przyjmie, zostaje w swoim formacie.
+   Format, którego odtwarzacz w ogóle nie czyta (na niektórych FLAC, ALAC
+   albo OGG, MP3 o nietypowej częstotliwości), staje się plikiem AIFF z tymi
+   samymi nazwami, tonacją i okładką; ponieważ zmienia się nazwa pliku, potem
+   zaktualizuj eksport rekordbox przyciskiem **Zaktualizuj eksport z
+   rekordbox…** w Ustawienia > AIFF zamiast WAV. Oryginały są najpierw
+   zapisywane w kopii zapasowej, a **Przywróć oryginały** przywraca je, kiedy
+   chcesz.
 4. **Eksportuj XML…** zapisuje playlistę rekordbox ze wszystkimi dopasowanymi
    plikami i pokazuje, jak ją zaimportować. W rekordbox: *Preferences >
    Advanced > Database > rekordbox xml*, raz wskaż ten plik; w drzewie pojawi

@@ -230,6 +230,12 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         const p = path.resolve(String(q.get("path") || ""));
         const ok = core.allowedDirs().some((d) => p.startsWith(d + path.sep));
         if (!ok || !fs.existsSync(p) || !fs.statSync(p).isFile()) return send(404, "text/plain", "not found");
+        // the app's player has no ALAC decoder: an ALAC file plays from a WAV decoded once (core.previewAs)
+        if (path.extname(p).toLowerCase() === ".m4a")
+          return void core.previewAs(p).then((wav) => serveFile(wav || p), () => serveFile(p));
+        return serveFile(p);
+      }
+      function serveFile(p: string): void {
         const types: Record<string, string> = { ".mp3": "audio/mpeg", ".wav": "audio/wav", ".flac": "audio/flac", ".aiff": "audio/aiff", ".aif": "audio/aiff", ".m4a": "audio/mp4", ".ogg": "audio/ogg", ".opus": "audio/ogg" };
         const ext = path.extname(p).toLowerCase();
         // the app's player has no AIFF reader: an AIFF goes out as WAV (same samples, nothing written)
@@ -239,7 +245,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || ""));
         let start = 0, end = size - 1;
         if (range) { if (range[1]) start = Number(range[1]); if (range[2]) end = Number(range[2]); if (!range[1] && range[2]) { start = Math.max(0, size - Number(range[2])); end = size - 1; } }
-        if (start > end || end >= size) { res.writeHead(416, { "Content-Range": `bytes */${size}` }); return res.end(); }
+        if (start > end || end >= size) { res.writeHead(416, { "Content-Range": `bytes */${size}` }); return void res.end(); }
         res.writeHead(range ? 206 : 200, { "Content-Type": type, "Accept-Ranges": "bytes", "Content-Length": end - start + 1,
           ...(range ? { "Content-Range": `bytes ${start}-${end}/${size}` } : {}) });
         const body = aif ? aif.stream(start, end) : fs.createReadStream(p, { start, end });
@@ -315,7 +321,11 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
             return route(() => core.addArt({ preview: !!data.preview }));
           }
           // the file actions are refused while Write tags in every file runs, not queued for minutes
-          case "/api/convert":  return idle(() => core.convertAll());
+          case "/api/convert": {   // an every-file run: its progress is GET /api/tag/progress
+            try { core.tagIdle(); if (pipelineBusy()) throw core.appError("tag_other_run", "another run is working on the files; wait until it is done"); core.claimTagRun("convert"); }
+            catch (e) { return json(errBody(e), 500); }
+            return route(() => core.convertAll());
+          }
           case "/api/restore":  return idle(() => core.restoreAll());
           case "/api/clean-backups": return idle(() => core.cleanBackups());
           case "/api/library": {   // set_dir: refused while a run works on the files (it would follow the old folder)

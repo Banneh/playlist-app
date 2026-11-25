@@ -515,6 +515,24 @@ html.mac-inset .page-head { padding-top: 30px; }
   background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; }
 .q-badge.on { display: block; }
 .q-badge.dot { display: block; min-width: 8px; width: 8px; height: 8px; padding: 0; top: 2px; right: 2px; background: var(--green); }
+/* the indicator next to the Tasks button (qIndicator): a progress ring, then a check */
+.q-ind { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 4px; cursor: pointer; color: var(--accent);
+  font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; transition: opacity .35s; }
+.q-ind[hidden] { display: none; }
+.q-ind.out { opacity: 0; }
+.q-ind .ic { width: 20px; height: 20px; }
+.q-ind.ok { color: var(--green); }
+.q-ind.fail { color: var(--red); }
+.q-ind.ok .ic, .q-ind.fail .ic { animation: q-pop .3s ease-out; }
+.q-pct { color: var(--text-2); }
+.q-ring { width: 20px; height: 20px; flex: none; transform: rotate(-90deg); }
+.q-ring circle { fill: none; stroke-width: 2.4; }
+.q-ring .bg { stroke: var(--line-2); }
+.q-ring .fg { stroke: currentColor; stroke-linecap: round; transition: stroke-dashoffset .4s ease; }
+.q-ring.turn { animation: q-turn .9s linear infinite; }
+.q-row .q-ring { width: 16px; height: 16px; color: var(--accent); }
+@keyframes q-turn { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
+@keyframes q-pop { from { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.15); } to { transform: scale(1); opacity: 1; } }
 .qpanel { width: 360px; padding: 0; }
 .q-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
 .q-list { max-height: min(420px, 60vh); overflow-y: auto; padding: 4px; }
