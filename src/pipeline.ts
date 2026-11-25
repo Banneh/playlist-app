@@ -371,15 +371,16 @@ async function plan(includePending: boolean) {
   return DEPS.enqueue(async () => {
     const lib = core.activeLib();
     if (!lib || !lib.playlist) return { lib: null, moves: [], pending: [] as core.BatchFile[], away: null };
-    // an unplugged drive: nothing could be moved there
-    if (core.folderTrouble(lib.dir)) return { lib: lib.id, moves: [], pending: [] as core.BatchFile[], away: lib.dir };
+    // an unplugged drive (or a collection without a folder): nothing could be moved there
+    const dest = core.moveDest(lib);
+    if (!dest || core.folderTrouble(dest)) return { lib: lib.id, moves: [], pending: [] as core.BatchFile[], away: dest || "" };
     const moves = await core.inboxMovePlan();
     let pending: core.BatchFile[] = [];
     if (includePending) {
       // not the downloads themselves, nor the file a download replaces (it goes to the backup folder)
       const names = new Set(moves.map((m) => path.basename(m.file)));
       const tracks = new Set(moves.map((m) => m.id));
-      pending = (await core.batchInfo(await core.unprocessedFiles())).filter((f) => !names.has(f.key) && !(f.track_id != null && tracks.has(f.track_id)));
+      pending = (await core.batchInfo(await core.unprocessedFiles())).filter((f) => !names.has(path.basename(f.key)) && !(f.track_id != null && tracks.has(f.track_id)));
     }
     return { lib: lib.id, moves, pending, away: null as string | null };
   });
@@ -617,12 +618,13 @@ async function stepMove(st: StepRec): Promise<void> {
       // in the library, and the download is gone, or (a zip, which stays) the file is pinned
       // to this track
       // (with "AIFF instead of WAV" on, the WAV may have become "<name>.aif" right after its move)
+      const destDir = core.moveDest(lib) || "";
       const aif = /\.wav$/i.test(name) && core.getSettings().aiff_auto ? name.replace(/\.wav$/i, ".aif") : "";
-      const there = !fs.existsSync(path.join(lib.dir, name)) && aif && fs.existsSync(path.join(lib.dir, aif)) ? aif : name;
-      const dst = path.join(lib.dir, there);
+      const there = destDir && !fs.existsSync(path.join(destDir, name)) && aif && fs.existsSync(path.join(destDir, aif)) ? aif : name;
+      const dst = destDir ? path.join(destDir, there) : "";
       const src = path.join(core.getSettings().inbox_dir, it.source.zip || name);
-      const pinned = it.track_id != null && core.STATE.assigned[String(it.track_id)] === there;
-      if (fs.existsSync(dst) && (it.source.zip ? pinned : !fs.existsSync(src))) { it.key = there; it.path = dst; setItem(it, "move", "ok"); }
+      const pinned = it.track_id != null && core.STATE.assigned[String(it.track_id)] === dst;
+      if (dst && fs.existsSync(dst) && (it.source.zip ? pinned : !fs.existsSync(src))) { it.key = dst; it.path = dst; setItem(it, "move", "ok"); }
       else setItem(it, "move", "failed", "move_failed", { file: name, ...errVars(e) });
     }
     save();

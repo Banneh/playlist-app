@@ -14,6 +14,7 @@ import { platformApps } from "./extapps";
 import { cueFixRoute } from "./cuefix";
 import { remapExport } from "./aiff";
 import { aifAsWav } from "./aifplay";
+import * as watch from "./watch";
 
 export interface ServerOpts {
   dataDir: string;
@@ -82,6 +83,7 @@ export interface ScView {
 export function startServer(opts: ServerOpts): Promise<http.Server> {
   core.init(opts.dataDir, !!opts.pickFolder, !!opts.reveal);
   core.setScTransport(opts.sc ? opts.sc.api : null);
+  watch.start();
 
   // file-mutating actions run one at a time
   let queue: Promise<any> = Promise.resolve();
@@ -335,7 +337,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
                 if (pipelineBusy()) throw core.appError("tag_other_run", "another run is working on the files; wait until it is done");
               } catch (e) { return json(errBody(e), 500); }
             }
-            return route(() => core.libraryOp(data));
+            return route(async () => { const v = await core.libraryOp(data); if (data?.op === "add") watch.sync(); return v; });
           }
           case "/api/aiff": {   // Convert WAV files to AIFF: {preview} or the run (an every-file run: GET /api/tag/progress)
             try {
@@ -368,6 +370,9 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/do-all/start":   return doAll(async () => { core.tagIdle(); return pipeline.start(data); });
           case "/api/do-all/control": return direct(() => pipeline.controlJob(data));
           case "/api/do-all/access":  return doAll(() => pipeline.accessibility(data));
+          case "/api/collection":      return route(async () => { const v = await core.collectionOp(data); watch.sync(); return v; });
+          case "/api/collection/view": return route(() => core.collectionView());
+          case "/api/move-targets":    return direct(async () => ({ targets: core.moveTargets(data.under ? String(data.under) : undefined) }));
           case "/api/override": return route(() => core.setOverride(data));
           case "/api/edit":     return route(() => core.setEdit(data));
           case "/api/assign":   return route(() => core.setAssign(data));
@@ -421,9 +426,11 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
             return direct(async () => config.plan(String(data.text ?? "")));
           }
           case "/api/config/import/probe": return direct(async () => config.probe(data));
-          case "/api/config/import/apply": return route(() => {
+          case "/api/config/import/apply": return route(async () => {
             const j = pipeline.status();   // a run that is going works on the current library's files
-            return config.apply(data, { jobActive: !!j.active || ["running", "waiting"].includes(j.job?.status) });
+            const v = await config.apply(data, { jobActive: !!j.active || ["running", "waiting"].includes(j.job?.status) });
+            watch.sync();
+            return v;
           });
           case "/api/reveal": {
             if (!opts.reveal) return json({ unsupported: true });

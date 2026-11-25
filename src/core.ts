@@ -92,12 +92,34 @@ export interface PlTrack {
   added?: number;
 }
 export interface Playlist { title: string; url: string; tracks: PlTrack[]; }
+
+/** One watched folder of the collection. `id` ("r1", "r2", …) stays with the root for its
+ *  lifetime and keys the backups of files under it, so paths can change without losing them. */
+export interface CollectionRoot {
+  id: string; path: string;
+  /** also scan the folders inside this root (on for roots that came from a library that scanned them) */
+  subfolders?: boolean;
+}
+/** The music collection: every playlist matches against the files of these folders. The
+ *  folder layout belongs to the user; DJ HQ never derives meaning from it. */
+export interface Collection {
+  roots: CollectionRoot[];
+  /** where "Move" puts a file when the playlist has no folder of its own: the folder picked last */
+  last_target?: string;
+  /** the default move target (Settings > Collection); first root when unset */
+  move_target?: string;
+}
+
 export interface Library {
-  /** the main music folder: new downloads are moved here */
+  /** `dir`, `dirs` and `subfolders` are the pre-collection shape (one library owned its
+   *  folders). They are kept as written for rollback and for resolving old backups, and are
+   *  no longer read anywhere else: the collection's roots say what is scanned. */
   id: string; dir: string; url: string; playlist: Playlist | null;
-  /** further folders that belong to this library (see libDirs) */
+  /** the playlist's own move target (opt-in): downloads moved in this playlist's context go here */
+  target?: string;
+  /** legacy: further folders that belonged to this library before the collection */
   dirs?: string[];
-  /** also scan the folders inside each library folder (off by default) */
+  /** legacy: whether this library's folders were scanned with their subfolders */
   subfolders?: boolean;
   /** tracks added after this (ms) are NEW; set by "Mark all as seen" */
   seen_mark?: number;
@@ -132,6 +154,8 @@ type CacheEntry = [number, number, number, [string, number, number], [string, st
 export interface AppState {
   libraries: Library[];
   active: string | null;
+  /** the music collection (see Collection); absent only in a pre-collection state, filled by migration */
+  collection?: Collection;
   dur_cache: Record<string, any[]>;
   overrides: Record<string, string>;
   /** artist / title typed in or swapped by hand, keyed by track id or "x:" + path; win
@@ -225,9 +249,65 @@ export function init(dataDir: string, canPick: boolean, canReveal = false): void
   STATE = r.state;
   STATE_PROBLEM = r.problem;
   SAVE_BLOCKED = r.blocked;
+  try { migrateToCollection(); }
+  catch (e: any) { console.error("DJ HQ could not migrate to the collection model: " + String(e?.message || e)); }
   if (!exitHooked) { exitHooked = true; process.on("exit", shutdown); }
 }
 let exitHooked = false;
+
+/** One-time move to the collection model: the libraries' folders become the collection's
+ *  roots, every file key (pins, aiff_from) becomes the file's absolute path, and each
+ *  library keeps its old main folder as its move target, so moves behave as before. The
+ *  database is snapshotted to backups/ first; the migration itself is idempotent (it only
+ *  runs while the state has no collection) and all-or-nothing in memory before one save. */
+export function migrateToCollection(): void {
+  if (STATE.collection) return;
+  if (!STATE.libraries.length) { STATE.collection = { roots: [] }; if (!SAVE_BLOCKED) saveState(); return; }
+  if (SAVE_BLOCKED) return;   // nothing may be written this session; try again next launch
+  try {
+    const bdir = path.join(DATA_DIR, "backups");
+    fs.mkdirSync(bdir, { recursive: true });
+    backupDb(path.join(bdir, new Date().toISOString().replace(/[:.]/g, "-") + "-before-collection.djhq.db"));
+  } catch (e: any) { console.error("DJ HQ could not back up its database before the collection migration: " + String(e?.message || e)); return; }
+  // the roots: every folder of every library, deduplicated; a folder inside another root
+  // that scans its subfolders is covered by it and dropped
+  let nextId = 1;
+  const roots: CollectionRoot[] = [];
+  for (const lib of STATE.libraries)
+    for (const d of legacyDirs(lib)) {
+      if (roots.some((r) => sameDir(r.path, d))) continue;
+      roots.push({ id: "r" + nextId++, path: path.resolve(d), ...(lib.subfolders ? { subfolders: true } : {}) });
+    }
+  const covered = (r: CollectionRoot) => roots.some((o) => o !== r && o.subfolders && insideDir(r.path, o.path));
+  const kept = roots.filter((r) => !covered(r));
+  // pins and aiff_from move from library-relative keys to absolute paths; the owning library
+  // of a pin is the one whose playlist holds the track (the first, if ever two do)
+  const owner = new Map<number, Library>();
+  for (const lib of STATE.libraries)
+    for (const t of lib.playlist?.tracks || [])
+      if (!owner.has(t.id)) owner.set(t.id, lib);
+  let pins = 0, moved = 0;
+  for (const [tid, key] of Object.entries(STATE.assigned)) {
+    if (!key || path.isAbsolute(key)) continue;
+    pins++;
+    const lib = owner.get(Number(tid));
+    if (!lib) continue;
+    STATE.assigned[tid] = legacyLibPath(lib, key);
+    moved++;
+  }
+  for (const lib of STATE.libraries) {
+    if (lib.aiff_from) {
+      const af: Record<string, string> = {};
+      for (const [a, b] of Object.entries(lib.aiff_from))
+        af[path.isAbsolute(a) ? a : legacyLibPath(lib, a)] = path.isAbsolute(b) ? b : legacyLibPath(lib, b);
+      lib.aiff_from = af;
+    }
+    lib.target = lib.dir;   // moves keep landing where they always did
+  }
+  STATE.collection = { roots: kept };
+  saveState();
+  console.log(`DJ HQ moved to the collection model: ${kept.length} root folder(s), ${moved} of ${pins} pins rekeyed`);
+}
 
 /** Set when the saved data could not be used at launch; the view carries it (state_problem)
  *  so the UI can say so. "state_unreadable": the file (state.json of an older version, or the
@@ -507,9 +587,9 @@ export async function setSettings(data: any): Promise<any> {
   saveState();
   return buildView();
 }
-/** Folders the UI may stream audio from (preview): every library folder and the downloads folder. */
+/** Folders the UI may stream audio from (preview): every collection root and the downloads folder. */
 export function allowedDirs(): string[] {
-  return [...STATE.libraries.flatMap((l) => libDirs(l).map((d) => path.resolve(d))), path.resolve(inboxDir())];
+  return [...collRoots().map((r) => path.resolve(r.path)), path.resolve(inboxDir())];
 }
 /** Total bytes under originals/<lib>/ (backups of converted files + replaced MP3s). */
 export function backupBytes(lib: Library | null): number {
@@ -529,27 +609,63 @@ export function activeLib(): Library | null {
 }
 
 export function libName(lib: Library): string {
-  return lib.playlist?.title || path.basename(lib.dir.replace(/\/+$/, "")) || lib.id;
+  return lib.playlist?.title || path.basename((lib.dir || "").replace(/\/+$/, "")) || lib.id;
 }
 
-/** Every folder of a library: the main one first, then the extra ones in the order they were added. */
-export function libDirs(lib: Library): string[] {
-  return [lib.dir, ...(lib.dirs || [])];
+// ---------------- the collection ----------------
+
+/** The collection (filled by migrateToCollection / withDefaults' caller: init). */
+export function collection(): Collection {
+  return STATE.collection || (STATE.collection = { roots: [] });
 }
-/** The key an extra folder's files carry: "<folder name>/<relative path>" (the main
- *  folder's files are keyed by their relative path alone, so old state stays valid).
- *  An extra folder named like another one, or like a subfolder of the main folder
- *  while subfolders are scanned, gets " (2)", " (3)" … so keys stay unambiguous. */
-export function dirPrefixes(lib: Library): Map<string, string> {
+export const collRoots = (): CollectionRoot[] => collection().roots;
+/** The root a path lies under (the deepest, if ever roots nest), else null. */
+export function rootOf(p: string): CollectionRoot | null {
+  let best: CollectionRoot | null = null;
+  for (const r of collRoots())
+    if (insideDir(p, r.path) && (!best || r.path.length > best.path.length)) best = r;
+  return best;
+}
+/** "<root id>/<relative path>" of a path under the collection, else null: the stable key
+ *  backups are stored under (the root's path may change, its id does not). */
+export function rootRelKey(p: string): string | null {
+  const r = rootOf(p);
+  if (!r) return null;
+  return "@" + r.id + "/" + path.relative(r.path, p).split(path.sep).join("/");
+}
+/** The absolute path a backup key names: "@<root id>/<rel>" under that root (null when the
+ *  root is gone), anything else through the legacy library layout. */
+function backupKeyPath(lib: Library, key: string): string | null {
+  if (key.startsWith("@@/")) return null;   // backed up from outside the roots: left for recovery by hand
+  const m = /^@(r\d+)\/(.+)$/.exec(key);
+  if (!m) return legacyLibPath(lib, key);
+  const r = collRoots().find((x) => x.id === m[1]);
+  return r ? path.join(r.path, ...m[2].split("/")) : null;
+}
+/** A short display name for a file of the collection: its path relative to its root
+ *  (prefixed with the root's folder name when there are several roots), else the base name. */
+export function collDisplay(p: string): string {
+  const r = rootOf(p);
+  if (!r) return path.basename(p);
+  const rel = path.relative(r.path, p).split(path.sep).join("/");
+  return collRoots().length > 1 ? path.basename(r.path) + "/" + rel : rel;
+}
+
+/** The folders of a library before the collection model (kept for old backups and rollback). */
+function legacyDirs(lib: Library): string[] {
+  return [lib.dir, ...(lib.dirs || [])].filter(Boolean);
+}
+/** The pre-collection key prefixes of a library's folders (see the old scanLocal keys). */
+function legacyPrefixes(lib: Library): Map<string, string> {
   const out = new Map<string, string>();
   const used = new Set<string>();
-  if (lib.subfolders) {
+  if (lib.subfolders && lib.dir) {
     try {
       for (const e of fs.readdirSync(lib.dir, { withFileTypes: true }))
         if (e.isDirectory() && !e.name.startsWith(".")) used.add(e.name);
     } catch {}
   }
-  libDirs(lib).forEach((d, i) => {
+  legacyDirs(lib).forEach((d, i) => {
     if (i === 0) { out.set(d, ""); return; }
     const base = path.basename(d.replace(/[\/\\]+$/, "")) || "folder";
     let name = base;
@@ -559,11 +675,16 @@ export function dirPrefixes(lib: Library): Map<string, string> {
   });
   return out;
 }
-/** Absolute path of a library file key (the inverse of the keys scanLocal hands out). */
-function libPath(lib: Library, key: string): string {
-  for (const [d, prefix] of dirPrefixes(lib))
+/** Absolute path of a pre-collection library file key. */
+function legacyLibPath(lib: Library, key: string): string {
+  for (const [d, prefix] of legacyPrefixes(lib))
     if (prefix && key.startsWith(prefix)) return path.join(d, ...key.slice(prefix.length).split("/"));
-  return path.join(lib.dir, ...key.split("/"));
+  return path.join(lib.dir || "", ...key.split("/"));
+}
+/** Absolute path of a file key: keys are absolute paths since the collection model; an old
+ *  relative key (from a state saved mid-change) still resolves through the legacy layout. */
+function libPath(lib: Library, key: string): string {
+  return path.isAbsolute(key) ? key : legacyLibPath(lib, key);
 }
 
 function requireLib(): Library {
@@ -1039,31 +1160,34 @@ export async function scLikesCheck(token: string, force = false): Promise<any> {
   type Have = { lib: string; file: string; path: string; lossy: boolean; score: number | null };
   const have = new Map<number, Have>();
   const inPl = new Map<number, string[]>();
-  const loose: { lib: Library; f: LocalFile }[] = [];   // files not matched to a playlist track
+  const usedPaths = new Set<string>();
   for (const lib of STATE.libraries) {
     if (!lib.playlist) continue;
     const view = await buildView(lib);
-    const files = new Map((await scanLocal(lib)).map((f) => [f.name, f]));
     for (const r of view.tracks) {
+      if (r.have && r.file) usedPaths.add(r.file);
       if (!ids.has(r.id)) continue;
       inPl.set(r.id, [...(inPl.get(r.id) || []), libName(lib)]);
-      if (r.have && r.file && !have.has(r.id)) have.set(r.id, { lib: libName(lib), file: r.file, path: r.path, lossy: !!r.lossy, score: null });
-    }
-    for (const e of view.extras) {
-      const f = files.get(e.name);
-      if (!f) continue;
-      if (e.found && ids.has(e.found.id) && !have.has(e.found.id))
-        have.set(e.found.id, { lib: libName(lib), file: f.name, path: f.path, lossy: LOSSY.test(f.fmt[0]), score: null });
-      else loose.push({ lib, f });
+      if (r.have && r.file && !have.has(r.id)) have.set(r.id, { lib: libName(lib), file: collDisplay(r.file), path: r.path, lossy: !!r.lossy, score: null });
     }
   }
-  // name + length matching for the rest, with a cheap shared-word filter first
+  // the rest of the collection: a found record first, then name + length matching, with a
+  // cheap shared-word filter (the collection can be large)
+  const files = await scanCollection();
+  const loose: LocalFile[] = [];
+  for (const f of files) {
+    if (usedPaths.has(f.path)) continue;
+    const fnd = STATE.found["x:" + f.path];
+    if (fnd && ids.has(fnd.id)) { if (!have.has(fnd.id)) have.set(fnd.id, { lib: "", file: collDisplay(f.path), path: f.path, lossy: LOSSY.test(f.fmt[0]), score: null }); }
+    else loose.push(f);
+  }
   const toks = tracks.map((t) => new Set(norm(`${t.user} ${t.title}`).split(" ").filter(Boolean)));
-  for (const { lib, f } of loose) {
+  for (const f of loose) {
     const ft = norm(f.base).split(" ").filter(Boolean);
     const cands = tracks.filter((t, i) => !have.has(t.id) && ft.some((w) => toks[i].has(w)));
+    if (!cands.length) continue;
     const [t, score] = bestTrackNames([f.base], f.dur, cands);
-    if (t && score >= 0.6) have.set(t.id, { lib: libName(lib), file: f.name, path: f.path, lossy: LOSSY.test(f.fmt[0]), score: Math.min(1, score) });
+    if (t && score >= 0.6) have.set(t.id, { lib: "", file: collDisplay(f.path), path: f.path, lossy: LOSSY.test(f.fmt[0]), score: Math.min(1, score) });
   }
   const active = activeLib();
   const rows = tracks.map((t, i) => {
@@ -1145,6 +1269,7 @@ async function refreshCache(p: string): Promise<void> {
   const st = fs.statSync(p);
   const pr = await probe(p);
   STATE.dur_cache[p] = [st.size, Math.floor(st.mtimeMs / 1000), pr.dur, pr.fmt, pr.tags, keyEntry(readKeyInfo(p))];
+  COLL_DIRTY = true;   // the file changed under DJ HQ's own hands: the index rereads it
 }
 
 /** A library folder that can't be listed right now: "missing" (not there: an unmounted
@@ -1174,28 +1299,58 @@ export function folderTrouble(d: string): "missing" | "unreadable" | null {
   try { fs.readdirSync(d); return null; } catch { return "unreadable"; }
 }
 
-/** Every audio file of a library: all its folders, with their subfolders when the
- *  library asks for that. With `away`, the folders that could not be listed (or came
- *  back empty) are reported there. Keys (name) are unique across folders; a path that is
- *  reachable twice (nested folders) is listed once. `sweep` false: a stale temp file of DJ HQ's
- *  is left where it is (scanFolder), for a folder that is only being looked at. */
-async function scanLocal(lib: Library, away?: FolderAway[], sweep = true): Promise<LocalFile[]> {
+/** The in-memory index of the collection: every audio file of every root, keyed by absolute
+ *  path (LocalFile.name is the path). Built by scanCollection and kept between views while
+ *  the watcher confirms nothing changed; any mutation or watcher event marks it dirty. */
+let COLL_CACHE: { files: LocalFile[]; away: FolderAway[] } | null = null;
+let COLL_DIRTY = true;
+/** bumped whenever a scan found the collection changed (memoised matches key off it) */
+export let COLL_VERSION = 0;
+/** true while a watcher keeps the index fresh (set by watch.ts); without one every view rescans */
+let WATCHING = false;
+export function setWatching(on: boolean): void { WATCHING = on; if (!on) COLL_DIRTY = true; }
+/** something changed under the roots (a file op of DJ HQ's, a watcher event): rescan next time */
+export function collDirty(): void { COLL_DIRTY = true; }
+
+/** Every audio file of the collection: all roots, with their subfolders where the root asks
+ *  for that. With `away`, the roots that could not be listed (or came back empty) are
+ *  reported there. A path reachable twice (nested roots) is listed once. */
+async function scanCollection(away?: FolderAway[], sweep = true): Promise<LocalFile[]> {
+  if (WATCHING && !COLL_DIRTY && COLL_CACHE) {
+    away?.push(...COLL_CACHE.away);
+    return COLL_CACHE.files;
+  }
   const out: LocalFile[] = [];
-  const seenPath = new Set<string>(), seenKey = new Set<string>();
-  for (const [d, prefix] of dirPrefixes(lib)) {
+  const got: FolderAway[] = [];
+  const seenPath = new Set<string>();
+  for (const r of collRoots()) {
+    const d = r.path;
     const why = folderTrouble(d);
-    const main = d === lib.dir ? { main: true as const } : {};
-    if (why) { away?.push({ dir: d, why, ...main, ...(why === "missing" && driveMissing(d) ? { drive: true as const } : {}) }); continue; }
-    const list = await scanFolder(d, !!lib.subfolders, sweep);
-    if (!list.length) away?.push({ dir: d, why: "empty", ...main });
+    if (why) { got.push({ dir: d, why, ...(why === "missing" && driveMissing(d) ? { drive: true as const } : {}) }); continue; }
+    const list = await scanFolder(d, !!r.subfolders, sweep);
+    if (!list.length) got.push({ dir: d, why: "empty" });
     for (const f of list) {
-      const key = prefix + f.name;
-      if (seenPath.has(f.path) || seenKey.has(key)) continue;
-      seenPath.add(f.path); seenKey.add(key);
-      out.push({ ...f, name: key });
+      if (seenPath.has(f.path)) continue;
+      seenPath.add(f.path);
+      out.push({ ...f, name: f.path });
     }
   }
+  const changed = !COLL_CACHE
+    || COLL_CACHE.files.length !== out.length
+    || COLL_CACHE.files.some((f, i) => f.path !== out[i].path || f.dur !== out[i].dur
+         || f.fmt.join() !== out[i].fmt.join() || f.tags.join("\u0000") !== out[i].tags.join("\u0000") || f.key !== out[i].key)
+    || JSON.stringify(COLL_CACHE.away) !== JSON.stringify(got);
+  if (changed) COLL_VERSION++;
+  COLL_CACHE = { files: out, away: got };
+  COLL_DIRTY = false;
+  away?.push(...got);
   return out;
+}
+
+/** The collection's files for a library view (the library argument is historic: every
+ *  playlist sees the whole collection). */
+async function scanLocal(_lib?: Library | null, away?: FolderAway[], sweep = true): Promise<LocalFile[]> {
+  return scanCollection(away, sweep);
 }
 
 /** Audio files inside a folder (and, with `recursive`, its subfolders), probed once
@@ -2109,29 +2264,34 @@ function otherExt(p: string): string[] {
   return names.filter((n) => n !== base && AUDIO_EXT_RE.test(n) && !/\.tmp\.[^.]+$/i.test(n) && stemKey(n) === stem)
     .map((n) => path.join(dir, n)).filter((q) => { try { return fs.statSync(q).isFile(); } catch { return false; } });
 }
-/** The AIFF a backup of Convert WAV files to AIFF became, when it is still there: its key and path. */
-function aiffOfBackup(lib: Library, key: string): [string, string] | null {
-  const aKey = lib.aiff_from?.[key];
-  if (!aKey) return null;
-  const p = libPath(lib, aKey);
-  if (fs.existsSync(p)) return [aKey, p];
-  // the AIFF was renamed in another letter case or to .aiff meanwhile: the one such file
-  const c = otherExt(libPath(lib, key)).filter((q) => /\.aiff?$/i.test(q));
-  if (c.length !== 1) return null;
-  const rel = path.relative(lib.dir, c[0]);
-  return rel.startsWith("..") || path.isAbsolute(rel) ? null : [rel.split(path.sep).join("/"), c[0]];
+/** The backup key a collection file is stored under in originals/<lib>/: "@<root id>/<rel>",
+ *  or "@@/<base name>" for a file that lies outside every root (it can still be restored by
+ *  its recorded place). */
+function backupKeyFor(p: string): string {
+  return rootRelKey(p) || "@@/" + path.basename(p);
 }
-/** Backups that could go back into the library: [key, backup path, library path, the AIFF it
- *  became (Convert WAV files to AIFF) when that is there]. Left out: a backup whose folder is gone
- *  (removed from the library, deleted), and one whose file is now there under another extension
- *  that DJ HQ did not convert it to (converted by hand, or a main folder of AIFF copies): putting
- *  the original back would make the track's file twice. */
+/** The AIFF a backup of Convert WAV files to AIFF became, when it is still there: its path
+ *  twice (key and path are the same since the collection model). `abs` is the backed-up
+ *  file's own place in the collection. */
+function aiffOfBackup(lib: Library, abs: string): [string, string] | null {
+  const aAbs = lib.aiff_from?.[abs];
+  if (!aAbs) return null;
+  if (fs.existsSync(aAbs)) return [aAbs, aAbs];
+  // the AIFF was renamed in another letter case or to .aiff meanwhile: the one such file
+  const c = otherExt(abs).filter((q) => /\.aiff?$/i.test(q));
+  if (c.length !== 1) return null;
+  return [c[0], c[0]];
+}
+/** Backups that could go back into the collection: [key, backup path, where it goes, the AIFF
+ *  it became (Convert WAV files to AIFF) when that is there]. Left out: a backup whose folder
+ *  (or root) is gone, and one whose file is now there under another extension that DJ HQ did
+ *  not convert it to (converted by hand): putting the original back would double the file. */
 function restorable(lib: Library): [string, string, string, [string, string] | null][] {
   const out: [string, string, string, [string, string] | null][] = [];
   for (const [key, src] of backupEntries(lib)) {
-    const dst = libPath(lib, key);
-    if (!fs.existsSync(path.dirname(dst))) continue;
-    const aiff = aiffOfBackup(lib, key);
+    const dst = backupKeyPath(lib, key);
+    if (!dst || !fs.existsSync(path.dirname(dst))) continue;
+    const aiff = aiffOfBackup(lib, dst);
     if (!aiff && !fs.existsSync(dst) && otherExt(dst).length) continue;
     out.push([key, src, dst, aiff]);
   }
@@ -2187,98 +2347,53 @@ const libTrackIds = (lib: Library) => new Set((lib.playlist?.tracks || []).map((
 function renameRecords(lib: Library, oldKey: string, newKey: string): void {
   if (moveRecords(libTrackIds(lib), oldKey, newKey, libPath(lib, oldKey), libPath(lib, newKey))) saveState();
 }
-/** Rule E, on every view: a pin, found or edits record whose file is gone follows the one file
- *  of the library with the same name and another audio extension ("X.wav" converted to "X.aif",
- *  by DJ HQ or by hand). Never a guess: with no such file or several, or one that another pin
- *  (or record) names already, nothing changes. While "X.wav" is there the record stays on it.
- *  A folder that is away lists no files, so nothing of it can follow anything. */
-function followRenamed(lib: Library, files: LocalFile[], fmap: Map<string, LocalFile>, byPath: Map<string, LocalFile>, trackIds: Set<number>): void {
-  const byStem = new Map<string, LocalFile[]>();
-  for (const f of files) { const k = stemKey(f.name); byStem.set(k, [...(byStem.get(k) || []), f]); }
+/** Rule E, on every view, across the whole collection: a pin, found or edits record whose
+ *  file is gone follows the one file that is that file elsewhere: first the same path with
+ *  another audio extension ("X.wav" converted to "X.aif"), then the one file with the same
+ *  base name in another folder of the collection (the user tidied their folders), first as
+ *  written, then without its audio extension. Never a guess: with no such file or several,
+ *  or one that another pin (or record) names already, nothing changes. While the file is
+ *  there the record stays on it. Nothing follows anything while a root is away. */
+function followRenamed(files: LocalFile[], byPath: Map<string, LocalFile>): void {
+  const pathStem = new Map<string, LocalFile[]>();   // the path without its extension (same folder)
+  const byBase = new Map<string, LocalFile[]>();     // the base name, case and Unicode folded
+  const byBaseStem = new Map<string, LocalFile[]>(); // the base name without its extension
+  const put = (m: Map<string, LocalFile[]>, k: string, f: LocalFile) => m.set(k, [...(m.get(k) || []), f]);
+  for (const f of files) {
+    put(pathStem, stemKey(f.path), f);
+    put(byBase, f.base.normalize("NFC").toLowerCase(), f);
+    put(byBaseStem, stemKey(f.base), f);
+  }
+  const follow = (p: string, taken: (f: LocalFile) => boolean): LocalFile | null => {
+    for (const m of [pathStem.get(stemKey(p)), byBase.get(path.basename(p).normalize("NFC").toLowerCase()), byBaseStem.get(stemKey(path.basename(p)))]) {
+      const c = (m || []).filter((f) => !taken(f));
+      if (c.length === 1) return c[0];
+    }
+    return null;
+  };
   let changed = false;
-  const pinned = new Set(Object.entries(STATE.assigned).filter(([k, f]) => f && trackIds.has(Number(k))).map(([, f]) => f));
+  const pinned = new Set(Object.values(STATE.assigned).filter(Boolean));
   for (const [tid, fname] of Object.entries(STATE.assigned)) {
-    if (!fname || !trackIds.has(Number(tid)) || fmap.has(fname)) continue;
-    const c = (byStem.get(stemKey(fname)) || []).filter((f) => !pinned.has(f.name));
-    if (c.length !== 1) continue;
-    pinned.add(c[0].name);
-    STATE.assigned[tid] = c[0].name;
+    if (!fname || !path.isAbsolute(fname) || byPath.has(fname)) continue;
+    const c = follow(fname, (f) => pinned.has(f.name));
+    if (!c) continue;
+    pinned.add(c.name);
+    STATE.assigned[tid] = c.name;
     changed = true;
   }
-  // the "x:" records (extras' names and found tracks) of files in this library's folders
-  const dirs = libDirs(lib).map((d) => d + path.sep);
-  const pathStem = new Map<string, LocalFile[]>();
-  for (const f of files) { const k = stemKey(f.path); pathStem.set(k, [...(pathStem.get(k) || []), f]); }
   for (const map of [STATE.found, STATE.edits] as Record<string, unknown>[]) {
     for (const k of Object.keys(map)) {
       if (!k.startsWith("x:")) continue;
       const p = k.slice(2);
-      if (byPath.has(p) || !dirs.some((d) => p.startsWith(d))) continue;
-      const c = (pathStem.get(stemKey(p)) || []).filter((f) => !(("x:" + f.path) in map));
-      if (c.length !== 1) continue;
-      map["x:" + c[0].path] = map[k];
+      if (byPath.has(p) || !rootOf(p)) continue;
+      const c = follow(p, (f) => ("x:" + f.path) in map);
+      if (!c) continue;
+      map["x:" + c.path] = map[k];
       delete map[k];
       changed = true;
     }
   }
   if (changed) saveState();
-}
-
-/** remove_folder: `prev` is the library with the folder `gone`, `lib` without it. Rule E across
- *  folders: a pin, found or edits record of a file in that folder follows the one file of the
- *  library left with the same relative name, in any letter case and with any audio extension
- *  ("Music HQ/X.wav" becomes the main folder's "X.aif" when that folder holds the AIFF copies).
- *  Never a guess: with no such file or several, or one another pin (or record) has already,
- *  nothing changes and the track loses its file with the next view. The other folders' keys
- *  follow too when their prefix changes (two folders of the same name: " (2)" goes away).
- *  Answers how many pins followed a file. */
-function followRemoved(prev: Library, lib: Library, gone: string): number {
-  const trackIds = libTrackIds(lib);
-  const oldPre = dirPrefixes(prev), newPre = dirPrefixes(lib);
-  const goneP = oldPre.get(gone)!;
-  const inGone = (k: string) => k.startsWith(goneP);   // (keys as they were with the folder)
-  // the other folders' keys under the new prefixes (the removed folder's keys stay as they are)
-  const shifted = rekeyer(prev, lib);
-  // what the library holds without the folder: key, path and the relative name's stem
-  const left: { key: string; path: string; stem: string }[] = [];
-  for (const [d, p] of newPre)
-    if (!folderTrouble(d))
-      for (const rel of listAudioKeys(d, !!lib.subfolders)) left.push({ key: p + rel, path: path.join(d, ...rel.split("/")), stem: stemKey(rel) });
-  const byStem = new Map<string, typeof left>();
-  for (const f of left) byStem.set(f.stem, [...(byStem.get(f.stem) || []), f]);
-  let followed = 0, changed = false;
-  const pins = Object.entries(STATE.assigned).filter(([tid, f]) => f && trackIds.has(Number(tid)));
-  const gonePins = pins.filter(([, f]) => inGone(f));
-  const taken = new Set<string>();
-  for (const [tid, f] of pins) {
-    if (inGone(f)) continue;
-    const nk = shifted(f);
-    taken.add(nk);
-    if (nk !== f) { STATE.assigned[tid] = nk; changed = true; }
-  }
-  for (const [tid, f] of gonePins) {
-    const c = (byStem.get(stemKey(f.slice(goneP.length))) || []).filter((x) => !taken.has(x.key));
-    if (c.length !== 1) continue;
-    STATE.assigned[tid] = c[0].key; taken.add(c[0].key); followed++; changed = true;
-  }
-  if (lib.aiff_from && Object.keys(lib.aiff_from).some((a) => !inGone(a) && shifted(a) !== a)) {
-    const af: Record<string, string> = {};
-    for (const [a, b] of Object.entries(lib.aiff_from)) af[inGone(a) ? a : shifted(a)] = inGone(b) ? b : shifted(b);
-    lib.aiff_from = af;
-  }
-  try { rekeyBackups(lib, shifted); } catch { /* best effort: a backup left under its old key is only not offered by Restore originals */ }
-  for (const map of [STATE.found, STATE.edits] as Record<string, unknown>[])
-    for (const k of Object.keys(map)) {
-      if (!k.startsWith("x:" + gone + path.sep)) continue;
-      const rel = path.relative(gone, k.slice(2)).split(path.sep).join("/");
-      const c = (byStem.get(stemKey(rel)) || []).filter((x) => !(("x:" + x.path) in map));
-      if (c.length !== 1) continue;
-      map["x:" + c[0].path] = map[k];
-      delete map[k];
-      changed = true;
-    }
-  if (changed) saveState();
-  return followed;
 }
 
 /** A library imported before its music was copied here (files_pending): pins whose file isn't
@@ -2359,10 +2474,23 @@ function matchFiles(files: LocalFile[], tracks: PlTrack[], manual: Map<number, s
   const fmap = new Set(files.map((f) => f.name));
   const matched = new Map<number, [string, number]>(); // score -1 = manual
   const fileHit = new Set<string>();
+  // A file and a track with no normalised word in common can never reach the 0.6 bar
+  // (without the Jaccard part the most a pair can score is 0.4 + 0.15), so each file is
+  // only scored against the tracks it shares a word with. The collection can hold tens
+  // of thousands of files; comparing each with every track would not scale.
+  const byToken = new Map<string, number[]>();
+  const trackToks: Set<string>[] = tracks.map((t, i) => {
+    const toks = new Set([...norm(t.title).split(" "), ...norm(`${t.user} ${t.title}`).split(" ")].filter(Boolean));
+    for (const w of toks) byToken.set(w, [...(byToken.get(w) || []), i]);
+    return toks;
+  });
   for (const f of files) {
     if (manualFiles.has(f.name)) { fileHit.add(f.name); continue; }
+    const cand = new Set<number>();
+    for (const w of norm(f.base).split(" ")) if (w) for (const i of byToken.get(w) || []) cand.add(i);
     let best: PlTrack | null = null, bestS = 0;
-    for (const t of tracks) {
+    for (const i of cand) {
+      const t = tracks[i];
       if (manual.has(t.id)) continue; // manually decided, don't steal / re-fill
       let s = Math.max(sim(f.base, t.title), sim(f.base, `${t.user} ${t.title}`));
       const dd = Math.abs(f.dur - t.dur);
@@ -2380,15 +2508,30 @@ function matchFiles(files: LocalFile[], tracks: PlTrack[], manual: Map<number, s
   return { matched, fileHit };
 }
 
+/** matchFiles for a library against the collection, memoised: the result holds until the
+ *  collection changes (COLL_VERSION), the playlist's tracks change or the pins change. */
+const MATCH_CACHE = new Map<string, { ver: number; sig: string; matched: Map<number, [string, number]>; fileHit: Set<string> }>();
+function matchLib(lib: Library, files: LocalFile[], tracks: PlTrack[], manual: Map<number, string>): { matched: Map<number, [string, number]>; fileHit: Set<string> } {
+  const sig = tracks.map((t) => t.id).join(",") + "|" + [...manual].map(([k, v]) => k + ":" + v).sort().join("|");
+  const hit = MATCH_CACHE.get(lib.id);
+  if (hit && hit.ver === COLL_VERSION && hit.sig === sig) return hit;
+  const r = matchFiles(files, tracks, manual);
+  MATCH_CACHE.set(lib.id, { ver: COLL_VERSION, sig, ...r });
+  return r;
+}
+
 /** `plans`: a tag_plan on tagged rows too (Write tags in every file); the page never needs them */
 export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}): Promise<any> {
   const gen = STATE_GEN;
   const lib = libArg || activeLib();
   let dev = STATE.device || "xdj-700";
   if (!DEVICES[dev]) dev = "xdj-700";
+  const coll = collection();
   const base: any = {
-    libraries: STATE.libraries.map((l) => ({ id: l.id, name: libName(l), dir: l.dir, dirs: libDirs(l), subfolders: !!l.subfolders, url: l.url })),
+    libraries: STATE.libraries.map((l) => ({ id: l.id, name: libName(l), url: l.url, target: l.target || null })),
     active: lib ? lib.id : null,
+    collection: { roots: coll.roots.map((r) => ({ id: r.id, path: r.path, subfolders: !!r.subfolders })),
+                  move_target: coll.move_target || null, last_target: coll.last_target || null },
     device: dev,
     devices: Object.entries(DEVICES).map(([id, d]) => ({ id, label: d.label })),
     backups: restorableCount(lib),
@@ -2401,24 +2544,28 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
     // imported without its SoundCloud link: nothing is fetched until Change link… sets one
     link_missing: !!lib && !lib.url,
   };
-  if (!lib || !lib.playlist) return { ...base, ready: false };
+  if (!lib || !lib.playlist) {
+    const away: FolderAway[] = [];
+    if (coll.roots.length) await scanCollection(away);
+    return { ...base, ready: false, folders_away: away };
+  }
   const away: FolderAway[] = [];
-  const files = await scanLocal(lib, away);
+  const files = await scanCollection(away);
   if (gen !== STATE_GEN) return buildView(undefined, opts);   // the state was replaced (an import) while the folders were scanned
   const pl = lib.playlist;
   const genre = pl.title || "Trance";
   const fmap = new Map(files.map((f) => [f.name, f]));
-  const byPath = new Map(files.map((f) => [f.path, f]));
+  const byPath = fmap;   // keys are the files' absolute paths
   const trackIds = new Set(pl.tracks.map((t) => t.id));
-  // rule E first: a record whose file now has another extension follows it, before anything is pruned
-  followRenamed(lib, files, fmap, byPath, trackIds);
-  // A folder that is gone or unreadable, or one that lists no audio although files in it
-  // are pinned or found, is "not available": the drive is unplugged, the cloud folder hasn't
-  // synced, the folder was renamed. Its files aren't gone for good, so nothing of this
-  // library is forgotten (pins, found, file-arrival times) until every folder is back.
+  // rule E first: a record whose file moved or changed extension follows it, before anything is pruned
+  followRenamed(files, byPath);
+  // A root that is gone or unreadable, or one that lists no audio although files in it are
+  // pinned or found, is "not available": the drive is unplugged, the cloud folder hasn't
+  // synced, the folder was renamed. Its files aren't gone for good, so nothing is forgotten
+  // (pins, found, file-arrival times) until every root is back.
   const inDir = (d: string, p: string) => p.startsWith(d + path.sep);
   const notAvailable = away.filter((a) => a.why !== "empty"
-    || Object.entries(STATE.assigned).some(([k, f]) => f && trackIds.has(Number(k)) && inDir(a.dir, libPath(lib, f)))
+    || Object.values(STATE.assigned).some((f) => f && inDir(a.dir, f))
     || Object.keys(STATE.found).some((k) => inDir(a.dir, k.slice(2))));
   if (lib.files_pending) { filesPending(lib, files, fmap, trackIds); notAvailable.push({ dir: lib.dir, why: "waiting" }); }
   const keep = notAvailable.length > 0;
@@ -2437,9 +2584,8 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
   if (!keep) for (const k of Object.keys(STATE.by_hand)) if (!(k in STATE.assigned)) { delete STATE.by_hand[k]; assignedDirty = true; }
   // local files whose SoundCloud match has since been added to the playlist:
   // pin the file to that track (unless the track already has a manual file)
-  const foundPrefixes = libDirs(lib).map((d) => "x:" + d + path.sep);
   for (const k of Object.keys(STATE.found)) {
-    if (!foundPrefixes.some((pre) => k.startsWith(pre))) continue;
+    if (!k.startsWith("x:") || !rootOf(k.slice(2))) continue;
     const ff = byPath.get(k.slice(2));
     if (!ff) { if (!keep) { delete STATE.found[k]; assignedDirty = true; } continue; }
     const fname = ff.name;
@@ -2460,7 +2606,22 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
     if (!trackIds.has(Number(k))) continue;   // another library's pin: its file name means nothing here
     manual.set(Number(k), fname);
   }
-  const { matched, fileHit } = matchFiles(files, pl.tracks, manual);
+  const { matched, fileHit } = matchLib(lib, files, pl.tracks, manual);
+  // the inbox is part of the index: a fresh download already matches its track and the row
+  // says "in inbox" instead of "missing", before anything is moved into the collection
+  const inboxMatch = new Map<number, { name: string; zip: string | null; score: number }>();
+  try {
+    const idir = inboxDir();
+    if (fs.existsSync(idir) && !collRoots().some((r) => sameDir(r.path, idir))) {
+      for (const f of (await scanInbox(idir)).files) {
+        if (fmap.has(f.path)) continue;   // the inbox lies inside a root: the file is in the collection already
+        const [t, score] = bestTrackNames(f.matchNames, f.dur, pl.tracks);
+        if (!t || score < 0.6 || matched.has(t.id)) continue;
+        const prev = inboxMatch.get(t.id);
+        if (!prev || score > prev.score) inboxMatch.set(t.id, { name: f.name, zip: f.zip || null, score });
+      }
+    }
+  } catch { /* the inbox is never load-bearing for the view */ }
   const reavailable: string[] = [];
   let naDirty = false;
   const now = Date.now();
@@ -2510,7 +2671,8 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
     return { n: i + 1, id: t.id, artist: a, title: ti, user: t.user, sc_title: t.title,
              name_conf: nm.conf, name_why: look.why, name_ok: confirmed, check_name: look.check, ...differs,
              dur: fmtDur(t.dur), url: t.url, art: t.art,
-             have, na, auto: !!m, file: m ? m[0] : null, path: m ? fmap.get(m[0])!.path : null,
+             have, na, in_inbox: !have && !na ? inboxMatch.get(t.id) || null : null,
+             auto: !!m, file: m ? m[0] : null, file_disp: m ? collDisplay(m[0]) : null, path: m ? fmap.get(m[0])!.path : null,
              score: m && m[1] >= 0 ? Math.min(1, m[1]) : null,
              pinned: manual.has(t.id), manual_match: manual.has(t.id) && !!STATE.by_hand[t.id], links, bc_at: STATE.bandcamp?.[String(t.id)]?.v === BANDCAMP_RULES ? STATE.bandcamp[String(t.id)].at : 0, lossy, upgrade,
              added: t.added || 0, is_new: (t.added || 0) > (lib.seen_mark || 0),
@@ -2521,44 +2683,94 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
   // first pass stamped existing files with 0 (not while a folder is away: its files would be NEW when it returns)
   if (!lib.acq_init && !keep) { lib.acq_init = true; naDirty = true; }
   if (naDirty) saveState();
-  const extras = files.filter((f) => !fileHit.has(f.name)).map((f) => {
-    const nm = extraName(f);
-    let xa = nm.artist, xt = nm.title;
-    const ed = STATE.edits["x:" + f.path];
-    const hand = handEdit(ed);
-    if (hand) { xa = ed!.artist || xa; xt = ed!.title || xt; }
-    const confirmed = !hand && !!ed?.ok && ed.ok === nameSig(xa, xt);
-    const fnd = STATE.found["x:" + f.path];
-    const tagged = isTagged(f, xa, xt, genre, handFields(ed)), differs = fileDiffers(f, xa, xt);
-    const look = nameLook(nm, ed, hand, confirmed, differs);
-    return { name: f.name, path: f.path, incompat: compatReason(f.fmt, dev, f.wext), dur: fmtDur(Math.round(f.dur)), lossy: LOSSY.test(f.fmt[0]),
-             artist: xa, title: xt, edited: hand, ...differs,
-             name_conf: nm.conf, name_why: look.why, name_ok: confirmed, check_name: look.check,
-             tagged, ...(tagged && !opts.plans ? {} : { tag_plan: tagPlan(f, xa, xt, handFields(ed), keptOver(ed, confirmed, differs)) }),
-             key: f.key ?? null, pn: f.pn ?? null,
-             found: fnd ? { ...fnd, dur: fmtDur(fnd.dur) } : null };
-  });
+  // the files this playlist's bulk actions (tag, convert, AIFF) work on: its matched files
+  const matchedFiles = rows.filter((r: any) => r.file && fmap.has(r.file)).map((r: any) => fmap.get(r.file)!);
   return {
     ...base, ready: true, playlist: pl.title, playlist_url: pl.url,
-    genre, tracks: rows, extras,
-    folders_away: notAvailable,   // [{dir, why: "missing" | "unreadable" | "empty"}]: nothing of this library is pruned meanwhile
-    local_files: files.map((f) => ({ name: f.name, path: f.path, dur: fmtDur(Math.round(f.dur)) })),
+    genre, tracks: rows,
+    extras: [],   // per-playlist extras are gone: the collection browser shows every file instead
+    folders_away: notAvailable,   // [{dir, why: "missing" | "unreadable" | "empty"}]: nothing is pruned meanwhile
+    local_files: files.map((f) => ({ name: f.name, disp: collDisplay(f.path), path: f.path, dur: fmtDur(Math.round(f.dur)) })),
     have: rows.filter((r) => r.have).length,
     missing: rows.filter((r) => !r.have && !r.na).length,
     na_count: rows.filter((r) => r.na).length,
+    in_inbox: rows.filter((r) => r.in_inbox).length,
     upgrades: rows.filter((r) => r.upgrade).length,
     reavailable,
     new_count: rows.filter((r) => r.is_new || r.is_new_file).length,
     new_tracks: rows.filter((r) => r.is_new).length,
     new_files: rows.filter((r) => r.is_new_file).length,
     seen_mark: lib.seen_mark || 0,
-    name_checks: rows.filter((r) => r.check_name).length + extras.filter((e) => e.check_name).length,
-    untagged: rows.filter((r) => r.tagged === false).length
-            + extras.filter((e) => e.tagged === false).length,
-    incompatible: files.filter((f) => compatReason(f.fmt, dev, f.wext)).length,
+    name_checks: rows.filter((r) => r.check_name).length,
+    untagged: rows.filter((r) => r.tagged === false).length,
+    incompatible: matchedFiles.filter((f) => compatReason(f.fmt, dev, f.wext)).length,
     local_count: files.length,
-    art: artCounts(rows, extras.length),
-    aiff: { on: !!STATE.settings?.aiff_auto, wav: files.filter((f) => path.extname(f.name).toLowerCase() === ".wav").length },
+    art: artCounts(rows, 0),
+    aiff: { on: !!STATE.settings?.aiff_auto, wav: matchedFiles.filter((f) => path.extname(f.path).toLowerCase() === ".wav").length },
+  };
+}
+
+/** The collection browser: every file of every root, with what the playlists make of it.
+ *  `unmatched`: the file is no playlist's track and has no found record either. */
+export async function collectionView(): Promise<any> {
+  const gen = STATE_GEN;
+  let dev = STATE.device || "xdj-700";
+  if (!DEVICES[dev]) dev = "xdj-700";
+  const away: FolderAway[] = [];
+  const files = await scanCollection(away);
+  if (gen !== STATE_GEN) return collectionView();
+  // what each playlist makes of its matched files, straight from the views (same names,
+  // same tag status the playlist page shows)
+  const usedBy = new Map<string, { lib: string; name: string; track: string; row: any }[]>();
+  for (const l of STATE.libraries) {
+    if (!l.playlist) continue;
+    const v = await buildView(l);
+    for (const r of v.tracks || []) {
+      if (!r.file) continue;
+      const label = [r.artist, r.title].filter(Boolean).join(" - ");
+      usedBy.set(r.file, [...(usedBy.get(r.file) || []), { lib: l.id, name: libName(l), track: label, row: r }]);
+    }
+  }
+  const rows = files.map((f, i) => {
+    const used = usedBy.get(f.name) || [];
+    const fnd = STATE.found["x:" + f.path];
+    const first = used[0]?.row;
+    let named: any;
+    if (first) {
+      named = { artist: first.artist, title: first.title, edited: !!first.edited,
+                name_conf: first.name_conf, name_why: first.name_why, name_ok: first.name_ok, check_name: first.check_name,
+                ...(first.file_artist !== undefined ? { file_artist: first.file_artist, file_title: first.file_title } : {}),
+                tagged: first.tagged !== false };
+    } else {
+      const nm = extraName(f);
+      let xa = nm.artist, xt = nm.title;
+      const ed = STATE.edits["x:" + f.path];
+      const hand = handEdit(ed);
+      if (hand) { xa = ed!.artist || xa; xt = ed!.title || xt; }
+      const confirmed = !hand && !!ed?.ok && ed.ok === nameSig(xa, xt);
+      const differs = fileDiffers(f, xa, xt);
+      const look = nameLook(nm, ed, hand, confirmed, differs);
+      named = { artist: xa, title: xt, edited: hand, ...differs,
+                name_conf: nm.conf, name_why: look.why, name_ok: confirmed, check_name: look.check,
+                tagged: isTagged(f, xa, xt, "", handFields(ed)) };
+    }
+    return { n: i + 1, name: f.name, disp: collDisplay(f.path), base: f.base, path: f.path, root: rootOf(f.path)?.id || null,
+             incompat: compatReason(f.fmt, dev, f.wext), dur: fmtDur(Math.round(f.dur)), lossy: LOSSY.test(f.fmt[0]),
+             ...named,
+             key: f.key ?? null, pn: f.pn ?? null,
+             in: used.map(({ lib, name, track }) => ({ lib, name, track })),
+             unmatched: !used.length && !fnd,
+             found: fnd ? { ...fnd, dur: fmtDur(fnd.dur) } : null };
+  });
+  const coll = collection();
+  return {
+    roots: coll.roots.map((r) => ({ id: r.id, path: r.path, subfolders: !!r.subfolders })),
+    folders_away: away,
+    files: rows,
+    total: rows.length,
+    unmatched: rows.filter((r) => r.unmatched).length,
+    untagged: rows.filter((r) => !r.tagged).length,
+    incompatible: rows.filter((r) => r.incompat).length,
   };
 }
 
@@ -2761,14 +2973,28 @@ export async function batchInfo(keys: string[]): Promise<BatchFile[]> {
   const lib = requireLib();
   const view = await buildView(lib);
   if (!view.ready) return [];
-  const files = new Map((await scanLocal(lib)).map((f) => [f.name, f]));
+  const files = new Map((await scanCollection()).map((f) => [f.name, f]));
   const rows = new Map<string, any>();
   for (const r of view.tracks || []) if (r.file) rows.set(r.file, r);
-  for (const e of view.extras || []) rows.set(e.name, e);
   const out: BatchFile[] = [];
   for (const k of keys) {
-    const f = files.get(k), r = rows.get(k);
-    if (!f || !r) continue;
+    const f = files.get(k);
+    let r = rows.get(k);
+    if (!f) continue;
+    if (!r) {
+      // not one of this playlist's matched files: its names as the collection browser derives them
+      const nm = extraName(f);
+      let xa = nm.artist, xt = nm.title;
+      const ed = STATE.edits["x:" + f.path];
+      const hand = handEdit(ed);
+      if (hand) { xa = ed!.artist || xa; xt = ed!.title || xt; }
+      const confirmed = !hand && !!ed?.ok && ed.ok === nameSig(xa, xt);
+      const differs = fileDiffers(f, xa, xt);
+      const look = nameLook(nm, ed, hand, confirmed, differs);
+      const tagged = isTagged(f, xa, xt, view.genre || "Trance", handFields(ed));
+      r = { id: null, artist: xa, title: xt, tagged, check_name: look.check,
+            tag_plan: tagged ? null : tagPlan(f, xa, xt, handFields(ed), keptOver(ed, confirmed, differs)) };
+    }
     let size = 0;
     try { size = fs.statSync(f.path).size; } catch {}
     out.push({ key: k, path: f.path, track_id: typeof r.id === "number" ? r.id : null, artist: r.artist, title: r.title,
@@ -2803,11 +3029,20 @@ export async function tagFile(key: string, artist: string, title: string, genre:
   await writeTags(libPath(requireLib(), key), artist, title, genre);
 }
 
-/** Library files of the active library that look unprocessed: no Platinum Notes mark
+/** The collection files matched to a library's playlist: what that playlist's bulk runs
+ *  (Write tags, Convert, WAV to AIFF) work on. The rest of the collection is not this
+ *  playlist's to rewrite. */
+async function matchedFilesOf(lib: Library): Promise<LocalFile[]> {
+  const view = await buildView(lib);
+  const fmap = new Map((await scanCollection()).map((f) => [f.name, f]));
+  return (view.tracks || []).filter((r: any) => r.file && fmap.has(r.file)).map((r: any) => fmap.get(r.file)!);
+}
+
+/** The active playlist's matched files that look unprocessed: no Platinum Notes mark
  *  (where the format can tell) or no musical key in the tags. */
 export async function unprocessedFiles(): Promise<string[]> {
   const lib = requireLib();
-  return (await scanLocal(lib)).filter((f) => f.pn === false || !f.key).map((f) => f.name);
+  return (await matchedFilesOf(lib)).filter((f) => f.pn === false || !f.key).map((f) => f.name);
 }
 
 /** The rate a file goes to for a player: its own when the player takes it, else the highest the
@@ -2849,7 +3084,7 @@ async function convertRun(): Promise<any> {
   let done = 0, aiff = 0;
   const errors: string[] = [], error_items: ErrorItem[] = [];
   const fail = (name: string, e: any) => { errors.push(`${name}: ${e.message}`); error_items.push(errItem(name, e)); };
-  const todo = (await scanLocal(lib)).filter((f) => compatReason(f.fmt, devKey, f.wext));
+  const todo = (await matchedFilesOf(lib)).filter((f) => compatReason(f.fmt, devKey, f.wext));
   TAG_RUN.total = todo.length;
   for (const f of todo) {
     TAG_RUN.done++;   // counted as it starts: the ring shows the file being worked on
@@ -2867,7 +3102,7 @@ async function convertRun(): Promise<any> {
     }
     const tmp = liveTmp(f.path + ".tmp" + ext);
     try {
-      const bpath = path.join(bdir, ...f.name.split("/"));
+      const bpath = path.join(bdir, ...backupKeyFor(f.path).split("/"));
       fs.mkdirSync(path.dirname(bpath), { recursive: true });
       if (!fs.existsSync(bpath)) copyPreservingTimes(f.path, bpath);
       if (why === "WAV header") {
@@ -3009,7 +3244,7 @@ async function toAiff(lib: Library, f: LocalFile, sr: number, bits: number): Pro
     throw e;
   } finally { LIVE_TMP.delete(tmp); }
   try {
-    const bpath = path.join(backupDir(lib), ...key.split("/"));
+    const bpath = path.join(backupDir(lib), ...backupKeyFor(src).split("/"));
     fs.mkdirSync(path.dirname(bpath), { recursive: true });
     backupMove(src, fs.existsSync(bpath) ? replacedName(lib, path.basename(src)) : bpath);
   } catch (e: any) {
@@ -3080,6 +3315,7 @@ function backupMove(src: string, dst: string): void {
     copyPreservingTimes(src, dst);
     try { fs.unlinkSync(src); } catch (e2) { try { fs.unlinkSync(dst); } catch { /* ignore */ } throw e2; }
   }
+  COLL_DIRTY = true;
 }
 /** A free name in originals/<lib>/replaced/ for `base` (" (2)", " (3)" … when taken), the folder made. */
 function replacedName(lib: Library, base: string): string {
@@ -3156,7 +3392,7 @@ export async function wavToAiff(lib: Library, key: string): Promise<string> {
   // - otherwise the backup is the original a Convert on the Prepare page kept: it stays the backup
   //   (Restore originals puts that original back) and this WAV goes to replaced/.
   try {
-    const bpath = path.join(backupDir(lib), ...key.split("/"));
+    const bpath = path.join(backupDir(lib), ...backupKeyFor(src).split("/"));
     if (!fs.existsSync(bpath)) {
       fs.mkdirSync(path.dirname(bpath), { recursive: true });
       backupMove(src, bpath);
@@ -3194,7 +3430,7 @@ export async function aiffAll(opts: { preview?: boolean } = {}): Promise<any> {
 }
 async function aiffRun(preview: boolean): Promise<any> {
   const lib = requireLib();
-  const wavs = (await scanLocal(lib)).filter((f) => path.extname(f.name).toLowerCase() === ".wav");
+  const wavs = (await matchedFilesOf(lib)).filter((f) => path.extname(f.name).toLowerCase() === ".wav");
   const bdir = backupDir(lib);
   if (preview) {
     const skip = { format: 0, exists: 0 };
@@ -3251,7 +3487,7 @@ export async function restoreAll(): Promise<any> {
       if (aiff) {
         try { backupMove(aiff[1], replacedName(lib, path.basename(aiff[1]))); }
         catch (e) { if (!had) try { fs.unlinkSync(dst); } catch { /* ignore */ } throw e; }
-        renameRecords(lib, aiff[0], key);
+        renameRecords(lib, aiff[0], dst);
         delete STATE.dur_cache[aiff[1]];
         aiff_undone++;
       }
@@ -3300,13 +3536,14 @@ function userDir(raw: any): string {
   return path.resolve(d);
 }
 
-/** POST /api/library: {op: "add", dir, url} · {op: "select", id} · {op: "remove", id}
- *  · {op: "add_folder", dir, id?} · {op: "remove_folder", dir, id?} · {op: "subfolders", on, id?}
- *  · {op: "set_url", url, id?} · {op: "files_ready", id?} · {op: "set_dir", dir, id?, confirm?} (see setMainDir)
- *  (the folder ops and set_url act on the active library unless
- *  `id` says otherwise). add and set_url answer with view.fetch_report = {unreadable}, set_url
- *  also with {same, of, had}: how many of the tracks were already in the old playlist. When the
- *  new link misses tracks the library had, set_url changes nothing and answers {confirm: report}
+/** POST /api/library: {op: "add", url, dir?} · {op: "select", id} · {op: "remove", id}
+ *  · {op: "set_url", url, id?} · {op: "set_target", dir, id?} (the playlist's own move
+ *  target; "" or null clears it) · {op: "files_ready", id?}
+ *  (the ops act on the active library unless `id` says otherwise). add may bring a first
+ *  folder along (the setup page): it becomes a collection root when it isn't one yet.
+ *  add and set_url answer with view.fetch_report = {unreadable}, set_url also with {same,
+ *  of, had}: how many of the tracks were already in the old playlist. When the new link
+ *  misses tracks the library had, set_url changes nothing and answers {confirm: report}
  *  (not a view) unless `confirm: true` was sent. */
 export async function libraryOp(data: any): Promise<any> {
   const op = data.op;
@@ -3317,20 +3554,28 @@ export async function libraryOp(data: any): Promise<any> {
     return lib;
   };
   if (op === "add") {
-    const d = userDir(data.dir);
     const url = await expandScUrl(data.url);
     if (!url.startsWith("http")) throw appError("url_not_full", "please give a full SoundCloud playlist or likes URL");
-    if (libs.some((l) => libDirs(l).some((x) => sameDir(x, d))))
-      throw appError("folder_is_library", "this folder is already a library");
+    if (data.dir) addRoot(userDir(data.dir));   // the setup page brings the first folder along
     const nid = "lib" + (Math.max(0, ...libs
       .filter((l) => /^lib\d+$/.test(l.id)).map((l) => parseInt(l.id.slice(3), 10))) + 1);
-    const lib: Library = { id: nid, dir: d, url, playlist: null };
+    const lib: Library = { id: nid, dir: "", url, playlist: null };
     libs.push(lib);
     STATE.active = nid;
     const unreadable = await fetchPlaylist(lib); // throws on bad URL / no internet; lib stays for retry
     const view = await buildView();
     view.fetch_report = { unreadable };
     return view;
+  } else if (op === "set_target") {
+    const lib = target();
+    const d = String(data.dir || "").trim();
+    if (!d) delete lib.target;
+    else {
+      const t = userDir(d);
+      if (!rootOf(t) && !collRoots().some((r) => sameDir(r.path, t)))
+        throw appError("target_outside_collection", "the move target must be a folder of the collection", { dir: t });
+      lib.target = t;
+    }
   } else if (op === "set_url") {
     // a new link for the same library, typically the same playlist made private (its share link):
     // read it first; only a good read replaces the link and the snapshot. Everything keyed by
@@ -3361,48 +3606,6 @@ export async function libraryOp(data: any): Promise<any> {
     if (libs.length <= 1) throw appError("last_library", "cannot remove the last library");
     STATE.libraries = libs.filter((l) => l.id !== data.id);
     if (STATE.active === data.id) STATE.active = STATE.libraries[0].id;
-  } else if (op === "add_folder") {
-    const lib = target();
-    const d = userDir(data.dir);
-    for (const x of libDirs(lib)) {
-      if (sameDir(x, d)) throw appError("folder_in_library", "this folder is already part of the library");
-      if (insideDir(d, x)) throw appError("folder_inside", `${d} is inside ${x}, which is already part of the library. Turn on "Include subfolders" instead`, { dir: d, parent: x });
-      if (insideDir(x, d)) throw appError("folder_contains", `${x} is inside ${d}; a library folder cannot contain another one`, { dir: d, child: x });
-    }
-    for (const other of libs)
-      if (other !== lib && libDirs(other).some((x) => sameDir(x, d)))
-        throw appError("folder_other_library", `this folder already belongs to the library “${libName(other)}”`, { name: libName(other) });
-    lib.dirs = [...(lib.dirs || []), d];
-  } else if (op === "remove_folder") {
-    const lib = target();
-    const d = String(data.dir || "");
-    if (sameDir(lib.dir, d)) throw appError("main_folder_fixed", "the main folder cannot be removed; remove the library instead");
-    const gone = (lib.dirs || []).find((x) => sameDir(x, d));
-    if (gone === undefined) throw appError("folder_not_in_library", "that folder is not part of the library");
-    const had = lib.playlist ? ((await buildView(lib)).tracks || []).filter((r: any) => r.file) : [];
-    const prev: Library = { ...lib };
-    lib.dirs = (lib.dirs || []).filter((x) => x !== gone);
-    if (!lib.dirs.length) delete lib.dirs;
-    const followed = followRemoved(prev, lib, gone);
-    // an earlier main folder (a swap) leaves the library: the rekordbox export update follows it like a moved main folder
-    if ((lib.former_main || []).some((y) => sameDir(y, gone))) {
-      lib.former_main = lib.former_main!.filter((y) => !sameDir(y, gone));
-      if (!lib.former_main.length) delete lib.former_main;
-      lib.moved_from = [...(lib.moved_from || []).filter((y) => !sameDir(y, gone) && !sameDir(y, lib.dir)), gone].slice(-5);
-    }
-    for (const k of Object.keys(STATE.dur_cache)) if (k.startsWith(gone + path.sep)) delete STATE.dur_cache[k];
-    saveState();
-    const view = await buildView();
-    // the tracks whose file was in that folder and that have none now (no file of the same name elsewhere)
-    const now = new Set(((lib === activeLib() ? view : await buildView(lib)).tracks || []).filter((r: any) => r.file).map((r: any) => r.id));
-    const lost = had.filter((r: any) => !now.has(r.id)).map((r: any) => ({ id: r.id, artist: r.artist, title: r.title, file: r.file }));
-    view.remove_report = { dir: gone, followed, before: had.length, after: now.size, lost: lost.slice(0, 200), lost_count: lost.length };
-    return view;
-  } else if (op === "subfolders") {
-    const lib = target();
-    if (data.on) lib.subfolders = true; else delete lib.subfolders;
-  } else if (op === "set_dir") {
-    return setMainDir(target(), data);
   } else if (op === "files_ready") {
     // an imported library whose music was being copied: the user says the copy is complete, so
     // pins whose file still isn't there are dropped with the next view, as for any other library
@@ -3414,198 +3617,107 @@ export async function libraryOp(data: any): Promise<any> {
   return buildView();
 }
 
-/** A folder change's "before": the tracks that have a file now; with the main folder gone (or
- *  listing no audio), those that had one when it was last seen. */
-async function tracksWithFile(lib: Library): Promise<{ fromAway: boolean; had: { id: number; artist: string; title: string; file: string }[] }> {
-  const tracks = lib.playlist?.tracks || [];
-  const fromAway = !!folderTrouble(lib.dir) || !listAudioKeys(lib.dir, !!lib.subfolders, 1).length;
-  if (!fromAway) {
-    const view = await buildView(lib);
-    return { fromAway, had: (view.tracks || []).filter((r: any) => r.file).map((r: any) => ({ id: r.id, artist: r.artist, title: r.title, file: r.file })) };
-  }
-  const names = libraryNames(tracks);
-  const nameOf = (t: PlTrack) => {
-    const nm = names.get(t.id)!, ed = STATE.edits[String(t.id)];
-    return handEdit(ed) ? { artist: ed!.artist || nm.artist, title: ed!.title || nm.title } : { artist: nm.artist, title: nm.title };
-  };
-  return { fromAway, had: tracks.filter((t) => `${lib.id}:${t.id}` in STATE.acquired || !!STATE.assigned[String(t.id)])
-    .map((t) => ({ id: t.id, ...nameOf(t), file: STATE.assigned[String(t.id)] || "" })) };
+/** Add a folder as a collection root (used by collectionOp and the setup flow). A folder
+ *  that is a root already is left as it is; one inside a root that scans its subfolders is
+ *  refused (it is covered); a root inside the new folder stays (files are listed once). */
+function addRoot(d: string, subfolders = true): CollectionRoot {
+  const coll = collection();
+  const have = coll.roots.find((r) => sameDir(r.path, d));
+  if (have) return have;
+  for (const r of coll.roots)
+    if (r.subfolders && insideDir(d, r.path))
+      throw appError("folder_inside", `${d} is inside ${r.path}, which is scanned with its subfolders already`, { dir: d, parent: r.path });
+  const id = "r" + (Math.max(0, ...coll.roots.map((r) => parseInt(/^r(\d+)$/.exec(r.id)?.[1] || "0", 10))) + 1);
+  const root: CollectionRoot = { id, path: d, ...(subfolders ? { subfolders: true } : {}) };
+  coll.roots.push(root);
+  COLL_DIRTY = true;
+  return root;
 }
 
-/** The key a file of `lib` gets when the library's folders become `next`'s (same folders, other
- *  roles or order): the folder a key belongs to is found by its prefix under `lib`, and the key
- *  gets that folder's prefix under `next` (the main folder's is ""). */
-function rekeyer(lib: Library, next: Library): (k: string) => string {
-  const oldPre = dirPrefixes(lib), newPre = dirPrefixes(next);
-  const byPre = [...oldPre].filter(([, p]) => p);
-  return (k: string) => {
-    let dir = lib.dir, rest = k;
-    for (const [d, p] of byPre) if (k.startsWith(p)) { dir = d; rest = k.slice(p.length); break; }
-    const p2 = newPre.get(dir);
-    return p2 === undefined ? k : p2 + rest;
-  };
-}
-/** Move the backups under originals/<lib>/ (keyed like the library's files) to their new keys.
- *  Two steps through a folder next to it, since one backup's new key can be another's old one;
- *  a step that fails puts back what it moved and throws, so nothing is half done. */
-function rekeyBackups(lib: Library, rekey: (k: string) => string): void {
-  const moves = backupEntries(lib).map(([k, p]) => [k, rekey(k), p] as [string, string, string]).filter(([a, b]) => a !== b);
-  if (!moves.length) return;
-  const bdir = backupDir(lib), tmp = path.join(DATA_DIR, "originals", `.${lib.id}.rekey`);
-  fs.rmSync(tmp, { recursive: true, force: true });
-  const done: [string, string][] = [];   // [from, to] in the order made
-  const mv = (a: string, b: string) => { fs.mkdirSync(path.dirname(b), { recursive: true }); fs.renameSync(a, b); done.push([a, b]); };
-  try {
-    for (const [, nk, p] of moves) mv(p, path.join(tmp, ...nk.split("/")));
-    for (const [, nk] of moves) {
-      const dst = path.join(bdir, ...nk.split("/"));
-      if (fs.existsSync(dst)) throw appError("backup_in_way", `a backup is in the way: ${dst}`, { file: dst });
-      mv(path.join(tmp, ...nk.split("/")), dst);
+/** POST /api/collection: {op: "add_root", dir, subfolders?} · {op: "remove_root", id}
+ *  · {op: "subfolders", id, on} · {op: "set_move_target", dir} ("" or null: back to the
+ *  first root) · {op: "rescan"}. remove_root answers with view.remove_report: the tracks
+ *  (of any playlist) whose file was under that root and that have none now. */
+export async function collectionOp(data: any): Promise<any> {
+  const op = data.op;
+  const coll = collection();
+  if (op === "add_root") {
+    addRoot(userDir(data.dir), data.subfolders !== false);
+  } else if (op === "remove_root") {
+    const root = coll.roots.find((r) => r.id === data.id || (data.dir && sameDir(r.path, String(data.dir))));
+    if (!root) throw appError("root_not_found", "that folder is not part of the collection");
+    // what every playlist holds under this root right now, for the report
+    const had: { lib: string; id: number; artist: string; title: string; file: string }[] = [];
+    for (const l of STATE.libraries) {
+      if (!l.playlist) continue;
+      for (const r of ((await buildView(l)).tracks || []))
+        if (r.file && (r.file as string).startsWith(root.path + path.sep)) had.push({ lib: l.id, id: r.id, artist: r.artist, title: r.title, file: r.file });
     }
-  } catch (e) {
-    for (const [a, b] of done.reverse()) try { fs.mkdirSync(path.dirname(a), { recursive: true }); fs.renameSync(b, a); } catch { /* left in tmp, kept */ }
-    throw e;
-  }
-  fs.rmSync(tmp, { recursive: true, force: true });
-}
-
-/** set_dir with one of the library's extra folders: the two folders swap roles. That folder
- *  becomes the main folder (new downloads go there) and the old main folder an extra folder; both
- *  stay in the library and no file on disk is touched. Only the keys change (an extra folder's
- *  files carry its name as a prefix, the main folder's none), so every record keyed by one follows
- *  its own file: the pins, the backups and the Convert to AIFF record. The found and edits
- *  records, the file cache and everything keyed by track id are keyed by path or track and stay
- *  as they are. Same protocol as setMainDir: {confirm: plan} (swap: true) until `confirm`. */
-async function swapMainDir(lib: Library, at: number, data: any): Promise<any> {
-  const x = lib.dirs![at], old = lib.dir;
-  for (const other of STATE.libraries)
-    if (other !== lib && libDirs(other).some((y) => sameDir(y, x)))
-      throw appError("folder_other_library", `this folder already belongs to the library “${libName(other)}”`, { name: libName(other) });
-  tagIdle();
-  const tracks = lib.playlist?.tracks || [];
-  const trackIds = libTrackIds(lib);
-  const next: Library = { ...lib, dir: x, dirs: lib.dirs!.map((y, i) => (i === at ? old : y)) };
-  const rekey = rekeyer(lib, next);
-  const pins = Object.entries(STATE.assigned).filter(([tid, f]) => f && trackIds.has(Number(tid)));
-  const { fromAway, had } = await tracksWithFile(lib);
-  const files = await scanLocal(next, undefined, false);
-  const manual = new Map<number, string>();
-  for (const [tid, f] of Object.entries(STATE.assigned))
-    if (trackIds.has(Number(tid))) manual.set(Number(tid), f ? rekey(f) : "");
-  const { matched } = matchFiles(files, tracks, manual);
-  const hadIds = new Set(had.map((h) => h.id));
-  const lose = had.filter((h) => !matched.has(h.id));
-  const gain = [...matched.keys()].filter((id) => !hadIds.has(id)).length;
-  const under = (p: string) => [old, x].some((d) => p.startsWith(d + path.sep));
-  const recs = [STATE.found, STATE.edits].reduce((n, m) => n + Object.keys(m).filter((k) => k.startsWith("x:") && under(k.slice(2))).length, 0);
-  const disk = listAudioKeys(x, !!lib.subfolders);
-  const plan = { swap: true, dir: x, from: old, from_away: fromAway, files: disk.length, empty: !disk.length,
-                 before: had.length, after: matched.size, lose: lose.slice(0, 200), lose_count: lose.length, gain,
-                 pins: { total: pins.length, kept: pins.length, other_ext: 0, lost: 0 }, records: { carried: recs, lost: 0 } };
-  if (!data.confirm) return { confirm: plan };
-  // apply: the backups first (the only step that can fail), then the keys in the state
-  rekeyBackups(lib, rekey);
-  for (const [tid, f] of pins) STATE.assigned[tid] = rekey(f);
-  if (lib.aiff_from) lib.aiff_from = Object.fromEntries(Object.entries(lib.aiff_from).map(([a, b]) => [rekey(a), rekey(b)]));
-  lib.dir = x;
-  lib.dirs = next.dirs;
-  lib.former_main = [...(lib.former_main || []).filter((y) => !sameDir(y, x) && !sameDir(y, old)), old];
-  if (lib.moved_from) { lib.moved_from = lib.moved_from.filter((y) => !sameDir(y, x) && !sameDir(y, old)); if (!lib.moved_from.length) delete lib.moved_from; }
-  saveState();
-  const view = await buildView();
-  view.main_report = { swap: true, dir: x, from: old, before: plan.before, after: plan.after, lost: lose.length };
-  return view;
-}
-
-/** Use another folder as a library's main folder (the music was moved, renamed, or converted into
- *  a copy of the folder). No file is touched. Everything DJ HQ remembers about the old folder's
- *  files follows them by name (matchKeys: exact, case and Unicode folded, the file name alone, the
- *  name without its audio extension): pins, found and edits records; the backups, file-arrival
- *  times and everything keyed by track id stay as they are. Without `confirm` nothing changes and
- *  the answer is {confirm: plan}: how many tracks have a file now (or had one when the old folder
- *  was last seen) and would have one in the new folder, which would lose theirs, and what happens
- *  to the pins and records. With it the plan is applied and the view has main_report. */
-async function setMainDir(lib: Library, data: any): Promise<any> {
-  const d = userDir(data.dir);
-  const old = lib.dir;
-  if (sameDir(old, d)) throw appError("folder_same", "this folder is already the main folder of the library", { dir: d });
-  const swapAt = (lib.dirs || []).findIndex((x) => sameDir(x, d));
-  if (swapAt >= 0) return swapMainDir(lib, swapAt, data);
-  for (const x of lib.dirs || []) {
-    if (insideDir(d, x)) throw appError("folder_inside", `${d} is inside ${x}, which is already part of the library. Turn on "Include subfolders" instead`, { dir: d, parent: x });
-    if (insideDir(x, d)) throw appError("folder_contains", `${x} is inside ${d}; a library folder cannot contain another one`, { dir: d, child: x });
-  }
-  for (const other of STATE.libraries)
-    if (other !== lib && libDirs(other).some((x) => sameDir(x, d)))
-      throw appError("folder_other_library", `this folder already belongs to the library “${libName(other)}”`, { name: libName(other) });
-  tagIdle();
-  const tracks = lib.playlist?.tracks || [];
-  const trackIds = libTrackIds(lib);
-  const next: Library = { ...lib, dir: d };
-  const oldPre = dirPrefixes(lib), newPre = dirPrefixes(next);
-  // an extra folder whose key prefix changes (a subfolder of the new main folder has its name)
-  const extraMove: [string, string][] = (lib.dirs || []).map((x) => [oldPre.get(x)!, newPre.get(x)!] as [string, string]).filter(([a, b]) => a !== b);
-  const isMain = (k: string) => ![...oldPre.values()].some((pre) => pre && k.startsWith(pre));
-  const reExtra = (k: string) => { for (const [a, b] of extraMove) if (k.startsWith(a)) return b + k.slice(a.length); return k; };
-  const pins = Object.entries(STATE.assigned).filter(([tid, f]) => f && trackIds.has(Number(tid)));
-  const mainPins = pins.filter(([, f]) => isMain(f));
-  // the records keyed by path under the old main folder (subfolders only when they are scanned)
-  const recs: { map: Record<string, unknown>; k: string; rel: string }[] = [];
-  for (const map of [STATE.found, STATE.edits] as Record<string, unknown>[])
-    for (const k of Object.keys(map)) {
-      if (!k.startsWith("x:" + old + path.sep)) continue;
-      const rel = path.relative(old, k.slice(2)).split(path.sep).join("/");
-      if (rel && (lib.subfolders || !rel.includes("/"))) recs.push({ map, k, rel });
+    coll.roots = coll.roots.filter((r) => r !== root);
+    if (coll.move_target && insideUnder(coll.move_target)) delete coll.move_target;
+    if (coll.last_target && insideUnder(coll.last_target)) delete coll.last_target;
+    for (const l of STATE.libraries) if (l.target && insideUnder(l.target)) delete l.target;
+    function insideUnder(p: string) { return sameDir(p, root!.path) || insideDir(p, root!.path); }
+    for (const k of Object.keys(STATE.dur_cache)) if (k.startsWith(root.path + path.sep)) delete STATE.dur_cache[k];
+    COLL_DIRTY = true;
+    MATCH_CACHE.clear();
+    saveState();
+    const view = await buildView();
+    // rule E may have carried a record to a same-named file elsewhere; report what is left without one
+    const lost: typeof had = [];
+    for (const l of STATE.libraries) {
+      if (!l.playlist) continue;
+      const now = new Set(((l === activeLib() ? view : await buildView(l)).tracks || []).filter((r: any) => r.file).map((r: any) => r.id));
+      for (const h of had) if (h.lib === l.id && !now.has(h.id)) lost.push(h);
     }
-  const disk = listAudioKeys(d, !!lib.subfolders);
-  const m = matchKeys([...mainPins.map(([, f]) => f), ...recs.map((r) => r.rel)], disk);
-  const { fromAway, had } = await tracksWithFile(lib);
-  // after: the new folder (and the extra folders) matched as the view would, the pins carried over
-  // (no sweep: until the change is confirmed the new folder is not the library's, and nothing in it is touched)
-  const files = await scanLocal(next, undefined, false);
-  const fileNames = new Set(files.map((f) => f.name));
-  const stems = new Map<string, string[]>();
-  for (const f of files) stems.set(stemKey(f.name), [...(stems.get(stemKey(f.name)) || []), f.name]);
-  const manual = new Map<number, string>();
-  for (const [tid, f] of Object.entries(STATE.assigned)) {
-    if (!trackIds.has(Number(tid))) continue;
-    if (!f) { manual.set(Number(tid), ""); continue; }
-    let to = isMain(f) ? m.map.get(f)?.to : reExtra(f);
-    if (to && !isMain(f) && !fileNames.has(to)) { const c = stems.get(stemKey(to)) || []; to = c.length === 1 ? c[0] : to; }
-    if (to) manual.set(Number(tid), to);   // else the pin is dropped with the next view; the file may still match by name
+    view.remove_report = { dir: root.path, before: had.length, lost: lost.slice(0, 200), lost_count: lost.length };
+    return view;
+  } else if (op === "subfolders") {
+    const root = coll.roots.find((r) => r.id === data.id);
+    if (!root) throw appError("root_not_found", "that folder is not part of the collection");
+    if (data.on) root.subfolders = true; else delete root.subfolders;
+    COLL_DIRTY = true;
+  } else if (op === "set_move_target") {
+    const d = String(data.dir || "").trim();
+    if (!d) delete coll.move_target;
+    else {
+      const t = userDir(d);
+      if (!rootOf(t) && !coll.roots.some((r) => sameDir(r.path, t)))
+        throw appError("target_outside_collection", "the move target must be a folder of the collection", { dir: t });
+      coll.move_target = t;
+    }
+  } else if (op === "rescan") {
+    COLL_DIRTY = true;
+  } else {
+    throw appError("bad_request", "unknown collection op");
   }
-  const { matched } = matchFiles(files, tracks, manual);
-  const hadIds = new Set(had.map((h) => h.id));
-  const lose = had.filter((h) => !matched.has(h.id));
-  const gain = [...matched.keys()].filter((id) => !hadIds.has(id)).length;
-  const ext = (k: string) => path.extname(k).toLowerCase();
-  const mapped = mainPins.filter(([, f]) => m.map.has(f));
-  const pinsRep = { total: mainPins.length, kept: mapped.filter(([, f]) => ext(m.map.get(f)!.to) === ext(f)).length,
-                    other_ext: mapped.filter(([, f]) => ext(m.map.get(f)!.to) !== ext(f)).length, lost: mainPins.length - mapped.length };
-  const records = { carried: recs.filter((r) => m.map.has(r.rel)).length, lost: recs.filter((r) => !m.map.has(r.rel)).length };
-  const plan = { dir: d, from: old, from_away: fromAway, files: disk.length, empty: !disk.length,
-                 before: had.length, after: matched.size, lose: lose.slice(0, 200), lose_count: lose.length, gain, pins: pinsRep, records };
-  if (!data.confirm) return { confirm: plan };
-  // apply: the records follow their files; nothing on disk changes
-  for (const [tid, f] of pins) {
-    const to = isMain(f) ? m.map.get(f)?.to : reExtra(f);
-    if (to && to !== f) STATE.assigned[tid] = to;
-  }
-  for (const r of recs) {
-    const to = m.map.get(r.rel)?.to;
-    if (!to) continue;
-    const nk = "x:" + path.join(d, ...to.split("/"));
-    if (nk === r.k) continue;
-    if (!(nk in r.map)) r.map[nk] = r.map[r.k];
-    delete r.map[r.k];
-  }
-  for (const k of Object.keys(STATE.dur_cache)) if (k.startsWith(old + path.sep)) delete STATE.dur_cache[k];
-  lib.moved_from = [...(lib.moved_from || []).filter((x) => !sameDir(x, old) && !sameDir(x, d)), old].slice(-5);
-  lib.dir = d;
   saveState();
-  const view = await buildView();
-  view.main_report = { dir: d, from: old, before: plan.before, after: plan.after, lost: lose.length };
-  return view;
+  return buildView();
+}
+
+/** The folders a move can land in: every root and (one level at a time) the subfolders
+ *  under it, for the destination picker. `under`: list that folder's subfolders instead. */
+export function moveTargets(under?: string): { path: string; name: string; dirs: { name: string; path: string; has_dirs: boolean }[] }[] {
+  const list = (d: string) => {
+    const out: { name: string; path: string; has_dirs: boolean }[] = [];
+    try {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        if (!e.isDirectory() || e.name.startsWith(".")) continue;
+        const p = path.join(d, e.name);
+        let has = false;
+        try { has = fs.readdirSync(p, { withFileTypes: true }).some((x) => x.isDirectory() && !x.name.startsWith(".")); } catch {}
+        out.push({ name: e.name, path: p, has_dirs: has });
+      }
+    } catch {}
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+  };
+  if (under) {
+    const d = path.resolve(under);
+    if (!rootOf(d) && !collRoots().some((r) => sameDir(r.path, d)))
+      throw appError("target_outside_collection", "that folder is not part of the collection", { dir: d });
+    return [{ path: d, name: path.basename(d), dirs: list(d) }];
+  }
+  return collRoots().map((r) => ({ path: r.path, name: path.basename(r.path), dirs: list(r.path) }));
 }
 
 export async function refresh(): Promise<any> {
@@ -3748,14 +3860,16 @@ export async function setFound(data: any): Promise<any> {
   return buildView();
 }
 
+const FIND_ALL_CAP = 300;
 export async function findAll(): Promise<any> {
   const lib = requireLib();
-  let view = await buildView();
-  const fmap = new Map((await scanLocal(lib)).map((f) => [f.name, f]));
-  let found = 0, in_playlist = 0, unsure = 0, none = 0;
+  const cv = await collectionView();
+  const fmap = new Map((await scanCollection()).map((f) => [f.name, f]));
+  let found = 0, in_playlist = 0, unsure = 0, none = 0, left = 0;
   const errors: string[] = [], error_items: ErrorItem[] = [];
-  for (const e of view.extras || []) {
-    if (e.found) continue;
+  const todo = (cv.files || []).filter((e: any) => e.unmatched && !e.found);
+  left = Math.max(0, todo.length - FIND_ALL_CAP);
+  for (const e of todo.slice(0, FIND_ALL_CAP)) {
     const f = fmap.get(e.name);
     if (!f) continue;
     try {
@@ -3773,8 +3887,8 @@ export async function findAll(): Promise<any> {
     }
   }
   saveState();
-  view = await buildView();
-  view.find_report = { found, in_playlist, unsure, none, errors, error_items };
+  const view = await buildView();
+  view.find_report = { found, in_playlist, unsure, none, left, errors, error_items };
   return view;
 }
 
@@ -3953,7 +4067,7 @@ export async function inboxView(opts: { auto?: boolean } = {}): Promise<any> {
   }
   base.others = base.unmatched.length;
   // auto-move: exact matches (same name, same length) of tracks we don't have yet
-  if (opts.auto !== false && STATE.settings?.auto_move && base.items.length && !libDirs(lib).some((d) => sameDir(d, dir))) {
+  if (opts.auto !== false && STATE.settings?.auto_move && base.items.length && !collRoots().some((r) => sameDir(r.path, dir))) {
     const movedTracks = new Set<number>();
     const keep: any[] = [];
     for (const it of base.items) {
@@ -3978,6 +4092,7 @@ function moveFile(src: string, dst: string): void {
     fs.copyFileSync(src, dst); // other volume: copy, then remove the original
     fs.unlinkSync(src);
   }
+  COLL_DIRTY = true;
 }
 
 /** Move one inbox file (or one entry of a zip in the inbox) into the library and
@@ -3997,12 +4112,40 @@ export async function inboxMove(data: any): Promise<any> {
  *  "AIFF instead of WAV" on, a WAV becomes an AIFF right after the move (wavToAiff), before it is
  *  pinned, and the key returned is the AIFF's; `aiff` says how that went. A WAV that can't be
  *  converted stays as it is and is moved all the same ({ok: false, item}: the reason). */
+/** Where a move out of the inbox lands: the folder asked for (`dest`, a collection folder
+ *  from the picker), else the playlist's own target, the folder picked last, the default
+ *  move target, the first root. The explicit pick is remembered as the last one. */
+function resolveMoveDest(lib: Library | null, dest: unknown): { dir: string; chosen: boolean } {
+  const coll = collection();
+  const ok = (d: string | undefined | null): string | null => {
+    if (!d) return null;
+    if (!rootOf(d) && !coll.roots.some((r) => sameDir(r.path, d))) return null;
+    try { if (!fs.statSync(d).isDirectory()) return null; } catch { return null; }
+    return path.resolve(d);
+  };
+  if (dest) {
+    const d = ok(typedPath(dest));
+    if (!d) throw appError("target_outside_collection", "the move target must be a folder of the collection", { dir: String(dest) });
+    return { dir: d, chosen: true };
+  }
+  const d = ok(lib?.target) || ok(coll.last_target) || ok(coll.move_target) || ok(coll.roots[0]?.path);
+  if (!d) throw appError("no_collection_folder", "add a folder to the collection first (Settings > Collection)");
+  return { dir: d, chosen: false };
+}
+
+/** The folder a move for this library would land in right now, or null when the collection
+ *  has no usable folder (the pipeline checks it before planning). */
+export function moveDest(lib: Library | null): string | null {
+  try { return resolveMoveDest(lib, undefined).dir; } catch { return null; }
+}
+
 export async function inboxMoveOne(data: any): Promise<{ key: string; path: string; track_id: number | null; aiff?: { ok: boolean; item?: ErrorItem } }> {
   const lib = requireLib();
   const name = path.basename(String(data.file || ""));
   const zip = data.zip ? path.basename(String(data.zip)) : "";
   if (!name) throw appError("no_file", "no file given");
-  const dst = path.join(lib.dir, name);
+  const dest = resolveMoveDest(lib, data.dest);
+  const dst = path.join(dest.dir, name);
   if (fs.existsSync(dst)) throw appError("name_taken", `${name}: a file with this name is already in the library`, { name });
   // the WAV would become an AIFF that is there already
   const toAiff = !!STATE.settings?.aiff_auto && path.extname(name).toLowerCase() === ".wav";
@@ -4044,9 +4187,10 @@ export async function inboxMoveOne(data: any): Promise<{ key: string; path: stri
     if (staged) try { fs.unlinkSync(staged); } catch {}
     throw e;
   } finally { if (staged) LIVE_TMP.delete(staged); }
-  let key = name, at = dst, aiff: { ok: boolean; item?: ErrorItem } | undefined;
+  if (dest.chosen) { collection().last_target = dest.dir; }
+  let key = dst, at = dst, aiff: { ok: boolean; item?: ErrorItem } | undefined;
   if (toAiff) {
-    try { key = await wavToAiff(lib, name); at = libPath(lib, key); aiff = { ok: true }; }
+    try { key = await wavToAiff(lib, dst); at = key; aiff = { ok: true }; }
     catch (e: any) { aiff = { ok: false, item: errItem(name, e) }; }
   }
   for (const a of Object.keys(STATE.assigned)) if (STATE.assigned[a] === key) { delete STATE.assigned[a]; delete STATE.by_hand[a]; }

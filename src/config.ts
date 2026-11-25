@@ -69,11 +69,36 @@ function scrubSecrets<T>(v: T): T {
   return walk(v);
 }
 
+/** The pre-collection folders of a library (kept on the library for rollback and old backups). */
+function legacyDirs(lib: Library): string[] {
+  return [lib.dir, ...(lib.dirs || [])].filter(Boolean);
+}
+/** The pre-collection key prefixes of a library's folders (what core.dirPrefixes was). */
+function legacyPrefixes(lib: Library): Map<string, string> {
+  const out = new Map<string, string>();
+  const used = new Set<string>();
+  if (lib.subfolders && lib.dir) {
+    try {
+      for (const e of fs.readdirSync(lib.dir, { withFileTypes: true }))
+        if (e.isDirectory() && !e.name.startsWith(".")) used.add(e.name);
+    } catch {}
+  }
+  legacyDirs(lib).forEach((d, i) => {
+    if (i === 0) { out.set(d, ""); return; }
+    const base = path.basename(d.replace(/[\/\\]+$/, "")) || "folder";
+    let name = base;
+    for (let n = 2; used.has(name); n++) name = `${base} (${n})`;
+    used.add(name);
+    out.set(d, name + "/");
+  });
+  return out;
+}
+
 /** The relative key of a path under one of the libraries' folders, with that library; null
  *  when it is under none. */
 function relKeyOf(abs: string, libs: Library[]): { lib: Library; key: string } | null {
   for (const lib of libs)
-    for (const [d, prefix] of core.dirPrefixes(lib)) {
+    for (const [d, prefix] of legacyPrefixes(lib)) {
       const rel = path.relative(d, abs);
       if (rel && !rel.startsWith("..") && !path.isAbsolute(rel)) return { lib, key: prefix + rel.split(path.sep).join("/") };
     }
@@ -86,7 +111,7 @@ export function exportInfo(): any {
   return {
     file_name: exportFileName(),
     libraries: S.libraries.map((l) => {
-      const away = core.libDirs(l).filter((d) => !!core.folderTrouble(d));
+      const away = legacyDirs(l).filter((d) => !!core.folderTrouble(d));
       return { id: l.id, name: core.libName(l), private_link: isPrivateLink(l.url) || isPrivateLink(l.playlist?.url || ""),
                private_tracks: (l.playlist?.tracks || []).filter((t) => !!core.scSecret(t.url)).length, folders_away: away,
                link_missing: !l.url };
@@ -105,7 +130,7 @@ export function buildExport(opts: { leaveLinksOut?: boolean; theme?: unknown }):
   const listing = new Map<Library, { keys: Set<string>; away: Map<string, "missing" | "unreadable"> }>();
   for (const lib of libs) {
     const keys = new Set<string>(), away = new Map<string, "missing" | "unreadable">();
-    for (const [d, prefix] of core.dirPrefixes(lib)) {
+    for (const [d, prefix] of legacyPrefixes(lib)) {
       const why = core.folderTrouble(d);
       if (why) { away.set(d, why); continue; }
       for (const k of core.listAudioKeys(d, !!lib.subfolders)) keys.add(prefix + k);
@@ -117,7 +142,7 @@ export function buildExport(opts: { leaveLinksOut?: boolean; theme?: unknown }):
   const recs = new Map<Library, LibRec>();
   for (const lib of libs) {
     const ls = listing.get(lib)!;
-    const prefixes = core.dirPrefixes(lib);
+    const prefixes = legacyPrefixes(lib);
     const playlist: Playlist | null = lib.playlist ? JSON.parse(JSON.stringify(lib.playlist)) : null;
     if (playlist && out) {
       playlist.url = "";
@@ -566,7 +591,7 @@ export async function apply(data: any, opts: { jobActive: boolean }): Promise<an
     if (!ms.some((m) => m && (m.pins.found || m.known.found || m.entries.found))) lib.acq_init = false;
     if (dormant[li]) lib.files_pending = true;
     // the key prefixes of this computer (extra folders are named after the chosen folder)
-    const pre = core.dirPrefixes(lib);
+    const pre = legacyPrefixes(lib);
     const newPrefix = dirs[li].map((d) => d ? pre.get(d)! : null);
     /** an exported key -> {key here, absolute path here, found} (null: its folder was left out) */
     const here = (k: string) => {
@@ -577,7 +602,7 @@ export async function apply(data: any, opts: { jobActive: boolean }): Promise<an
       const rel = m ? m.to : rest;
       return { key: newPrefix[fi] + rel, abs: path.join(d, ...rel.split("/")), found: !!m };
     };
-    const rep = { i: li, id: lib.id, name: libTitle(l), dir: lib.dir, dirs: core.libDirs(lib), pins: 0, pins_dropped: 0, by_hand: 0,
+    const rep = { i: li, id: lib.id, name: libTitle(l), dir: lib.dir, dirs: legacyDirs(lib), pins: 0, pins_dropped: 0, by_hand: 0,
                   edits: 0, found: 0, dropped: 0, files_pending: !!dormant[li], subfolders_on: subOn,
                   folders: ms.map((m) => m ? matchOut(m) : null) };
     const pinTaken = new Set<string>();
@@ -604,7 +629,7 @@ export async function apply(data: any, opts: { jobActive: boolean }): Promise<an
       if (f.found) { if (h.found || dormant[li]) { put(next.found, "x:" + h.abs, f.found); rep.found++; } else rep.dropped++; }
     }
     // the probe cache of this computer, for files under the new folders (a backup restored here costs no new probe)
-    for (const [k, v] of Object.entries(S.dur_cache)) if (core.libDirs(lib).some((d) => sameOrInside(k, d))) next.dur_cache[k] = v;
+    for (const [k, v] of Object.entries(S.dur_cache)) if (legacyDirs(lib).some((d) => sameOrInside(k, d))) next.dur_cache[k] = v;
     next.libraries.push(lib);
     report.libraries.push(rep);
   });
@@ -656,6 +681,9 @@ export async function apply(data: any, opts: { jobActive: boolean }): Promise<an
   try {
     if (setTheme) core.setPrefs({ theme });
     undo = core.replaceState(state);
+    // a v1 file describes libraries that own folders: the same migration that moved this
+    // computer to the collection model turns them into collection roots and absolute keys
+    core.migrateToCollection();
   } catch (e) { themeBack(); throw e; }
   PLANS.delete(p.id);   // used up: the state is in place
   let view: any;

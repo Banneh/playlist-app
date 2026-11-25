@@ -8,7 +8,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { readXmlText, unescapeXml } from "./rbxml";
-import { appError, libDirs, Library } from "./core";
+import { appError, collRoots, Library } from "./core";
 
 const AUDIO = /\.(wav|mp3|aiff?|flac|m4a|ogg)$/i;
 const KIND: Record<string, string> = { ".wav": "WAV File", ".mp3": "MP3 File", ".aiff": "AIFF File",
@@ -77,7 +77,8 @@ function whereNow(p: string, libs: Library[]): string | null | "missing" {
     if (p2) break;
   }
   if (!p2) {
-    if (!libs.some((l) => libDirs(l).some((d) => under(p, d)))) return null;
+    const legacy = (l: Library) => [l.dir, ...(l.dirs || [])].filter(Boolean);
+    if (!collRoots().some((r) => under(p, r.path)) && !libs.some((l) => legacy(l).some((d) => under(p, d)))) return null;
     p2 = p;
   }
   if (exists(p2)) return fold(p2) === fold(p) ? null : p2;
