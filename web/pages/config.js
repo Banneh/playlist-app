@@ -47,7 +47,7 @@ async function cfExport() {
   catch (e) { return toast(t('config.exFailed', { error: errText(e, 'config') }), true); }
   const priv = info.libraries.filter(l => l.private_link).map(l => l.name);
   const privTracks = info.libraries.reduce((n, l) => n + (l.private_tracks || 0), 0);
-  const away = info.libraries.flatMap(l => l.folders_away || []);
+  const away = [...(info.roots_away || []), ...info.libraries.flatMap(l => l.folders_away || [])];
   const noLink = info.libraries.filter(l => l.link_missing).map(l => l.name);
   const notes = [
     ...(priv.length || privTracks ? [noteHtml((priv.length ? cfT('exPrivate', { n: priv.length, names: cfNames(priv) }) : '')
@@ -215,10 +215,12 @@ function cfReadFile(file) {
 function cfPlanned(sum, fileName) {
   const R = CF.imp; if (!R) return;
   R.sum = sum; R.fileName = fileName;
-  R.dirs = sum.libraries.map(l => l.folders.map(f => f.suggest || ''));
-  R.skip = sum.libraries.map(l => l.folders.map(() => false));
-  R.probes = sum.libraries.map(l => l.folders.map(() => null));
-  R.noFiles = {}; R.replaceOk = false; R.machine = false;
+  // a v2 file maps the collection's roots (one group); a v1 file maps each library's folders
+  const groups = sum.v2 ? [sum.roots] : sum.libraries.map(l => l.folders);
+  R.dirs = groups.map(fs => fs.map(f => f.suggest || ''));
+  R.skip = groups.map(fs => fs.map(() => false));
+  R.probes = groups.map(fs => fs.map(() => null));
+  R.noFiles = {}; R.noFilesAll = false; R.replaceOk = false; R.machine = false;
   R.i = 1; R.err = '';
   cfPaint();
 }
@@ -254,16 +256,23 @@ function cfSummaryHtml(R) {
 /* step 3: the folders on this computer */
 function cfFoldersHtml(R) {
   const s = R.sum;
+  if (s.v2) {
+    // one group: the collection's roots
+    const group = { i: 0, name: t('config.imCollectionFolders') };
+    return `<p class="cf-p">${cfT('imFolderSub')}</p><div class="cf-lib"><h4>${icon('folder')}${esc(group.name)}</h4>${
+      s.roots.map(f => cfFolderRow(R, group, { ...f, main: f.i === 0 })).join('')}</div>`;
+  }
   return `<p class="cf-p">${cfT('imFolderSub')}</p>` + s.libraries.map(l => `<div class="cf-lib"><h4>${icon('listMusic')}${esc(l.name)}</h4>${
     l.folders.map(f => cfFolderRow(R, l, f)).join('')}</div>`).join('');
 }
 function cfFolderRow(R, l, f) {
   const li = l.i, fi = f.i, skipped = R.skip[li][fi];
+  const head = R.sum.v2 ? esc(f.name || '') : cfT(f.main ? 'imMainFolder' : 'imExtraFolder');
   const was = f.hint ? (R.sum.machine.same_platform ? cfT('imWas', { path: shortPath(f.hint) }) : cfT('imWasPlatform', { platform: cfPlatform(R.sum.file.platform), path: f.hint })) : '';
   const skip = f.main ? '' : `<label class="da-check cf-check"><input type="checkbox" ${skipped ? 'checked' : ''} onchange="cfSkip(${li},${fi},this.checked)"><span>${cfT('imSkip')}</span></label>`;
-  if (skipped) return `<div class="cf-folder"><div class="cf-fhead"><b>${cfT(f.main ? 'imMainFolder' : 'imExtraFolder')}</b> <span class="faint">${was}</span></div>${skip}<p class="cf-count faint">${cfT('imSkipped')}</p></div>`;
+  if (skipped) return `<div class="cf-folder"><div class="cf-fhead"><b>${head}</b> <span class="faint">${was}</span></div>${skip}<p class="cf-count faint">${cfT('imSkipped')}</p></div>`;
   return `<div class="cf-folder">
-    <div class="cf-fhead"><b>${cfT(f.main ? 'imMainFolder' : 'imExtraFolder')}</b> <span class="faint cf-was" title="${esc(f.hint)}">${was}</span></div>
+    <div class="cf-fhead"><b>${head}</b> <span class="faint cf-was" title="${esc(f.hint)}">${was}</span></div>
     <div class="fieldrow">
       <input class="input" data-dir="${li}:${fi}" value="${esc(R.dirs[li][fi] || '')}" placeholder="${esc(t('config.imFolderPh'))}" spellcheck="false" autocomplete="off">
       ${DATA && DATA.can_pick ? `<button class="btn" onclick="cfBrowse(${li},${fi})">${icon('folder')}${th('common.browse')}</button>` : ''}
@@ -311,7 +320,7 @@ async function cfProbe(li, fi, dir) {
   const seq = ++R.seq;
   R.probes[li][fi] = { busy: true, seq, asked: dir }; cfPaint();
   let p;
-  try { p = await api('/api/config/import/probe', { plan: R.sum.plan, lib: li, folder: fi, dir }); }
+  try { p = await api('/api/config/import/probe', R.sum.v2 ? { plan: R.sum.plan, root: fi, dir } : { plan: R.sum.plan, lib: li, folder: fi, dir }); }
   catch (e) { p = { error: cfErr(e) }; }
   if (CF.imp !== R || (R.probes[li][fi] && R.probes[li][fi].seq !== seq)) return;
   if (p.dir) R.dirs[li][fi] = p.dir;   // the server's form of the path (~ expanded)
@@ -321,6 +330,10 @@ async function cfProbe(li, fi, dir) {
 }
 function cfProbeAll() {
   const R = CF.imp; if (!R) return;
+  if (R.sum.v2) {
+    R.sum.roots.forEach(f => { if (R.dirs[0][f.i] && !R.probes[0][f.i]) cfProbe(0, f.i, R.dirs[0][f.i]); });
+    return;
+  }
   R.sum.libraries.forEach(l => l.folders.forEach(f => {
     if (R.dirs[l.i][f.i] && !R.probes[l.i][f.i]) cfProbe(l.i, f.i, R.dirs[l.i][f.i]);
   }));
@@ -328,7 +341,19 @@ function cfProbeAll() {
 /** a probe that counts: finished, fine, and of the path that is in the field now */
 const cfUsable = (R, li, fi) => { const p = R.probes[li][fi]; return !!p && !p.busy && !p.problem && !p.error && !!p.dir && p.dir === R.dirs[li][fi]; };
 function cfFoldersReady(R) {
+  if (R.sum.v2) return R.sum.roots.every(f => R.skip[0][f.i] || cfUsable(R, 0, f.i));
   return R.sum.libraries.every(l => l.folders.every(f => R.skip[l.i][f.i] || cfUsable(R, l.i, f.i)));
+}
+/** v2: totals over the chosen roots */
+function cfRootCounts(R) {
+  let pins = 0, found = 0, known = 0, knownFound = 0, sub = false, dropped = 0;
+  R.sum.roots.forEach(f => {
+    if (R.skip[0][f.i]) { dropped += f.wants.pins; return; }
+    const p = R.probes[0][f.i]; if (!cfUsable(R, 0, f.i)) return;
+    pins += p.pins.total; found += p.pins.found; known += p.known.total; knownFound += p.known.found;
+    sub = sub || p.needs_subfolders;
+  });
+  return { pins, found, known, knownFound, sub, dropped: dropped + pins - found, zero: (pins + known) > 0 && !found && !knownFound };
 }
 /** the library's totals over its chosen folders */
 function cfLibCounts(R, l) {
@@ -345,6 +370,25 @@ function cfLibCounts(R, l) {
 /* step 4: confirm */
 function cfConfirmHtml(R) {
   const s = R.sum;
+  if (s.v2) {
+    const c = cfRootCounts(R);
+    const dirs = s.roots.filter(f => !R.skip[0][f.i]).map(f => shortPath(R.dirs[0][f.i]));
+    const lines = [
+      c.zero ? '' : cfT('imWillPins', { n: c.found }),
+      c.zero || !c.dropped ? '' : cfT('imWillDrop', { n: c.dropped }),
+      c.sub ? cfT('imWillSub') : '',
+    ].filter(Boolean);
+    const nf = c.zero ? `<label class="da-check cf-check"><input type="checkbox" ${R.noFilesAll ? 'checked' : ''} onchange="cfSetNoFilesAll(this.checked)"><span><b>${cfT('imNoFilesAll')}</b><span class="faint cf-hint">${cfT('imNoFilesHint')}</span></span></label>` : '';
+    const libs = s.libraries.map(l => `<li>${esc(l.name)}${l.fetched ? ' · ' + cfT('imTracks', { n: l.tracks }) : ''}${l.link === 'missing' ? ' · ' + cfT('imLinkMissing') : ''}</li>`).join('');
+    const replace2 = s.replaces.length ? `<label class="da-check cf-check"><input type="checkbox" data-k="replace" ${R.replaceOk ? 'checked' : ''} onchange="cfSetReplace(this.checked)"><span><b>${cfT('imReplaceOk')}</b>
+        <span class="faint cf-hint">${cfT('imReplaces', { n: s.replaces.length, names: cfNames(s.replaces.map(r => r.name)) })} ${cfT('imReplaceHint')}</span></span></label>` : '';
+    const machine2 = s.machine.same_platform && (s.machine.inbox_dir || (APP.do_all && s.machine.do_all))
+      ? `<label class="da-check cf-check"><input type="checkbox" ${R.machine ? 'checked' : ''} onchange="cfSetMachine(this.checked)"><span>${cfT(APP.do_all ? 'imMachineOpt' : 'imMachineOptNoDa')}<span class="faint cf-hint">${cfT('imMachineHint')}</span></span></label>` : '';
+    return `<p class="cf-p">${cfT('imConfirmSub')}</p>
+      <div class="cf-lib"><h4>${icon('folder')}${cfHtml('imWillColl', { dirs: esc(dirs.join(' · ')) })}</h4>${lines.length ? `<ul class="da-ul">${lines.map(x => `<li>${x}</li>`).join('')}</ul>` : ''}${nf}</div>
+      <div class="cf-lib"><h4>${icon('listMusic')}${cfT('imPlaylists', { n: s.libraries.length })}</h4><ul class="da-ul">${libs}</ul></div>
+      ${replace2}${machine2}<p class="da-small">${cfT('imFirstScan')}</p>`;
+  }
   const libs = s.libraries.map(l => {
     const c = cfLibCounts(R, l);
     const lines = [
@@ -364,8 +408,10 @@ function cfConfirmHtml(R) {
 }
 function cfCanApply(R) {
   if (R.sum.replaces.length && !R.replaceOk) return false;
+  if (R.sum.v2) return !cfRootCounts(R).zero || R.noFilesAll;
   return R.sum.libraries.every(l => !cfLibCounts(R, l).zero || R.noFiles[l.i]);
 }
+function cfSetNoFilesAll(on) { const R = CF.imp; if (R) { R.noFilesAll = !!on; cfPaint(); } }
 function cfSetReplace(on) { const R = CF.imp; if (R) { R.replaceOk = !!on; cfPaint(); } }
 function cfSetNoFiles(i, on) { const R = CF.imp; if (R) { R.noFiles[i] = !!on; cfPaint(); } }
 function cfSetMachine(on) { const R = CF.imp; if (R) { R.machine = !!on; cfPaint(); } }
@@ -374,7 +420,13 @@ async function cfApply() {
   const R = CF.imp; if (!R || R.busy || !cfCanApply(R)) return;
   R.busy = true; R.err = ''; cfPaint();
   try {
-    const view = await api('/api/config/import/apply', {
+    const view = await api('/api/config/import/apply', R.sum.v2 ? {
+      plan: R.sum.plan,
+      roots: R.sum.roots.map(f => R.skip[0][f.i] ? null : R.dirs[0][f.i]),
+      confirm_replace: !!R.replaceOk,
+      no_files_ok: !!R.noFilesAll,
+      machine: !!R.machine,
+    } : {
       plan: R.sum.plan,
       folders: R.sum.libraries.map(l => l.folders.map(f => R.skip[l.i][f.i] ? null : R.dirs[l.i][f.i])),
       confirm_replace: !!R.replaceOk,
