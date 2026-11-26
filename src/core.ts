@@ -1895,6 +1895,15 @@ function wordKind(s: string): "free" | "buy" | null {
 /** On a shop, "Download" or "DL" alone is just SoundCloud's stock button label, not a price:
  *  the link is only free when it says so ("free", "gratis"). "Feel free to buy" is no price either. */
 const freeOnShop = (s: string) => /\bfree\b|gratis/i.test(s.replace(/\bfeel free\b|\bfree to\b/gi, " "));
+/** A pre-save campaign (Hypeddit's /presave/, presave.io and the like): it saves a release to a
+ *  streaming library, there is no file behind it, so it is neither Free DL nor Buy. */
+const PRESAVE_WORDS = /\bpre-?save/i;
+export function isPresave(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return /(^|\.)presave\.io$/i.test(u.hostname) || /(^|\/)pre-?saves?(\/|$)/i.test(u.pathname);
+  } catch { return false; }
+}
 /** a line that holds a link of its own: its words are about that link */
 const hasLink = (s: string) => /https?:\/\/|www\.|\b[a-z0-9-]+\.(com|me|io|to|eu|co|pro|nz|link|net|org)\//i.test(s);
 
@@ -1905,6 +1914,7 @@ const hasLink = (s: string) => /https?:\/\/|www\.|\b[a-z0-9-]+\.(com|me|io|to|eu
  *  above "Bandcamp: x.bandcamp.com/track/y" is the gate's word, not the shop's), and an artist's
  *  Bandcamp page is never the free file itself. */
 function classify(host: string, line: string, prev: string, url = ""): "free" | "buy" | null {
+  if (isPresave(url) || (PRESAVE_WORDS.test(line) && !freeOnShop(line))) return null;
   if (FREE_HOSTS.test(host)) return "free";
   if (SHOP_HOSTS.test(host)) {
     if (BANDCAMP.test(host) && bandcampRoot(url)) return "buy";
@@ -2005,7 +2015,7 @@ export function trackLinks(t: PlTrack): BuyLink[] {
     if (i < 0) out.push(l);
     else if (linkRank(l) > linkRank(out[i])) out[i] = l;
   };
-  if (t.buy_url && /^https?:\/\//i.test(t.buy_url)) {
+  if (t.buy_url && /^https?:\/\//i.test(t.buy_url) && !isPresave(t.buy_url) && !PRESAVE_WORDS.test(t.buy_title || "")) {
     const host = hostOf(t.buy_url);
     if (host) {
       const title = (t.buy_title || "").trim();
