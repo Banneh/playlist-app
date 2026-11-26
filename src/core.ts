@@ -1836,12 +1836,16 @@ function wordKind(s: string): "free" | "buy" | null {
   if (f && b) return /\bfree\b/i.test(s) ? "free" : "buy"; // "free dl" beats "support"; "stream/download" is a shop
   return f ? "free" : b ? "buy" : null;
 }
+/** On a shop, "Download" or "DL" alone is just SoundCloud's stock button label, not a price:
+ *  the link is only free when it says so ("free", "gratis"). */
+const freeOnShop = (s: string) => /\bfree\b|gratis/i.test(s);
 
 /** Host is decisive for gates/file hosts; otherwise the words on the link's own
  *  line, then the line above ("FREE DOWNLOAD:\nhttps://..."), then shop hosts. */
 function classify(host: string, line: string, prev: string): "free" | "buy" | null {
   if (FREE_HOSTS.test(host)) return "free";
-  return wordKind(line) || wordKind(prev) || (SHOP_HOSTS.test(host) ? "buy" : null);
+  if (SHOP_HOSTS.test(host)) return freeOnShop(line) || freeOnShop(prev) ? "free" : "buy";
+  return wordKind(line) || wordKind(prev) || null;
 }
 
 export interface BuyLink {
@@ -1919,7 +1923,8 @@ export function trackLinks(t: PlTrack): BuyLink[] {
     const host = hostOf(t.buy_url);
     if (host) {
       const title = (t.buy_title || "").trim();
-      add(t.buy_url, FREE_WORDS.test(title) || FREE_HOSTS.test(host) ? "free" : "buy", title, host);
+      const free = FREE_HOSTS.test(host) || (SHOP_HOSTS.test(host) ? freeOnShop(title) : FREE_WORDS.test(title));
+      add(t.buy_url, free ? "free" : "buy", title, host);
     }
   }
   for (const [url, line, prev] of t.desc_links || []) {
