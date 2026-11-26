@@ -57,13 +57,63 @@ export async function scWrite(w: WalkWindow, method: string, apiPath: string, bo
     return { status: Number(out.slice(0, sp)), text: out.slice(sp + 1) };
   };
   // DataDome answers 403 with a captcha URL while the page's own scripts are still settling; a
-  // second pass a few seconds later goes through.
+  // second pass a few seconds later goes through. When it still refuses, the challenge is real:
+  // show the window so the human can solve it, then retry.
   let r = await run();
   if (r.status === 403) {
     await sleep(3500);
     r = await run();
   }
+  for (let i = 0; i < 2 && r.status === 403; i++) {
+    const url = captchaUrl(r.text);
+    if (!url) break;
+    if (!(await solveCaptcha(w, url))) break;
+    await ensurePage(w);
+    await sleep(1200);
+    r = await run();
+  }
+  // 401 means the token in the cookie is dead (they expire after a day). Nothing refreshes it on
+  // its own, so the human has to sign in again.
+  if (r.status === 401 && (await w.signIn(tok))) {
+    await ensurePage(w);
+    await sleep(1200);
+    r = await run();
+  }
   return r;
+}
+
+const CAPTCHA_TIMEOUT_MS = 3 * 60 * 1000;
+
+/** The challenge URL out of a DataDome 403 body. The body is truncated, so it is matched, not
+ *  parsed. */
+function captchaUrl(text: string): string | null {
+  const m = text.match(/https:\/\/geo\.captcha-delivery\.com\/captcha\/\?[^"\\\s]+/);
+  return m ? m[0] : null;
+}
+
+/** Show the window on the challenge and wait for the human. The `datadome` cookie rotates every
+ *  couple of seconds whether or not the challenge is passed, so the cookie alone proves nothing:
+ *  the page is asked for a cheap api-v2 call and only a non-403 answer counts as solved. */
+async function solveCaptcha(w: WalkWindow, url: string): Promise<boolean> {
+  w.log("[captcha] challenge, showing the window");
+  w.reveal();
+  try {
+    w.load(url);
+    const deadline = Date.now() + CAPTCHA_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      await sleep(1500);
+      const at = w.win.isDestroyed() ? "" : w.win.webContents.getURL();
+      if (!/captcha-delivery\.com/.test(at)) continue;
+      const status = await w.js<number>(
+        `fetch('https://api-v2.soundcloud.com/me', { credentials: 'include' }).then((r) => r.status).catch(() => 0)`,
+      ).catch(() => 0);
+      if (status && status !== 403) { w.log(`[captcha] solved (${status})`); return true; }
+    }
+    w.log("[captcha] not solved in time");
+    return false;
+  } finally {
+    w.conceal();
+  }
 }
 
 /** The numeric id of a track from its permalink URL. */
