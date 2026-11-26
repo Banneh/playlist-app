@@ -60,11 +60,14 @@ export class WalkWindow {
       height: 780,
       webPreferences: { session: this.ses, contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
     });
+    // never heard while nobody sees it: gate pages and the players their steps open can autoplay
+    win.webContents.setAudioMuted(!this.visible);
     win.webContents.setWindowOpenHandler(({ url }) => {
       this.log("[auth] popup " + url.slice(0, 80));
       return { action: "allow", overrideBrowserWindowOptions: { width: 520, height: 640, show: this.visible, webPreferences: { session: this.ses } } };
     });
     win.webContents.on("did-create-window", (w) => {
+      w.webContents.setAudioMuted(!this.visible);
       this.popups.push(w);
       if (this.visible) w.showInactive();
     });
@@ -91,15 +94,16 @@ export class WalkWindow {
   private show(): void {
     if (this.destroyed || this.visible) return;
     this.visible = true;
-    if (!this.win.isDestroyed()) this.win.showInactive();
-    for (const p of this.popups) if (!p.isDestroyed()) p.showInactive();
+    // shown to a human: sound as in any window they look at
+    if (!this.win.isDestroyed()) { this.win.webContents.setAudioMuted(false); this.win.showInactive(); }
+    for (const p of this.popups) if (!p.isDestroyed()) { p.webContents.setAudioMuted(false); p.showInactive(); }
   }
 
   private hide(): void {
     if (!this.visible) return;
     this.visible = false;
-    if (!this.win.isDestroyed()) this.win.hide();
-    for (const p of this.popups) if (!p.isDestroyed()) p.hide();
+    if (!this.win.isDestroyed()) { this.win.hide(); this.win.webContents.setAudioMuted(true); }
+    for (const p of this.popups) if (!p.isDestroyed()) { p.hide(); p.webContents.setAudioMuted(true); }
   }
 
   private release(): void {
@@ -118,7 +122,7 @@ export class WalkWindow {
     this.log("[attention] " + reason);
     const at = target.isDestroyed() ? "" : target.webContents.getURL();
     this.show();
-    if (target !== this.win && !target.isDestroyed()) target.showInactive();
+    if (target !== this.win && !target.isDestroyed()) { target.webContents.setAudioMuted(false); target.showInactive(); }
     await new Promise<void>((resolve) => {
       const done = () => {
         clearInterval(iv);
