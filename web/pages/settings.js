@@ -56,7 +56,20 @@ PAGES.settings = {
          <input class="input" id="st-dlmail" type="email" value="${esc(S.dl_email || '')}" placeholder="${esc(t('settings.inbox.dlMailPh'))}" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')stSaveDlMail()">
          <button class="btn" onclick="stSaveDlMail()">${icon('check')}${esc(t('common.save'))}</button>
        </div>
-       <span class="faint">${th('settings.inbox.dlMailHint')}</span>` : ''}`);
+       <span class="faint">${th('settings.inbox.dlMailHint')}</span>
+       <div class="fieldrow st-inboxrow">
+         <input class="input" id="st-dlcomment" value="${esc(S.dl_comment || '')}" placeholder="${esc(t('settings.inbox.dlCommentPh'))}" maxlength="280" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')stSaveDlComment()">
+         <button class="btn" onclick="stSaveDlComment()">${icon('check')}${esc(t('common.save'))}</button>
+       </div>
+       <span class="faint">${th('settings.inbox.dlCommentHint')}</span>
+       <label class="st-switch">
+         <input type="checkbox" id="st-undo" ${S.undo_after_download ? 'checked' : ''} onchange="stToggleUndo(this)">
+         <span class="st-track" aria-hidden="true"></span>
+         <span class="st-lbl"><b>${esc(t('settings.inbox.undo'))}</b>
+           <span>${th('settings.inbox.undoHint')}</span></span>
+       </label>` : ''}`);
+
+    const gates = stCard('bolt', 'amber', esc(t('settings.gates.title')), th('settings.gates.text'), stGatesControls(S));
 
     const A = DATA.aiff || { on: !!S.aiff_auto, wav: 0 };
     const aiff = stCard('image', 'green', esc(t('settings.aiff.title')),
@@ -149,7 +162,7 @@ PAGES.settings = {
     return `<div class="st-list">
       ${group('settings.group.collection')}${collection}${downloads}${aiff}${backups}
       ${group('settings.group.playlist')}${playlist}
-      ${group('settings.group.integrations')}${rekordbox}${account}${links}${bandcamp}${doAll}${config}
+      ${group('settings.group.integrations')}${gates}${rekordbox}${account}${links}${bandcamp}${doAll}${config}
       ${group('settings.group.app')}${refresh}${appearance}${language}${about}</div>`;
   },
   onShow: () => stRbxLoad(),
@@ -428,6 +441,51 @@ async function stSaveDlMail() {
   const v = (el && el.value || '').trim();
   try { await stSave({ dl_email: v }, v ? t('settings.inbox.dlMailSaved', { email: v }) : t('settings.inbox.dlMailCleared')); }
   catch { if (el) el.focus(); }
+}
+async function stSaveDlComment() {
+  const el = $('#st-dlcomment');
+  const v = (el && el.value || '').trim();
+  await stSave({ dl_comment: v }, t('settings.inbox.dlCommentSaved'));
+}
+async function stToggleUndo(el) {
+  const on = !!el.checked;
+  await stSave({ undo_after_download: on }, t(on ? 'settings.inbox.undoOn' : 'settings.inbox.undoOff'));
+}
+/* ---------- gates (Integrations): every adapter in one list, plus what nothing handles ---------- */
+const ST_GATES = ['droploud', 'downloadgater', 'gaterush', 'fangate', 'toneden', 'gatekit', 'powergate', 'pumpyoursound', 'beltergate', 'managerone'];
+
+function stGatesControls(S) {
+  const off = new Set(S.gate_off || []);
+  const row = (id, on, label, hint) => `<label class="st-switch">
+      <input type="checkbox" ${on ? 'checked' : ''} onchange="stToggleGate('${esc(id)}', this.checked)">
+      <span class="st-track" aria-hidden="true"></span>
+      <span class="st-lbl"><b>${esc(label)}</b>${hint ? `<span>${esc(hint)}</span>` : ''}</span>
+    </label>`;
+  const hosts = DATA.gate_hosts || [];
+  const unhandled = hosts.filter(h => !h.adapter);
+  const handled = hosts.filter(h => h.adapter);
+  return `<div class="st-gatelist">
+      ${ST_GATES.map(id => {
+        const h = handled.find(x => x.adapter === id);
+        return row(id, !off.has(id), id, h ? tn('settings.gates.links', h.count) : t('settings.gates.none'));
+      }).join('')}
+      ${row('__walker', S.gate_walker !== false, t('settings.gates.walker'), t('settings.gates.walkerHint'))}
+    </div>
+    <div class="st-path-row st-wide"><b>${esc(t('settings.gates.unhandled'))}</b></div>
+    ${unhandled.length
+      ? `<div class="st-gatelist">${unhandled.map(h => `<div class="st-gatehost"><span>${esc(h.host)}</span><span class="faint">${esc(tn('settings.gates.links', h.count))}</span></div>`).join('')}</div>`
+      : `<span class="faint">${esc(t('settings.gates.allHandled'))}</span>`}`;
+}
+
+async function stToggleGate(id, on) {
+  const S = DATA.settings || {};
+  const off = new Set(S.gate_off || []);
+  if (id === '__walker') {
+    await stSave({ gate_walker: on }, t(on ? 'settings.gates.walkerOn' : 'settings.gates.walkerOff'));
+    return;
+  }
+  if (on) off.delete(id); else off.add(id);
+  await stSave({ gate_off: [...off] }, t(on ? 'settings.gates.on' : 'settings.gates.off', { id }));
 }
 async function stBrowseInbox() {
   try {

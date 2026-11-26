@@ -7,6 +7,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as core from "./core";
 import * as gatewalk from "./gatewalk";
+import * as gates from "./gates/registry";
+import { SC_PARTITION } from "./gates/types";
 import * as hypeddit from "./hypeddit";
 import { IN_USE_TEXT, PickKind, ScRect, ScView, startServer } from "./server";
 import { Lang, mainLang, mt } from "./lang";
@@ -72,7 +74,6 @@ function buildMenu() {
 }
 
 // ---------------- embedded SoundCloud ----------------
-const SC_PARTITION = "persist:soundcloud";
 const SC_HOME = "https://soundcloud.com/discover";
 /** hosts that may load inside the view: SoundCloud itself, the sign-in providers it offers and
  *  its bot check (DataDome's captcha-delivery.com): a check that ever opens on its own must stay in
@@ -512,19 +513,30 @@ function axTrusted(prompt: boolean): boolean {
   return false;
 }
 
-// ---------------- automated free download (Hypeddit) ----------------
+// ---------------- automated free download ----------------
 
-/** Get a Hypeddit gate's file into the downloads folder without the user seeing a page.
+/** Get a gate's file into the downloads folder without the user seeing a page.
  *
- *  Two ways, in order: the plain-HTTP walk (src/hypeddit.ts) — fast, no window, and it covers
- *  the ordinary email/social gates — and, when that gate hands out nothing, a hidden window
- *  that drives the gate's own script (src/gatewalk.ts), which is the only way through a gate
- *  with a Spotify step. Resolves with the saved path, or null when neither got a file (the
- *  caller then falls back to opening the page in the browser). */
+ *  Three ways, in order: a per-platform HTTP adapter (src/gates/) for the gates that are pure HTTP
+ *  plus one consent click — it runs in a hidden window on the app's own SoundCloud session and only
+ *  shows a window when a human is genuinely needed; the plain-HTTP Hypeddit walk (src/hypeddit.ts);
+ *  and, when that gate hands out nothing, a hidden window that drives the gate's own script
+ *  (src/gatewalk.ts), which is the only way through a Hypeddit gate with a Spotify step. Resolves
+ *  with the saved path, or null when none got a file (the caller then opens the page in the
+ *  browser). */
 async function freeDownload(url: string, email: string): Promise<{ file: string | null }> {
-  if (!core.isHypeddit(url)) throw core.appError("not_hypeddit", "not a Hypeddit link");
+  const adapter = gates.match(new URL(url));
+  if (adapter) {
+    const viaAdapter = await gates.walk(adapter, url, email).catch((e) => {
+      console.error(`[gate:${adapter.id}] failed:`, e);
+      return null;
+    });
+    if (viaAdapter) return { file: viaAdapter.filePath };
+  }
+  if (!core.isHypeddit(url)) return { file: null };
   const viaHttp = await hypeddit.freeDownload(url, email).catch(() => ({ file: null as string | null }));
   if (viaHttp.file) return viaHttp;
+  if (core.getSettings().gate_walker === false) return { file: null };
   const viaWindow = await gatewalk.walk(url, email).catch(() => null);
   return { file: viaWindow };
 }
@@ -586,7 +598,7 @@ app.whenReady().then(async () => {
   win.on("closed", () => { win = null; scShown = false; scView = null; });
 });
 
-app.on("window-all-closed", () => app.quit());
+app.on("window-all-closed", () => { if (!gates.busy()) app.quit(); });
 // every save is on disk already; closing releases the database's lock and journal file
 app.on("will-quit", () => core.shutdown());
 process.on("SIGINT", () => app.quit());

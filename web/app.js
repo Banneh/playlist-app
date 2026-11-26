@@ -248,10 +248,18 @@ function qToggle(anchor) {
   requestAnimationFrame(() => m.classList.add('show'));
 }
 
-/* ---------- the green Free DL button: a Hypeddit gate is walked in the background ---------- */
-/** true for a link the app can walk itself (a Hypeddit gate, and only with the DJ_HQ_DOWNLOAD_BYPASS
- *  switch on); everything else still opens in the browser */
-const isHypeddit = (url) => { if (!APP.dl_bypass) return false; try { return /(^|\.)hypeddit\.com$/i.test(new URL(url).hostname.replace(/^www\./, '')); } catch { return false; } };
+/* ---------- the green Free DL button: a gate the app knows is walked in the background ---------- */
+/** true for a link the app can fetch itself: a direct file, a Hypeddit gate, or any gate a platform
+ *  adapter claims (the host list comes from the adapter registry); everything else opens in the
+ *  browser. Only with the DJ_HQ_DOWNLOAD_BYPASS switch on. */
+const isHypeddit = (url) => {
+  if (!APP.dl_bypass) return false;
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    if (/(^|\.)hypeddit\.com$/i.test(host)) return true;
+    return (APP.gate_hosts || []).some((src) => { try { return new RegExp(src, 'i').test(host); } catch { return false; } });
+  } catch { return false; }
+};
 
 /** Download a free link into the downloads folder without a browser. A direct link (Drive, Dropbox,
  *  an audio file, SoundCloud's download button; opts.id is its track) is fetched as it is. A Hypeddit
@@ -892,7 +900,7 @@ function libraryMenu(anchor) {
 }
 
 /* ---------- updates: a daily look at the latest GitHub release ---------- */
-let APP = { version: '', platform: '', arch: '', packaged: false, do_all: false, dl_bypass: false };
+let APP = { version: '', platform: '', arch: '', packaged: false, do_all: false, dl_bypass: false, gate_hosts: [] };
 let UPDATE = null;   // { version, url, page, asset } once a newer release is known
 const UPD_KEY = 'updateDismissed';
 const RELEASES_API = 'https://api.github.com/repos/Banneh/playlist-app/releases/latest';

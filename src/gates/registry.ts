@@ -1,0 +1,106 @@
+/** The adapter registry: first match wins, ordered by measured frequency.
+ *
+ *  `main.ts` asks `match()`; on null it falls through to the Hypeddit walkers. `walk()` owns the
+ *  shared pieces — the hidden window, the abort signal, the undo pass — so no adapter touches
+ *  main.ts state. */
+import { session, type Session } from "electron";
+import * as core from "../core";
+import { WalkWindow } from "./oauth";
+import { undo } from "./soundcloud";
+import { UA } from "./http";
+import { SC_PARTITION, type GateAdapter, type WalkContext, type WalkResult } from "./types";
+import droploud from "./droploud";
+import downloadgater from "./downloadgater";
+import gaterush from "./gaterush";
+import fangate from "./fangate";
+import toneden from "./toneden";
+import gatekit from "./gatekit";
+import powergate from "./powergate";
+import pumpyoursound from "./pumpyoursound";
+import beltergate from "./beltergate";
+import managerone from "./managerone";
+
+const ADAPTERS: GateAdapter[] = [droploud, downloadgater, gaterush, fangate, toneden, gatekit, powergate, pumpyoursound, beltergate, managerone];
+
+export function match(url: URL): GateAdapter | null {
+  const off = disabled();
+  for (const a of ADAPTERS) {
+    if (off.has(a.id)) continue;
+    if (!a.hosts.test(url.hostname)) continue;
+    try { if (a.match(url)) return a; } catch {}
+  }
+  return null;
+}
+
+/** Host patterns for the UI, so a link the app can fetch itself is not offered as a browser link. */
+export const hostSources = () => ADAPTERS.map((a) => a.hosts.source);
+
+/** Adapter ids switched off in Settings → Gates. */
+function disabled(): Set<string> {
+  const raw = core.getSettings().gate_off;
+  return new Set(Array.isArray(raw) ? raw.map((x: string) => String(x).toLowerCase()) : []);
+}
+
+export const ids = () => ADAPTERS.map((a) => a.id);
+
+/** Whether any adapter claims this URL, ignoring the switches (for the Settings list). */
+export function claims(url: string): string | null {
+  let u: URL;
+  try { u = new URL(url); } catch { return null; }
+  for (const a of ADAPTERS) { try { if (a.match(u)) return a.id; } catch {} }
+  return null;
+}
+
+/** A walk is in flight: `window-all-closed` must not quit the app under it. */
+let active = 0;
+export const busy = () => active > 0;
+
+/** Provider logins the user already made through the Hypeddit walker live in its partition. Copy
+ *  them over once so a provider step stays hidden instead of asking for a login again. */
+const PROVIDER_DOMAINS = [".spotify.com", ".instagram.com", ".facebook.com", ".google.com", ".x.com", ".twitter.com"];
+async function seedProviderSessions(ses: Session): Promise<void> {
+  const src = session.fromPartition("persist:hypeddit");
+  for (const domain of PROVIDER_DOMAINS) {
+    const have = new Set((await ses.cookies.get({ domain })).map((c) => c.name));
+    for (const c of await src.cookies.get({ domain })) {
+      if (have.has(c.name)) continue;
+      await ses.cookies.set({
+        url: `https://${domain.replace(/^\./, "")}${c.path || "/"}`,
+        name: c.name, value: c.value, domain: c.domain, path: c.path,
+        secure: c.secure, httpOnly: c.httpOnly, sameSite: c.sameSite, expirationDate: c.expirationDate,
+      }).catch(() => {});
+    }
+  }
+}
+
+/** Walk one gate. Resolves with the saved file; throws when the gate hands out nothing. */
+export async function walk(adapter: GateAdapter, url: string, email: string): Promise<WalkResult> {
+  const ses = session.fromPartition(SC_PARTITION);
+  await seedProviderSessions(ses).catch(() => {});
+  const log = (m: string) => console.log(`[gate:${adapter.id}] ${m}`);
+  const w = new WalkWindow(ses, log);
+  const ac = new AbortController();
+  const s = core.getSettings();
+  const ctx: WalkContext = {
+    url,
+    email,
+    comment: s.dl_comment || "fire",
+    ua: UA,
+    session: ses,
+    window: w,
+    log,
+    signal: ac.signal,
+    needAttention: (r) => w.needAttention(r),
+  };
+  active++;
+  try {
+    const res = await adapter.walk(ctx);
+    if (s.undo_after_download !== false && res.performed.length) {
+      await undo(w, res.performed).catch((e) => log("[undo] failed: " + e));
+    }
+    return res;
+  } finally {
+    active--;
+    w.destroy();
+  }
+}

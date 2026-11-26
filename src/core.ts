@@ -193,6 +193,14 @@ export interface AppState {
                bandcamp_days?: number;
                /** the address the automated Hypeddit free download fills into a gate's email step */
                dl_email?: string;
+               /** the comment the automated gate walk posts on a comment step; default "fire" */
+               dl_comment?: string;
+               /** take back the repost/like/follow a gate walk performed, after the file is in; on unless false */
+               undo_after_download?: boolean;
+               /** dev only: adapter ids switched off in Settings → Gates; empty means all on */
+               gate_off?: string[];
+               /** dev only: the DOM walker fallback for gates no adapter handles; on unless false */
+               gate_walker?: boolean;
                /** the rekordbox collection connection (src/rekordbox.ts): the switch and the
                 *  files moved in that still wait to be written into rekordbox's database */
                rekordbox?: { on?: boolean; pending?: string[] } };
@@ -435,6 +443,10 @@ export function getSettings(): any {
     sc_open: s.sc_open === "browser" ? "browser" : "discover",
     aiff_auto: !!s.aiff_auto,
     dl_email: s.dl_email || "",
+    dl_comment: s.dl_comment || "",
+    undo_after_download: s.undo_after_download !== false,
+    gate_off: Array.isArray(s.gate_off) ? s.gate_off : [],
+    gate_walker: s.gate_walker !== false,
     bandcamp: s.bandcamp !== false,
     bandcamp_days: BANDCAMP_DAYS.includes(s.bandcamp_days ?? -1) ? s.bandcamp_days : 14,
     data_dir: DATA_DIR,
@@ -607,6 +619,17 @@ export async function setSettings(data: any): Promise<any> {
     if (v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) throw appError("bad_email", "that isn't an email address", { email: v });
     if (v) s.dl_email = v; else delete s.dl_email;
   }
+  if ("dl_comment" in data) {
+    const v = String(data.dl_comment || "").trim().slice(0, 280);
+    if (v) s.dl_comment = v; else delete s.dl_comment;
+  }
+  if ("undo_after_download" in data) { if (data.undo_after_download) delete s.undo_after_download; else s.undo_after_download = false; }
+  if ("gate_off" in data) {
+    const v: string[] = (Array.isArray(data.gate_off) ? data.gate_off : String(data.gate_off || "").split(","))
+      .map((x: unknown) => String(x).trim().toLowerCase()).filter(Boolean);
+    if (v.length) s.gate_off = [...new Set(v)]; else delete s.gate_off;
+  }
+  if ("gate_walker" in data) { if (data.gate_walker) delete s.gate_walker; else s.gate_walker = false; }
   if ("sc_open" in data) s.sc_open = data.sc_open === "browser" ? "browser" : "discover";
   if ("do_all" in data) patchDoAll(data.do_all);
   if ("refresh_min" in data) {
@@ -1797,6 +1820,31 @@ export function hostOf(url: string): string {
 /** A Hypeddit download gate: the only host the automated free download knows how to walk. */
 export const isHypeddit = (url: string) => /(^|\.)hypeddit\.com$/i.test(hostOf(url));
 
+/** Hosts that are not gates: shops, streaming, file hosts, link shorteners and artist pages. */
+const NOT_A_GATE = /(^|\.)(bandcamp\.com|beatport\.com|spotify\.com|dropbox\.com|google\.com|drive\.google\.com|distrokid\.com|lnk\.to|ffm\.to|bit\.ly|smarturl\.it|found\.ee|soundcloud\.com|bfan\.link|fanlink\.tv|songkick\.com|sea-watch\.org|revealedrecordings\.com)$/i;
+
+/** Every download-link host in the library with its link count, and which gate adapter (if any)
+ *  claims it. Feeds the Settings → Gates list, so all gates are managed in one place. */
+export function gateHosts(): Array<{ host: string; count: number; sample: string; adapter: string | null }> {
+  const seen = new Map<string, { count: number; sample: string }>();
+  const add = (url: string) => {
+    if (!/^https?:\/\//i.test(url)) return;
+    const host = hostOf(url);
+    if (!host || NOT_A_GATE.test(host)) return;
+    const e = seen.get(host);
+    if (e) e.count++; else seen.set(host, { count: 1, sample: url });
+  };
+  for (const lib of STATE.libraries) for (const t of lib.playlist?.tracks || []) {
+    if (t.buy_url) add(t.buy_url);
+    for (const [url] of t.desc_links || []) add(url);
+  }
+  // lazy: the registry imports this module
+  const reg = require("./gates/registry") as typeof import("./gates/registry");
+  return [...seen.entries()]
+    .map(([host, e]) => ({ host, count: e.count, sample: e.sample, adapter: isHypeddit(e.sample) ? "hypeddit" : reg.claims(e.sample) }))
+    .sort((a, b) => b.count - a.count || a.host.localeCompare(b.host));
+}
+
 /** Candidate "get the track here" links in a description: [url, its line, the
  *  line before it]. Socials/streaming are dropped; scheme-less URLs only count
  *  for known hosts (descriptions are full of "www.instagram.com/..."). */
@@ -2574,6 +2622,7 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
     can_pick: CAN_PICK,
     can_reveal: CAN_REVEAL,
     settings: getSettings(),
+    gate_hosts: gateHosts(),
     backup_bytes: backupBytes(lib),
     state_problem: STATE_PROBLEM,
     // imported without its SoundCloud link: nothing is fetched until Change link… sets one

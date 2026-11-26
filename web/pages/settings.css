@@ -52,3 +52,10 @@
 .st-account { display: flex; align-items: center; gap: 10px; width: 100%; font-size: 13px; }
 .st-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: var(--surface-3); flex-shrink: 0; }
 .st-avatar.ph { display: grid; place-items: center; color: var(--text-3); }
+
+/* gates: one switch per adapter, then the hosts nothing handles */
+.st-gatelist { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.st-gatelist .st-switch { margin-top: 4px; }
+.st-gatehost { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px solid var(--line-1); font-size: 13px; }
+.st-gatehost:last-child { border-bottom: 0; }
+.st-gatehost .faint { font-size: 12px; flex-shrink: 0; }
