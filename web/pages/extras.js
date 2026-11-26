@@ -1,6 +1,7 @@
 /* Page: Collection — every audio file of the collection's folders, with what the playlists
-   make of each one (matched to a track, found on SoundCloud, or unmatched). Filters: all,
-   unmatched, needs tags, needs convert, per root. A file can be looked up on SoundCloud
+   make of each one (matched to a track, found on SoundCloud, or unmatched). Two filters a file
+   must pass both of: the state rail (CSTATE: all, in no playlist, needs tags, needs convert)
+   and "In" (CIN: everything, one playlist, or one collection folder). A file can be looked up on SoundCloud
    (Find dialog / Find all); once the user adds the track to the playlist there, the next
    refresh matches the file.
    Globals used by other code: COLL, loadCollection(), PAGES.collection, openFind(i),
@@ -8,7 +9,8 @@
 
 let COLL = null;      // last /api/collection/view
 let COLL_BUSY = false;
-let CFILTER = 'all';
+let CSTATE = 'all';   // 'all' | 'unmatched' | 'tags' | 'convert'
+let CIN = '';         // '' | 'lib:<id>' | 'root:<id>'
 
 async function loadCollection({ quiet = false } = {}) {
   if (typeof TOUR !== 'undefined' && TOUR && TOUR.demo) return;   // the tour shows sample data
@@ -22,60 +24,92 @@ async function loadCollection({ quiet = false } = {}) {
 
 const coMatches = (f, q) => !q || (f.artist + ' ' + f.title + ' ' + f.disp + ' ' + (f.found ? f.found.user + ' ' + f.found.title : '')
   + ' ' + (f.in || []).map(u => u.track + ' ' + u.name).join(' ')).toLowerCase().includes(q);
-const coFilter = f => CFILTER === 'all' ? true
-  : CFILTER === 'unmatched' ? f.unmatched
-  : CFILTER === 'tags' ? f.tagged === false
-  : CFILTER === 'convert' ? !!f.incompat
-  : f.root === CFILTER;
+const coState = (f, st = CSTATE) => st === 'all' ? true
+  : st === 'unmatched' ? f.unmatched
+  : st === 'tags' ? f.tagged === false
+  : !!f.incompat;
+const coIn = (f, cin = CIN) => !cin ? true
+  : cin.startsWith('lib:') ? (f.in || []).some(u => u.lib === cin.slice(4))
+  : f.root === cin.slice(5);
+const coFilter = f => coState(f) && coIn(f);
+/** the libraries and folders "In" can pick; a pick whose playlist or folder is gone goes back to All */
+const coLibs = () => (DATA && DATA.libraries || []).map(l => ({ id: 'lib:' + l.id, name: l.name, ico: 'listMusic' }));
+const coRoots = () => (COLL && COLL.roots || []).map(r => ({ id: 'root:' + r.id, name: r.path.split(/[\\/]/).filter(Boolean).pop() || r.path, path: r.path, ico: 'folder' }));
+function coInCheck() {
+  if (CIN && ![...coLibs(), ...coRoots()].some(x => x.id === CIN)) CIN = '';
+}
 
-/* ---------- row ---------- */
-function coFileLine(f) {
-  const tags = fileIssueTags(f);
-  if (f.key) tags.push(keyTag(f));
-  return `<div class="t-file">${playBtn(f.path, f.title || f.base, f.artist || '') || `<span class="ic">${icon('music')}</span>`}<span class="fn" title="${esc(f.path)}">${esc(f.disp)}</span>${
-    tags.length ? `<span class="tags">${tags.join('')}</span>` : ''}</div>`;
+/* ---------- row: 60 px, one fact per column ----------
+   cover (play on hover) · title + artist · file · key · length · to do · playlists · more.
+   Narrow windows fold key and to do into the second line as compact labels. */
+const coIssues = (f, i) => fileIssues({ incompat: f.incompat, tagged: f.tagged });
+function coTodo(f, i) {
+  const xs = coIssues(f, i);
+  if (!xs.length) return '';
+  return issueTag({ ...xs[0], size: 'full' }) + (xs.length > 1
+    ? `<button class="itag-more" onclick="event.stopPropagation();issuePop(this)" data-issues="${esc(JSON.stringify(xs))}" aria-haspopup="dialog" title="${esc(tn('tags.issue.notes', xs.length))}">+${xs.length - 1}</button>` : '');
 }
-function coFoundLine(f, i) {
-  const fd = f.found; if (!fd) return '';
-  return `<div class="t-file found link ex-found" onclick="openFind(${i})" title="${esc(t('extras.foundTip'))}"><span class="ic">${icon('cloud')}</span><span class="fn">${
-    esc(fd.user)} - ${esc(fd.title)}</span><span class="ex-dur">${esc(typeof fd.dur === 'number' ? fmtSecs(fd.dur) : fd.dur)}</span></div>`;
+/** the Playlists cell: where the file is used, or the action that puts it in a playlist */
+function coPlaylists(f, i) {
+  const used = f.in || [], fd = f.found;
+  if (used.length) {
+    const tip = used.length === 1 ? t('coll.openLibTip', { name: used[0].name }) : tn('coll.inN', used.length);
+    return `<button class="co-pl" onclick="coPlPop(this, ${i})" title="${esc(tip)}"${used.length > 1 ? ' aria-haspopup="dialog"' : ''}><i class="dot"></i><span class="nm">${esc(used[0].name)}</span>${
+      used.length > 1 ? `<span class="n">+${used.length - 1}</span>` : ''}</button>`;
+  }
+  if (fd) {
+    const add = typeof scCan === 'function' && scCan()
+      ? `<button class="btn btn-sm btn-accent" onclick="scAddUrl('${esc(fd.url)}')" title="${esc(t('extras.addTip'))}">${icon('plus')}${esc(t('extras.addToPlaylist'))}</button>`
+      : `<button class="btn btn-sm btn-accent" onclick="scOpen('${esc(fd.url)}')" title="${esc(t('extras.addOpenTip'))}">${icon('external')}${esc(t('extras.addToPlaylist'))}</button>`;
+    return `${add}<span class="co-found link" onclick="openFind(${i})" title="${esc(t('extras.foundTip'))}">${esc(t('coll.found', { name: fd.user + ' - ' + fd.title }))}</span>`;
+  }
+  return `<button class="btn btn-sm" onclick="openFind(${i})" title="${esc(t('extras.findTip'))}">${icon('search')}${esc(t('tags.findOnSc'))}</button>`;
 }
-/** which playlists use the file, as small tags */
-function coUsedLine(f) {
-  const used = f.in || [];
-  if (!used.length) return '';
-  return `<div class="t-file co-used"><span class="ic">${icon('listMusic')}</span>${used.map(u =>
-    `<span class="tag tag-ok" title="${esc(t('coll.usedTip', { track: u.track }))}">${icon('check')}<span class="tx">${esc(u.name)}</span></span>`).join('')}</div>`;
+/** one playlist: open it; several: list them, each opens its playlist */
+function coPlPop(btn, i) {
+  const used = (COLL && COLL.files[i] && COLL.files[i].in) || [];
+  if (used.length === 1) return coOpenLib(used[0].lib);
+  showPopover(btn, `<div class="pop-title">${esc(tn('coll.inN', used.length))}</div>${used.map(u =>
+    `<button class="menu-item co-pl-item" onclick="closeMenu();coOpenLib('${esc(u.lib)}')" title="${esc(t('coll.usedTip', { track: u.track }))}"><i class="dot"></i><span>${esc(u.name)}</span>${icon('chevronRight')}</button>`).join('')}`, { align: 'right' });
+}
+async function coOpenLib(id) {
+  try {
+    if (DATA.active !== id) { DATA = await api('/api/library', { op: 'select', id }); EDIT_ID = null; bandcampRun(); if (typeof loadInbox === 'function') loadInbox(); }
+    go('all');
+  } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
+}
+/** the cover: the matched track's artwork, else the file's own picture, else a note; play on hover */
+function coArt(f) {
+  const src = f.art || (f.pic ? '/api/cover?path=' + encodeURIComponent(f.path) : '');
+  const on = typeof plIsPlaying === 'function' && plIsPlaying(f.path);
+  return `<button class="art co-art${src ? '' : ' none'}${on ? ' is-playing' : ''}" data-play="${esc(f.path)}" data-label="${esc(f.title || f.base)}" data-sub="${esc(f.artist || '')}" onclick="playFromBtn(this)" title="${esc(t(on ? 'common.pause' : 'player.preview'))}">${
+    src ? `<img src="${esc(src)}" loading="lazy" alt="" onerror="this.parentNode.classList.add('none');this.remove()">` : icon('music')}<span class="ov">${on ? plIcon('pause') : icon('play')}</span></button>`;
 }
 function exRow(f, i) {
   if ('x' + i === EDIT_ID) return `
-    <div class="tr tr-edit ex-row" style="grid-template-columns:30px minmax(0,1fr)">
-      <span class="num"></span><!-- no art cell: the edit form takes the width -->
+    <div class="tr tr-edit ex-row" style="grid-template-columns:40px minmax(0,1fr);height:auto">
+      <span></span><!-- no art cell: the edit form takes the width -->
       ${editFormHtml(f, `saveExtra(${i})`, `resetExtra(${i})`, t('extras.resetTip'))}
     </div>`;
-  const fd = f.found;
-  // the matched track's artwork, else the picture embedded in the file itself
-  const artSrc = f.art || (f.pic ? '/api/cover?path=' + encodeURIComponent(f.path) : '');
+  const base = f.path.split(/[\\/]/).pop() || f.disp;
+  // the folder before the file name only when "In" shows everything and there is more than one folder
+  const root = !CIN && COLL.roots.length > 1 ? (coRoots().find(r => r.id === 'root:' + f.root) || {}).name : '';
+  const narrow = issueLine([...coIssues(f, i), ...(f.key ? [{ html: keyTag(f), tip: t(f.pn ? 'tags.keyTipPn' : 'tags.keyTip'), label: f.key }] : [])], 'compact');
   return `
     <div class="tr ex-row">
-      <span class="num"></span>
-      <span class="art${artSrc ? '' : ' none'}">${artSrc ? `<img src="${esc(artSrc)}" loading="lazy" alt="" onerror="this.parentNode.classList.add('none');this.remove()">` : icon('music')}</span>
+      ${coArt(f)}
       <div class="t-meta">
         <div class="t-title"><span title="${esc(f.title)}">${esc(f.title)}</span>${
-          f.edited ? tag(t('tags.edited'), 'outline', 'pencil', t('tags.editedTip')) : ''}${
-          f.check_name ? `<span class="link" onclick="openCheckNames('check', COLL.files[${i}].name)">${tag(t('tags.checkName'), 'warn', 'alert', ncTip(f))}</span>` : ''}</div>
-        <div class="t-sub">${f.artist ? esc(f.artist)
-          : `<span class="ex-noartist" onclick="exEdit(${i})" title="${esc(t('extras.noArtistTip'))}">${icon('pencil')}${esc(t('extras.noArtist'))}</span>`}</div>
-        ${coFileLine(f)}
-        ${coUsedLine(f)}
-        ${coFoundLine(f, i)}
+          f.edited ? `<span class="co-edited" title="${esc(t('tags.editedTip'))}">${esc(t('tags.edited'))}</span>` : ''}${
+          f.check_name ? issueTag({ kind: 'name', label: t('tags.issue.name'), tip: ncTip(f), click: `openCheckNames('check', COLL.files[${i}].name)` }) : ''}</div>
+        <div class="t-sub co-sub">${f.artist ? `<span class="co-artist">${esc(f.artist)}</span>`
+          : `<span class="ex-noartist" onclick="exEdit(${i})" title="${esc(t('extras.noArtistTip'))}">${icon('pencil')}${esc(t('extras.noArtist'))}</span>`}<span class="co-sep">·</span><span class="co-fn" title="${esc(f.path)}">${
+          root ? `<span class="co-root">${esc(root)}/</span>` : ''}${esc(base)}</span>${narrow ? `<span class="co-narrow">${narrow}</span>` : ''}</div>
       </div>
+      <span class="co-key">${f.key ? keyTag(f) : ''}</span>
       <span class="dur">${esc(f.dur)}</span>
-      <div class="cell">${(f.in || []).length ? '' : fd
-        ? (typeof scCan === 'function' && scCan()
-          ? `<button class="btn btn-sm btn-accent" onclick="scAddUrl('${esc(fd.url)}')" title="${esc(t('extras.addTip'))}">${icon('plus')}${esc(t('extras.addToPlaylist'))}</button>`
-          : `<button class="btn btn-sm btn-accent" onclick="scOpen('${esc(fd.url)}')" title="${esc(t('extras.addOpenTip'))}">${icon('external')}${esc(t('extras.addToPlaylist'))}</button>`)
-        : `<button class="btn btn-sm" onclick="openFind(${i})" title="${esc(t('extras.findTip'))}">${icon('search')}${esc(t('tags.findOnSc'))}</button>`}</div>
+      <div class="co-todo">${coTodo(f, i)}</div>
+      <div class="co-pls">${coPlaylists(f, i)}</div>
       <button class="btn btn-ghost btn-sm btn-icon more" onclick="exMenu(this, ${i})" title="${esc(t('common.more'))}">${icon('more')}</button>
     </div>`;
 }
@@ -195,8 +229,57 @@ async function findAll() {
 }
 
 /* ---------- page ---------- */
-const coHead = () => `<div class="thead ex-head"><span class="num"></span><span></span><span>${esc(t('common.file'))}</span><span class="r">${esc(t('common.length'))}</span><span>${
-  esc(t('tags.onSoundCloud'))}</span><span></span></div>`;
+const coHead = () => `<div class="thead ex-head"><span></span><span>${esc(t('coll.head.track'))}</span><span class="co-key">${esc(t('coll.head.key'))}</span><span class="r">${
+  esc(t('common.length'))}</span><span class="co-todo">${esc(t('coll.head.todo'))}</span><span>${esc(t('coll.head.playlists'))}</span><span></span></div>`;
+
+/* ---------- the "In" picker: a searchable list of playlists and folders ---------- */
+/** files that match the search, per "In" entry (the list's counts ignore the state rail) */
+function coInCounts(q) {
+  const fs = COLL.files.filter(f => coMatches(f, q));
+  const n = { '': fs.length };
+  for (const x of [...coLibs(), ...coRoots()]) n[x.id] = fs.filter(f => coIn(f, x.id)).length;
+  return n;
+}
+function coInButton(q) {
+  const x = [...coLibs(), ...coRoots()].find(e => e.id === CIN);
+  if (!x) return `<button class="co-in" id="co-in" onclick="coInOpen(this)" aria-haspopup="listbox"><span class="lbl">${esc(t('coll.in.label'))}</span>${esc(t('coll.in.all'))}${icon('chevronDown')}</button>`;
+  const n = COLL.files.filter(f => coMatches(f, q) && coIn(f)).length;
+  return `<span class="co-in on"><button onclick="coInOpen(this)" aria-haspopup="listbox" title="${esc(x.path || x.name)}">${icon(x.ico)}<span class="nm">${esc(x.name)}</span><span class="n">${n}</span></button><button class="x" onclick="CIN='';renderTop()" aria-label="${esc(t('coll.in.clear'))}" title="${esc(t('coll.in.clear'))}">${icon('x')}</button></span>`;
+}
+function coInOpen(anchor) {
+  const q = Q.trim().toLowerCase(), counts = coInCounts(q);
+  const libs = coLibs(), roots = COLL.roots.length > 1 ? coRoots() : [];
+  const opt = (x, cls = '') => `<button class="menu-item co-opt${CIN === x.id ? ' checked' : ''}${counts[x.id] ? '' : ' co-none'}${cls}" role="option" aria-selected="${CIN === x.id}" data-id="${esc(x.id)}" data-q="${esc((x.name || '').toLowerCase())}" title="${esc(x.path || x.name)}">${
+    x.ico ? icon(x.ico) : '<i class="led"></i>'}<span class="nm">${esc(x.name)}</span><span class="n">${counts[x.id] ? counts[x.id] : esc(t('coll.in.empty'))}</span></button>`;
+  const group = (label, xs) => xs.length ? `<div class="co-grp" data-grp><span>${esc(label)}</span><span class="n">${xs.length}</span><i></i></div>${xs.map(x => opt(x)).join('')}` : '';
+  const m = showPopover(anchor.closest('.co-in') || anchor, `<div class="co-find search">${icon('search')}<input type="search" placeholder="${esc(t('coll.in.find'))}" aria-label="${esc(t('coll.in.find'))}" spellcheck="false"></div>
+    <div class="co-opts" role="listbox">${opt({ id: '', name: t('coll.in.allLong') }, ' co-all')}${group(t('coll.in.playlists'), libs)}${group(t('coll.in.folders'), roots)}</div>`, { cls: 'co-inpop' });
+  if (!m) return;
+  const inp = m.querySelector('input');
+  const items = () => [...m.querySelectorAll('.co-opt')].filter(b => !b.hidden);
+  let cur = Math.max(0, items().findIndex(b => b.classList.contains('checked')));
+  const mark = () => items().forEach((b, k) => b.classList.toggle('kb', k === cur));
+  const pick = b => { CIN = b.dataset.id; closeMenu(); renderTop(); };
+  m.querySelectorAll('.co-opt').forEach(b => b.onclick = () => pick(b));
+  inp.oninput = () => {
+    const v = inp.value.trim().toLowerCase();
+    m.querySelectorAll('.co-opt').forEach(b => { b.hidden = !!v && !b.classList.contains('co-all') && !b.dataset.q.includes(v); });
+    m.querySelectorAll('[data-grp]').forEach(g => {   // a group heading goes with its last visible entry
+      let n = g.nextElementSibling, any = false;
+      while (n && n.classList.contains('co-opt')) { if (!n.hidden) any = true; n = n.nextElementSibling; }
+      g.hidden = !any;
+    });
+    cur = 0; mark();
+  };
+  inp.onkeydown = e => {
+    const xs = items();
+    if (e.key === 'ArrowDown') { e.preventDefault(); cur = Math.min(xs.length - 1, cur + 1); mark(); xs[cur] && xs[cur].scrollIntoView({ block: 'nearest' }); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); cur = Math.max(0, cur - 1); mark(); xs[cur] && xs[cur].scrollIntoView({ block: 'nearest' }); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (xs[cur]) pick(xs[cur]); }
+  };
+  mark();
+  setTimeout(() => inp.focus(), 0);
+}
 PAGES.collection = {
   title: () => t('app.nav.collection'),
   onShow: () => { if (!COLL || COLL.error) loadCollection(); },
@@ -209,21 +292,20 @@ PAGES.collection = {
   },
   actions: () => {
     const todo = COLL && !COLL.error ? COLL.files.filter(f => f.unmatched && !f.found).length : 0;
-    return `<button class="btn" onclick="loadCollection()" ${COLL_BUSY ? 'disabled' : ''} title="${esc(t('coll.rescanTip'))}">${COLL_BUSY ? spin(t('inbox.scanningShort')) : icon('refresh') + esc(t('common.rescan'))}</button>`
-      + (todo ? `<button class="btn" id="btn-findall" onclick="findAll()" title="${esc(t('extras.findAll.tip'))}">${icon('search')}${esc(t('extras.findAll.button'))}${badge(todo)}</button>` : '');
+    // with files to look up, Find all is the main button and Rescan an ordinary one
+    return `<button class="btn" onclick="loadCollection()" ${COLL_BUSY ? 'disabled' : ''} title="${esc(t('coll.rescanTip'))}">${COLL_BUSY ? spin(t('inbox.scanningShort')) : icon('folderSearch') + esc(t('common.rescan'))}</button>`
+      + (todo ? `<button class="btn btn-primary" id="btn-findall" onclick="findAll()" title="${esc(t('extras.findAll.tip'))}">${icon('search')}${esc(t('extras.findAll.button'))}${badge(todo)}</button>` : '');
   },
   tools: () => {
     if (!COLL || COLL.error) return '';
+    coInCheck();
     const q = Q.trim().toLowerCase();
-    const fs = COLL.files.filter(f => coMatches(f, q));
-    const chips = [['all', 'tags.chip.all', fs.length], ['unmatched', 'coll.chip.unmatched', fs.filter(f => f.unmatched).length],
-      ['tags', 'tags.needsTags', fs.filter(f => f.tagged === false).length, 'tag'],
-      ['convert', 'playlist.have.chip.convert', fs.filter(f => !!f.incompat).length, 'sliders']];
-    const roots = COLL.roots.length > 1 ? COLL.roots.map(r => [r.id, null, fs.filter(f => f.root === r.id).length, 'folder', r.path]) : [];
-    return '<div class="chips" role="radiogroup">' + chips.map(([k, label, n, ico]) =>
-      `<button class="chip${CFILTER === k ? ' on' : ''}" role="radio" aria-checked="${CFILTER === k}" onclick="CFILTER='${k}';renderTop()">${ico ? icon(ico) : ''}${esc(t(label))}<span class="n">${n}</span></button>`).join('')
-      + roots.map(([k, , n, ico, p]) =>
-      `<button class="chip${CFILTER === k ? ' on' : ''}" role="radio" aria-checked="${CFILTER === k}" onclick="CFILTER='${esc(k)}';renderTop()" title="${esc(p)}">${icon(ico)}${esc(p.split(/[\\/]/).pop())}<span class="n">${n}</span></button>`).join('') + '</div>';
+    // the rail's counts follow "In" and the search
+    const fs = COLL.files.filter(f => coMatches(f, q) && coIn(f));
+    const st = ['all', 'unmatched', 'tags', 'convert'].map(k => [k, fs.filter(f => coState(f, k)).length]);
+    return '<div class="chips co-rail" role="radiogroup">' + st.map(([k, n]) =>
+      `<button class="chip${CSTATE === k ? ' on' : ''}" role="radio" aria-checked="${CSTATE === k}" ${n || CSTATE === k ? '' : 'disabled'} onclick="CSTATE='${k}';renderTop()">${esc(t('coll.state.' + k))}<span class="n">${n}</span></button>`).join('')
+      + '</div>' + coInButton(q);
   },
   get search() { return t('coll.search'); },
   body: q => {

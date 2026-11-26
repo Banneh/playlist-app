@@ -25,6 +25,13 @@ I18N.add('en', 'tags', {
   pctMatchTip: 'How closely the file name and length match the playlist entry',
   exactMatch: 'Exact match',
   needsTags: 'Needs tags',
+  // problem labels: one word each, the sentence goes to the tooltip and the +N list
+  issue: {
+    convert: 'Convert', tags: 'Needs tags', name: 'Check name', lossless: 'Lossless',
+    wavHeader: 'WAV HEADER',
+    notes: { one: '{n} note on this file', other: '{n} notes on this file' },
+    fix: 'Fix in {page}',
+  },
   needsTagsTip: 'The artist / title in the file are missing or differ from the name shown here',
   convert: 'Convert · {codec}',
   bits: { one: '{n}-bit', other: '{n}-bit' },

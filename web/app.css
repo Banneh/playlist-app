@@ -204,6 +204,34 @@ b, strong { font-weight: 600; }
 .tag-newfile { background: var(--green); color: var(--on-status); font-family: var(--mono); letter-spacing: .06em; font-size: 10px; }
 .tag-outline { background: transparent; box-shadow: inset 0 0 0 1px var(--line-2); }
 
+/* problem labels (issueTag in pages/playlist.js): a word and an optional mono fact; never cut,
+   never shrunk. Full: dot + word | fact. Compact: icon + fact, the word in the tooltip. */
+.itag { flex: none; display: inline-flex; align-items: stretch; white-space: nowrap; overflow: hidden;
+  background: var(--amber-soft); color: var(--amber); vertical-align: middle; line-height: 1; }
+.itag.it-info { background: var(--blue-soft); color: var(--blue); }
+.itag.link { cursor: pointer; }
+.itag.link:hover { filter: brightness(.96); box-shadow: inset 0 0 0 1px currentColor; }
+.itag.it-f { height: 22px; border-radius: 6px; }
+.itag.it-f .w { display: inline-flex; align-items: center; gap: 5px; padding: 0 7px; font-size: 11.5px; font-weight: 600; }
+.itag.it-f .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.itag.it-f .fact { display: inline-flex; align-items: center; padding: 0 7px; border-left: 1px solid var(--amber-line); }
+.itag.it-info.it-f .fact { border-left-color: var(--blue-line, currentColor); }
+.itag .fact { font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: .04em; }
+.itag.it-c { height: 20px; border-radius: 4px; align-items: center; gap: 4px; padding: 0 6px; }
+.itag.it-c .ic { width: 11px; height: 11px; flex: none; }
+.itag.it-c .fact { padding-right: 1px; }
+.itag-more { flex: none; height: 20px; padding: 0 7px; border: 0; border-radius: 999px; background: var(--text); color: var(--surface);
+  font-family: var(--mono); font-size: 10.5px; font-weight: 600; line-height: 20px; cursor: pointer; }
+.itag-more:hover { opacity: .85; }
+/* a popover (showPopover in app.js): a menu box with free content */
+.menu.popover { padding: 6px; max-width: 360px; }
+.pop-title { padding: 7px 9px 5px; font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.pop-note { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; padding: 7px 9px; border-radius: 8px; }
+.pop-note .pop-tag { justify-self: start; }
+.pop-tx { font-size: 12.5px; line-height: 1.4; color: var(--text-2); min-width: 180px; }
+.pop-link { display: block; margin: 4px 9px 6px; font-size: 12.5px; font-weight: 600; color: var(--accent-text); }
+.pop-link:hover { text-decoration: underline; }
+
 /* the filter rail: the single-select chips drawn as one segmented control, like a channel
    selector. A 6 px LED sits before each label (lit on the selected segment). */
 .chips, .ph-tools .rail { display: flex; align-items: center; gap: 2px; flex-wrap: wrap;
@@ -498,10 +526,10 @@ html.mac-inset .page-head { padding-top: 30px; }
 .t-sub .via { color: var(--text-3); }
 .t-file { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; color: var(--text-3); margin-top: 1px; }
 .t-file .ic { width: 13px; height: 13px; flex-shrink: 0; }
-.t-file .fn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.t-file .fn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 120px; flex: 0 1 auto; }
 .t-file .fn.link { cursor: pointer; }
 .t-file .fn.link:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
-.t-file .tags { display: flex; gap: 4px; flex-shrink: 0; }
+.t-file .tags { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .t-file.link { cursor: pointer; }
 .t-file.link:hover .fn { color: var(--text); }
 .t-file.found { color: var(--text-2); }
@@ -516,7 +544,8 @@ html.mac-inset .page-head { padding-top: 30px; }
 .more { opacity: 1; color: var(--text-3); transition: color .12s; }
 .tr:hover .more, .more:focus-visible, .more[aria-expanded="true"] { color: var(--text); }
 /* developer mode: the provider a Free DL was recognised as, next to the button */
-body.devmode .thead, body.devmode .tr { grid-template-columns: 30px 40px minmax(0, 1fr) 48px 112px 284px 30px; }
+/* only the track lists with a Get it column: other tables keep their own grid */
+body.devmode .table:has(.tr > .get) > .thead, body.devmode .tr:has(> .get) { grid-template-columns: 30px 40px minmax(0, 1fr) 48px 112px 284px 30px; }
 .dev-prov { flex-shrink: 0; max-width: 94px; height: 20px; line-height: 20px; padding: 0 6px; border-radius: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-family: var(--mono); font-size: 10.5px; background: var(--surface-3); color: var(--text-3); }
 .dev-prov.own { background: var(--blue-soft); color: var(--blue); }   /* same blue as the Free DL the app fetches itself */
@@ -674,10 +703,10 @@ body.devmode .thead, body.devmode .tr { grid-template-columns: 30px 40px minmax(
    and Buy / Free DL stack vertically so the title keeps its room */
 @media (max-width: 1040px) {
   .thead, .tr { gap: 10px; grid-template-columns: 40px minmax(0, 1fr) 48px 104px 92px 30px; }
-  body.devmode .thead, body.devmode .tr { grid-template-columns: 40px minmax(0, 1fr) 48px 104px 92px 30px; }   /* the label stacks under the buttons */
+  body.devmode .table:has(.tr > .get) > .thead, body.devmode .tr:has(> .get) { grid-template-columns: 40px minmax(0, 1fr) 48px 104px 92px 30px; }   /* the label stacks under the buttons */
   .thead .num, .tr .num { display: none; }
   .get { flex-direction: column; align-items: stretch; gap: 4px; }
-  .get .btn, .get .btn:only-child { margin-left: 0; width: 92px; }
+  .get .btn, .get a.btn:only-of-type { margin-left: 0; width: 92px; }
   .page-head { padding-left: 22px; padding-right: 22px; }
   .page-body { padding-left: 22px; padding-right: 22px; }
 }

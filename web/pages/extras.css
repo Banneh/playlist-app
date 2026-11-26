@@ -1,9 +1,84 @@
 /* page-specific styles for pages/extras.js (tokens and components come from app.css) */
 
-/* row grid: (blank) · art · file · length · action · more */
-.thead.ex-head, .tr.ex-row { grid-template-columns: 30px 40px minmax(0, 1fr) 48px 176px 30px; }
-.ex-row .cell .btn { width: 100%; }
-.ex-row .art { cursor: default; }
+/* row: 60 px, one fact per column. art · track + file · key · length · to do · playlists · more */
+.thead.ex-head, .tr.ex-row { grid-template-columns: 40px minmax(0, 1fr) 40px 48px 148px 184px 28px; gap: 14px; }
+.tr.ex-row { height: 60px; min-height: 0; padding-top: 0; padding-bottom: 0; }
+.tr.ex-row.tr-edit { height: auto; min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
+.ex-row .more { color: var(--text-3); opacity: 1; }
+
+/* the cover plays the file on hover; without a picture a note on surface-3, still playable */
+.co-art.none .ov { display: grid; }
+.co-art.none { background: var(--surface-3); }
+.co-art.is-playing .ov { opacity: 1; }
+
+/* line 1: title, EDITED, check name; line 2: artist · file name (folder only when "In" is All) */
+.ex-row .t-meta { gap: 3px; }
+.co-edited { flex: none; height: 16px; padding: 0 5px; border-radius: 4px; background: var(--surface-3); color: var(--text-2);
+  font-family: var(--mono); font-size: 9.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; line-height: 16px; }
+.co-sub { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.co-sub .co-artist { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.co-sub .ex-noartist { flex: none; }
+.co-sep { flex: none; color: var(--text-3); }
+.co-fn { flex: 1 1 auto; min-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-3); }
+.co-root { color: var(--text-3); opacity: .75; }
+.co-narrow { display: none; align-items: center; gap: 4px; flex: none; }
+.co-key { display: flex; align-items: center; min-width: 0; }
+.ex-row .dur { font-family: var(--mono); font-size: 12px; }
+.co-todo { display: flex; align-items: center; gap: 4px; min-width: 0; }
+
+/* Playlists: where the file is used, or the action that puts it in one */
+.co-pls { display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; }
+.co-pls .btn { width: 100%; }
+.co-pl { display: inline-flex; align-items: center; gap: 7px; min-width: 0; max-width: 100%; height: 28px; padding: 0 8px; margin-left: -8px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer; }
+.co-pl:hover { background: var(--surface-2); }
+.co-pl .dot, .co-pl-item .dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--green); }
+.co-pl .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.co-pl .n { flex: none; height: 18px; padding: 0 6px; border-radius: 999px; background: var(--surface-3); color: var(--text-2);
+  font-family: var(--mono); font-size: 11px; font-weight: 600; line-height: 18px; }
+.co-pl-item { height: 30px; }
+.co-pl-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.co-found { font-size: 11.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.co-found:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+
+/* the filters: the state rail (always four) and "In" */
+.co-rail { flex-wrap: nowrap; }
+.co-rail .chip:disabled { opacity: .4; pointer-events: none; }
+.co-in { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 9px 0 10px; border-radius: 10px; border: 1px solid var(--line-2);
+  background: var(--surface-2); color: var(--text); font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+button.co-in:hover { background: var(--surface); }
+.co-in .lbl { color: var(--text-3); font-weight: 500; }
+.co-in .ic { width: 13px; height: 13px; color: var(--text-3); }
+.co-in.on { padding: 0; gap: 0; border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); cursor: default; }
+.co-in.on > button { display: inline-flex; align-items: center; gap: 7px; height: 30px; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.co-in.on > button:first-child { padding: 0 6px 0 10px; border-radius: 9px 0 0 9px; max-width: 240px; }
+.co-in.on .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.co-in.on .n { font-family: var(--mono); font-size: 11px; }
+.co-in.on .ic { color: inherit; }
+.co-in.on .x { width: 26px; justify-content: center; border-left: 1px solid var(--accent-soft-2); border-radius: 0 9px 9px 0; }
+.co-in.on > button:hover { background: var(--accent-soft-2); }
+.co-inpop { width: 340px; }
+.co-find { position: relative; display: flex; width: 100%; margin-bottom: 4px; }
+.co-find input { width: 100%; }
+.co-opts { max-height: min(420px, 60vh); overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+.co-opt { height: 30px; }
+.co-opt .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.co-opt .n { flex: none; font-family: var(--mono); font-size: 11.5px; color: var(--text-3); }
+.co-opt.checked .n { color: var(--text-2); }
+.co-opt.co-none { color: var(--text-3); }
+.co-opt.kb { background: var(--surface-2); }
+.co-opt[hidden], .co-grp[hidden] { display: none; }
+.co-grp { display: flex; align-items: center; gap: 8px; padding: 10px 9px 4px; font-family: var(--mono); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.co-grp .n { font-weight: 500; }
+.co-grp i { flex: 1; height: 1px; background: var(--line); }
+
+/* narrow windows: key and to do fold into line 2 as compact labels; the row stays 60 px */
+@media (max-width: 1100px) {
+  .thead.ex-head, .tr.ex-row { grid-template-columns: 40px minmax(0, 1fr) 48px 172px 28px; gap: 12px; }
+  .ex-head .co-key, .ex-head .co-todo, .ex-row .co-key, .ex-row .co-todo { display: none; }
+  .co-narrow { display: inline-flex; }
+}
 
 /* "No artist yet — add one" */
 .ex-noartist { display: inline-flex; align-items: center; gap: 5px; color: var(--text-3); cursor: pointer; }
@@ -18,10 +93,6 @@
 .ex-find .search { flex: 1; width: auto; }
 .ex-wait { padding: 28px 20px; flex-direction: row; gap: 8px; font-size: 13px; }
 
-@media (max-width: 980px) {
-  .thead.ex-head, .tr.ex-row { grid-template-columns: 40px minmax(0, 1fr) 48px 176px 30px; }
-  .ex-head .num, .ex-row .num { display: none; }
-}
 
 /* ---------- collection model additions ---------- */
 .lib-row { display: flex; align-items: center; gap: 2px; min-width: 0; }
@@ -30,7 +101,6 @@
 .st-group:first-child { margin-top: 0; }
 .st-switch-sm .st-lbl { font-size: 12px; }
 .st-switch-sm { flex-shrink: 0; }
-.co-used .tag { margin-right: 4px; }
 .t-file.ib-pending { opacity: .85; }
 .dest-row { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .dest-row .dest-pick { margin-left: auto; opacity: 0; }

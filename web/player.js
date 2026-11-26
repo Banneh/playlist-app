@@ -214,7 +214,8 @@ function plSync() {
   document.querySelectorAll('[data-play]').forEach(el => {
     const on = playing && el.dataset.play === PLAYER.path;
     el.classList.toggle('is-playing', on);
-    el.innerHTML = on ? plIcon('pause') : icon('play');
+    // a cover that plays (Collection) keeps its picture: only the overlay's icon changes
+    (el.querySelector(':scope > .ov') || el).innerHTML = on ? plIcon('pause') : icon('play');
     el.title = t(on ? 'common.pause' : 'player.preview');
   });
 }

@@ -72,6 +72,7 @@ const PATHS = {
   link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   pin: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
   arrowUp: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+  folderSearch: '<path d="M10.7 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v4.1"/><path d="m21 21-1.9-1.9"/><circle cx="17" cy="17" r="3"/>',
   arrowUpCircle: '<circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4"/><path d="M12 16V8"/>',
   arrowRight: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
   arrowLeft: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
@@ -467,6 +468,25 @@ function showMenu(anchor, items, opts = {}) {
     : `<button class="menu-item${it.danger ? ' danger' : ''}${it.checked ? ' checked' : ''}" data-i="${i}"${it.disabled ? ' disabled' : ''}${it.hint ? ` title="${esc(it.hint)}"` : ''}>${
         'checked' in it ? '<span class="led"></span>' : ''}${it.icon ? icon(it.icon) : 'checked' in it ? '' : '<span class="ic"></span>'}<span>${esc(it.label)}</span></button>`).join('');
   m.querySelectorAll('.menu-item').forEach(b => b.onclick = e => { e.stopPropagation(); const it = items[+b.dataset.i]; closeMenu(); it.onclick && it.onclick(); });
+  document.body.appendChild(m);
+  const r = anchor.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight;
+  const mw = m.offsetWidth, mh = m.offsetHeight;
+  let x = opts.align === 'right' ? r.right - mw : r.left, y = r.bottom + 6;
+  if (x + mw > W - 8) x = W - 8 - mw; if (x < 8) x = 8;
+  if (y + mh > H - 8) y = Math.max(8, r.top - mh - 6);
+  m.style.left = x + 'px'; m.style.top = y + 'px';
+  anchor.setAttribute('aria-expanded', 'true');
+  MENU = m;
+  coverNative(true);
+  requestAnimationFrame(() => m.classList.add('show'));
+  return m;
+}
+/** a small popover under `anchor` with any html inside; it closes like a menu (outside click, Esc, resize) */
+function showPopover(anchor, html, opts = {}) {
+  if (MENU && MENU._anchor === anchor) return closeMenu();
+  closeMenu();
+  const m = document.createElement('div'); m.className = 'menu popover' + (opts.cls ? ' ' + opts.cls : ''); m._anchor = anchor;
+  m.innerHTML = html;
   document.body.appendChild(m);
   const r = anchor.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight;
   const mw = m.offsetWidth, mh = m.offsetHeight;

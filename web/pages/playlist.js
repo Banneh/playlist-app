@@ -56,13 +56,72 @@ function incompatText(s) {
   return s;
 }
 
-/** the small tags every file line shares: needs tags · convert · MP3 · key (prepare.js has its own convert tip) */
+/* ---------- issue labels: a word, never a sentence ----------
+   A problem label is one word from a fixed list (Convert, Needs tags, Check name, Lossless) and
+   at most a short fact in mono ("24-BIT", "FLAC"); the sentence lives in the tooltip and in the
+   +N list. Two sizes: full (word and fact, the To do column and Prepare) and compact (icon and
+   fact, file lines). A file line shows at most two labels, most important first, then +N. */
+const ISSUE_ICON = { convert: 'sliders', tags: 'tag', name: 'alert', lossless: 'arrowUp' };
+/** the short fact for a file's incompat reason ("24-bit" > 24-BIT, "X unsupported" > X) */
+function incompatFact(s) {
+  let m = /^(\d+)-bit$/.exec(s); if (m) return m[1] + '-BIT';
+  m = /^([\d.]+) kHz$/.exec(s); if (m) return I18N.num(+m[1]) + ' KHZ';
+  if (s === 'WAV header') return t('tags.issue.wavHeader');
+  m = /^(\S+) unsupported$/.exec(s); if (m) return m[1] === 'UNKNOWN' ? '?' : m[1].toUpperCase();
+  return String(s || '').toUpperCase();
+}
+/** one problem label. kind: convert | tags | name | lossless; size: 'full' | 'compact';
+ *  click: an onclick attribute value (Check name opens its dialog) */
+function issueTag({ kind, label, fact = '', tip = '', size = 'full', click = '' }) {
+  const shortFact = fact.length > 12 ? fact.slice(0, 11) + '…' : fact;
+  const title = tip ? `${label}: ${tip}${shortFact !== fact ? ` (${fact})` : ''}` : label + (shortFact !== fact ? ` (${fact})` : '');
+  const cls = `itag ${size === 'compact' ? 'it-c' : 'it-f'}${kind === 'lossless' ? ' it-info' : ''}${click ? ' link' : ''}`;
+  const on = click ? ` onclick="event.stopPropagation();${esc(click)}"` : '';
+  const factHtml = fact ? `<span class="fact">${esc(shortFact)}</span>` : '';
+  return size === 'compact'
+    ? `<span class="${cls}" title="${esc(title)}" aria-label="${esc(label + (fact ? ' ' + fact : ''))}"${on}>${icon(ISSUE_ICON[kind])}${factHtml}</span>`
+    : `<span class="${cls}" title="${esc(title)}"${on}><span class="w"><i class="dot"></i>${esc(label)}</span>${factHtml}</span>`;
+}
+/** what a file line says about a file, most important first: problems (kind + word + fact + sentence),
+ *  then the labels that already fit (key, % match, MP3, matched by hand) as ready html.
+ *  opts: convertTip (Prepare names the player), name (include Check name, with its onclick) */
+function fileIssues(r, opts = {}) {
+  const out = [];
+  if (r.incompat) out.push({ kind: 'convert', label: t('tags.issue.convert'), fact: incompatFact(r.incompat),
+    tip: r.incompat === 'WAV header' ? t('tags.wavHeaderTip') : `${opts.convertTip || t('tags.convertTip')} (${incompatText(r.incompat)})` });
+  if (r.tagged === false) out.push({ kind: 'tags', label: t('tags.issue.tags'), tip: t('tags.needsTagsTip') });
+  if (opts.name && r.check_name) out.push({ kind: 'name', label: t('tags.issue.name'), tip: ncTip(r), click: opts.name });
+  if (r.upgrade) out.push({ kind: 'lossless', label: t('tags.issue.lossless'), tip: t('tags.losslessTip') });
+  if (r.key) out.push({ html: keyTag(r), tip: t(r.pn ? 'tags.keyTipPn' : 'tags.keyTip'), label: r.key });
+  if (!r.manual_match && r.score != null && r.score < 0.995) {
+    const pct = t('tags.pctMatch', { pct: Math.round(r.score * 100) });
+    out.push({ html: tag(pct, 'outline', '', t('tags.pctMatchTip')), tip: t('tags.pctMatchTip'), label: pct });
+  }
+  if (r.lossy) out.push({ html: tag('MP3', 'mono', '', t('tags.lossyTip')), tip: t('tags.lossyTip'), label: 'MP3' });
+  if (r.manual_match) out.push({ html: tag(t('tags.matchedByHand'), '', 'pin', t('tags.matchedByHandTip')), tip: t('tags.matchedByHandTip'), label: t('tags.matchedByHand') });
+  return out;
+}
+const issueHtml = (it, size) => it.kind ? issueTag({ ...it, size }) : it.html;
+/** at most `max` labels, then a +N button that lists every note on the file */
+function issueLine(items, size = 'compact', max = 2) {
+  if (!items.length) return '';
+  const shown = items.length > max ? items.slice(0, max) : items;
+  const more = items.length - shown.length;
+  return shown.map(it => issueHtml(it, size)).join('')
+    + (more ? `<button class="itag-more" onclick="event.stopPropagation();issuePop(this)" data-issues="${esc(JSON.stringify(items))}" aria-haspopup="dialog" title="${esc(tn('tags.issue.notes', items.length))}">+${more}</button>` : '');
+}
+/** the +N popover: every note in full size next to its sentence; a fix link for Convert / Needs tags */
+function issuePop(btn) {
+  let items = [];
+  try { items = JSON.parse(btn.dataset.issues || '[]'); } catch { /* nothing to show */ }
+  const fix = items.some(it => it.kind === 'convert' || it.kind === 'tags');
+  showPopover(btn, `<div class="pop-title">${esc(tn('tags.issue.notes', items.length))}</div>
+    ${items.map(it => `<div class="pop-note"><span class="pop-tag">${issueHtml(it, 'full')}</span><span class="pop-tx">${esc(it.tip || '')}</span></div>`).join('')}
+    ${fix ? `<a class="pop-link" href="#" onclick="event.preventDefault();closeMenu();go('prepare')">${esc(t('tags.issue.fix', { page: t('prepare.title') }))}</a>` : ''}`, { cls: 'pop-notes' });
+}
+/** Prepare and older callers: the full-size labels of a file's problems and MP3 */
 function fileIssueTags(r, convertTip) {
-  const tags = [];
-  if (r.tagged === false) tags.push(tag(t('tags.needsTags'), 'warn', 'tag', t('tags.needsTagsTip')));
-  if (r.incompat) tags.push(tag(t('tags.convert', { codec: incompatText(r.incompat) }), 'warn', 'sliders', r.incompat === 'WAV header' ? t('tags.wavHeaderTip') : convertTip || t('tags.convertTip')));
-  if (r.lossy) tags.push(tag('MP3', 'mono', '', t('tags.lossyTip')));
-  return tags;
+  return fileIssues({ incompat: r.incompat, tagged: r.tagged, lossy: r.lossy, upgrade: r.upgrade }, { convertTip }).map(it => issueHtml(it, 'full'));
 }
 const keyTag = r => r.key ? tag(r.key, 'outline', '', t(r.pn ? 'tags.keyTipPn' : 'tags.keyTip')) : '';
 
@@ -73,15 +132,10 @@ function fileLine(r) {
     if (r.in_inbox) return `<div class="t-file ib-pending link" onclick="go('inbox')" title="${esc(t('tags.inInboxTip'))}">${icon('inbox')}<span class="fn">${esc(t('tags.inInbox', { name: r.in_inbox.name }))}</span></div>`;
     return '';
   }
-  const tags = [];
-  if (r.manual_match) tags.push(tag(t('tags.matchedByHand'), '', 'pin', t('tags.matchedByHandTip')));
-  else if (r.score !== null && r.score < 0.995) tags.push(tag(t('tags.pctMatch', { pct: Math.round(r.score * 100) }), 'outline', '', t('tags.pctMatchTip')));
-  tags.push(...fileIssueTags(r));
-  if (r.upgrade) tags.push(tag(t('tags.lossless'), 'accent', 'arrowUp', t('tags.losslessTip')));
-  if (r.key) tags.push(keyTag(r));
+  const tags = issueLine(fileIssues(r), 'compact');
   const disp = r.file_disp || r.file;
   return `<div class="t-file">${playBtn(filePath(r, r.file), r.title, r.artist) || `<span class="ic">${icon('music')}</span>`}<span class="fn link" onclick="openAssign(${r.id})" title="${esc(t('tags.fileTip', { file: r.file }))}">${esc(disp)}</span>${
-    tags.length ? `<span class="tags">${tags.join('')}</span>` : ''}</div>`;
+    tags ? `<span class="tags">${tags}</span>` : ''}</div>`;
 }
 
 function statusPill(r) {
@@ -123,7 +177,7 @@ function trackRow(r) {
           r.is_new ? tag(t('tags.isNew'), 'new', '', t('tags.isNewTip', { date: fmtDate(r.added) })) : ''}${
           r.is_new_file ? tag(t('tags.newFile'), 'newfile', '', t('tags.newFileTip', { date: fmtDate(r.acquired) })) : ''}${
           r.edited ? tag(t('tags.edited'), 'outline', 'pencil', t('tags.editedTip')) : ''}${
-          r.check_name ? `<span class="link" onclick="openCheckNames('check', ${r.id})">${tag(t('tags.checkName'), 'warn', 'alert', ncTip(r))}</span>` : ''}</div>
+          r.check_name ? issueTag({ kind: 'name', label: t('tags.issue.name'), tip: ncTip(r), click: `openCheckNames('check', ${r.id})` }) : ''}</div>
         <div class="t-sub">${esc(r.artist)}${viaHtml(r)}</div>
         ${fileLine(r)}
       </div>
