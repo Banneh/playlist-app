@@ -69,7 +69,8 @@ PAGES.settings = {
            <span>${th('settings.inbox.undoHint')}</span></span>
        </label>` : ''}`);
 
-    const gates = stCard('bolt', 'amber', esc(t('settings.gates.title')), th('settings.gates.text'), stGatesControls(S));
+    // only with the gate switch (DJ_HQ_DOWNLOAD_BYPASS): which gate adapters run, and the walker
+    const gates = !APP.dl_bypass ? '' : stCard('bolt', 'amber', esc(t('settings.gates.title')), th('settings.gates.text'), stGatesControls(S));
 
     const A = DATA.aiff || { on: !!S.aiff_auto, wav: 0 };
     const aiff = stCard('image', 'green', esc(t('settings.aiff.title')),

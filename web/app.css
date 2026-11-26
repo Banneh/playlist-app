@@ -511,10 +511,16 @@ html.mac-inset .page-head { padding-top: 30px; }
 .cell.r { justify-content: flex-end; }
 .get { display: flex; align-items: center; gap: 6px; }
 .get .btn { width: 89px; padding: 0 6px; }
-.get .btn:only-child { margin-left: 95px; }     /* keeps Free DL in its own column when there is no Buy */
+.get a.btn:only-of-type { margin-left: 95px; }     /* keeps Free DL in its own column when there is no Buy */
 .get .btn.first { margin-left: 0; }
 .more { opacity: 1; color: var(--text-3); transition: color .12s; }
 .tr:hover .more, .more:focus-visible, .more[aria-expanded="true"] { color: var(--text); }
+/* developer mode: the provider a Free DL was recognised as, next to the button */
+body.devmode .thead, body.devmode .tr { grid-template-columns: 30px 40px minmax(0, 1fr) 48px 112px 284px 30px; }
+.dev-prov { flex-shrink: 0; max-width: 94px; height: 20px; line-height: 20px; padding: 0 6px; border-radius: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--mono); font-size: 10.5px; background: var(--surface-3); color: var(--text-3); }
+.dev-prov.own { background: var(--blue-soft); color: var(--blue); }   /* same blue as the Free DL the app fetches itself */
+.dev-prov.warn { background: var(--amber-soft); color: var(--amber); }
 /* a Missing row with no link at all: a quiet word in the Get it column */
 .get .nolink { color: var(--text-3); font-size: 12px; }
 
@@ -668,6 +674,7 @@ html.mac-inset .page-head { padding-top: 30px; }
    and Buy / Free DL stack vertically so the title keeps its room */
 @media (max-width: 1040px) {
   .thead, .tr { gap: 10px; grid-template-columns: 40px minmax(0, 1fr) 48px 104px 92px 30px; }
+  body.devmode .thead, body.devmode .tr { grid-template-columns: 40px minmax(0, 1fr) 48px 104px 92px 30px; }   /* the label stacks under the buttons */
   .thead .num, .tr .num { display: none; }
   .get { flex-direction: column; align-items: stretch; gap: 4px; }
   .get .btn, .get .btn:only-child { margin-left: 0; width: 92px; }

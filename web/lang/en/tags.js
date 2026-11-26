@@ -14,6 +14,8 @@ I18N.add('en', 'tags', {
     notFound: 'Not on Bandcamp',
     notFoundTip: 'Looked up on {date}. Settings > Bandcamp says when it is tried again',
     fmtLossless: 'lossless',
+    devNone: 'none: {host}',
+    devOff: '{id} (off)',
   },
   noFileByHand: 'Set to “no file” by hand',
   noFileByHandTip: 'Click to match a file',

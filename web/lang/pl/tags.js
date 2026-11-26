@@ -12,6 +12,8 @@ I18N.add('pl', 'tags', {
     notFound: 'Nie ma na Bandcamp',
     notFoundTip: 'Sprawdzono {date}. Kiedy ponowić, ustawisz w Ustawienia > Bandcamp',
     fmtLossless: 'bezstratny',
+    devNone: 'brak: {host}',
+    devOff: '{id} (wył.)',
   },
   noFileByHand: 'Ręcznie ustawiono „bez pliku”',
   noFileByHandTip: 'Kliknij, aby dopasować plik',

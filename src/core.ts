@@ -468,6 +468,14 @@ export const DO_ALL_FEATURE = /^(1|true|yes|on)$/i.test(
 export const DOWNLOAD_BYPASS = /^(1|true|yes|on)$/i.test(
   String(process.env.DJ_HQ_DOWNLOAD_BYPASS ?? process.env.dj_hq_download_bypass ?? "").trim());
 
+/** The feature switch for developer mode: each Free DL button shows, next to it, which download
+ *  provider the link was recognised as (a gate adapter, Hypeddit, a direct file or a shop), so a
+ *  whole list can be checked at a glance. Only when the environment has DJ_HQ_DEVELOPER_MODE=true
+ *  (also 1 / yes / on; the lower-case name works too). Read once at start: changing it needs a
+ *  restart. */
+export const DEV_MODE = /^(1|true|yes|on)$/i.test(
+  String(process.env.DJ_HQ_DEVELOPER_MODE ?? process.env.dj_hq_developer_mode ?? "").trim());
+
 /** The "Do everything" settings with defaults, and what keeps it from running, as stable
  *  codes. Only cheap existence checks: this runs on every view. */
 export function doAllStatus(): { do_all: Required<Omit<DoAll, "pn_mode" | "pn_mode_at" | "steps">> & { pn_mode: string | null; pn_mode_at: number | null; switched_off: boolean; steps: { pn: boolean; mik: boolean; xml: boolean } };
@@ -1885,14 +1893,25 @@ function wordKind(s: string): "free" | "buy" | null {
   return f ? "free" : b ? "buy" : null;
 }
 /** On a shop, "Download" or "DL" alone is just SoundCloud's stock button label, not a price:
- *  the link is only free when it says so ("free", "gratis"). */
-const freeOnShop = (s: string) => /\bfree\b|gratis/i.test(s);
+ *  the link is only free when it says so ("free", "gratis"). "Feel free to buy" is no price either. */
+const freeOnShop = (s: string) => /\bfree\b|gratis/i.test(s.replace(/\bfeel free\b|\bfree to\b/gi, " "));
+/** a line that holds a link of its own: its words are about that link */
+const hasLink = (s: string) => /https?:\/\/|www\.|\b[a-z0-9-]+\.(com|me|io|to|eu|co|pro|nz|link|net|org)\//i.test(s);
 
 /** Host is decisive for gates/file hosts; otherwise the words on the link's own
- *  line, then the line above ("FREE DOWNLOAD:\nhttps://..."), then shop hosts. */
-function classify(host: string, line: string, prev: string): "free" | "buy" | null {
+ *  line, then the line above ("FREE DOWNLOAD:\nhttps://..."), then shop hosts.
+ *  On a shop the own line wins ("Support:", "BUY THE WAV", "High quality DL here:"), the line
+ *  above only counts when it is a heading without a link of its own ("Free DL: hypeddit.com/x"
+ *  above "Bandcamp: x.bandcamp.com/track/y" is the gate's word, not the shop's), and an artist's
+ *  Bandcamp page is never the free file itself. */
+function classify(host: string, line: string, prev: string, url = ""): "free" | "buy" | null {
   if (FREE_HOSTS.test(host)) return "free";
-  if (SHOP_HOSTS.test(host)) return freeOnShop(line) || freeOnShop(prev) ? "free" : "buy";
+  if (SHOP_HOSTS.test(host)) {
+    if (BANDCAMP.test(host) && bandcampRoot(url)) return "buy";
+    if (freeOnShop(line)) return "free";
+    if (FREE_WORDS.test(line) || BUY_WORDS.test(line)) return "buy";
+    return !hasLink(prev) && freeOnShop(prev) ? "free" : "buy";
+  }
   return wordKind(line) || wordKind(prev) || null;
 }
 
@@ -1906,6 +1925,24 @@ export interface BuyLink {
   direct?: DirectKind;
   /** found by the Bandcamp search, not given by the uploader */
   found?: boolean;
+  /** developer mode, free links only: the provider the link was recognised as (a gate adapter's
+   *  id, "hypeddit", a direct kind like "drive"; "" when nothing handles it), and whether that
+   *  adapter is switched off in Settings → Gates */
+  provider?: string;
+  provider_off?: true;
+}
+
+/** Which download provider a free link goes to, for the developer-mode label next to Free DL.
+ *  Uses the same adapter registry as the download itself, ignoring the on/off switches. */
+function freeProvider(url: string, direct?: DirectKind): { provider: string; provider_off?: true } {
+  if (direct) return { provider: direct };
+  if (isHypeddit(url)) return { provider: "hypeddit" };
+  // lazy: the registry imports this module
+  const reg = require("./gates/registry") as typeof import("./gates/registry");
+  const id = reg.claims(url);
+  if (!id) return { provider: "" };
+  const off = STATE.settings?.gate_off;
+  return Array.isArray(off) && off.includes(id) ? { provider: id, provider_off: true } : { provider: id };
 }
 
 export type DirectKind = "drive" | "dropbox" | "file" | "soundcloud";
@@ -1963,6 +2000,7 @@ export function trackLinks(t: PlTrack): BuyLink[] {
     if (found) l.found = true;
     const direct = scDl ? "soundcloud" : kind === "free" ? directKind(url) : null;
     if (direct) l.direct = direct;
+    if (DEV_MODE && kind === "free") Object.assign(l, freeProvider(url, l.direct));
     const i = out.findIndex((o) => o.kind === kind);
     if (i < 0) out.push(l);
     else if (linkRank(l) > linkRank(out[i])) out[i] = l;
@@ -1977,7 +2015,7 @@ export function trackLinks(t: PlTrack): BuyLink[] {
   }
   for (const [url, line, prev] of t.desc_links || []) {
     const host = hostOf(url);
-    const kind = host ? classify(host, line, prev) : null;
+    const kind = host ? classify(host, line, prev, url) : null;
     if (!kind) continue;
     // tooltip: the words around the link; never a bare URL (e.g. the Instagram line above it)
     const words = (s: string) => s.replace(/(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?/gi, "")

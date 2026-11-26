@@ -274,7 +274,7 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
       if (req.url === "/api/app") {
         let version = "";
         try { version = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || ""; } catch {}
-        return json({ version, platform: process.platform, arch: process.arch, packaged: !!opts.packaged, sc: !!opts.sc, do_all: core.DO_ALL_FEATURE, dl_bypass: core.DOWNLOAD_BYPASS, gate_hosts: gates.hostSources() });
+        return json({ version, platform: process.platform, arch: process.arch, packaged: !!opts.packaged, sc: !!opts.sc, do_all: core.DO_ALL_FEATURE, dl_bypass: core.DOWNLOAD_BYPASS, dev_mode: core.DEV_MODE, gate_hosts: gates.hostSources() });
       }
       // static UI assets (web/app.css, web/app.js, web/pages/*.js)
       const rel = decodeURIComponent((req.url || "/").split("?")[0]);

@@ -900,7 +900,7 @@ function libraryMenu(anchor) {
 }
 
 /* ---------- updates: a daily look at the latest GitHub release ---------- */
-let APP = { version: '', platform: '', arch: '', packaged: false, do_all: false, dl_bypass: false, gate_hosts: [] };
+let APP = { version: '', platform: '', arch: '', packaged: false, do_all: false, dl_bypass: false, dev_mode: false, gate_hosts: [] };
 let UPDATE = null;   // { version, url, page, asset } once a newer release is known
 const UPD_KEY = 'updateDismissed';
 const RELEASES_API = 'https://api.github.com/repos/Banneh/playlist-app/releases/latest';
@@ -1001,6 +1001,7 @@ async function boot() {
     }
   });
   try { APP = await (await fetch('/api/app')).json(); } catch {}
+  document.body.classList.toggle('devmode', !!APP.dev_mode);   // widens the Get it column for the provider label
   try {
     DATA = await api('/api/state');
     if (PREFS.setupPending && (DATA.libraries || []).length && typeof SETUP !== 'undefined') SETUP = true;   // quit in the middle of "Before we start"
