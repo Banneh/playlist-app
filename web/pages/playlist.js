@@ -84,10 +84,12 @@ function issueTag({ kind, label, fact = '', tip = '', size = 'full', click = '' 
 }
 /** what a file line says about a file, most important first: problems (kind + word + fact + sentence),
  *  then the labels that already fit (key, % match, MP3, matched by hand) as ready html.
- *  opts: convertTip (Prepare names the player), name (include Check name, with its onclick) */
+ *  opts: convert (only Prepare: the player is picked there; elsewhere nobody knows what the file
+ *  will be played on, maybe a controller), convertTip (Prepare names the player), name (include
+ *  Check name, with its onclick) */
 function fileIssues(r, opts = {}) {
   const out = [];
-  if (r.incompat) out.push({ kind: 'convert', label: t('tags.issue.convert'), fact: incompatFact(r.incompat),
+  if (opts.convert && r.incompat) out.push({ kind: 'convert', label: t('tags.issue.convert'), fact: incompatFact(r.incompat),
     tip: r.incompat === 'WAV header' ? t('tags.wavHeaderTip') : `${opts.convertTip || t('tags.convertTip')} (${incompatText(r.incompat)})` });
   if (r.tagged === false) out.push({ kind: 'tags', label: t('tags.issue.tags'), tip: t('tags.needsTagsTip') });
   if (opts.name && r.check_name) out.push({ kind: 'name', label: t('tags.issue.name'), tip: ncTip(r), click: opts.name });
@@ -121,7 +123,7 @@ function issuePop(btn) {
 }
 /** Prepare and older callers: the full-size labels of a file's problems and MP3 */
 function fileIssueTags(r, convertTip) {
-  return fileIssues({ incompat: r.incompat, tagged: r.tagged, lossy: r.lossy, upgrade: r.upgrade }, { convertTip }).map(it => issueHtml(it, 'full'));
+  return fileIssues({ incompat: r.incompat, tagged: r.tagged, lossy: r.lossy, upgrade: r.upgrade }, { convert: true, convertTip }).map(it => issueHtml(it, 'full'));
 }
 const keyTag = r => r.key ? tag(r.key, 'outline', '', t(r.pn ? 'tags.keyTipPn' : 'tags.keyTip')) : '';
 

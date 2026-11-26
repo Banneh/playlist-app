@@ -11,7 +11,7 @@ I18N.add('en', 'coll', {
   search: 'Search the collection…',
   rescanTip: 'Read the collection folders again',
   chip: { unmatched: 'In no playlist' },
-  state: { all: 'All', unmatched: 'No playlist', tags: 'Tags', convert: 'Convert' },
+  state: { all: 'All', unmatched: 'No playlist', tags: 'Tags' },
   in: {
     label: 'In', all: 'All', allLong: 'All playlists and folders', find: 'Find a playlist or folder…',
     playlists: 'Playlists', folders: 'Folders', empty: 'empty', clear: 'Show all playlists and folders',

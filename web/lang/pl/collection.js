@@ -10,7 +10,7 @@ I18N.add('pl', 'coll', {
   search: 'Szukaj w kolekcji…',
   rescanTip: 'Przeczytaj foldery kolekcji jeszcze raz',
   chip: { unmatched: 'Poza playlistami' },
-  state: { all: 'Wszystkie', unmatched: 'Bez playlisty', tags: 'Tagi', convert: 'Konwersja' },
+  state: { all: 'Wszystkie', unmatched: 'Bez playlisty', tags: 'Tagi' },
   in: {
     label: 'W', all: 'Wszystkie', allLong: 'Wszystkie playlisty i foldery', find: 'Znajdź playlistę lub folder…',
     playlists: 'Playlisty', folders: 'Foldery', empty: 'pusty', clear: 'Pokaż wszystkie playlisty i foldery',

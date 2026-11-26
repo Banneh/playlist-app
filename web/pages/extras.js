@@ -1,6 +1,7 @@
 /* Page: Collection — every audio file of the collection's folders, with what the playlists
    make of each one (matched to a track, found on SoundCloud, or unmatched). Two filters a file
-   must pass both of: the state rail (CSTATE: all, in no playlist, needs tags, needs convert)
+   must pass both of: the state rail (CSTATE: all, in no playlist, needs tags; converting is
+   Prepare's business, where the player is picked)
    and "In" (CIN: everything, one playlist, or one collection folder). A file can be looked up on SoundCloud
    (Find dialog / Find all); once the user adds the track to the playlist there, the next
    refresh matches the file.
@@ -9,7 +10,7 @@
 
 let COLL = null;      // last /api/collection/view
 let COLL_BUSY = false;
-let CSTATE = 'all';   // 'all' | 'unmatched' | 'tags' | 'convert'
+let CSTATE = 'all';   // 'all' | 'unmatched' | 'tags'
 let CIN = '';         // '' | 'lib:<id>' | 'root:<id>'
 
 async function loadCollection({ quiet = false } = {}) {
@@ -26,8 +27,7 @@ const coMatches = (f, q) => !q || (f.artist + ' ' + f.title + ' ' + f.disp + ' '
   + ' ' + (f.in || []).map(u => u.track + ' ' + u.name).join(' ')).toLowerCase().includes(q);
 const coState = (f, st = CSTATE) => st === 'all' ? true
   : st === 'unmatched' ? f.unmatched
-  : st === 'tags' ? f.tagged === false
-  : !!f.incompat;
+  : f.tagged === false;
 const coIn = (f, cin = CIN) => !cin ? true
   : cin.startsWith('lib:') ? (f.in || []).some(u => u.lib === cin.slice(4))
   : f.root === cin.slice(5);
@@ -302,7 +302,8 @@ PAGES.collection = {
     const q = Q.trim().toLowerCase();
     // the rail's counts follow "In" and the search
     const fs = COLL.files.filter(f => coMatches(f, q) && coIn(f));
-    const st = ['all', 'unmatched', 'tags', 'convert'].map(k => [k, fs.filter(f => coState(f, k)).length]);
+    if (!['all', 'unmatched', 'tags'].includes(CSTATE)) CSTATE = 'all';
+    const st = ['all', 'unmatched', 'tags'].map(k => [k, fs.filter(f => coState(f, k)).length]);
     return '<div class="chips co-rail" role="radiogroup">' + st.map(([k, n]) =>
       `<button class="chip${CSTATE === k ? ' on' : ''}" role="radio" aria-checked="${CSTATE === k}" ${n || CSTATE === k ? '' : 'disabled'} onclick="CSTATE='${k}';renderTop()">${esc(t('coll.state.' + k))}<span class="n">${n}</span></button>`).join('')
       + '</div>' + coInButton(q);
