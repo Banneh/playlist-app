@@ -471,10 +471,15 @@ export const DOWNLOAD_BYPASS = /^(1|true|yes|on)$/i.test(
 /** The feature switch for developer mode: each Free DL button shows, next to it, which download
  *  provider the link was recognised as (a gate adapter, Hypeddit, a direct file or a shop), so a
  *  whole list can be checked at a glance. Only when the environment has DJ_HQ_DEVELOPER_MODE=true
- *  (also 1 / yes / on; the lower-case name works too). Read once at start: changing it needs a
+ *  (also 1 / yes / on; the lower-case name works too) or the build baked it in. Read once at start: changing it needs a
  *  restart. */
 export const DEV_MODE = /^(1|true|yes|on)$/i.test(
-  String(process.env.DJ_HQ_DEVELOPER_MODE ?? process.env.dj_hq_developer_mode ?? "").trim());
+  String(process.env.DJ_HQ_DEVELOPER_MODE ?? process.env.dj_hq_developer_mode ?? "").trim()) || bakedDevMode();
+/** a build can switch developer mode on for good: electron-builder -c.extraMetadata.djhq_dev_mode=true
+ *  writes it into the app's package.json (the repo's own package.json never has it) */
+function bakedDevMode(): boolean {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).djhq_dev_mode === true; } catch { return false; }
+}
 
 /** The "Do everything" settings with defaults, and what keeps it from running, as stable
  *  codes. Only cheap existence checks: this runs on every view. */
