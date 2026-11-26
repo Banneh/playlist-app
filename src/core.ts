@@ -178,6 +178,10 @@ export interface AppState {
    *  under the name `sig` and not found. `free`: a free download there. `no`: pages the user said
    *  are not this track */
   bandcamp?: Record<string, { at: number; sig: string; v?: number; url?: string; title?: string; free?: true; no?: string[] }>;
+  /** the link on the release card of a track's new SoundCloud page ("LA MENTE · Digital · FREE DL"),
+   *  by track id: read from the page while it is open in Discover (see scCardSeen), since api-v2
+   *  does not have it. `title`: the words on the card's button */
+  sc_card?: Record<string, { url: string; title: string; at: number }>;
   /** folder watched for fresh downloads; default ~/Downloads */
   inbox_dir?: string;
   /** user settings (see getSettings) */
@@ -1845,6 +1849,8 @@ export function gateHosts(): Array<{ host: string; count: number; sample: string
   for (const lib of STATE.libraries) for (const t of lib.playlist?.tracks || []) {
     if (t.buy_url) add(t.buy_url);
     for (const [url] of t.desc_links || []) add(url);
+    const card = STATE.sc_card?.[String(t.id)];
+    if (card) add(card.url);
   }
   // lazy: the registry imports this module
   const reg = require("./gates/registry") as typeof import("./gates/registry");
@@ -2036,10 +2042,76 @@ export function trackLinks(t: PlTrack): BuyLink[] {
     const ctx = words(line) || words(prev);
     add(url, kind, ctx.slice(0, 80), host);
   }
+  const card = STATE.sc_card?.[String(t.id)];
+  if (card) {
+    const host = hostOf(card.url), kind = host ? cardKind(card.url, card.title) : null;
+    if (kind) add(card.url, kind, card.title, host);
+  }
   if (t.sc_dl && t.url) add(t.url, "free", "Download on SoundCloud", "soundcloud.com", true);
   const bc = bandcampFound(t.id);
   if (bc?.url) add(bc.url, bc.free ? "free" : "buy", bc.title || "", hostOf(bc.url), false, true);
   return out.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "buy" ? -1 : 1));
+}
+
+/** SoundCloud's redirect around an outside link (gate.sc / exit.sc ?url=): the link itself */
+function unwrapSc(url: string): string {
+  try {
+    const u = new URL(url);
+    if (!/^(gate\.sc|exit\.sc)$/i.test(u.hostname.replace(/^www\./, ""))) return url;
+    const to = u.searchParams.get("url") || "";
+    return /^https?:\/\//i.test(to) ? to : "";
+  } catch { return ""; }
+}
+/** What a link on a release card is: like the uploader's purchase button, a gate or file host is
+ *  a free download whatever the button says; anywhere else the button's words must say free or
+ *  buy (the page around the card has other short links too, the uploader's profile links among
+ *  them). Socials, an artist's Bandcamp page and pre-saves are never the card's link. */
+function cardKind(url: string, words: string): "free" | "buy" | null {
+  const host = hostOf(url);
+  if (!host || NOISE_HOSTS.test(host) || isPresave(url) || PRESAVE_WORDS.test(words)) return null;
+  if (FREE_HOSTS.test(host)) return "free";
+  if (SHOP_HOSTS.test(host)) {
+    if (BANDCAMP.test(host) && bandcampRoot(url)) return null;
+    return freeOnShop(words) ? "free" : FREE_WORDS.test(words) || BUY_WORDS.test(words) ? "buy" : null;
+  }
+  return wordKind(words);
+}
+
+/** The links Discover read off the release card of a track's new SoundCloud page (main.ts):
+ *  `path` is the track's address on soundcloud.com, `h1` the title the page shows, `links` the
+ *  short labelled outside links on it ([address as the page has it, its words]). The card's link
+ *  (a free one before a buy one) is kept for the track, by id, so a playlist refresh keeps it; the
+ *  title must match the track's, or the frame was still showing the page it left. Resolves true
+ *  when a track's links changed. */
+export async function scCardSeen(path: string, h1: string, links: [string, string][]): Promise<boolean> {
+  if (!/^\/[^\/]+\/[^\/]+$/.test(path)) return false;
+  let best: { url: string; title: string; kind: "free" | "buy" } | null = null;
+  for (const [href, text] of links.slice(0, 40)) {
+    const url = unwrapSc(String(href || "")), title = String(text || "").replace(/\s+/g, " ").trim().slice(0, 80);
+    const kind = url ? cardKind(url, title) : null;
+    if (kind && (!best || (best.kind === "buy" && kind === "free"))) best = { url, title, kind };
+  }
+  if (!best) return false;
+  const pageUrl = "https://soundcloud.com" + path;
+  const same = (t: { title: string }) => compact(t.title) === compact(h1);
+  const byPath = (u: string) => { try { return decodeURI(new URL(u).pathname).replace(/\/+$/, "").toLowerCase() === decodeURI(path).toLowerCase(); } catch { return false; } };
+  const ids = new Set<number>();
+  for (const t of [...STATE.libraries.flatMap((l) => l.playlist?.tracks || []), ...(likesSnap?.tracks || [])])
+    if (byPath(t.url) && same(t)) ids.add(t.id);
+  if (!ids.size) {
+    // a track in no list yet: kept too, for when it is added
+    const t = await scNow(pageUrl).catch(() => null);
+    if (t && same(t)) ids.add(t.id);
+  }
+  let changed = false;
+  for (const id of ids) {
+    const cur = STATE.sc_card?.[String(id)];
+    if (cur && cur.url === best.url && cur.title === best.title) continue;
+    (STATE.sc_card ||= {})[String(id)] = { url: best.url, title: best.title, at: Date.now() };
+    changed = true;
+  }
+  if (changed) saveState();
+  return changed;
 }
 
 /** One of a track's links, by its address: the only thing a download request may name. The track
@@ -2082,7 +2154,7 @@ export async function bandcampWanted(id?: string): Promise<{ id: number; artist:
     if (id === undefined && (good || (r.have && !r.lossy))) continue;
     const slug = /soundcloud\.com\/([^/?#]+)/i.exec(t.url || "")?.[1] || "";
     const names = [...new Set([...nameParts(r.artist), r.artist, ...uploaderNames(t)].map((n: string) => n.trim()).filter((n) => compact(n)))];
-    const hosts = [...new Set([t.buy_url || "", ...(t.desc_links || []).map((d) => d[0])].map(hostOf).filter((h) => /\.bandcamp\.com$/i.test(h)))];
+    const hosts = [...new Set([t.buy_url || "", STATE.sc_card?.[String(t.id)]?.url || "", ...(t.desc_links || []).map((d) => d[0])].map(hostOf).filter((h) => /\.bandcamp\.com$/i.test(h)))];
     out.push({ row: r, w: { id: t.id, artist: r.artist, title: r.title, names, dur: t.dur, prio: r.have ? 2 : r.links.length ? 1 : 0, profile: slug ? "https://soundcloud.com/" + slug : "", hosts } });
   }
   return out.sort((a, b) => Number(a.row.have) - Number(b.row.have) || (b.row.added || 0) - (a.row.added || 0)).map((x) => x.w);

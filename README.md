@@ -63,7 +63,9 @@ Everything else builds on that:
 
 - **Missing** lists every playlist track that isn't in your folder yet, with a
   **Free DL** or **Buy** button that opens the download gate or the shop. Links are found in the track's download button *and* in its
-  description.
+  description. Some uploaders put the link only on the release card of
+  SoundCloud's new track page; DJ HQ reads that card when you open the track
+  on the Discover page.
 - **Have** shows the file behind each track you own, and flags anything that
   still needs tags, conversion, or could be upgraded from MP3 to lossless.
 - **New** collects tracks added to the playlist and files that arrived in your
@@ -704,7 +706,9 @@ them into a new database.
   file, or choose *No file*. The status pill lets you set Have or Missing by
   hand.
 - **No Free DL or Buy button on a track.** The uploader set no purchase link
-  and wrote none in the description, and the track was not found on Bandcamp. The **⋯** menu still opens the track on
+  and wrote none in the description, and the track was not found on Bandcamp. If SoundCloud
+  shows a Free DL button on the track's page, open the track on the Discover page once and the
+  button appears in DJ HQ too. The **⋯** menu still opens the track on
   SoundCloud.
 - **Find on SoundCloud finds nothing.** Try shorter search text and drop the
   remix part. Some edits aren't on SoundCloud at all; **⋯ > Search on

@@ -58,7 +58,9 @@ którego utworu, porównując nazwy i długości. Wszystko inne opiera się na t
 - **Brakujące** wypisuje każdy utwór z playlisty, którego jeszcze nie ma
   w twoim folderze, z przyciskiem **Za darmo** albo **Kup**, który otwiera
   bramkę pobierania albo sklep. Linki są szukane w przycisku
-  pobierania utworu *i* w jego opisie.
+  pobierania utworu *i* w jego opisie. Niektórzy wgrywający dają link tylko
+  na karcie wydania w nowej stronie utworu SoundCloud; DJ HQ odczytuje tę
+  kartę, gdy otworzysz utwór na stronie Discover.
 - **Mam** pokazuje plik każdego utworu, który masz, i oznacza
   wszystko, co jeszcze wymaga tagów, konwersji albo można podmienić z MP3 na
   plik bezstratny.
@@ -738,7 +740,9 @@ nowej bazy danych.
   właściwy plik albo *Bez pliku*. Status pozwala ręcznie ustawić Mam albo
   Brak.
 - **Utwór nie ma przycisku Za darmo ani Kup.** Wgrywający nie ustawił linku do
-  zakupu i nie podał go w opisie, a na Bandcamp utworu nie znaleziono. Menu **⋯** nadal otwiera utwór na
+  zakupu i nie podał go w opisie, a na Bandcamp utworu nie znaleziono. Jeśli SoundCloud
+  pokazuje na stronie utworu przycisk Free DL, otwórz utwór raz na stronie Discover, a przycisk
+  pojawi się też w DJ HQ. Menu **⋯** nadal otwiera utwór na
   SoundCloud.
 - **Znajdź na SoundCloud nic nie znajduje.** Spróbuj krótszego tekstu i usuń
   część z remiksem. Niektórych wersji w ogóle nie ma na SoundCloud; **⋯ >

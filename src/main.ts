@@ -113,6 +113,10 @@ function scEnsure(): WebContentsView {
   // reports them through the console (the view is sandboxed, with no preload), and they are
   // handed to the UI's dcKey(), the same place that handles keys pressed on the app's own page
   wc.on("dom-ready", () => { scEval(SC_KEYS_JS); });
+  // a track page opened (in the frame of the new page too): its release card may hold a link
+  wc.on("did-navigate", scCardWatch);
+  wc.on("did-navigate-in-page", scCardWatch);
+  wc.on("did-frame-navigate", scCardWatch);
   wc.on("console-message", (e) => {
     const m = /^djhq:key:(.+)$/.exec(e.message || "");
     if (m && win) win.webContents.executeJavaScript(`typeof dcKey === "function" && dcKey(${JSON.stringify(m[1])})`, true).catch(() => {});
@@ -285,6 +289,57 @@ async function scGo(v: WebContentsView, url: string, play?: boolean) {
     setTimeout(step, 250);
   };
   step();
+}
+
+/** The release card of SoundCloud's new track page ("LA MENTE · Digital · FREE DL"): its button is
+ *  the only place some uploaders put their free download, api-v2 does not have it. The new page is
+ *  in its frame (iframe.webiIframe at /n/<path>, generated class names, see scStartJs), so what is
+ *  read is every outside link there with a short label of words: the card's button, and the profile
+ *  links beside it, which core.scCardSeen sorts out. Links whose text is an address (the
+ *  description's, the comments') are left out. The page's h1 goes along: while it loads, the frame
+ *  shows another page under the new address, and core checks the title against the track's. */
+const SC_CARD_JS = `(() => {
+  const out = [];
+  for (const f of document.querySelectorAll('iframe.webiIframe')) {
+    let d = null;
+    try { d = f.contentDocument; } catch {}
+    if (!d || !d.body || !d.title || !f.getBoundingClientRect().width) continue;
+    const m = /^\\/n(\\/[^\\/]+\\/[^\\/]+)\\/?$/.exec(d.location.pathname);
+    const h = d.querySelector('h1');
+    if (!m || !h || h.closest('a')) continue;   // not a track page, or a track that is not there
+    const links = [];
+    for (const a of d.querySelectorAll('a[href]')) {
+      let u;
+      try { u = new URL(a.href); } catch { continue; }
+      if (!/^https?:$/.test(u.protocol) || /(^|\\.)(soundcloud\\.com|sndcdn\\.com)$/i.test(u.hostname)) continue;
+      const text = (a.textContent || '').replace(/\\s+/g, ' ').trim() || a.getAttribute('aria-label') || '';
+      if (!text || text.length > 80 || /https?:|www\\.|[a-z0-9-]\\.[a-z]{2,}(\\/|$)/i.test(text)) continue;
+      links.push([a.href, text]);
+      if (links.length >= 40) break;
+    }
+    if (links.length) out.push({ path: decodeURI(m[1]), h1: h.textContent.trim(), links });
+  }
+  return out;
+})()`;
+/** After a page opened in the view: look at it for a while (the new page draws its card late),
+ *  and hand what a release card links to over to core. A newer page starts its own look. */
+let scCardSeq = 0;
+const scCardDone = new Set<string>();
+function scCardWatch() {
+  const seq = ++scCardSeq, t0 = Date.now();
+  const step = async () => {
+    if (seq !== scCardSeq || !scView) return;
+    const found = await scEval<{ path: string; h1: string; links: [string, string][] }[]>(SC_CARD_JS);
+    for (const c of Array.isArray(found) ? found : []) {
+      const key = JSON.stringify(c);
+      if (scCardDone.has(key)) continue;
+      scCardDone.add(key);
+      if (scCardDone.size > 200) scCardDone.delete(scCardDone.values().next().value!);
+      core.scCardSeen(c.path, c.h1, c.links).catch((e) => console.error("[sc-card]", e));
+    }
+    if (Date.now() - t0 < 15000) setTimeout(step, 1500);
+  };
+  setTimeout(step, 1000);
 }
 
 /** keys the Discover page handles (see DC_KEYS in web/pages/discover.js): forwarded from the
