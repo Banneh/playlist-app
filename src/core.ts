@@ -2005,6 +2005,9 @@ export function trackLinks(t: PlTrack): BuyLink[] {
   const out: BuyLink[] = [];
   const add = (url: string, kind: "free" | "buy", title: string, host: string, scDl = false, found = false) => {
     if (out.some((o) => o.url === url)) return;
+    // Bandcamp is always Buy: a paid release is, and a name-your-price one is too (pay the artist
+    // what you can, even if 0 is allowed), so DJ HQ never offers it as a free download
+    if (BANDCAMP.test(host)) kind = "buy";
     const l: BuyLink = { url, kind, label: kind === "free" ? "Free DL" : "Buy", title, host, fmt: fmtHint(title, host) };
     if (scDl) l.sc_dl = true;
     if (found) l.found = true;
