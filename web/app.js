@@ -261,7 +261,8 @@ const isHypeddit = (url) => {
   } catch { return false; }
 };
 
-/** Download a free link into the downloads folder without a browser. A direct link (Drive, Dropbox,
+/** Download a free link into the downloads folder without a browser. opts.bulk (Download all): no
+ *  toast and no browser fallback per link, and the outcome comes back as 'ok', 'nofile' or 'failed'. A direct link (Drive, Dropbox,
  *  an audio file, SoundCloud's download button; opts.id is its track) is fetched as it is. A Hypeddit
  *  gate is walked in the app's hidden window: the gate's skip steps are taken and the email step is
  *  filled from Settings. The button shows a spinner while it runs. Returns false when the link is not
@@ -273,6 +274,7 @@ async function freeDownload(url, btn, opts = {}) {
   if (btn) { btn.classList.add('busy'); btn.dataset.was = btn.innerHTML; btn.innerHTML = '<span class="spin"></span>'; }
   let name = opts.name || (btn && btn.dataset.name);
   if (!name) try { name = decodeURIComponent(url.split(/[?#]/)[0].split('/').filter(Boolean).pop() || url); } catch { name = url; }
+  let out = 'failed';
   try {
     const r = await qTask(t('app.queue.download', { name }), async (task) => {
       const r = id ? await api('/api/direct-download', { id, url }) : await api('/api/free-download', { url });
@@ -280,16 +282,19 @@ async function freeDownload(url, btn, opts = {}) {
       else if (!r.unsupported) { task.status = 'failed'; task.msg = t('app.queue.noFile'); }
       return r;
     });
-    if (r.unsupported) return false;   // no Electron window (headless): let the browser have it
+    if (r.unsupported) return opts.bulk ? 'failed' : false;   // no Electron window (headless): let the browser have it
+    out = r.file ? 'ok' : 'nofile';
+    if (opts.bulk) return out;
     if (r.file) toast(t('app.freedl.saved', { name: r.file.split(/[\\/]/).pop() }), false, 8000);
     else { toast(t(id ? 'app.freedl.noFileDirect' : 'app.freedl.noFile')); window.open(url, '_blank', 'noopener'); }
   } catch (e) {
+    if (opts.bulk) return 'failed';
     toast(t('app.freedl.failed', { msg: errText(e) }), true);
     window.open(url, '_blank', 'noopener');   // it did not work out: let the user have the page
   } finally {
     if (btn) { btn.classList.remove('busy'); if (btn.dataset.was) btn.innerHTML = btn.dataset.was; }
   }
-  return true;
+  return opts.bulk ? out : true;
 }
 
 // one listener for every Free DL button that carries data-freedl (the playlist rows)

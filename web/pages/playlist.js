@@ -272,6 +272,49 @@ function openAssign(id) {
   });
 }
 
+/* ---------- Download all: with the gate switch (DJ_HQ_DOWNLOAD_BYPASS) only ----------
+   Every shown track whose Free DL the app fetches itself (a gate it knows, a direct file), one after
+   another so the gates see one visitor, as one task in the Queue. Pressed again it stops after the
+   current file. A link that gives no file keeps its row and its button, nothing opens in the browser. */
+let DLALL = null;   // { stop } while a run goes
+const dlAllItems = rows => rows.map(r => ({ r, l: (r.links || []).find(x => x.kind === 'free') }))
+  .filter(({ r, l }) => !r.have && l && (isDirect(l) || isHypeddit(l.url)));
+function dlAllButton(rows) {
+  if (!APP.dl_bypass) return '';
+  if (DLALL) return `<button class="btn btn-ghost btn-sm" onclick="downloadAll()" title="${esc(t('playlist.missing.dlAllStopTip'))}"><span class="spin"></span>${esc(t('playlist.missing.dlAllStop'))}</button>`;
+  const n = dlAllItems(rows).length;
+  return `<button class="btn btn-ghost btn-sm" onclick="downloadAll()" ${n ? '' : 'disabled'} title="${esc(t('playlist.missing.dlAllTip'))}">${icon('download')}${esc(tn('playlist.missing.dlAll', n))}</button>`;
+}
+const dlAllTools = () => { if (PAGE === 'missing') { const el = $('#ph-tools'); if (el) el.innerHTML = PAGES.missing.tools(); } };
+async function downloadAll() {
+  if (DLALL) { DLALL.stop = true; return; }
+  const items = dlAllItems(LAST_ROWS);
+  if (!items.length) return;
+  const run = DLALL = { stop: false };
+  dlAllTools();
+  let ok = 0, bad = 0;
+  try {
+    await qTask(tn('playlist.missing.dlAllTask', items.length), async (task) => {
+      task.total = items.length;
+      for (const { r, l } of items) {
+        if (run.stop) break;
+        // the row may have been drawn again meanwhile: its button now, for the spinner
+        const btn = [...document.querySelectorAll('a[data-freedl]')].find(a => a.dataset.freedl === l.url) || null;
+        const res = await freeDownload(l.url, btn, { id: isDirect(l) ? r.id : '', name: [r.artist, r.title].filter(Boolean).join(' - '), bulk: true });
+        if (res === 'ok') ok++; else bad++;
+        task.done++; qRender();
+      }
+      task.msg = t('playlist.missing.dlAllResult', { ok, bad });
+      if (!ok && bad) task.status = 'failed';
+    });
+  } catch { /* the task shows it */ }
+  finally {
+    DLALL = null;
+    dlAllTools();
+    toast(t(run.stop ? 'playlist.missing.dlAllStopped' : 'playlist.missing.dlAllDone', { ok, bad }), !ok && bad > 0, 8000);
+  }
+}
+
 /* ---------- copy links ---------- */
 function copyLinks() {
   const rows = LAST_ROWS.filter(r => r.links.length);
@@ -472,7 +515,7 @@ PAGES.missing = {
     const withLink = shown.filter(r => r.links.length).length;
     return chipsHtml('MFILTER', MFILTER, [['all', 'tags.chip.all', n.all], ['free', 'playlist.missing.chip.free', n.free, 'download'], ['buy', 'playlist.missing.chip.buy', n.buy, 'bag'],
       ['none', 'playlist.missing.chip.none', n.none], ['names', 'playlist.missing.chip.names', n.names, 'alert']])
-      + `<span class="spacer"></span><button class="btn btn-ghost btn-sm" onclick="copyLinks()" ${withLink ? '' : 'disabled'} title="${esc(t('playlist.missing.copyTip'))}">${icon('copy')}${esc(tn('playlist.missing.copy', withLink))}</button>`;
+      + `<span class="spacer"></span>${dlAllButton(shown)}<button class="btn btn-ghost btn-sm" onclick="copyLinks()" ${withLink ? '' : 'disabled'} title="${esc(t('playlist.missing.copyTip'))}">${icon('copy')}${esc(tn('playlist.missing.copy', withLink))}</button>`;
   },
   body: q => {
     let rows = DATA.tracks.filter(r => !r.have && !r.na && matchesQ(r, q));
