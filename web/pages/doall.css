@@ -107,6 +107,11 @@
 
 /* Settings card */
 .da-st-rows { width: 100%; display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+/* the three optional steps of the run as small switches */
+.da-steps { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 7px; margin: 2px 0; }
+.da-steps > .da-st-l { flex: none; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+.da-steps .st-switch { margin: 0; width: auto; }
+.da-steps-hint { font-size: 11.5px; color: var(--text-3); }
 .da-st-l { flex: 0 0 170px; font-size: 12.5px; color: var(--text-2); }
 .da-st-rows .path { font-size: 11.5px; }
 .da-path-plain { background: transparent; padding-left: 0; }

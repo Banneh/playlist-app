@@ -229,6 +229,19 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
             res.end(text);
           }, (e) => json(errBody(e), 500));
       }
+      if ((req.url || "").startsWith("/api/cover?")) {   // the cover embedded in a local file (Collection page)
+        const q = new URL(req.url || "", "http://x").searchParams;
+        const p = path.resolve(String(q.get("path") || ""));
+        const ok = core.allowedDirs().some((d) => p.startsWith(d + path.sep));
+        if (!ok || !fs.existsSync(p) || !fs.statSync(p).isFile()) return send(404, "text/plain", "not found");
+        return void core.coverFile(p).then((img) => {
+          if (!img) return send(404, "text/plain", "no cover");
+          const buf = fs.readFileSync(img);
+          const type = buf[0] === 0x89 ? "image/png" : "image/jpeg";
+          res.writeHead(200, { "Content-Type": type, "Content-Length": buf.length, "Cache-Control": "max-age=86400" });
+          res.end(buf);
+        }, () => send(404, "text/plain", "no cover"));
+      }
       if ((req.url || "").startsWith("/api/file?")) {   // stream a local audio file for the in-app preview
         const q = new URL(req.url || "", "http://x").searchParams;
         const p = path.resolve(String(q.get("path") || ""));

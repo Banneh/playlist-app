@@ -184,6 +184,9 @@ export interface AppState {
   settings?: { auto_move?: boolean; refresh_min?: number; like_on_add?: boolean; sc_open?: "discover" | "browser"; do_all?: DoAll;
                /** WAV files DJ HQ moves into a library become AIFF files (wavToAiff); off by default */
                aiff_auto?: boolean;
+               /** what Convert does with a format the player can't read at all: a copy in this
+                *  format next to the file ("aiff" is the default), or "skip" to leave it alone */
+               convert_rules?: { flac?: string; alac?: string; other?: string };
                /** look for missing tracks on Bandcamp in the background; on unless false */
                bandcamp?: boolean;
                /** days until a track not found there is looked up again; 0 = never (default 14) */
@@ -211,6 +214,10 @@ export interface DoAll {
   mik_db?: string;
   /** the rekordbox XML rekordbox imports from: tracks and keys are merged into it */
   rb_xml?: string;
+  /** which optional steps the run performs (each defaults to on): Platinum Notes,
+   *  Mixed In Key and the rekordbox XML; a step switched off is skipped whole and
+   *  its setup fields neither block the run nor show in Settings */
+  steps?: { pn?: boolean; mik?: boolean; xml?: boolean };
   /** quit Platinum Notes / Mixed In Key after their step, when DJ HQ started them (default on) */
   close_apps?: boolean;
   /** macOS: press Start Processing in Platinum Notes for the user (needs Accessibility; default off) */
@@ -451,27 +458,34 @@ export const DOWNLOAD_BYPASS = /^(1|true|yes|on)$/i.test(
 
 /** The "Do everything" settings with defaults, and what keeps it from running, as stable
  *  codes. Only cheap existence checks: this runs on every view. */
-export function doAllStatus(): { do_all: Required<Omit<DoAll, "pn_mode" | "pn_mode_at">> & { pn_mode: string | null; pn_mode_at: number | null; switched_off: boolean };
+export function doAllStatus(): { do_all: Required<Omit<DoAll, "pn_mode" | "pn_mode_at" | "steps">> & { pn_mode: string | null; pn_mode_at: number | null; switched_off: boolean; steps: { pn: boolean; mik: boolean; xml: boolean } };
                                  do_all_ready: boolean; do_all_missing: string[]; do_all_optional: string[] } {
   const d: DoAll = STATE.settings?.do_all || {};
   const exists = (p?: string) => { try { return !!p && fs.existsSync(p); } catch { return false; } };
   const missing: string[] = [], optional: string[] = [];
-  if (!d.pn_app) missing.push("pn_app_missing"); else if (!exists(d.pn_app)) missing.push("pn_app_not_found");
-  if (!d.mik_app) missing.push("mik_app_missing"); else if (!exists(d.mik_app)) missing.push("mik_app_not_found");
-  if (!d.rb_xml) missing.push("rb_xml_missing");
-  else if (!exists(d.rb_xml)) missing.push("rb_xml_not_found");
-  else if (isExportXml(d.rb_xml)) missing.push("rb_xml_is_export");
-  else { try { fs.accessSync(d.rb_xml, fs.constants.R_OK | fs.constants.W_OK); } catch { missing.push("rb_xml_not_writable"); } }
-  if (!d.pn_mode) missing.push("pn_mode_unchecked");
-  else if (d.pn_mode === "other") missing.push("pn_mode_wrong");
-  else if (d.pn_mode === "unknown" && !d.pn_replace_confirmed) missing.push("pn_mode_unknown");
-  if (!d.mik_db) optional.push("mik_db_missing"); else if (!exists(d.mik_db)) optional.push("mik_db_not_found");
+  // which optional steps are part of the run; a step switched off needs no setup at all
+  const st = { pn: d.steps?.pn !== false, mik: d.steps?.mik !== false, xml: d.steps?.xml !== false };
+  if (st.pn) { if (!d.pn_app) missing.push("pn_app_missing"); else if (!exists(d.pn_app)) missing.push("pn_app_not_found"); }
+  // Mixed In Key is optional: with no app set, its step is skipped
+  if (st.mik) { if (!d.mik_app) optional.push("mik_app_missing"); else if (!exists(d.mik_app)) missing.push("mik_app_not_found"); }
+  if (st.xml) {
+    if (!d.rb_xml) missing.push("rb_xml_missing");
+    else if (!exists(d.rb_xml)) missing.push("rb_xml_not_found");
+    else if (isExportXml(d.rb_xml)) missing.push("rb_xml_is_export");
+    else { try { fs.accessSync(d.rb_xml, fs.constants.R_OK | fs.constants.W_OK); } catch { missing.push("rb_xml_not_writable"); } }
+  }
+  if (st.pn) {
+    if (!d.pn_mode) missing.push("pn_mode_unchecked");
+    else if (d.pn_mode === "other") missing.push("pn_mode_wrong");
+    else if (d.pn_mode === "unknown" && !d.pn_replace_confirmed) missing.push("pn_mode_unknown");
+  }
+  if (st.mik) { if (!d.mik_db) optional.push("mik_db_missing"); else if (!exists(d.mik_db)) optional.push("mik_db_not_found"); }
   return {
     do_all: { on: !!d.on, pn_app: d.pn_app || "", mik_app: d.mik_app || "", mik_db: d.mik_db || "", rb_xml: d.rb_xml || "",
               close_apps: d.close_apps !== false, press_start: !!d.press_start, include_pending: !!d.include_pending,
               pn_replace_confirmed: !!d.pn_replace_confirmed, pn_mode: d.pn_mode || null, pn_mode_at: d.pn_mode_at || null,
               // off by the user's choice (not just never set up): the button is hidden then
-              switched_off: d.on === false },
+              switched_off: d.on === false, steps: st },
     do_all_ready: missing.length === 0, do_all_missing: missing, do_all_optional: optional,
   };
 }
@@ -516,6 +530,12 @@ function patchDoAll(p: any): void {
   const d: DoAll = { ...(s.do_all || {}) };
   for (const k of ["on", "close_apps", "press_start", "include_pending", "pn_replace_confirmed"] as const)
     if (k in p) d[k] = !!p[k];
+  if ("steps" in p) {
+    const sp = p.steps && typeof p.steps === "object" ? p.steps : {};
+    const cur = { ...(d.steps || {}) };
+    for (const k of ["pn", "mik", "xml"] as const) if (k in sp) cur[k] = !!sp[k];
+    d.steps = cur;
+  }
   const file = (v: any): string | null => typedPath(v) || null;
   for (const k of ["pn_app", "mik_app"] as const) if (k in p) {
     const v = file(p[k]);
@@ -569,6 +589,13 @@ export async function setSettings(data: any): Promise<any> {
   if ("auto_move" in data) s.auto_move = !!data.auto_move;
   if ("like_on_add" in data) s.like_on_add = !!data.like_on_add;
   if ("aiff_auto" in data) s.aiff_auto = !!data.aiff_auto;
+  if ("convert_rules" in data) {
+    const src = data.convert_rules && typeof data.convert_rules === "object" ? data.convert_rules : {};
+    const out: { flac?: string; alac?: string; other?: string } = {};
+    for (const k of ["flac", "alac", "other"] as const)
+      if (["aiff", "wav", "skip"].includes(src[k])) out[k] = src[k];
+    s.convert_rules = out;
+  }
   if ("bandcamp_days" in data) {
     const n = Number(data.bandcamp_days);
     if (!BANDCAMP_DAYS.includes(n)) throw appError("bad_request", "the Bandcamp interval must be one of " + BANDCAMP_DAYS.join(", ") + " days");
@@ -2706,10 +2733,11 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
     seen_mark: lib.seen_mark || 0,
     name_checks: rows.filter((r) => r.check_name).length,
     untagged: rows.filter((r) => r.tagged === false).length,
-    incompatible: matchedFiles.filter((f) => compatReason(f.fmt, dev, f.wext)).length,
+    incompatible: matchedFiles.filter((f) => convertWould(f, dev)).length,
     local_count: files.length,
     art: artCounts(rows, 0),
     aiff: { on: !!STATE.settings?.aiff_auto, wav: matchedFiles.filter((f) => path.extname(f.path).toLowerCase() === ".wav").length },
+    convert_rules: convertRules(),
   };
 }
 
@@ -2758,6 +2786,7 @@ export async function collectionView(): Promise<any> {
                 tagged: isTagged(f, xa, xt, "", handFields(ed)) };
     }
     return { n: i + 1, name: f.name, disp: collDisplay(f.path), base: f.base, path: f.path, root: rootOf(f.path)?.id || null,
+             art: first?.art || null, pic: !!f.pic,
              incompat: compatReason(f.fmt, dev, f.wext), dur: fmtDur(Math.round(f.dur)), lossy: LOSSY.test(f.fmt[0]),
              ...named,
              key: f.key ?? null, pn: f.pn ?? null,
@@ -3048,6 +3077,30 @@ export async function unprocessedFiles(): Promise<string[]> {
   return (await matchedFilesOf(lib)).filter((f) => f.pn === false || !f.key).map((f) => f.name);
 }
 
+/** What Convert does with a format the player can't read at all (FLAC, ALAC, OGG, an odd-rate
+ *  MP3 or AAC): a copy next to the file as "aiff" (the default) or "wav", or "skip" to leave the
+ *  file alone. In-place fixes (depth, rate, the WAV header) keep the format and are not a rule. */
+export type ConvertTarget = "aiff" | "wav" | "skip";
+export function convertRules(): { flac: ConvertTarget; alac: ConvertTarget; other: ConvertTarget } {
+  const r = STATE.settings?.convert_rules || {};
+  const pick = (v: any): ConvertTarget => (v === "wav" || v === "skip" ? v : "aiff");
+  return { flac: pick(r.flac), alac: pick(r.alac), other: pick(r.other) };
+}
+const ruleFor = (codec: string): ConvertTarget => {
+  const r = convertRules();
+  return codec === "flac" ? r.flac : codec === "alac" ? r.alac : r.other;
+};
+/** Convert would touch this file: it won't play as it is, and no "leave it alone" rule covers it. */
+function convertWould(f: LocalFile, devKey: string): boolean {
+  if (!compatReason(f.fmt, devKey, f.wext)) return false;
+  const dev = DEVICES[devKey] || DEVICES["xdj-700"];
+  const [codec] = f.fmt;
+  const ext = path.extname(f.name).toLowerCase();
+  const pcm = codec.startsWith("pcm") && [".wav", ".aiff", ".aif"].includes(ext);
+  const same = (codec === "flac" && dev.flac && ext === ".flac") || (codec === "alac" && dev.alac && ext === ".m4a");
+  return pcm || same || ruleFor(codec) !== "skip";
+}
+
 /** The rate a file goes to for a player: its own when the player takes it, else the highest the
  *  player takes in the same family (44.1 or 48 kHz multiples) that is not above it. */
 function targetRate(sr: number, dev: Device): number {
@@ -3069,7 +3122,8 @@ function plainWav(tmp: string): void {
  *    WAVE_FORMAT_EXTENSIBLE header gets the plain one (the samples copied byte for byte);
  *  - FLAC and ALAC on a player that reads them, in place in the same format (depth or rate);
  *  - anything the player can't read at all (FLAC, ALAC, OGG, an MP3 or AAC at an odd rate) becomes
- *    an AIFF next to it (toAiff): the name changes, so rekordbox needs its export updated.
+ *    an AIFF or a WAV next to it (toCopy, by the convert rules; a "skip" rule leaves it alone):
+ *    the name changes, so rekordbox needs its export updated.
  *  The untouched original goes to the backups first; Restore originals brings it back. The run is
  *  claimed by the route (claimTagRun("convert")), so GET /api/tag/progress counts its files. */
 export async function convertAll(): Promise<any> {
@@ -3084,10 +3138,12 @@ async function convertRun(): Promise<any> {
   const devKey = DEVICES[STATE.device] ? STATE.device : "xdj-700";
   const dev = DEVICES[devKey];
   const bdir = backupDir(lib);
-  let done = 0, aiff = 0;
+  let done = 0, aiff = 0, wav = 0;
   const errors: string[] = [], error_items: ErrorItem[] = [];
   const fail = (name: string, e: any) => { errors.push(`${name}: ${e.message}`); error_items.push(errItem(name, e)); };
-  const todo = (await matchedFilesOf(lib)).filter((f) => compatReason(f.fmt, devKey, f.wext));
+  const all = (await matchedFilesOf(lib)).filter((f) => compatReason(f.fmt, devKey, f.wext));
+  const todo = all.filter((f) => convertWould(f, devKey));
+  const skipped = all.length - todo.length;   // left alone by a "skip" rule
   TAG_RUN.total = todo.length;
   for (const f of todo) {
     TAG_RUN.done++;   // counted as it starts: the ring shows the file being worked on
@@ -3099,7 +3155,8 @@ async function convertRun(): Promise<any> {
     const newSr = targetRate(sr, dev), newBits = Math.min(bits || 16, dev.wavBits);
     if (!codec) { fail(f.name, appError("convert_manual_unknown", "this format can't be read, so it was left as it is")); continue; }
     if (!pcm && !same) {
-      try { await toAiff(lib, f, newSr, /^(pcm|flac|alac)/.test(codec) ? newBits : 16); aiff++; done++; }
+      const target = ruleFor(codec);   // never "skip" here: convertWould filtered those out
+      try { await toCopy(lib, f, newSr, /^(pcm|flac|alac)/.test(codec) ? newBits : 16, target === "wav" ? "wav" : "aiff"); target === "wav" ? wav++ : aiff++; done++; }
       catch (e: any) { fail(f.name, e); }
       continue;
     }
@@ -3153,7 +3210,7 @@ async function convertRun(): Promise<any> {
   }
   saveState();
   const view = await buildView();
-  view.convert_report = { done, aiff, errors, error_items, backup_dir: bdir };
+  view.convert_report = { done, aiff, wav, skipped, errors, error_items, backup_dir: bdir };
   return view;
 }
 
@@ -3212,35 +3269,65 @@ async function sourceTags(p: string, picOut: string): Promise<{ frames: Frame[];
   return { frames, artist: get("artist"), title: get("title"), genre: get("genre"), key };
 }
 
+/** The cover picture embedded in a local audio file, extracted once into DATA_DIR/covers and
+ *  reused while the file is unchanged (the cache key carries mtime and size). An empty cache
+ *  file remembers that the file has no picture. Null: no picture. */
+export async function coverFile(p: string): Promise<string | null> {
+  const st = fs.statSync(p);
+  const id = require("crypto").createHash("sha1").update(`${p}|${st.size}|${Math.floor(st.mtimeMs)}`).digest("hex").slice(0, 24);
+  const dir = path.join(DATA_DIR, "covers");
+  const out = path.join(dir, id + ".img");
+  try { return fs.statSync(out).size ? out : null; } catch { /* not cached yet */ }
+  fs.mkdirSync(dir, { recursive: true });
+  const tmp = out + ".tmp";
+  const r = await run(FFMPEG, ["-y", "-v", "error", "-nostdin", "-i", p, "-an", "-map", "0:v:0", "-c", "copy", "-f", "image2", tmp], 30000);
+  try {
+    if (r.code === 0 && fs.statSync(tmp).size) { fs.renameSync(tmp, out); return out; }
+  } catch { /* no picture */ }
+  try { fs.unlinkSync(tmp); } catch { /* none */ }
+  try { fs.writeFileSync(out, ""); } catch { /* the miss just isn't cached */ }
+  return null;
+}
+
 /** One file the player can't read (FLAC, ALAC, OGG, an MP3 or AAC at an odd rate) becomes an AIFF
- *  next to it: `bits` deep at `sr` (the same samples when neither changes, checked by their MD5),
- *  with an ID3v2.3 tag written by DJ HQ (names, key, album, BPM, year, the cover). Then the AIFF
+ *  or a WAV next to it (`fmt`, from the convert rules): `bits` deep at `sr` (the same samples when
+ *  neither changes, checked by their MD5), with an ID3v2.3 tag written by DJ HQ (names, key, album,
+ *  BPM, year, the cover); a WAV copy also gets the RIFF INFO names rekordbox reads. Then the copy
  *  takes the file's place, the original goes to the backups (Restore originals puts it back and
- *  moves the AIFF out, as for a WAV made AIFF), and what DJ HQ remembers follows it; aiff_from
- *  records it, so Update a rekordbox export points the tracks at the AIFF. Returns the new key. */
-async function toAiff(lib: Library, f: LocalFile, sr: number, bits: number): Promise<string> {
+ *  moves the copy out, as for a WAV made AIFF), and what DJ HQ remembers follows it; aiff_from
+ *  records it, so Update a rekordbox export points the tracks at the copy. Returns the new key. */
+async function toCopy(lib: Library, f: LocalFile, sr: number, bits: number, fmt: "aiff" | "wav"): Promise<string> {
   const key = f.name, src = f.path;
-  if (asAiffThere(src)) throw appError("aiff_exists", "an AIFF file with this name is already there, so the file was left alone");
+  const toWav = fmt === "wav";
+  const twinThere = toWav
+    ? [".wav", ".WAV"].some((e) => fs.existsSync(src.replace(/\.[^./]+$/, e)))
+    : asAiffThere(src);
+  const label = toWav ? "WAV" : "AIFF";
+  if (twinThere) throw appError("aiff_exists", `a ${label} file with this name is already there, so the file was left alone`);
   const before = await probeAudio(src);
   if (!before) throw appError("convert_manual_unknown", "this format can't be read, so it was left as it is");
-  const newKey = asAiffKey(key), dst = libPath(lib, newKey);
-  const tmp = staleGone(dst + ".tmp.aif");
+  const newKey = toWav ? key.replace(/\.[^./]+$/, ".wav") : asAiffKey(key), dst = libPath(lib, newKey);
+  const tmp = staleGone(dst + ".tmp" + (toWav ? ".wav" : ".aif"));
   const depth = bits <= 16 ? 16 : bits <= 24 ? 24 : 32;
   const exact = sr === before.sr && depth === before.bits && /^(pcm|flac|alac)/.test(before.codec);
   try {
-    const r = await run(FFMPEG, ["-y", "-v", "error", "-nostdin", "-i", src, "-map", "0:a:0", "-c:a", `pcm_s${depth}be`, "-ar", String(sr),
-      "-map_metadata", "-1", "-write_id3v2", "0", "-fflags", "+bitexact", tmp], 600000);
-    if (r.code !== 0) throw appError("ffmpeg_failed", "ffmpeg: " + r.stderr.slice(0, 200), { error: r.stderr.slice(0, 200) });
     const t = await sourceTags(src, dst + ".cover");
+    const args = ["-y", "-v", "error", "-nostdin", "-i", src, "-map", "0:a:0", "-c:a", `pcm_s${depth}${toWav ? "le" : "be"}`, "-ar", String(sr), "-map_metadata", "-1"];
+    if (toWav) args.push(...metaArgs(t.artist, t.title, t.genre));   // RIFF INFO, as writeTags
+    else args.push("-write_id3v2", "0", "-fflags", "+bitexact");
+    args.push(tmp);
+    const r = await run(FFMPEG, args, 600000);
+    if (r.code !== 0) throw appError("ffmpeg_failed", "ffmpeg: " + r.stderr.slice(0, 200), { error: r.stderr.slice(0, 200) });
     const tag = buildId3v23(t.artist, t.title, t.genre, t.frames);
-    if (tag.length > 10) appendChunks(tmp, [{ id: "ID3 ", data: tag }]);
+    if (tag.length > 10) appendChunks(tmp, [{ id: toWav ? "id3 " : "ID3 ", data: tag }]);
+    if (toWav) plainWav(tmp);   // the plain PCM header Pioneer players read
     const after = await probeAudio(tmp);
-    const bad = (why: string) => appError("aiff_check_failed", "the AIFF copy did not come out as planned, so the file was kept: " + why, { why });
+    const bad = (why: string) => appError("aiff_check_failed", `the ${label} copy did not come out as planned, so the file was kept: ` + why, { why });
     if (!after || after.sr !== sr || after.bits !== depth || after.ch !== before.ch || Math.abs(after.dur - before.dur) > 0.1) throw bad("format");
     if (exact && (await pcmMd5(src)) !== (await pcmMd5(tmp))) throw bad("audio");
     if (t.key && readKeyInfo(tmp).key !== t.key) throw bad("tag");
     await keepFileMeta(src, tmp);
-    if (fs.existsSync(dst)) throw appError("aiff_exists", "an AIFF file with this name is already there, so the file was left alone");
+    if (fs.existsSync(dst)) throw appError("aiff_exists", `a ${label} file with this name is already there, so the file was left alone`);
     fs.renameSync(tmp, dst);
   } catch (e) {
     doneTmp(tmp);
@@ -3252,7 +3339,7 @@ async function toAiff(lib: Library, f: LocalFile, sr: number, bits: number): Pro
     backupMove(src, fs.existsSync(bpath) ? replacedName(lib, path.basename(src)) : bpath);
   } catch (e: any) {
     try { fs.unlinkSync(dst); } catch { /* ignore */ }
-    throw appError("aiff_backup_failed", "the original could not be moved to the backups, so it was kept and the AIFF copy was removed: " + String(e?.message || e), { error: String(e?.code || e?.message || e) });
+    throw appError("aiff_backup_failed", `the original could not be moved to the backups, so it was kept and the ${label} copy was removed: ` + String(e?.message || e), { error: String(e?.code || e?.message || e) });
   }
   renameRecords(lib, key, newKey);
   lib.aiff_from = { ...(lib.aiff_from || {}), [key]: newKey };
@@ -4131,7 +4218,9 @@ function resolveMoveDest(lib: Library | null, dest: unknown): { dir: string; cho
     if (!d) throw appError("target_outside_collection", "the move target must be a folder of the collection", { dir: String(dest) });
     return { dir: d, chosen: true };
   }
-  const d = ok(lib?.target) || ok(coll.last_target) || ok(coll.move_target) || ok(coll.roots[0]?.path);
+  // the playlist's own folder, then the collection's configured default, then the folder
+  // last picked by hand, then the first root: a setting beats a remembered one-off pick
+  const d = ok(lib?.target) || ok(coll.move_target) || ok(coll.last_target) || ok(coll.roots[0]?.path);
   if (!d) throw appError("no_collection_folder", "add a folder to the collection first (Settings > Collection)");
   return { dir: d, chosen: false };
 }

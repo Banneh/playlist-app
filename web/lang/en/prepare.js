@@ -2,6 +2,7 @@
    The Prepare for player page, convert / restore and the rekordbox XML export dialog.
    Keys ending in "Any" are used when no target player is known. */
 I18N.add('en', 'prepare', {
+  title: 'Prepare for player',
   convertTip: 'Not playable on {player} as-is',
   sub: 'Get your files ready for rekordbox and the players at the club.',
   device: {
@@ -94,6 +95,26 @@ I18N.add('en', 'prepare', {
   convertAiff: {
     one: '{n} file is an AIFF now: update your rekordbox export in Settings > AIFF instead of WAV.',
     other: '{n} files are AIFF now: update your rekordbox export in Settings > AIFF instead of WAV.',
+  },
+  convertWav: {
+    one: '{n} file is a WAV now: update your rekordbox export in Settings > AIFF instead of WAV.',
+    other: '{n} files are WAV now: update your rekordbox export in Settings > AIFF instead of WAV.',
+  },
+  convertSkipped: {
+    one: '{n} file was left alone by your convert rules.',
+    other: '{n} files were left alone by your convert rules.',
+  },
+  rules: {
+    title: 'Convert rules',
+    text: 'A format the player can’t read at all gets a copy in the chosen format next to the file; the original goes to the backups and everything DJ HQ remembers follows the copy. Bit-depth, sample-rate and WAV-header fixes always happen in place, whatever the rule says.',
+    flac: 'FLAC',
+    alac: 'ALAC (Apple Lossless)',
+    other: 'Other formats (OGG, odd MP3 and AAC)',
+    to: {
+      aiff: 'AIFF copy next to the file',
+      wav: 'WAV copy next to the file',
+      skip: 'Leave the file alone',
+    },
   },
   restoreAsk: {
     title: {

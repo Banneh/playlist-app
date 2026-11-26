@@ -1,5 +1,6 @@
 /* DJ HQ strings: prepare, Polish. Owner: job B. */
 I18N.add('pl', 'prepare', {
+  title: 'Przygotuj na odtwarzacz',
   convertTip: 'Odtwarzacz {player} nie odtworzy go w tej postaci',
   sub: 'Przygotuj pliki dla rekordbox i odtwarzaczy w klubie.',
   device: {
@@ -102,6 +103,28 @@ I18N.add('pl', 'prepare', {
     one: '{n} plik jest teraz plikiem AIFF: zaktualizuj eksport rekordbox w Ustawienia > AIFF zamiast WAV.',
     few: '{n} pliki są teraz plikami AIFF: zaktualizuj eksport rekordbox w Ustawienia > AIFF zamiast WAV.',
     many: '{n} plików jest teraz plikami AIFF: zaktualizuj eksport rekordbox w Ustawienia > AIFF zamiast WAV.',
+  },
+  convertWav: {
+    one: '{n} plik jest teraz plikiem WAV: zaktualizuj eksport rekordbox w Ustawienia > AIFF zamiast WAV.',
+    few: '{n} pliki są teraz plikami WAV: zaktualizuj eksport rekordbox w Ustawienia > AIFF zamiast WAV.',
+    many: '{n} plików jest teraz plikami WAV: zaktualizuj eksport rekordbox w Ustawienia > AIFF zamiast WAV.',
+  },
+  convertSkipped: {
+    one: '{n} plik został zostawiony w spokoju zgodnie z regułami konwersji.',
+    few: '{n} pliki zostały zostawione w spokoju zgodnie z regułami konwersji.',
+    many: '{n} plików zostało zostawionych w spokoju zgodnie z regułami konwersji.',
+  },
+  rules: {
+    title: 'Reguły konwersji',
+    text: 'Format, którego odtwarzacz w ogóle nie czyta, dostaje obok pliku kopię w wybranym formacie; oryginał trafia do kopii zapasowych, a wszystko, co DJ HQ pamięta, podąża za kopią. Poprawki głębi bitowej, częstotliwości i nagłówka WAV zawsze odbywają się w miejscu, niezależnie od reguły.',
+    flac: 'FLAC',
+    alac: 'ALAC (Apple Lossless)',
+    other: 'Inne formaty (OGG, nietypowe MP3 i AAC)',
+    to: {
+      aiff: 'kopia AIFF obok pliku',
+      wav: 'kopia WAV obok pliku',
+      skip: 'zostaw plik w spokoju',
+    },
   },
   restoreAsk: {
     title: {

@@ -340,13 +340,14 @@ function daPreviewHtml(R) {
   const dir = shortPath((INBOX && INBOX.dir) || daSet().inbox_dir || '~/Downloads');
   const xml = shortPath(daCfg().rb_xml || '');
   const li = (ico, text) => `<li>${icon(ico)}<span>${text}</span></li>`;
+  const sOn = daSteps();   // a step switched off stays out of the plan
   const plan = [
     n.moves.length ? li('folderIn', daNh('pvMove', n.moves.length, { dir }) + (n.ups ? ' ' + daNh('pvUpgrades', n.ups) : '')) : li('folderIn', daT('pvMoveNone')),
     n.total ? li('tag', daNh('pvTag', n.total)) : '',
-    n.total ? li('sparkles', !n.pn ? daT('pvPnNone') : daCfg().press_start && !daWin() && DA.ax && DA.ax.state === 'granted' ? daNh('pvPnAuto', n.pn) : daNh('pvPn', n.pn)) : '',
-    n.total ? li('music', n.mik ? daNh('pvMik', n.mik) : daT('pvMikNone')) : '',
-    n.total ? li('upload', xml ? daT('pvXml', { file: xml }) : daT('pvXmlNone')) : '',   // no XML file chosen yet: the blockers say so
-  ].join('');
+    sOn.pn && n.total ? li('sparkles', !n.pn ? daT('pvPnNone') : daCfg().press_start && !daWin() && DA.ax && DA.ax.state === 'granted' ? daNh('pvPnAuto', n.pn) : daNh('pvPn', n.pn)) : '',
+    sOn.mik && n.total ? li('music', n.mik ? daNh('pvMik', n.mik) : daT('pvMikNone')) : '',
+    sOn.xml && n.total ? li('upload', xml ? daT('pvXml', { file: xml }) : daT('pvXmlNone')) : '',   // no XML file chosen yet: the blockers say so
+  ].filter(Boolean).join('');
   const pending = (p.pending_files || []).length;
   const inc = pending ? `<label class="da-check"><input type="checkbox" data-k="inc" ${R.inc ? 'checked' : ''} onchange="daSetInc(this.checked)"><span>${daNh('pvInclude', pending)}</span></label>` : '';
   // what keeps it from starting: the server's blockers, and nothing at all to do with the box as it is
@@ -500,18 +501,29 @@ function daReportHtml(j) {
 /* ---------- the setup wizard (Configure…) ---------- */
 const DA_WZ = ['pn_app', 'mik_app', 'mik_db', 'pn_mode', 'rb_xml', 'summary'];
 const DA_FIELDS = ['pn_app', 'mik_app', 'mik_db', 'rb_xml'];
+/** which optional steps are part of the run (Settings > Do everything > Steps) */
+function daSteps() {
+  const s = daCfg().steps || {};
+  return { pn: s.pn !== false, mik: s.mik !== false, xml: s.xml !== false };
+}
+/** the wizard pages and fields for the steps that are on */
+const daWzList = () => {
+  const s = daSteps();
+  return [s.pn && 'pn_app', s.mik && 'mik_app', s.mik && 'mik_db', s.pn && 'pn_mode', s.xml && 'rb_xml', 'summary'].filter(Boolean);
+};
+const daFieldsOn = () => daWzList().filter(f => DA_FIELDS.includes(f));
 
 function daConfigure(start) {
   if (daDemo() || DA.wiz) return;
   if (DA.run) { daConfigureFromRun(); return; }   // one dialog at a time (Esc would close both)
   const c = daCfg();
   modal((dlg, done) => {
-    DA.wiz = { dlg, done, i: Math.max(0, DA_WZ.indexOf(start)), det: null, detecting: false, detErr: '',
+    DA.wiz = { dlg, done, wz: daWzList(), fields: daFieldsOn(), i: Math.max(0, daWzList().indexOf(start)), det: null, detecting: false, detErr: '',
                draft: { pn_app: c.pn_app || '', mik_app: c.mik_app || '', mik_db: c.mik_db || '', rb_xml: c.rb_xml || '' },
                typing: {}, typed: {}, err: {}, confirm: !!c.pn_replace_confirmed, close: c.close_apps !== false, press: !!c.press_start, busy: false, html: '',
                // fields the user chose to leave empty: never filled in again by a detection (the
                // database step was passed with "Don't use it" when setup got as far as the XML)
-               cleared: { mik_db: !c.mik_db && !!(c.rb_xml || c.on) } };
+               cleared: { mik_db: !c.mik_db && !!(c.rb_xml || c.on), mik_app: !c.mik_app && !!(c.rb_xml || c.on) } };
     if (!DATA.can_pick) DA_FIELDS.forEach(f => { DA.wiz.typing[f] = true; });
     daWizPaint();
     daDetect();
@@ -541,7 +553,7 @@ function daGone(f) {
 /** detected | chosen | gone | missing (| unused for the optional database) */
 function daSource(f) {
   const v = DA.wiz.draft[f];
-  if (!v) return f === 'mik_db' ? 'unused' : 'missing';
+  if (!v) return f === 'mik_db' || f === 'mik_app' ? 'unused' : 'missing';
   if (v === daStored(f) && daGone(f)) return 'gone';
   return daCandidates(f).some(c => daSamePath(c.path, v)) ? 'detected' : 'chosen';
 }
@@ -562,7 +574,7 @@ async function daDetect() {
       rb_xml: ((d.rb_xml.suggestions || []).find(s => s.exists) || {}).path,
     };
     // a stored path that is gone gives way to what was found; a field the user cleared stays empty
-    for (const f of DA_FIELDS) if (first[f] && !W.cleared[f] && (!W.draft[f] || (W.draft[f] === daStored(f) && daGone(f)))) W.draft[f] = first[f];
+    for (const f of W.fields) if (first[f] && !W.cleared[f] && (!W.draft[f] || (W.draft[f] === daStored(f) && daGone(f)))) W.draft[f] = first[f];
   } catch (e) {
     if (DA.wiz !== W) return;
     W.detErr = daHtml('wzDetectFailed', { error: daErr(e) });
@@ -631,15 +643,15 @@ function daWizPress(on) { if (DA.wiz) { DA.wiz.press = !!on; daWizPaint(); if (o
 
 async function daWizGo(i) {
   const W = DA.wiz; if (!W || W.busy) return;
-  const f = DA_WZ[W.i];
-  if (i > W.i && DA_FIELDS.includes(f) && !(await daSaveField(f))) return;   // a step moves on once its choice is saved
+  const f = W.wz[W.i];
+  if (i > W.i && W.fields.includes(f) && !(await daSaveField(f))) return;   // a step moves on once its choice is saved
   if (DA.wiz !== W) return;
-  W.i = Math.max(0, Math.min(i, DA_WZ.length - 1));
+  W.i = Math.max(0, Math.min(i, W.wz.length - 1));
   daWizPaint();
 }
 async function daWizFinish() {
   const W = DA.wiz; if (!W || W.busy) return;
-  for (const f of DA_FIELDS) if (!(await daSaveField(f))) { W.i = DA_WZ.indexOf(f); daWizPaint(); return; }
+  for (const f of W.fields) if (!(await daSaveField(f))) { W.i = W.wz.indexOf(f); daWizPaint(); return; }
   if (DA.wiz !== W) return;
   W.busy = true; daWizPaint();
   try {
@@ -659,8 +671,8 @@ function daWizPaint() {
   const W = DA.wiz; if (!W) return;
   // typed text survives a redraw
   W.dlg.querySelectorAll('input[id^="da-in-"]').forEach(el => { W.typed[el.id.slice(6)] = el.value; });
-  const n = DA_WZ.length, step = DA_WZ[W.i];
-  const strip = DA_WZ.map((s, k) => `<button class="da-wz-chip${k === W.i ? ' on' : ''}${k < W.i ? ' past' : ''}" onclick="daWizGo(${k})" ${W.busy ? 'disabled' : ''}>${k + 1}. ${th('doall.wz.' + s + '.title')}</button>`).join('');
+  const n = W.wz.length, step = W.wz[W.i];
+  const strip = W.wz.map((s, k) => `<button class="da-wz-chip${k === W.i ? ' on' : ''}${k < W.i ? ' past' : ''}" onclick="daWizGo(${k})" ${W.busy ? 'disabled' : ''}>${k + 1}. ${th('doall.wz.' + s + '.title')}</button>`).join('');
   const head = `<div class="dlg-head">
       <div class="wt-top"><span class="wt-step">${th('common.stepOf', { i: W.i + 1, n })}</span><span class="wt-bar"><i style="width:${Math.round(100 * (W.i + 1) / n)}%"></i></span></div>
       <h3>${daT('wzTitle')}</h3><div class="sub">${daT('wzSub')}</div>
@@ -730,7 +742,7 @@ function daWizField(W, f) {
       <button class="btn btn-sm" onclick="daDetect()" ${W.detecting || W.busy ? 'disabled' : ''}>${W.detecting ? spin() : icon('search')}${daT('wzDetect')}</button>
       ${DATA.can_pick ? `<button class="btn btn-sm" onclick="daWizBrowse('${f}')" ${W.busy ? 'disabled' : ''}>${icon('folder')}${th('common.browse')}</button>` : ''}
       ${DATA.can_pick && !W.typing[f] ? `<button class="btn btn-sm btn-ghost" onclick="daWizType('${f}')">${icon('pencil')}${daT('wzType')}</button>` : ''}
-      ${f === 'mik_db' && v ? `<button class="btn btn-sm btn-ghost" onclick="daWizClear('mik_db')" ${W.busy ? 'disabled' : ''}>${icon('x')}${daT('wzSkipDb')}</button>` : ''}
+      ${(f === 'mik_db' || f === 'mik_app') && v ? `<button class="btn btn-sm btn-ghost" onclick="daWizClear('${f}')" ${W.busy ? 'disabled' : ''}>${icon('x')}${daT(f === 'mik_app' ? 'wzSkipMik' : 'wzSkipDb')}</button>` : ''}
     </div>
     ${W.typing[f] ? `<div class="fieldrow da-typed"><input class="input" id="da-in-${f}" value="${esc(typed)}" placeholder="${esc(ph)}" spellcheck="false" autocomplete="off">
       <button class="btn" onclick="daWizUseTyped('${f}')" ${W.busy ? 'disabled' : ''}>${icon('check')}${daT('wzUse')}</button></div>` : ''}`;
@@ -761,9 +773,9 @@ function daWizSummary(W) {
   const S = daSet();
   const mode = (W.det && W.det.pn_mode) || daCfg().pn_mode;
   const row = (f, label, value, t) => `<div class="da-sum-row"><span class="da-sum-l">${esc(label)}</span><span class="da-sum-v" title="${esc(value || '')}">${value ? esc(shortPath(value)) : `<span class="faint">${daT('notSet')}</span>`}</span>${t}
-      <button class="btn btn-ghost btn-sm" onclick="daWizGo(${DA_WZ.indexOf(f)})">${icon('pencil')}</button></div>`;
-  const rows = DA_FIELDS.map(f => row(f, t('doall.row.' + f), W.draft[f], daSourceTag(daSource(f)))).join('')
-    + row('pn_mode', t('doall.row.pn_mode'), '', daModeTag(mode, W.confirm));
+      <button class="btn btn-ghost btn-sm" onclick="daWizGo(${W.wz.indexOf(f)})">${icon('pencil')}</button></div>`;
+  const rows = W.fields.map(f => row(f, t('doall.row.' + f), W.draft[f], daSourceTag(daSource(f)))).join('')
+    + (W.wz.includes('pn_mode') ? row('pn_mode', t('doall.row.pn_mode'), '', daModeTag(mode, W.confirm)) : '');
   // what the server still misses (after the saves); the PN confirmation is saved with Finish
   const missing = (S.do_all_missing || []).filter(c => !(c === 'pn_mode_unknown' && W.confirm));
   const state = missing.length
@@ -771,9 +783,9 @@ function daWizSummary(W) {
     : noteHtml(daT('wzAllSet'), '', 'green');
   return `<h4 class="da-wz-h">${daT('wz.summary.title')}</h4><p>${daT('wz.summary.text')}</p>${state}${W.err.summary ? noteHtml(W.err.summary, '', 'red', 'alert') : ''}
     <div class="da-sum">${rows}</div>
-    <label class="st-switch"><input type="checkbox" ${W.close ? 'checked' : ''} onchange="daWizClose(this.checked)"><span class="st-track" aria-hidden="true"></span>
-      <span class="st-lbl"><b>${daT('stClose')}</b><span>${daT('stCloseHelp')}</span></span></label>
-    ${daWin() ? '' : `<label class="st-switch"><input type="checkbox" ${W.press ? 'checked' : ''} onchange="daWizPress(this.checked)"><span class="st-track" aria-hidden="true"></span>
+    ${W.wz.includes('pn_app') || W.wz.includes('mik_app') ? `<label class="st-switch"><input type="checkbox" ${W.close ? 'checked' : ''} onchange="daWizClose(this.checked)"><span class="st-track" aria-hidden="true"></span>
+      <span class="st-lbl"><b>${daT('stClose')}</b><span>${daT('stCloseHelp')}</span></span></label>` : ''}
+    ${daWin() || !W.wz.includes('pn_app') ? '' : `<label class="st-switch"><input type="checkbox" ${W.press ? 'checked' : ''} onchange="daWizPress(this.checked)"><span class="st-track" aria-hidden="true"></span>
       <span class="st-lbl"><b>${daT('stPress')}</b><span>${daT('stPressHelp')}</span></span></label>${W.press ? daAxHtml() : ''}`}
     <div class="da-how-box"><b>${daT('wzRbHead')}</b><ol class="steps">${['rb_untick_key', 'rb_refresh', 'rb_import'].map(c => `<li>${daCode(c, { playlist: 'DJ HQ' })}</li>`).join('')}</ol></div>`;
 }
@@ -792,15 +804,23 @@ function daSettingsCard() {
   const S = daSet(), c = daCfg();
   const miss = new Set([...(S.do_all_missing || []), ...(S.do_all_optional || [])]);
   const state = f => {
-    if (miss.has(f + '_missing')) return f === 'mik_db' ? tag(t('doall.tagOptional'), 'outline') : tag(t('doall.tagNotSet'), 'warn', 'alert');
+    if (miss.has(f + '_missing')) return f === 'mik_db' || f === 'mik_app' ? tag(t('doall.tagOptional'), 'outline') : tag(t('doall.tagNotSet'), 'warn', 'alert');
     if (miss.has(f + '_not_found')) return tag(t('doall.tagNotFound'), 'bad', 'alert');
     if (miss.has(f + '_not_writable')) return tag(t('doall.tagNoWrite'), 'bad', 'alert');
     if (miss.has(f + '_is_export')) return tag(t('doall.tagExport'), 'bad', 'alert');
     return tag(t('doall.tagOk'), 'ok', 'check');
   };
-  const rows = DA_FIELDS.map(f => `<div class="st-path-row"><span class="da-st-l">${esc(t('doall.row.' + f))}</span>
+  const stp = daSteps();
+  // a step switched off disappears from the rows below: nothing of it is used
+  const rows = daFieldsOn().map(f => `<div class="st-path-row"><span class="da-st-l">${esc(t('doall.row.' + f))}</span>
       <div class="path" title="${esc(c[f] || '')}"><span>${c[f] ? esc(shortPath(c[f])) : `<span class="faint">${daT('notSet')}</span>`}</span>${state(f)}</div></div>`).join('')
-    + `<div class="st-path-row"><span class="da-st-l">${daT('row.pn_mode')}</span><div class="path da-path-plain"><span></span>${daModeTag(c.pn_mode, c.pn_replace_confirmed)}</div></div>`;
+    + (stp.pn ? `<div class="st-path-row"><span class="da-st-l">${daT('row.pn_mode')}</span><div class="path da-path-plain"><span></span>${daModeTag(c.pn_mode, c.pn_replace_confirmed)}</div></div>` : '');
+  const stepRow = k => `<label class="st-switch st-switch-sm">
+       <input type="checkbox" ${stp[k] ? 'checked' : ''} onchange="daToggleStep('${k}', this)">
+       <span class="st-track" aria-hidden="true"></span>
+       <span class="st-lbl"><b>${daT('steps.' + k)}</b></span>
+     </label>`;
+  const steps = `<div class="da-steps"><span class="da-st-l">${daT('steps.title')}</span>${['pn', 'mik', 'xml'].map(stepRow).join('')}<div class="da-steps-hint">${daT('steps.hint')}</div></div>`;
   const configured = DA_FIELDS.some(f => c[f]) || c.on;
   return stCard('wand', 'green', daT('stTitle'), daT('stText'),
     `<label class="st-switch">
@@ -808,14 +828,15 @@ function daSettingsCard() {
        <span class="st-track" aria-hidden="true"></span>
        <span class="st-lbl"><b>${daT('stOn')}</b><span>${daT('stOnHelp')}</span></span>
      </label>
+     ${steps}
      ${configured ? `<div class="da-st-rows">${rows}</div>` : ''}
      ${c.on && !S.do_all_ready ? `<div class="da-st-why">${icon('alert')}<span>${daReason()}</span></div>` : ''}
-     <label class="st-switch">
+     ${stp.pn || stp.mik ? `<label class="st-switch">
        <input type="checkbox" ${c.close_apps !== false ? 'checked' : ''} onchange="daToggleClose(this)">
        <span class="st-track" aria-hidden="true"></span>
        <span class="st-lbl"><b>${daT('stClose')}</b><span>${daT('stCloseHelp')}</span></span>
-     </label>
-     ${daWin() ? '' : `<label class="st-switch">
+     </label>` : ''}
+     ${daWin() || !stp.pn ? '' : `<label class="st-switch">
        <input type="checkbox" ${c.press_start ? 'checked' : ''} onchange="daTogglePress(this)">
        <span class="st-track" aria-hidden="true"></span>
        <span class="st-lbl"><b>${daT('stPress')}</b><span>${daT('stPressHelp')}</span></span>
@@ -828,6 +849,12 @@ async function daToggle(el) {
   if (!ok) { el.checked = !on; return; }
   if (on && !daSet().do_all_ready) daConfigure();   // nothing to run with yet: set it up now
   if (on) daBoot();
+}
+async function daToggleStep(k, el) {
+  const on = !!el.checked;
+  const ok = await stSave({ do_all: { steps: { [k]: on } } }, t(on ? 'doall.stStepOn' : 'doall.stStepOff', { step: t('doall.steps.' + k) }));
+  if (!ok) { el.checked = !on; return; }
+  daBoot();
 }
 async function daTogglePress(el) {
   const on = !!el.checked;

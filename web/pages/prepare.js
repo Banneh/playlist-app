@@ -31,7 +31,7 @@ function ppRow(r) {
 }
 
 PAGES.prepare = {
-  title: () => t('app.nav.prepare'),
+  title: () => t('prepare.title'),
   sub: () => th('prepare.sub'),
   search: false,
   body: () => {
@@ -48,6 +48,16 @@ PAGES.prepare = {
         </div>
         <div class="select-wrap pp-select"><select id="pp-device" aria-label="${esc(t('prepare.device.title'))}" onchange="ppSetDevice(this.value)">${
           (DATA.devices || []).map(d => `<option value="${esc(d.id)}"${d.id === DATA.device ? ' selected' : ''}>${esc(d.label)}</option>`).join('')}</select></div>
+        <div class="pp-rules">
+          <h4>${th('prepare.rules.title')}</h4>
+          <p>${th('prepare.rules.text')}</p>
+          ${['flac', 'alac', 'other'].map(k => {
+            const v = (DATA.convert_rules || {})[k] || 'aiff';
+            return `<div class="pp-rule"><span class="lbl">${esc(t('prepare.rules.' + k))}</span>
+              <div class="select-wrap"><select aria-label="${esc(t('prepare.rules.' + k))}" onchange="ppSetRule('${k}', this.value)">${
+                ['aiff', 'wav', 'skip'].map(o => `<option value="${o}"${v === o ? ' selected' : ''}>${esc(t('prepare.rules.to.' + o))}</option>`).join('')}</select></div></div>`;
+          }).join('')}
+        </div>
       </div>`;
     const cards = `
       <div class="cards pp-cards">
@@ -111,6 +121,12 @@ async function ppSetDevice(id) {
     toast(ppOn('prepare.checking', 'prepare.checkingAny'));
   } catch (e) { toast(t('common.error', { msg: errText(e) }), true); render(); }
 }
+async function ppSetRule(k, v) {
+  try {
+    DATA = await api('/api/settings', { convert_rules: { ...(DATA.convert_rules || {}), [k]: v } });
+    render();
+  } catch (e) { toast(t('common.error', { msg: errText(e) }), true); render(); }
+}
 function ppBusy(id, text) {
   const b = $(id); if (!b) return;
   b.disabled = true; b.innerHTML = spin(text);
@@ -172,8 +188,10 @@ async function ppConvert() {
     const stop = followRun(() => {});   // the Tasks ring counts the files (pages/playlist.js)
     try { DATA = await qTask(t('app.queue.convert'), () => api('/api/convert', {}), { run: true }); } finally { stop(); }
     const [msg, err] = fileReport(DATA.convert_report, 'prepare.convertFailed', 'prepare.convertDone');
-    const aiff = (DATA.convert_report || {}).aiff || 0;
-    toast(aiff ? msg.replace(/[.!]?$/, '.') + ' ' + tn('prepare.convertAiff', aiff) : msg, err);
+    const rep = DATA.convert_report || {};
+    const extra = [rep.aiff ? tn('prepare.convertAiff', rep.aiff) : '', rep.wav ? tn('prepare.convertWav', rep.wav) : '',
+                   rep.skipped ? tn('prepare.convertSkipped', rep.skipped) : ''].filter(Boolean).join(' ');
+    toast(extra ? msg.replace(/[.!]?$/, '.') + ' ' + extra : msg, err);
   } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
   render();
 }

@@ -50,13 +50,16 @@ function coUsedLine(f) {
 function exRow(f, i) {
   if ('x' + i === EDIT_ID) return `
     <div class="tr tr-edit ex-row" style="grid-template-columns:30px minmax(0,1fr)">
-      <span class="num"></span>
+      <span class="num"></span><!-- no art cell: the edit form takes the width -->
       ${editFormHtml(f, `saveExtra(${i})`, `resetExtra(${i})`, t('extras.resetTip'))}
     </div>`;
   const fd = f.found;
+  // the matched track's artwork, else the picture embedded in the file itself
+  const artSrc = f.art || (f.pic ? '/api/cover?path=' + encodeURIComponent(f.path) : '');
   return `
     <div class="tr ex-row">
       <span class="num"></span>
+      <span class="art${artSrc ? '' : ' none'}">${artSrc ? `<img src="${esc(artSrc)}" loading="lazy" alt="" onerror="this.parentNode.classList.add('none');this.remove()">` : icon('music')}</span>
       <div class="t-meta">
         <div class="t-title"><span title="${esc(f.title)}">${esc(f.title)}</span>${
           f.edited ? tag(t('tags.edited'), 'outline', 'pencil', t('tags.editedTip')) : ''}${
@@ -192,7 +195,7 @@ async function findAll() {
 }
 
 /* ---------- page ---------- */
-const coHead = () => `<div class="thead ex-head"><span class="num"></span><span>${esc(t('common.file'))}</span><span class="r">${esc(t('common.length'))}</span><span>${
+const coHead = () => `<div class="thead ex-head"><span class="num"></span><span></span><span>${esc(t('common.file'))}</span><span class="r">${esc(t('common.length'))}</span><span>${
   esc(t('tags.onSoundCloud'))}</span><span></span></div>`;
 PAGES.collection = {
   title: () => t('app.nav.collection'),

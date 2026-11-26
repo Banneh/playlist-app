@@ -26,7 +26,7 @@ I18N.add('en', 'tags', {
   needsTagsTip: 'The artist / title in the file are missing or differ from the name shown here',
   convert: 'Convert · {codec}',
   bits: { one: '{n}-bit', other: '{n}-bit' },
-  unsupported: '{codec} not supported',
+  unsupported: 'the player doesn’t read {codec}',
   unknownFormat: 'unknown format',
   wavHeader: 'WAV header',
   wavHeaderTip: 'Pioneer players often refuse this WAV header (WAVE_FORMAT_EXTENSIBLE). Convert gives the file the plain one: the audio stays as it is',

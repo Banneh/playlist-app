@@ -10,7 +10,7 @@ I18N.add('pl', 'app', {
     new: 'Nowe',
     inbox: 'Pobrane',
     extras: 'Spoza playlisty',
-    prepare: 'Przygotuj na odtwarzacz',
+    prepare: 'Przygotuj',
   },
 
   // the library card at the top of the sidebar
@@ -30,8 +30,8 @@ I18N.add('pl', 'app', {
     removeBody: 'Biblioteka zostanie usunięta tylko z DJ HQ. Twoje pliki z muzyką zostaną dokładnie tam, gdzie są.',
     removed: 'Usunięto bibliotekę',
     rescanned: 'Ponownie przeskanowano foldery',
-    add: 'Dodaj bibliotekę',
-    addHint: 'Dodaj folder z muzyką i playlistę',
+    add: 'Dodaj playlistę',
+    addHint: 'Połącz kolejną playlistę SoundCloud z kolekcją',
     options: 'Opcje biblioteki',
   },
 
@@ -73,6 +73,7 @@ I18N.add('pl', 'app', {
     running: 'W toku',
     nRunning: { one: '{n} zadanie w toku', few: '{n} zadania w toku', many: '{n} zadań w toku' },
     allDone: 'Wszystkie zadania zakończone',
+    dismiss: 'Usuń z listy',
     someFailed: 'Jedno z zadań się nie udało. Kliknij, aby zobaczyć które',
     done: 'Gotowe',
     failed: 'Nie udało się: {msg}',

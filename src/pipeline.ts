@@ -32,7 +32,10 @@ export const TEXT: Record<string, string> = {
   do_all_off: "Do everything is switched off in Settings.",
   pn_app_missing: "Choose where Platinum Notes is installed.",
   pn_app_not_found: "Platinum Notes is no longer where it was set up: {path}.",
-  mik_app_missing: "Choose where Mixed In Key is installed.",
+  mik_app_missing: "Mixed In Key isn't set up, so its step is skipped. Choose the app to use it.",
+  mik_off: "Mixed In Key is switched off or not set up, so its step was skipped.",
+  pn_off: "Platinum Notes is switched off, so its step was skipped.",
+  xml_off: "The rekordbox XML step is switched off, so nothing was exported.",
   mik_app_not_found: "Mixed In Key is no longer where it was set up: {path}.",
   rb_xml_missing: "Choose the rekordbox XML file rekordbox imports from.",
   rb_xml_not_found: "The rekordbox XML file isn't there: {path}.",
@@ -548,9 +551,25 @@ async function drive(): Promise<void> {
       if (id !== "finish" && job.lib !== core.activeLib()?.id) { failStep(st, "library_changed"); break; }
       if (id === "move") await stepMove(st);
       else if (id === "tag") await stepTag(st);
-      else if (id === "pn") await stepApp("pn", st);
-      else if (id === "mik") await stepApp("mik", st);
-      else if (id === "xml") await stepXml(st);
+      else if (id === "pn") {
+        // Platinum Notes can be switched off as a step: skipped whole then
+        if (core.doAllStatus().do_all.steps.pn) await stepApp("pn", st);
+        else { for (const it of eligible("pn")) setItem(it, "pn", "skipped", "pn_off"); say("pn_off"); }
+      }
+      else if (id === "mik") {
+        // Mixed In Key is optional: switched off as a step, or simply not set up
+        const da = core.doAllStatus().do_all;
+        if (da.steps.mik && da.mik_app) await stepApp("mik", st);
+        else {
+          for (const it of eligible("mik")) setItem(it, "mik", "skipped", "mik_off");
+          say("mik_off");
+          await retagAfterApps();   // Platinum Notes may have rewritten files: the names go back in
+        }
+      }
+      else if (id === "xml") {
+        if (core.doAllStatus().do_all.steps.xml) await stepXml(st);
+        else { for (const it of eligible("xml")) setItem(it, "xml", "skipped", "xml_off"); say("xml_off"); }
+      }
       else { markBlocked(); buildReport(); st.state = "ok"; }
       if (control.cancel) break;
       if (st.state === "running") st.state = "ok";

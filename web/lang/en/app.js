@@ -10,7 +10,7 @@ I18N.add('en', 'app', {
     new: 'New',
     inbox: 'Downloads',
     extras: 'Not in playlist',
-    prepare: 'Prepare for player',
+    prepare: 'Prepare',
   },
 
   // the library card at the top of the sidebar
@@ -30,8 +30,8 @@ I18N.add('en', 'app', {
     removeBody: 'The library is removed from DJ HQ only. Your music files stay exactly where they are.',
     removed: 'Library removed',
     rescanned: 'Folders rescanned',
-    add: 'Add library',
-    addHint: 'Add a music folder and a playlist',
+    add: 'Add playlist',
+    addHint: 'Link another SoundCloud playlist to the collection',
     options: 'Library options',
   },
 
@@ -69,6 +69,7 @@ I18N.add('en', 'app', {
     running: 'In progress',
     nRunning: { one: '{n} task running', other: '{n} tasks running' },
     allDone: 'All tasks finished',
+    dismiss: 'Remove from the list',
     someFailed: 'A task failed. Click to see which',
     done: 'Done',
     failed: 'Failed: {msg}',

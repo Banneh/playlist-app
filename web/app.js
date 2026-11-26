@@ -199,47 +199,20 @@ function qRing(p) {
   return `<svg class="q-ring${p === null ? ' turn' : ''}" viewBox="0 0 20 20" aria-hidden="true"><circle class="bg" cx="10" cy="10" r="8"/>`
     + `<circle class="fg" cx="10" cy="10" r="8" stroke-dasharray="${p === null ? '14 ' + C : C}" stroke-dashoffset="${p === null ? 0 : (C * (1 - p)).toFixed(2)}"/></svg>`;
 }
-/* The indicator next to the Tasks button: while tasks run, a ring that fills with their progress
-   (a turning one while none can tell how far it is), then a green check (a red mark when one
-   failed) for a few seconds. A click opens the list. Background tasks nobody started by hand
-   (the Bandcamp search) show the ring but no check. */
-let Q_IND = { on: false, since: 0, timer: 0 };
-function qIndicator() {
-  const el = $('#q-ind'); if (!el) return;
-  if (!el.onclick) el.onclick = e => { e.stopPropagation(); qToggle($('#btn-queue')); };
-  const run = QUEUE.filter(q => q.status === 'running');
-  if (run.length) {
-    clearTimeout(Q_IND.timer);
-    if (!Q_IND.on) Q_IND = { on: true, since: Date.now(), timer: 0 };
-    const known = run.filter(q => q.total), done = known.reduce((a, q) => a + q.done, 0), total = known.reduce((a, q) => a + q.total, 0);
-    const p = total ? Math.min(1, done / total) : null;
-    el.className = 'q-ind run';
-    el.innerHTML = qRing(p) + (p === null ? '' : `<span class="q-pct">${I18N.num(Math.floor(p * 100))}%</span>`);
-    el.title = run.length === 1 ? run[0].label + (total ? ` · ${done} / ${total}` : '') : tn('app.queue.nRunning', run.length);
-    el.hidden = false;
-    return;
-  }
-  if (!Q_IND.on) return;
-  Q_IND.on = false;
-  const ended = QUEUE.filter(q => q.ended && q.ended >= Q_IND.since && !q.quiet);
-  if (!ended.length) { el.hidden = true; return; }
-  const failed = ended.some(q => q.status === 'failed');
-  el.className = 'q-ind ' + (failed ? 'fail' : 'ok');
-  el.innerHTML = icon(failed ? 'xCircle' : 'checkCircle');
-  el.title = failed ? t('app.queue.someFailed') : t('app.queue.allDone');
-  el.hidden = false;
-  Q_IND.timer = setTimeout(() => { el.classList.add('out'); Q_IND.timer = setTimeout(() => { if (!Q_IND.on) el.hidden = true; }, 400); }, failed ? 10000 : 5000);
-}
 function qRowHtml(q) {
-  const ic = q.status === 'running' ? (q.total ? qRing(Math.min(1, q.done / q.total)) : qRing(null)) : icon(q.status === 'failed' ? 'xCircle' : 'checkCircle');
   const when = I18N.time ? I18N.time(q.ended || q.started) : new Date(q.ended || q.started).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const st = q.status === 'running'
     ? t('app.queue.running') + (q.total ? ` · ${q.done} / ${q.total}` : '')
     : q.status === 'failed' ? t('app.queue.failed', { msg: q.msg }) : t('app.queue.done') + (q.msg ? ' · ' + q.msg : '');
   const bar = q.status === 'running' && q.total ? `<div class="q-bar"><i style="width:${Math.round(100 * q.done / q.total)}%"></i></div>` : '';
-  return `<div class="q-row ${q.status}"><span class="q-ic">${ic}</span><div class="q-main"><div class="q-label" title="${esc(q.label)}">${esc(q.label)}</div>
+  // a finished task's mark is a button: the tick (or the red mark) takes the row off the list
+  const ic = q.status === 'running'
+    ? `<span class="q-ic">${q.total ? qRing(Math.min(1, q.done / q.total)) : qRing(null)}</span>`
+    : `<button class="q-ic q-drop" onclick="qDrop(${q.id})" title="${esc(t('app.queue.dismiss'))}">${icon(q.status === 'failed' ? 'xCircle' : 'checkCircle')}</button>`;
+  return `<div class="q-row ${q.status}">${ic}<div class="q-main"><div class="q-label" title="${esc(q.label)}">${esc(q.label)}</div>
     <div class="q-st"><span>${esc(st)}</span><span class="q-when">${esc(when)}</span></div>${bar}</div></div>`;
 }
+function qDrop(id) { QUEUE = QUEUE.filter(q => q.id !== id); qRender(); }
 function qPanelHtml() {
   const fin = QUEUE.some(q => q.status !== 'running');
   return `<div class="q-head"><b>${esc(t('app.queue.title'))}</b><span class="spacer"></span>${
@@ -257,7 +230,6 @@ function qRender() {
   }
   const m = qPanel();
   if (m) m.innerHTML = qPanelHtml();
-  qIndicator();
 }
 function qClear() { QUEUE = QUEUE.filter(q => q.status === 'running'); qRender(); }
 function qToggle(anchor) {
@@ -819,7 +791,7 @@ function renderSidebar() {
   $('#lib-dir').title = roots.map(r => r.path + (r.subfolders ? ' (' + t('common.subfolders').toLowerCase() + ')' : '')).join('\n');
 
   $('#nav').innerHTML = NAV.map(it => {
-    if (it.sec) return it.when && !it.when() ? '' : `<div class="nav-sec"><span class="n">${it.n}</span><span class="lbl-sec">${esc(t(it.sec))}</span></div>`;
+    if (it.sec) return it.when && !it.when() ? '' : `<div class="nav-sec"><span class="lbl-sec">${esc(t(it.sec))}</span></div>`;
     if (it.when && !it.when()) return '';
     const c = DATA.ready ? it.count() : '';
     const show = c !== '' && c !== undefined && !(it.hideZero && !c);

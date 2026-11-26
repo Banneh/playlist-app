@@ -24,6 +24,7 @@ I18N.add('pl', 'app', {
     addOption: '＋ Dodaj playlistę…',
     plSettings: 'Ustawienia playlisty',
     noRoots: 'Nie ma jeszcze folderów kolekcji',
+    haveOf: '{have} z {n} w kolekcji',
   },
 });
 I18N.add('pl', 'common', { change: 'Zmień…' });

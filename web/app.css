@@ -325,16 +325,17 @@ html.mac-inset .sb-brand * { -webkit-app-region: no-drag; }
 .mosaic .ph { display: grid; place-items: center; color: var(--text-3); grid-column: 1 / -1; grid-row: 1 / -1; }
 .lib-name { position: relative; min-width: 0; flex: 1; }
 .lib-name select {
-  appearance: none; -webkit-appearance: none; width: 100%; padding: 0 20px 0 0; border: 0; background: transparent;
+  appearance: none; -webkit-appearance: none; width: 100%; padding: 0 18px 0 0; border: 0; background: transparent;
   font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; outline: none; text-overflow: ellipsis;
 }
-.lib-name::after {
-  content: ""; position: absolute; right: 2px; top: 50%; width: 14px; height: 14px; transform: translateY(-50%); pointer-events: none;
+/* the switcher's chevron sits at the select's right edge, inside the row (left of the gear) */
+.lib-row { position: relative; }
+.lib-row::after {
+  content: ""; position: absolute; right: 32px; top: 50%; width: 14px; height: 14px; transform: translateY(-50%); pointer-events: none;
   background: var(--text-3);
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E") center/contain no-repeat;
           mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E") center/contain no-repeat;
 }
-.lib-name.single::after { display: none; }
 .lib-name .sub { font-size: 11.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lib-progress { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .bar { flex: 1; height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
@@ -343,10 +344,9 @@ html.mac-inset .sb-brand * { -webkit-app-region: no-drag; }
 .lib-foot { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11.5px; color: var(--text-3); }
 
 .nav { display: flex; flex-direction: column; gap: 1px; margin-top: 8px; }
-/* section headers: the step number in mono, the label in small caps, a hairline to the right */
+/* section headers: the label in small caps, a hairline to the right */
 .nav-sec { display: flex; align-items: center; gap: 8px; padding: 12px 10px 4px;
   font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
-.nav-sec .n { font-family: var(--mono); font-weight: 600; opacity: .8; }
 .nav-sec::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .nav-item {
   display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border: 0; border-radius: var(--r-sm);
@@ -388,7 +388,7 @@ html.mac-inset .sb-brand * { -webkit-app-region: no-drag; }
   :root { --sb-w: 64px; }
   .sidebar { padding-left: 8px; padding-right: 8px; align-items: stretch; }
   .sb-brand h1, .sb-brand .ver, .nav-item .lbl, .lib-name, .lib-progress, .lib-foot, .sb-status, .sb-row .seg, .sb-row .lbl, .sb-update { display: none; }
-  /* the rail keeps the icons; section headers become thin dividers carrying the step number */
+  /* the rail keeps the icons; section headers become thin dividers */
   .nav-item > .ic { display: block; }
   .nav-item > .ic.nav-spark + .led, .nav-item .led { display: none; }
   .nav-sec { padding: 8px 2px 4px; justify-content: center; gap: 6px; }
@@ -563,6 +563,8 @@ html.mac-inset .page-head { padding-top: 30px; }
 .q-badge.on { display: block; }
 .q-badge.dot { display: block; min-width: 8px; width: 8px; height: 8px; padding: 0; top: 2px; right: 2px; background: var(--green); }
 /* the indicator next to the Tasks button (qIndicator): a progress ring, then a check */
+.q-drop { border: 0; background: transparent; padding: 0; cursor: pointer; border-radius: 6px; }
+.q-drop:hover { background: var(--surface-2); }
 .q-ind { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 4px; cursor: pointer; color: var(--accent);
   font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; transition: opacity .35s; }
 .q-ind[hidden] { display: none; }

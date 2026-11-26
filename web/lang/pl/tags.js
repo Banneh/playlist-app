@@ -24,7 +24,7 @@ I18N.add('pl', 'tags', {
   needsTagsTip: 'W pliku brakuje wykonawcy / tytułu albo różnią się od nazwy widocznej tutaj',
   convert: 'Do konwersji · {codec}',
   bits: { one: '{n} bit', few: '{n} bity', many: '{n} bitów' },
-  unsupported: 'format {codec} nieobsługiwany',
+  unsupported: 'odtwarzacz nie czyta {codec}',
   unknownFormat: 'nieznany format',
   wavHeader: 'nagłówek WAV',
   wavHeaderTip: 'Odtwarzacze Pioneer często odrzucają ten nagłówek WAV (WAVE_FORMAT_EXTENSIBLE). Konwertuj zapisuje zwykły nagłówek, a dźwięk zostaje bez zmian',
