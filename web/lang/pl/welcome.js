@@ -44,7 +44,11 @@ I18N.add('pl', 'welcome', {
     changeLinkHint: 'Ustaw dla tej playlisty inny link SoundCloud, np. link udostępniania, jeśli jest prywatna',
     hintPublic: 'Playlista musi być <b>publiczna</b> albo, jeśli jest prywatna, połączona linkiem z przycisku <b>Share</b> (udostępnianie) na SoundCloud. <b>Zmień link…</b> pozwala go podmienić.',
     hintNet: 'Pierwsze wczytanie wymaga połączenia z internetem. Potem zmiany są sprawdzane automatycznie co 15 minut.',
-    hintFolder: 'Folder z muzyką: {path}',
+    hintFolder: {
+      one: 'Folder kolekcji: {path}',
+      few: 'Foldery kolekcji: {path}',
+      many: 'Foldery kolekcji: {path}',
+    },
   },
 
   // /api/state failed at launch

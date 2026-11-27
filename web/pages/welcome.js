@@ -124,12 +124,19 @@ PAGES.welcome = {
   /** a library exists but its playlist was never fetched (or the first fetch failed) */
   noData: () => {
     const lib = (DATA.libraries || []).find(l => l.id === DATA.active);
+    // until the first fetch the server names a playlist by its id ("lib2"): then the text names none
+    const named = !!(lib && lib.name && lib.name !== lib.id);
+    // the collection folders, shown as the sidebar card shows them; no line when there are none
+    const roots = (DATA.collection && DATA.collection.roots) || [];
+    const first = roots.length ? `<span class="wl-path">${esc(shortPath(roots[0].path))}</span>` : '';
+    const dirs = roots.length > 1 ? th('app.lib.dirMore', { dir: I18N.raw(first), n: I18N.num(roots.length - 1) }) : first;
+    const dirsTip = roots.map(r => r.path + (r.subfolders ? ' ' + t('app.lib.withSubfolders') : '')).join('\n');
     return `
     <div class="wl-nodata">
       <div class="empty">
         <div class="eico accent">${icon('cloud')}</div>
         <h4>${esc(t('app.head.noData'))}</h4>
-        <p>${lib ? th('welcome.noData.textLib', { name: lib.name }) : th('welcome.noData.text')}</p>
+        <p>${named ? th('welcome.noData.textLib', { name: lib.name }) : th('welcome.noData.text')}</p>
         <div class="acts">
           <button class="btn btn-primary" onclick="manualRefresh()">${icon('refresh')}${esc(t('welcome.noData.fetch'))}</button>
           ${lib ? `<button class="btn" onclick="stChangeLink()" title="${esc(t('welcome.noData.changeLinkHint'))}">${icon('link')}${esc(t('common.changeLink'))}</button>` : ''}
@@ -139,7 +146,7 @@ PAGES.welcome = {
       <div class="wl-hints">
         <div class="wl-hint">${icon('check')}<span>${th('welcome.noData.hintPublic')}</span></div>
         <div class="wl-hint">${icon('check')}<span>${th('welcome.noData.hintNet')}</span></div>
-        ${lib ? `<div class="wl-hint">${icon('folder')}<span>${th('welcome.noData.hintFolder', { path: I18N.raw(`<span class="wl-path" title="${esc(lib.dir)}">${esc(shortPath(lib.dir))}</span>`) })}</span></div>` : ''}
+        ${roots.length ? `<div class="wl-hint">${icon('folder')}<span>${tnh('welcome.noData.hintFolder', roots.length, { path: I18N.raw(`<span title="${esc(dirsTip)}">${dirs}</span>`) })}</span></div>` : ''}
       </div>
     </div>`;
   },

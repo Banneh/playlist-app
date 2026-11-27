@@ -44,7 +44,7 @@ I18N.add('en', 'welcome', {
     changeLinkHint: 'Point this playlist at another SoundCloud link, e.g. its share link if it is private',
     hintPublic: 'The playlist must be <b>public</b>, or linked with the link from <b>Share</b> on SoundCloud if it is private. <b>Change link…</b> swaps it.',
     hintNet: 'The first fetch needs an internet connection. After that DJ HQ checks for changes every 15 minutes on its own.',
-    hintFolder: 'Music folder: {path}',
+    hintFolder: { one: 'Collection folder: {path}', other: 'Collection folders: {path}' },
   },
 
   // /api/state failed at launch
