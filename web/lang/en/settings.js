@@ -84,6 +84,14 @@ I18N.add('en', 'settings', {
     on: '{id} is on',
     off: '{id} is off',
   },
+  // developer mode only
+  dev: {
+    title: 'Developer mode',
+    text: 'Developer mode is on (DJ_HQ_DEVELOPER_MODE).',
+    labels: 'Show provider labels',
+    labelsHint: 'Which provider each Free DL was recognised as, next to the button on the playlist pages, Your Likes and Work through. Switch it off to see the lists as everyone else does.',
+  },
+
   glogs: {
     title: 'Gate logs',
     text: 'Developer mode writes a log of every gate walk: each request, window and step of the hidden browser, one file per walk. Open one to see where a download stopped.',

@@ -628,6 +628,10 @@ let PREFS = {};
 async function loadPrefs() {
   try { PREFS = (await (await fetch('/api/prefs')).json()) || {}; } catch { PREFS = {}; }
 }
+/** developer mode's provider labels next to Free DL: on unless hidden in Settings (PREFS.devLabels === false),
+ *  so the lists can be looked at the way everyone else sees them */
+function devLabels() { return !!APP.dev_mode && PREFS.devLabels !== false; }
+function applyDevLabels() { document.body.classList.toggle('devmode', devLabels()); }   // widens the Get it column for the label
 function setPref(key, value) {
   PREFS[key] = value;
   fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [key]: value }) }).catch(() => {});
@@ -1099,7 +1103,7 @@ async function boot() {
     }
   });
   try { APP = await (await fetch('/api/app')).json(); } catch {}
-  document.body.classList.toggle('devmode', !!APP.dev_mode);   // widens the Get it column for the provider label
+  applyDevLabels();
   try {
     DATA = await api('/api/state');
     if (PREFS.setupPending && (DATA.libraries || []).length && typeof SETUP !== 'undefined') SETUP = true;   // quit in the middle of "Before we start"

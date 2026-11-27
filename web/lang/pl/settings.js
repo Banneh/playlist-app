@@ -84,6 +84,14 @@ I18N.add('pl', 'settings', {
     on: '{id} włączony',
     off: '{id} wyłączony',
   },
+  // tylko w trybie deweloperskim
+  dev: {
+    title: 'Tryb deweloperski',
+    text: 'Tryb deweloperski jest włączony (DJ_HQ_DEVELOPER_MODE).',
+    labels: 'Pokazuj etykiety dostawców',
+    labelsHint: 'Jako jaki dostawca został rozpoznany każdy Free DL, obok przycisku na stronach playlisty, w Twoich polubieniach i w Przejdź po kolei. Wyłącz, żeby zobaczyć listy tak, jak widzą je wszyscy.',
+  },
+
   glogs: {
     title: 'Logi bramek',
     text: 'Tryb deweloperski zapisuje log każdego przejścia przez bramkę: każde zapytanie, okno i krok ukrytej przeglądarki, jeden plik na przejście. Otwórz log, żeby zobaczyć, gdzie pobieranie stanęło.',

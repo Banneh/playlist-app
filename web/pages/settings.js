@@ -73,7 +73,7 @@ PAGES.settings = {
     // only with the gate switch (DJ_HQ_DOWNLOAD_BYPASS): which gate adapters run, and the walker
     const gates = !APP.dl_bypass ? '' : stCard('bolt', 'amber', esc(t('settings.gates.title')), th('settings.gates.text'), stGatesControls(S));
     // developer mode only: the step by step logs of every gate walk
-    const gateLogs = APP.dev_mode ? stGlogCard() : '';
+    const gateLogs = APP.dev_mode ? stDevCard() + stGlogCard() : '';
 
     const A = DATA.aiff || { on: !!S.aiff_auto, wav: 0 };
     const aiff = stCard('image', 'green', esc(t('settings.aiff.title')),
@@ -534,6 +534,18 @@ async function stGlogLoad() {
   try { ST_GLOGS = await api('/api/gate-logs'); } catch (e) { ST_GLOGS = { error: errText(e), files: [] }; }
   if (PAGE === 'settings') render();
 }
+/** developer mode: hide the provider labels next to Free DL to see the lists as everyone else does */
+function stDevCard() {
+  return stCard('eye', 'amber', esc(t('settings.dev.title')), th('settings.dev.text'),
+    `<label class="st-switch">
+       <input type="checkbox" id="st-devlabels" ${devLabels() ? 'checked' : ''} onchange="stToggleDevLabels(this)">
+       <span class="st-track" aria-hidden="true"></span>
+       <span class="st-lbl"><b>${esc(t('settings.dev.labels'))}</b>
+         <span>${th('settings.dev.labelsHint')}</span></span>
+     </label>`);
+}
+function stToggleDevLabels(el) { setPref('devLabels', !!el.checked); applyDevLabels(); }
+
 function stGlogCard() {
   const s = ST_GLOGS;
   const files = (s && s.files) || [];

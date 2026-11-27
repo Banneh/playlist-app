@@ -39,7 +39,7 @@ function linkBtn(r, kind) {
   const cls = kind === 'free' ? (own ? 'btn-green btn-hype' : 'btn-green btn-get') : '';
   return `<a class="btn btn-sm ${cls}${kind === 'free' && !hasLink(r, 'buy') ? '' : ' first'}" href="${esc(l.url)}" target="_blank" rel="noopener"${dl} title="${esc(tip)}">${
     icon(kind === 'free' ? 'download' : 'bag')}${esc(t(kind === 'free' ? 'tags.link.free' : 'tags.link.buy'))}</a>${   // the server's label is english
-    kind === 'free' && APP.dev_mode ? devProvider(l, own) : ''}`;
+    kind === 'free' && devLabels() ? devProvider(l, own) : ''}`;
 }
 
 /** developer mode (DJ_HQ_DEVELOPER_MODE): which provider a Free DL was recognised as, always in
