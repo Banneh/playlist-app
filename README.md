@@ -33,13 +33,13 @@ The app speaks English and Polish: it follows your system language, and
   - [Discover: SoundCloud inside the app](#discover-soundcloud-inside-the-app)
   - [Your Likes](#your-likes)
   - [New: what changed since you last looked](#new-what-changed-since-you-last-looked)
-  - [Downloads: moving new files into your library](#downloads-moving-new-files-into-your-library)
+  - [Downloads: moving new files into your collection](#downloads-moving-new-files-into-your-collection)
   - [Not in playlist: files SoundCloud doesn't know about](#not-in-playlist-files-soundcloud-doesnt-know-about)
   - [Prepare for player: tags, conversion and rekordbox](#prepare-for-player-tags-conversion-and-rekordbox)
   - [Appearance, search and the sidebar](#appearance-search-and-the-sidebar)
   - [Settings](#settings)
   - [More than one folder](#more-than-one-folder)
-  - [AIFF instead of WAV, and moving the main folder](#aiff-instead-of-wav-and-moving-the-main-folder)
+  - [AIFF instead of WAV, and moving a folder](#aiff-instead-of-wav-and-moving-a-folder)
   - [More than one playlist](#more-than-one-playlist)
   - [Moving to another computer, or a backup](#moving-to-another-computer-or-a-backup)
 - [Tips and troubleshooting](#tips-and-troubleshooting)
@@ -56,8 +56,11 @@ The app speaks English and Polish: it follows your system language, and
 
 ## What DJ HQ does
 
-A *library* in DJ HQ is a music folder (or several) linked to one SoundCloud
-playlist: a public one, or a private one through its share link. The app fetches the playlist, scans the folders and works
+Your *collection* is the folder (or folders) where your music lives. A
+*playlist* is a SoundCloud playlist you connect: a public one, a private one
+through its share link, or your Likes page. Every playlist is matched against
+the whole collection, so a track that is in three playlists is still one file.
+The app fetches the playlist, scans the folders and works
 out which file belongs to which track by comparing names and lengths.
 Everything else builds on that:
 
@@ -71,7 +74,7 @@ Everything else builds on that:
 - **New** collects tracks added to the playlist and files that arrived in your
   folder since you last looked.
 - **Downloads** watches your Downloads folder and moves new files into your
-  library with one click, no renaming. Bandcamp zips are looked inside, and
+  collection with one click, no renaming. Bandcamp zips are looked inside, and
   exact matches can move in on their own.
 - **Not in playlist** finds the SoundCloud track for files that aren't in the
   playlist yet, so you can add them there.
@@ -83,8 +86,8 @@ Everything else builds on that:
   cover anywhere in DJ HQ plays the track there.
 - **Your Likes** checks every track you liked on SoundCloud against your
   folders and shows what's still to get.
-- Every file can be **previewed** in the app, and a library can follow your
-  SoundCloud **Likes** instead of a playlist.
+- Every file can be **previewed** in the app, and your SoundCloud **Likes**
+  page can be connected like a playlist.
 
 The playlist is checked again every 15 minutes while the window is open, and
 whenever you press **Refresh**. DJ HQ writes to SoundCloud only when you ask it
@@ -141,7 +144,7 @@ SmartScreen says it protected your PC. Click **More info**, then
 
 DJ HQ looks for a newer version on GitHub once a day. When there is one, a
 small notice appears at the bottom of the sidebar with a **Download** button
-for your computer. Install the new version over the old one; your library and
+for your computer. Install the new version over the old one; your playlists and
 settings stay where they are. **⋯ > Check for updates…** checks right away.
 
 The first start after an update lists what changed, version by version, since the
@@ -159,24 +162,24 @@ one you had. **⋯ > What's new…** (also in Settings) shows the whole list any
    see the playlist, so keep it to yourself. If you collect by liking tracks
    instead, paste your Likes page (`https://soundcloud.com/you/likes`); it
    works the same way.
-3. Click **Connect library**.
+3. Click **Connect playlist**.
 
 DJ HQ fetches the playlist, scans the folder and matches files to tracks. That
 takes a few seconds for a few hundred tracks. If SoundCloud won't hand out some
 of the tracks (deleted, blocked in your country, or private and not shared
 with the link), the status line says how many could not be read.
 
-To point a library at another link later, for example after making its playlist
+To point a playlist at another link later, for example after making it
 private, use **Settings > Change link…**. The new link is fetched first; your
 matches, edits and "new" marks stay, and the old link is kept if the new one
-can't be read. If the new link misses tracks the library has (another playlist,
+can't be read. If the new link misses tracks the playlist has (another playlist,
 or tracks it can't read), DJ HQ says how many and asks before it changes
-anything, since those tracks leave the library with their matches.
+anything, since those tracks leave the playlist with their matches.
 
 ![Before we start: the downloads folder, the target player, subfolders and appearance, asked once](docs/screens/setup.png)
 
 The first time, a **Before we start** screen asks for the basics: which folder
-your downloads land in and whether exact matches may be moved into the library
+your downloads land in and whether exact matches may be moved into the collection
 on their own, which player you play on, whether the folders inside your music
 folder count too, light or dark, and the language. Each has a default, so you
 can click **Let's go** right away; all of it can be changed in Settings later.
@@ -186,8 +189,8 @@ playlist is already in your folder.
 
 The first time, DJ HQ offers a one-minute tour that points out what each list
 is for. It runs on a few sample tracks, so you can take it before connecting
-anything (there's a button for it on the welcome screen) and nothing in your
-own library changes. Click **Not now** to skip it; **⋯ > Show me around**
+anything (there's a button for it on the welcome screen) and your own
+playlists and files stay untouched. Click **Not now** to skip it; **⋯ > Show me around**
 replays it any time.
 
 ![The tour: a short card explains each part of the app on sample data while the rest is dimmed](docs/screens/tour.png)
@@ -227,7 +230,7 @@ that isn't in your folder, with the links to get it.
 2. Click **Free DL** or **Buy**. The link opens in your browser (a blue button
    downloads by itself); the file ends up in your Downloads folder as usual.
 3. Switch to **Downloads** in the sidebar once a few files have landed, and
-   move them into your library from there (see below).
+   move them into your collection from there (see below).
 
 **Working through a long list**
 
@@ -235,7 +238,7 @@ that isn't in your folder, with the links to get it.
 
 **Work through** (top right) takes the list one track at a time: artwork, the
 links, and a watch on your Downloads folder. Open the link, grab the file in
-your browser, and when it lands DJ HQ offers **Move into library** and steps to
+your browser, and when it lands DJ HQ offers **Move into collection** and steps to
 the next track. Enter opens the link, the arrow keys step, N parks a track as
 not available, Esc closes.
 
@@ -310,7 +313,7 @@ The bar shows the track SoundCloud's player is playing, with its cover, its
 length and whether it's in the playlist already:
 
 - **Add to playlist** puts it into the playlist on SoundCloud, so it lands in
-  Missing right away. For a library that follows your Likes, Add likes the
+  Missing right away. When the playlist follows your Likes, Add likes the
   track instead.
 - The **heart** likes or unlikes it. With **Also like tracks you add to the
   playlist** turned on in Settings, adding likes it as well, so your Likes keep
@@ -326,7 +329,7 @@ bar or the SoundCloud page (as long as you aren't typing in a field):
 | `Space` | play / pause |
 | `←` `→` | 10 seconds back / forward |
 | `N` `P` | next / previous track: in SoundCloud's queue on Discover, in the list on screen for a track started from a list |
-| `A` | add the playing track to the playlist (to your Likes for a Likes library) |
+| `A` | add the playing track to the playlist (to your Likes when the playlist follows them) |
 | `L` | like / unlike it |
 
 Discover's player also serves the rest of the app. Click a track's cover on
@@ -362,14 +365,14 @@ so, and you use soundcloud.com next to DJ HQ instead.
 ### Your Likes
 
 Every track the signed-in SoundCloud account has liked, checked against the
-files in all your libraries. **Still to get** lists the liked tracks that are
+files in your collection. **Still to get** lists the liked tracks that are
 in none of your folders, with the same Free DL and Buy links as Missing. **In
 your folders** are the ones you already have, through the playlist, a found
-file, or a file with the same name and length in any library. **Not in the
+file, or a file with the same name and length anywhere in your collection. **Not in the
 playlist** are those missing from the active playlist, each with an **Add**
 button. The list is cached for a few minutes; **Refresh** reads it from
-SoundCloud again. A library that follows your Likes is this list by
-definition, so Add is hidden there.
+SoundCloud again. A playlist that follows your Likes is this list by
+definition, so Add is hidden while it is the active one.
 
 ### New: what changed since you last looked
 
@@ -381,17 +384,17 @@ the to-do list for tagging, converting and importing into rekordbox. When a
 refresh finds changes, a short notice tells you how many tracks were added or
 removed.
 
-### Downloads: moving new files into your library
+### Downloads: moving new files into your collection
 
-![The Downloads list: files that match a playlist track, each with a Move into library button](docs/screens/downloads.png)
+![The Downloads list: files that match a playlist track, each with a Move into collection button](docs/screens/downloads.png)
 
 DJ HQ watches your Downloads folder. Audio files there are compared
-with the playlist the same way your library is, and the ones that match a track
+with the playlist the same way your collection is, and the ones that match a track
 show up here.
 
 1. Check the row: it shows which track the file belongs to, whether the length
    matches, and whether it's an MP3.
-2. Click **Move into library**. The file is moved as it is, no renaming, and
+2. Click **Move into collection**. The file is moved as it is, no renaming, and
    linked to the track. It disappears from Missing and appears in Have.
 3. For a lossless download of a track you only had as an MP3, the button reads
    **Upgrade**. The old MP3 goes to the backup folder, not the bin.
@@ -399,8 +402,8 @@ show up here.
    are upgrades.
 
 Audio that matches no track in the playlist is listed below, under **Not in
-the playlist**. **Move** puts such a file into your library as it is, where
-Not in playlist picks it up. **Find on SoundCloud** searches for the track
+the playlist**. **Move** puts such a file into your collection as it is; it
+shows up on the Collection page. **Find on SoundCloud** searches for the track
 first: pick the right candidate and the file moves in matched to it, and, with
 the box ticked (signed in on Discover), the track goes into the playlist on
 SoundCloud in the same step, so it lands in Have right away. If the candidate
@@ -409,12 +412,12 @@ is already in the playlist, the file is matched to that track.
 Bandcamp purchases arrive as zips; DJ HQ looks inside them, lists the tracks
 that belong to the playlist (tagged "from Album.zip") and unpacks only those,
 leaving the zip where it is. Unfinished downloads are ignored; let them finish,
-then click **Rescan**. Files that are already in your library by name are
+then click **Rescan**. Files that are already in your collection by name are
 counted but not listed.
 
-With **Move exact matches automatically** turned on in Settings, a download
-whose name and length match a track exactly moves into the library on its own
-within a minute, and the app tells you. Fuzzy matches and upgrades always wait
+With **Move exact matches into the collection automatically** turned on in
+Settings, a download whose name and length match a track exactly moves in on its
+own within a minute, and the app tells you. Fuzzy matches and upgrades always wait
 for your click.
 
 ### Not in playlist: files SoundCloud doesn't know about
@@ -489,7 +492,7 @@ values.
    **Check names** while it showed the file's other name.
 
    **Write tags in every file**, under those buttons, writes the names again
-   into every file of the library, also the ones that already count as
+   into every file of the playlist, also the ones that already count as
    tagged: a repair for when another app damaged or removed tags without DJ HQ
    noticing. The same rules apply, the audio is not touched, and the button
    counts the files as it goes. Names a file already has stay in it as they
@@ -521,7 +524,7 @@ values.
    skip or go back with the arrow keys. A file that already carries a
    different name is listed there too: the dialog shows it under **In the file
    now**, and **Use the file's** (F) takes it. Switch to **All names** to go
-   through the whole library. Your choices are kept and win over what DJ HQ reads;
+   through the whole playlist. Your choices are kept and win over what DJ HQ reads;
    **Write tags** then puts them into the files. **⋯ > Swap artist and title**
    on a row does the same for one track.
 3. **Convert** turns files your player can't play into ones it can, in place:
@@ -538,7 +541,7 @@ values.
    shows you how to import it. In rekordbox: *Preferences > Advanced >
    Database > rekordbox xml*, browse to the file once; a *rekordbox xml* item
    then appears in the tree, and right-clicking the playlist there offers
-   **Import Playlist**. Tracks already in your collection keep their cues and
+   **Import Playlist**. Tracks already in your rekordbox collection keep their cues and
    grids. Export again whenever the playlist changes; the file path stays the
    same.
 
@@ -568,28 +571,31 @@ need tags or conversion, each with its artwork and a play button.
 - The **?** button in the top right opens the Guide for the page you're on: what
   every row, tag, button and chip means and what to do with it, in more detail
   than the tour. Press `?` for the same thing.
-- The library card at the top of the sidebar shows how many playlist tracks are
-  in your folder; the counts next to each list are live. **All tracks** is the
-  whole playlist, **Missing** and **Have** split it.
+- The card at the top of the sidebar shows the active playlist and how many of
+  its tracks are in your collection; the counts next to each list are live.
+  **All tracks** is the whole playlist, **Missing** and **Have** split it.
 - The **⋯** button at the bottom of the sidebar opens the playlist on
   SoundCloud, rescans the music folder, exports the rekordbox XML, replays the
-  tour, checks for updates, and adds or removes libraries. The gear next to it
+  tour, checks for updates, and adds or removes playlists. The gear next to it
   opens Settings.
 
 ### Settings
 
-![Settings: the library's folders, the downloads folder, auto-move, refresh interval, appearance, backups](docs/screens/settings.png)
+![Settings: the collection folders, the folder for new tracks, and the watched downloads folder with auto-move](docs/screens/settings.png)
 
-The gear at the bottom of the sidebar. From top to bottom: the library (its
-folders, playlist, remove), the SoundCloud account signed in on Discover (sign
-out, and the switch that likes every track you add), where tracks open
-(Discover or your browser), the Downloads folder DJ HQ watches and the switch
-for moving exact matches automatically, AIFF instead of WAV (see
-[below](#aiff-instead-of-wav-and-moving-the-main-folder)), how often the playlist is checked,
-appearance, language, backups (how much space the originals of converted files and
-replaced MP3s take, with a **Clean up** button once you're sure you won't need
-them), moving or backing up your setup (**Export configuration…** and
-**Import configuration…**), and updates.
+The gear at the bottom of the sidebar. The cards are in four groups.
+**Collection**: the collection folders and the folder for new tracks, the
+watched downloads folder and the switch for moving exact matches
+automatically, AIFF instead of WAV (see
+[below](#aiff-instead-of-wav-and-moving-a-folder)), and backups (how much space
+the originals of converted files and replaced MP3s take, with a **Clean up
+backups…** button once you're sure you won't need them). **This playlist**:
+the active playlist's link, its own folder for new tracks, and **Remove this
+playlist…**. **Integrations**, among others: the SoundCloud account signed in
+on Discover (sign out, and the switch that likes every track you add), where
+tracks open (Discover or your browser), and moving or backing up your setup
+(**Export configuration…** and **Import configuration…**). **Application**:
+how often the playlist is checked, appearance, language, and updates.
 
 **Language.** DJ HQ comes in English and Polish. On **Automatic** it follows
 your computer's language: Polish on a Polish system, English on any other.
@@ -599,24 +605,23 @@ artist and file names, and messages from SoundCloud itself, stay as they are.
 
 ### More than one folder
 
-A library starts with one folder, but your tracks for a playlist may be spread
-over several, or sorted into subfolders. Both work:
+Your tracks may be spread over several folders, or sorted into subfolders.
+Both work:
 
-- **Add folder** in the library card of Settings adds another folder to the
-  library. Files in any of its folders count as yours. The first folder stays
-  the *main* one: that is where downloads are moved into, until you click
-  **Make main folder** on another folder's row. A folder can be removed from
-  the library again; its files stay where they are.
-- **Include subfolders** also scans the folders inside each library folder.
-  It is off unless you turn it on, so a library never picks up more than you
-  asked for.
+- **Add folder** on the Collection folders card of Settings adds a folder to
+  the collection. Every playlist is matched against the files in all
+  collection folders. The **×** next to a folder stops watching it; its files
+  stay where they are. **New tracks go to** is the folder downloads are moved
+  into.
+- **Include subfolders**, next to each folder, also scans the folders inside
+  it. It is on unless you turn it off.
 
-Files outside the main folder are listed with their folder in front, for
-example `Deep/Artist - Title.wav` or `Vinyl rips/Artist - Title.wav`, so you
-can see where each one lives. Tags, conversion, backups and restore work on
-them like on any other file.
+With more than one collection folder, every file is listed with its folder's
+name in front, for example `Deep/Artist - Title.wav` or
+`Vinyl rips/Artist - Title.wav`, so you can see where each one lives. Tags,
+conversion, backups and restore work the same in every folder.
 
-### AIFF instead of WAV, and moving the main folder
+### AIFF instead of WAV, and moving a folder
 
 rekordbox shows cover art for AIFF files and not for WAV files, so DJ HQ can
 turn WAV files into AIFF files with the same audio at the same sample rate and
@@ -628,27 +633,25 @@ comes back and the AIFF goes to the backups. rekordbox then sees
 new files without cue points: export your collection in rekordbox with File >
 Export Collection in xml format, choose that file with **Update a rekordbox
 export…**, and import from the new file DJ HQ writes next to it the playlists
-it names (tracks that are in no playlist come in through All Tracks). If you moved or renamed the library's folder, use
-**Change…** next to the main folder in Settings > Library: no files are moved,
-and your matches carry over, also when a file now has the same name with
-another extension. When the AIFF copies are already in an extra folder of the
-library, click **Make main folder** on that folder's row: the two folders swap
-roles, the old main folder stays in the library as an extra folder, and every
-match, pin and edit stays with its file. Remove the old folder afterwards if
-you like: a track matched to a file there keeps its match when the library has
-a file of the same name in another folder, also with another extension.
+it names (tracks that are in no playlist come in through All Tracks). If you moved or renamed a collection folder, add it
+at its new place with **Add folder** in Settings > Collection folders, then
+remove the old row with its **×**. No files are moved, and a track matched to a
+file in the old folder keeps its match when the collection has a file of the
+same name, also with another extension. That way, when the AIFF copies are in
+another collection folder, you can remove the folder with the WAV files.
 
 ### More than one playlist
 
-Click **+ Add library** in the sidebar to link another folder to another
-playlist, and switch between libraries from the library name at the top. Each
-library keeps its own matches, edits and "new" marks.
+Click **+ Add playlist** in the sidebar to link another SoundCloud playlist to
+the collection, and switch between playlists from the name at the top. A match
+and an edited name belong to the track and are shared by every playlist that
+has it; only the "new" marks are per playlist.
 
 ### Moving to another computer, or a backup
 
 **Settings > Move or back up your setup > Export configuration…** saves one
 file, `DJ HQ config <date>.djhq.json`, with everything DJ HQ knows about your
-libraries: each library's SoundCloud link and track list, its matches (by hand
+playlists and your collection: each playlist's SoundCloud link and track list, its matches (by hand
 and automatic), the names you edited, Have / Missing / not available marks,
 what's new, and your settings (refresh interval, auto-move, appearance, the
 target player). Save it on a USB stick or in a cloud folder (to DJ HQ a cloud
@@ -659,11 +662,11 @@ Not in the file: the music itself, the backed-up originals (so *Restore
 originals* has nothing to restore on the new computer), the SoundCloud
 sign-in, the language setting, and this computer's paths: the Downloads folder
 is looked up again there.
-Files are recorded by their name inside the library folder, never by a full
+Files are recorded by their name inside their collection folder, never by a full
 path, so a Mac file imports on Windows and the other way round.
 
-A private playlist's share link works like a password. When a library uses
-one, the export says so and offers **Leave the links out**; the library then
+A private playlist's share link works like a password. When a playlist uses
+one, the export says so and offers **Leave the links out**; the playlist then
 arrives without its link, says so on every page, and isn't checked for
 changes until you paste the link again with **Change link…**. Everything else
 works from the track list in the file.
@@ -673,23 +676,23 @@ goes in steps, and nothing changes before the last one:
 
 1. Choose the file. DJ HQ reads and checks it; a file from a newer DJ HQ, a
    damaged or cut-off file, or one with file names pointing outside the
-   library folder is refused.
-2. What's in it: per library the tracks, matches (by hand and found by DJ HQ),
+   collection folder is refused.
+2. What's in it: per playlist the tracks, matches (by hand and found by DJ HQ),
    edited names and marks, and what the import replaces on this computer.
-3. Music folders: for each library folder, the folder on this computer
-   (Browse… or type it). DJ HQ counts how many of the library's files it finds
+3. Music folders: for each collection folder, the folder on this computer
+   (Browse… or type it). DJ HQ counts how many of that folder's files it finds
    there before anything is changed. Files are found by their name, also when
    the copy changed upper and lower case or the way accented letters are
    stored, and by a file name that appears once anywhere in the folder (then
    *Include subfolders* is switched on). A name that appears twice is left
    unmatched rather than guessed.
 4. Confirm. Matches whose file isn't in the folder are dropped. When none of a
-   library's files are there yet (a fresh computer, music not copied yet), you
-   can still import it: the library then waits for its files, keeps every
+   playlist's files are there yet (a fresh computer, music not copied yet), you
+   can still import it: the playlist then waits for its files, keeps every
    match and points it at each file as it arrives, until you press **The copy
    is complete**. Nothing shows as a new file that wasn't new before.
 
-An import replaces the libraries on this computer (adding one next to existing
+An import replaces the playlists and the collection folders on this computer (adding a playlist next to existing
 ones comes later). Before it writes anything it saves a copy of the current
 data (`<time>-before-import.djhq.db`) in `backups/` in the data folder (the
 last five imports, and every import of the past week, are kept). To go back:
@@ -721,7 +724,7 @@ them into a new database.
   playing, Add and the heart work again.
 - **A download doesn't show up.** Zips and unfinished downloads are ignored:
   unzip, let it finish, then **Rescan**. A file whose name already exists in
-  your folder counts as "already in your library".
+  your folder counts as "already in your collection".
 - **rekordbox still shows the old bit depth after converting.** That column is
   cached. Right-click the track and choose *Analyze Track* (hot cues survive),
   or ignore it: playback uses the real file.
@@ -730,7 +733,7 @@ them into a new database.
 - **The XML playlist imported but the tracks look unchanged.** A rekordbox
   quirk: importing a playlist doesn't update tracks already in the collection.
   Right-click the tracks inside the *rekordbox xml* node and import those too.
-- **"Couldn't load your library: operation not permitted" (macOS).** Give the
+- **"Couldn't read your music folder: operation not permitted" (macOS).** Give the
   app access to your music folder in System Settings > Privacy & Security >
   Files and Folders.
 - **macOS says the app is "damaged" and should go in the Bin.** That happens
@@ -752,9 +755,9 @@ Windows. Running from source uses the project folder instead. In there:
 
 | | |
 | --- | --- |
-| `djhq.db` | the database: libraries, playlist snapshots, manual matches, edits, "new" marks, settings and appearance (`djhq.db-journal` sits next to it while DJ HQ runs) |
-| `originals/<library>/` | originals backed up before a conversion |
-| `originals/<library>/replaced/` | MP3s replaced by a lossless download |
+| `djhq.db` | the database: playlists and their snapshots, the collection folders, manual matches, edits, "new" marks, settings and appearance (`djhq.db-journal` sits next to it while DJ HQ runs) |
+| `originals/<playlist>/` | originals backed up before a conversion (`<playlist>` is the playlist's internal id) |
+| `originals/<playlist>/replaced/` | MP3s replaced by a lossless download |
 | `rekordbox.xml` | the last rekordbox export |
 | `backups/` | copies of `djhq.db` from before each configuration import (the last five, and all of the past week) |
 | `state.json.imported-<time>` | the `state.json` of DJ HQ 1.7 or older, as it was when it was moved into `djhq.db` (kept, never read again; `prefs.json` likewise) |
@@ -792,7 +795,7 @@ says it isn't used. To carry on with that file instead: quit DJ HQ, move
 `djhq.db` out of the data folder and start DJ HQ, which moves `state.json` into
 a new database. To keep the database, move `state.json` out of the data folder.
 
-When a library folder isn't there (an unplugged drive, a cloud folder
+When a collection folder isn't there (an unplugged drive, a cloud folder
 that hasn't synced, a renamed folder), the app says so and forgets nothing:
 manual matches and "new" marks come back with the folder.
 
@@ -856,12 +859,12 @@ npm run dist        # build installers locally into release/
 | `web/tour.js` · `web/demo.js` | the guided tour and its sample data |
 | `web/news.js` | What's new: the list of versions and the dialog after an update; the texts are in `web/lang/*/news.js` |
 | `web/guide.js` | the Guide panel behind the ? button, one entry per page |
-| `web/pages/setup.js` | the "Before we start" screen shown once after the first library |
+| `web/pages/setup.js` | the "Before we start" screen shown once after the first playlist |
 | `web/player.js` | the preview player |
 | `src/bandcamp.ts` | the Bandcamp search: artist pages first, then the title, over plain HTTP |
 | `src/directdl.ts` | free downloads that need no page (Drive, Dropbox, audio files, SoundCloud's button) |
 | `src/zip.ts` | minimal zip reader for Bandcamp downloads |
-| `src/config.ts` | configuration export and import: the file format, its checks, re-pointing the library folders, the backup before an import |
+| `src/config.ts` | configuration export and import: the file format, its checks, re-pointing the collection folders, the backup before an import |
 | `web/pages/config.js` | the Export / Import configuration dialogs and their Settings card |
 | `scripts/afterPack.js` | ad-hoc signs the macOS app after packaging |
 | `scripts/screenshots.js` | regenerates the README screenshots from sample data (`npm run screens`) |
@@ -874,7 +877,7 @@ requests are queued and run one at a time. Errors meant for the user
 carry a short `code` next to the English `error` text.
 
 The screenshots in this README come from `npm run screens`: it builds a
-throw-away home folder with a sample library (real audio files, made-up
+throw-away home folder with a sample collection (real audio files, made-up
 artists), runs the app against it and captures every screen, so nobody's
 actual collection ends up in the pictures.
 
@@ -928,30 +931,30 @@ bodies are JSON.
 | `GET /api/state` | | current view |
 | `GET /api/app` | | app version, platform and whether it runs packaged (not a view) |
 | `POST /api/refresh` | | fetch the playlist, then the view (with `fetch_report: {unreadable}`, tracks SoundCloud wouldn't hand out) |
-| `POST /api/rescan` | | rescan the library folders |
-| `POST /api/library` | `{op: "add", dir, url}` · `{op: "select", id}` · `{op: "remove", id}` · `{op: "add_folder", dir}` · `{op: "remove_folder", dir}` · `{op: "subfolders", on}` · `{op: "set_url", url, confirm?}` · `{op: "files_ready"}` · `{op: "set_dir", dir, confirm?}` | manage libraries, their folders and their SoundCloud link (the folder ops, `set_url`, `set_dir` and `files_ready` take an optional `id`, default: the active library; `files_ready` ends an imported library's wait for its music; `set_dir` makes another folder the main folder, moving no files: without `confirm` it changes nothing and answers `{confirm: {dir, from, from_away, files, empty, before, after, lose, lose_count, gain, pins, records}}`, with it the view carries `main_report`; matches, edits and found tracks follow their files, also to the same name with another audio extension; for one of the library's extra folders the two folders swap roles, `swap: true` in the plan and in `main_report`; `remove_folder` moves a pin or record of a file in that folder to the one file of the same name left in the library, also with another extension, and the view carries `remove_report: {dir, followed, before, after, lost, lost_count}`). `folders_away` entries carry `main: true` for the main folder and `drive: true` when its drive isn't mounted. The view carries `link_missing` for a library imported without its link (`/api/refresh` then refuses with that code) and `folders_away` entries with `why: "waiting"` while an imported library waits for its files. `add` and `set_url` add `fetch_report: {unreadable}`, `set_url` also `{same, of, had}`; a new link that misses tracks the library had changes nothing and answers `{confirm: report}` until it is sent again with `confirm: true` |
+| `POST /api/rescan` | | rescan the collection folders |
+| `POST /api/library` | `{op: "add", dir, url}` · `{op: "select", id}` · `{op: "remove", id}` · `{op: "add_folder", dir}` · `{op: "remove_folder", dir}` · `{op: "subfolders", on}` · `{op: "set_url", url, confirm?}` · `{op: "files_ready"}` · `{op: "set_dir", dir, confirm?}` | manage playlists, their SoundCloud link and folders (the folder ops, `set_url`, `set_dir` and `files_ready` take an optional `id`, default: the active playlist; `files_ready` ends an imported playlist's wait for its music; `set_dir` makes another folder the main folder, moving no files: without `confirm` it changes nothing and answers `{confirm: {dir, from, from_away, files, empty, before, after, lose, lose_count, gain, pins, records}}`, with it the view carries `main_report`; matches, edits and found tracks follow their files, also to the same name with another audio extension; for one of the extra folders the two folders swap roles, `swap: true` in the plan and in `main_report`; `remove_folder` moves a pin or record of a file in that folder to the one file of the same name left in the collection, also with another extension, and the view carries `remove_report: {dir, followed, before, after, lost, lost_count}`). `folders_away` entries carry `main: true` for the main folder and `drive: true` when its drive isn't mounted. The view carries `link_missing` for a playlist imported without its link (`/api/refresh` then refuses with that code) and `folders_away` entries with `why: "waiting"` while an imported playlist waits for its files. `add` and `set_url` add `fetch_report: {unreadable}`, `set_url` also `{same, of, had}`; a new link that misses tracks the playlist had changes nothing and answers `{confirm: report}` until it is sent again with `confirm: true` |
 | `POST /api/device` | `{device}` | target player (`xdj-700`, `nxs2`, `cdj-3000`, `cdj-3000x`) |
-| `POST /api/settings` | `{inbox_dir?, auto_move?, refresh_min?, like_on_add?, sc_open?, aiff_auto?, bandcamp?, bandcamp_days?}` | downloads folder (`""` = default), auto-move, check interval in minutes, like-on-add, where SoundCloud links open (`"discover"` or `"browser"`), whether WAV files moved into the library become AIFF files (the move's view carries `move_report: {key, aiff_kept}`, Move all's `inbox_report` has `aiff_kept`) |
-| `POST /api/config/export-info` | | what the export dialog warns about: libraries with private links, folders that are away, `can_save` (not a view) |
+| `POST /api/settings` | `{inbox_dir?, auto_move?, refresh_min?, like_on_add?, sc_open?, aiff_auto?, bandcamp?, bandcamp_days?}` | downloads folder (`""` = default), auto-move, check interval in minutes, like-on-add, where SoundCloud links open (`"discover"` or `"browser"`), whether WAV files moved into the collection become AIFF files (the move's view carries `move_report: {key, aiff_kept}`, Move all's `inbox_report` has `aiff_kept`) |
+| `POST /api/config/export-info` | | what the export dialog warns about: playlists with private links, folders that are away, `can_save` (not a view) |
 | `POST /api/config/export` | `{leave_links_out?}` | Electron: a save dialog, then `{path}` or `{canceled}`; headless answers `unsupported` (not a view) |
 | `GET /api/config/export?leave_links_out=1` | | the configuration file as a download (only for `Host` 127.0.0.1 / localhost) |
 | `GET /api/state/raw` | | the saved data (all but the appearance settings), as the `state.json` of DJ HQ 1.7 and older, as a download (only for `Host` 127.0.0.1 / localhost) |
 | `POST /api/state/raw` | | Electron: a save dialog for the same file, then `{path}` or `{canceled}`; headless answers `unsupported` (not a view) |
-| `POST /api/config/import/plan` | `{text}` · `{pick: true}` | reads and checks a configuration file (or asks for one with a file dialog); writes nothing; answers a single-use `plan` id and a summary per library, plus what it `replaces` (not a view, not queued) |
+| `POST /api/config/import/plan` | `{text}` · `{pick: true}` | reads and checks a configuration file (or asks for one with a file dialog); writes nothing; answers a single-use `plan` id and a summary per playlist, plus what it `replaces` (not a view, not queued) |
 | `POST /api/config/import/probe` | `{plan, lib, folder, dir}` | how many of that folder's matched and known files are in `dir` (names only, nothing changes; `problem` for a folder that can't be used) |
-| `POST /api/config/import/apply` | `{plan, folders: [[main, extra \| null, …] per library], confirm_replace?, no_files?: [library index], machine?}` | saves a copy of `djhq.db` in `backups/`, replaces the libraries and settings, answers the view with `import_report`; refuses with `confirm_replace`, `no_files_found`, `folder_*`, `job_active`, `store_blocked` (nothing can be saved right now) |
-| `GET /api/file?path=` | | streams a local audio file for the preview (library and downloads folders only) |
-| | | file keys (`file`, `name`) are relative to the library folder, `/`-separated; files of an extra folder carry its name in front |
-| `POST /api/clean-backups` | | deletes the active library's backups (adds `clean_report`) |
+| `POST /api/config/import/apply` | `{plan, folders: [[main, extra \| null, …] per library], confirm_replace?, no_files?: [library index], machine?}` | saves a copy of `djhq.db` in `backups/`, replaces the playlists, the collection folders and settings, answers the view with `import_report`; refuses with `confirm_replace`, `no_files_found`, `folder_*`, `job_active`, `store_blocked` (nothing can be saved right now) |
+| `GET /api/file?path=` | | streams a local audio file for the preview (collection and downloads folders only) |
+| | | file keys (`file`, `name`) are relative to the collection folder, `/`-separated; files of an extra folder carry its name in front |
+| `POST /api/clean-backups` | | deletes the active playlist's backups (adds `clean_report`) |
 | `POST /api/override` | `{id, status: "have" \| "missing" \| "na" \| null}` | status override / not available now |
 | `POST /api/assign` | `{id, file}` (`""` = no file, `null` = automatic) | pin a file to a track |
 | `POST /api/edit` | `{id, artist, title}` or `{file, artist, title}` | artist/title edit (track or local file) |
 | `POST /api/direct-download` | `{id, url}` | fetch one of that track's own links (Drive, Dropbox, an audio file, SoundCloud's button) into the downloads folder; answers `{file}`, null when a page came back (not a view, not queued) |
-| `POST /api/bandcamp/start` · `GET /api/bandcamp/progress` | `{force?}` | look for the active library's tracks without a good link, in the background (new ones join a run; `force`: also those not found before): `{running, done, total, found, error, now, now_id, paused_until, pending, links}` (not a view, not queued) |
+| `POST /api/bandcamp/start` · `GET /api/bandcamp/progress` | `{force?}` | look for the active playlist's tracks without a good link, in the background (new ones join a run; `force`: also those not found before): `{running, done, total, found, error, now, now_id, paused_until, pending, links}` (not a view, not queued) |
 | `POST /api/bandcamp/find` | `{id}` | look one track up now; answers `{found, title?}` (not a view, not queued) |
 | `POST /api/bandcamp/reject` | `{id}` | the found link is not this track: removed, and that page is not offered again |
 | `POST /api/seen` | | mark all as seen |
-| `POST /api/tag` | `{preview?, replace?, keep_file?, seen?, all?}` | write tags (adds `tag_report`; files whose own different name would be replaced are left and listed in `kept` unless `replace`, or `keep_file` makes their names hand edits first; both apply only to the previewed replaces whose `sig` is in `seen`); `preview` writes nothing and answers `{writes, replaces}`; `all` takes every library file, tagged or not (preview and `tag_report` add `left`: tagged files whose rewrite would lose something; `tag_report` also `all`, `total` and `changed`: files that changed on disk during the run), one run at a time: meanwhile every `/api/tag`, convert, restore and clean-backups is refused with code `tag_running` |
+| `POST /api/tag` | `{preview?, replace?, keep_file?, seen?, all?}` | write tags (adds `tag_report`; files whose own different name would be replaced are left and listed in `kept` unless `replace`, or `keep_file` makes their names hand edits first; both apply only to the previewed replaces whose `sig` is in `seen`); `preview` writes nothing and answers `{writes, replaces}`; `all` takes every file of the active playlist, tagged or not (preview and `tag_report` add `left`: tagged files whose rewrite would lose something; `tag_report` also `all`, `total` and `changed`: files that changed on disk during the run), one run at a time: meanwhile every `/api/tag`, convert, restore and clean-backups is refused with code `tag_running` |
 | `GET /api/tag/progress` | | `{running, kind, done, total, report}` of the `all` run or of `/api/art` (`kind` `tags`, `art` or `aiff`; not queued; `report`: the last run's `tag_report` or `art_report`) |
 | `POST /api/art` | `{preview?}` | Add cover art: the track's SoundCloud artwork (500x500, then 300x300, then the stored link, each step only on a 404/410) goes into each matched file that is tagged, has an ID3v2.3/2.4 tag DJ HQ writes and no picture; adds `art_report` `{done, errors, error_items, changed, total, left, offline?}` (`offline`: files not tried after three links in a row failed to download); `preview` writes and downloads nothing and answers `{writes, wav, left}` (`left` by reason: `has_pic`, `untagged`, `format`, `no_art`, `extra`; the view's `art` has the same counts). One file-writing run at a time with Write tags in every file: while it runs those calls are refused with `art_running`, and it is refused with `tag_running` during theirs |
 | `POST /api/convert` · `/api/restore` | | convert / restore originals (adds a report) |
@@ -961,14 +964,14 @@ bodies are JSON.
 | `POST /api/found` | `{file, track \| null}` | remember / forget the picked track |
 | `POST /api/find-all` | | search every unresolved file, accept sure matches |
 | `POST /api/inbox` | | downloads that match the playlist (`items`) and audio that matches nothing (`unmatched`), including tracks inside zips (not a view; carries `moved` when auto-move acted) |
-| `POST /api/inbox-move` · `/api/inbox-move-all` | `{file, id?, zip?, track?}` · | move downloads into the library (unpacks from a zip when `zip` is given); without `id` the file is moved as it is, `track` (a search result) remembers it as found for that track |
+| `POST /api/inbox-move` · `/api/inbox-move-all` | `{file, id?, zip?, track?}` · | move downloads into the collection (unpacks from a zip when `zip` is given); without `id` the file is moved as it is, `track` (a search result) remembers it as found for that track |
 | `POST /api/inbox-find` | `{file, zip?, q?}` | search SoundCloud for an unmatched download, scored like `/api/find` |
 | `POST /api/export-xml` | | write `rekordbox.xml` (returns path and counts) |
 | `POST /api/reveal` · `/api/pick-folder` | `{path}` · | Electron only |
 | `POST /api/sc/status` | | Discover: who is signed in, what the embedded player is playing and `captcha` (SoundCloud's bot check is up in the view) (not a view; `available: false` headless) |
 | `POST /api/sc/add` · `/api/sc/remove` | `{url, like?}` | add a track to / remove it from the playlist on SoundCloud, signed in on Discover (adds `sc_result`) |
 | `POST /api/sc/like` | `{url, on}` | like / unlike a track (adds `sc_like`) |
-| `POST /api/sc/likes` | `{force?}` | the signed-in account's likes checked against all libraries (not a view) |
+| `POST /api/sc/likes` | `{force?}` | the signed-in account's likes checked against the collection (not a view) |
 | `POST /api/sc/show` · `/hide` · `/bounds` · `/nav` · `/signout` | | the embedded SoundCloud view (Electron only) |
 
 ### Releases

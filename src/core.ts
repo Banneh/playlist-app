@@ -754,7 +754,7 @@ function libPath(lib: Library, key: string): string {
 
 function requireLib(): Library {
   const lib = activeLib();
-  if (!lib) throw appError("no_library", "add a library first (＋ button in the header)");
+  if (!lib) throw appError("no_library", "add a playlist first");
   return lib;
 }
 
@@ -873,7 +873,7 @@ async function healLibUrl(lib: Library): Promise<void> {
 
 /** A library imported from a configuration file whose link was left out has url "": it keeps
  *  its snapshot and everything else, and only fetching waits for Change link…. */
-const linkMissing = () => appError("link_missing", "this library has no SoundCloud link yet; set it with Change link… in Settings");
+const linkMissing = () => appError("link_missing", "this playlist has no SoundCloud link yet; set it with Change link… in Settings");
 
 /** Read a playlist or likes link from SoundCloud without touching the state. `prev` is the
  *  snapshot it replaces: its first-seen times are kept (none at all = a first fetch). */
@@ -1068,18 +1068,18 @@ const cannot = (likes: boolean, code: string, why: string, vars?: Record<string,
   ({ ok: false, likes, why, why_code: code, ...(vars ? { why_vars: vars } : {}) });
 export async function scCanWrite(token: string): Promise<ScCan> {
   const lib = activeLib();
-  if (!lib) return cannot(false, "no_library", "no library");
+  if (!lib) return cannot(false, "no_library", "no playlist");
   const me = await scMe(token);
   await healLibUrl(lib);
-  if (!lib.url) return cannot(false, "can_no_link", "This library has no SoundCloud link yet; set it with Change link… in Settings.");
+  if (!lib.url) return cannot(false, "can_no_link", "This playlist has no SoundCloud link yet; set it with Change link… in Settings.");
   const likes = likesUser(lib.url);
   if (likes) {
     if (likes.toLowerCase() !== me.permalink.toLowerCase())
-      return cannot(true, "can_other_likes", `This library follows ${likes}'s likes, but you are signed in as ${me.username}.`, { likes, me: me.username });
+      return cannot(true, "can_other_likes", `This playlist follows ${likes}'s likes, but you are signed in as ${me.username}.`, { likes, me: me.username });
     return { ok: true, likes: true };
   }
   const pl = await scResolve(lib.url);
-  if (!pl || pl.kind !== "playlist") return cannot(false, "can_playlist_gone", "The library's playlist could not be found on SoundCloud.");
+  if (!pl || pl.kind !== "playlist") return cannot(false, "can_playlist_gone", "This playlist could not be found on SoundCloud.");
   if (pl.user_id !== me.id)
     return pl.user?.username
       ? cannot(false, "can_not_owner", `This playlist belongs to ${pl.user.username}; you can only add to your own playlists.`, { owner: pl.user.username })
@@ -3818,7 +3818,7 @@ export async function libraryOp(data: any): Promise<any> {
   const libs = STATE.libraries;
   const target = (): Library => {
     const lib = data.id ? libs.find((l) => l.id === data.id) : activeLib();
-    if (!lib) throw appError("library_not_found", "library not found");
+    if (!lib) throw appError("library_not_found", "this playlist is no longer in DJ HQ");
     return lib;
   };
   if (op === "add") {
@@ -3853,8 +3853,8 @@ export async function libraryOp(data: any): Promise<any> {
     if (!url.startsWith("http")) throw appError("url_not_full", "please give a full SoundCloud playlist or likes URL");
     // (a library imported without its link has none to compare with: the track check below still guards it)
     if (lib.url && !!likesUser(url) !== !!likesUser(lib.url))
-      throw likesUser(lib.url) ? appError("link_is_likes", "this library follows a Likes page; add a new library for a playlist")
-                               : appError("link_is_playlist", "this library follows a playlist; add a new library for a Likes page");
+      throw likesUser(lib.url) ? appError("link_is_likes", "a playlist link can't replace a Likes page; add it as a new playlist")
+                               : appError("link_is_playlist", "a Likes page can't replace a playlist link; add it as a new playlist");
     const r = await readPlaylist(url, lib.playlist);
     const before = new Set((lib.playlist?.tracks || []).map((t) => t.id));
     const same = r.playlist.tracks.filter((t) => before.has(t.id)).length;
@@ -3871,7 +3871,7 @@ export async function libraryOp(data: any): Promise<any> {
   } else if (op === "select") {
     if (libs.some((l) => l.id === data.id)) STATE.active = data.id;
   } else if (op === "remove") {
-    if (libs.length <= 1) throw appError("last_library", "cannot remove the last library");
+    if (libs.length <= 1) throw appError("last_library", "the last playlist can't be removed");
     STATE.libraries = libs.filter((l) => l.id !== data.id);
     if (STATE.active === data.id) STATE.active = STATE.libraries[0].id;
   } else if (op === "files_ready") {
@@ -3879,7 +3879,7 @@ export async function libraryOp(data: any): Promise<any> {
     // pins whose file still isn't there are dropped with the next view, as for any other library
     delete target().files_pending;
   } else {
-    throw appError("bad_request", "unknown library op");
+    throw appError("bad_request", "unknown playlist op");
   }
   saveState();
   return buildView();
@@ -4107,7 +4107,7 @@ function confident(c: Candidate[]): boolean {
 export async function findTrack(data: any): Promise<any> {
   const lib = requireLib();
   const f = (await scanLocal(lib)).find((x) => x.name === data.file);
-  if (!f) throw appError("file_not_found", "file not found in the library folder");
+  if (!f) throw appError("file_not_found", "file not found in the collection");
   const q = String(data.q || "").trim() || extraQuery(f);
   return { q, candidates: await searchCandidates(lib, f, q) };
 }
@@ -4421,10 +4421,10 @@ export async function inboxMoveOne(data: any): Promise<{ key: string; path: stri
   if (!name) throw appError("no_file", "no file given");
   const dest = resolveMoveDest(lib, data.dest);
   const dst = path.join(dest.dir, name);
-  if (fs.existsSync(dst)) throw appError("name_taken", `${name}: a file with this name is already in the library`, { name });
+  if (fs.existsSync(dst)) throw appError("name_taken", `${name}: a file with this name is already in the collection`, { name });
   // the WAV would become an AIFF that is there already
   const toAiff = !!STATE.settings?.aiff_auto && path.extname(name).toLowerCase() === ".wav";
-  if (toAiff && aiffThere(dst)) throw appError("name_taken", `${name}: a file with this name is already in the library`, { name });
+  if (toAiff && aiffThere(dst)) throw appError("name_taken", `${name}: a file with this name is already in the collection`, { name });
   const found = data.track && typeof data.track === "object" ? data.track : null;
   const inList = (id: any) => !!lib.playlist?.tracks.some((t) => String(t.id) === String(id));
   // the playlist track the file is for: the one given, or the found track when it is in the playlist already

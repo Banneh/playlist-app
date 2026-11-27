@@ -123,7 +123,7 @@ I18N.add('en', 'settings', {
   pl: {
     title: 'Playlist: {name}',
     text: 'This playlist’s own settings. The playlist matches its tracks against the whole collection.',
-    textLikes: 'This list follows your SoundCloud likes and matches them against the whole collection.',
+    textLikes: 'This playlist follows your SoundCloud Likes and matches them against the whole collection.',
     dest: 'New tracks go to <b>{dir}</b>',
     destNone: 'Add a collection folder first',
     src: { own: '(set for this playlist)', default: '(collection default)', last: '(last picked when moving a file)', first: '(first collection folder)' },

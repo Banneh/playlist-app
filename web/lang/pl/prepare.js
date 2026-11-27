@@ -33,7 +33,7 @@ I18N.add('pl', 'prepare', {
     checkAllTip: 'Przejrzyj po kolei wszystkie nazwy',
     all: 'Zapisz we wszystkich plikach',
     allTip: 'Zapisz nazwy jeszcze raz w każdym pliku, także w otagowanych: naprawa po tym, jak inna aplikacja uszkodziła tagi',
-    noFilesTip: 'W bibliotece nie ma jeszcze plików',
+    noFilesTip: 'W kolekcji nie ma jeszcze plików',
     art: 'Dodaj okładki',
     artTip: 'Zapisz w każdym pliku okładkę jego utworu z SoundCloud, jeśli plik nie ma jeszcze obrazka',
     noArtTip: 'Nie ma czego dodać: żadnemu otagowanemu plikowi WAV, MP3 ani AIFF nie brakuje okładki, którą jego utwór ma na SoundCloud',
@@ -150,12 +150,12 @@ I18N.add('pl', 'prepare', {
   xml: {
     failed: 'Eksport nie powiódł się: {msg}',
     title: 'Wyeksportowano playlistę rekordbox',
-    none: 'Nie ma jeszcze bibliotek z wczytaną playlistą.',
+    none: 'Żadna playlista nie jest jeszcze wczytana.',
     lead: 'W rekordbox:',
     s1: 'Otwórz <b>Preferences > Advanced > Database</b> i w sekcji <b>rekordbox xml</b> wskaż powyższy plik.',
     s2: 'W drzewie po lewej pojawi się pozycja <b>rekordbox xml</b>.',
     s3: 'Kliknij prawym przyciskiem playlistę w tej pozycji i wybierz <b>Import Playlist</b>.',
-    after: 'Utwory, które są już w twojej kolekcji, zachowają punkty cue i siatki. Eksportuj ponownie, kiedy chcesz. Ścieżka pliku się nie zmienia, więc rekordbox wczyta zmiany przy następnym imporcie.',
+    after: 'Utwory, które są już w twojej kolekcji rekordboxa, zachowają punkty cue i siatki. Eksportuj ponownie, kiedy chcesz. Ścieżka pliku się nie zmienia, więc rekordbox wczyta zmiany przy następnym imporcie.',
   },
   cues: {
     button: 'Popraw cue…',

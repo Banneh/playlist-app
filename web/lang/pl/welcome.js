@@ -3,8 +3,8 @@ I18N.add('pl', 'welcome', {
   title: 'Witaj w DJ HQ',
   lead: 'Utrzymuj foldery z muzyką w zgodzie ze swoimi playlistami na SoundCloud i przygotuj je do rekordbox i do grania w klubie.',
   addMore: 'Kolejne foldery i playlisty dodasz w każdej chwili.',
-  connect: 'Połącz bibliotekę',
-  connecting: 'Łączenie i wczytywanie playlisty…',
+  connect: 'Podłącz playlistę',
+  connecting: 'Podłączanie i wczytywanie playlisty…',
   or: 'albo',
   tour: 'Zacznij od minutowego oprowadzania',
   feat: {
@@ -32,16 +32,16 @@ I18N.add('pl', 'welcome', {
 
   // the Add a library dialog
   add: {
-    title: 'Nowa biblioteka',
-    sub: 'Połącz folder z plikami muzycznymi z playlistą SoundCloud. Między bibliotekami przełączasz się na pasku bocznym.',
+    title: 'Dodaj playlistę',
+    sub: 'Połącz kolejną playlistę SoundCloud z kolekcją. Jeśli wybranego folderu nie ma jeszcze w kolekcji, zostanie dodany. Między playlistami przełączasz się na pasku bocznym.',
   },
 
   // a library whose playlist was never fetched
   noData: {
-    textLib: 'Playlista biblioteki <b>{name}</b> nie została jeszcze wczytana z SoundCloud. Wczytaj ją teraz, aby zobaczyć, które utwory są już w twoim folderze, a których wciąż brakuje.',
+    textLib: 'Playlista <b>{name}</b> nie została jeszcze wczytana z SoundCloud. Wczytaj ją teraz, aby zobaczyć, które utwory są już w twoim folderze, a których wciąż brakuje.',
     text: 'Playlista nie została jeszcze wczytana z SoundCloud. Wczytaj ją teraz, aby zobaczyć, które utwory są już w twoim folderze, a których wciąż brakuje.',
     fetch: 'Wczytaj playlistę',
-    changeLinkHint: 'Ustaw dla tej biblioteki inny link SoundCloud, np. link udostępniania prywatnej playlisty',
+    changeLinkHint: 'Ustaw dla tej playlisty inny link SoundCloud, np. link udostępniania, jeśli jest prywatna',
     hintPublic: 'Playlista musi być <b>publiczna</b> albo, jeśli jest prywatna, połączona linkiem z przycisku <b>Share</b> (udostępnianie) na SoundCloud. <b>Zmień link…</b> pozwala go podmienić.',
     hintNet: 'Pierwsze wczytanie wymaga połączenia z internetem. Potem zmiany są sprawdzane automatycznie co 15 minut.',
     hintFolder: 'Folder z muzyką: {path}',
@@ -49,7 +49,7 @@ I18N.add('pl', 'welcome', {
 
   // /api/state failed at launch
   loadError: {
-    title: 'Nie udało się wczytać biblioteki',
+    title: 'Nie można odczytać folderu z muzyką',
     perm: '<b>macOS blokuje dostęp do folderu z muzyką.</b> Otwórz Ustawienia systemowe > Prywatność i ochrona > Pliki i foldery, zezwól na dostęp dla DJ HQ i spróbuj ponownie.',
   },
 });

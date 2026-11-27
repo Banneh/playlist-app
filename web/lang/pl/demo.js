@@ -1,6 +1,6 @@
 /* DJ HQ strings: demo, Polish. Owner: job E. Sample data shown during the tour. */
 I18N.add('pl', 'demo', {
-  library: 'Przykładowa biblioteka',
+  library: 'Przykładowa playlista',
   playlist: 'Przykładowa playlista',
   link: {
     freeDownload: 'POBIERZ ZA DARMO',

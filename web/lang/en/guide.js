@@ -31,12 +31,12 @@ I18N.add('en', 'guide', {
 
   missing: {
     title: 'Missing',
-    lead: 'Every playlist track that isn’t in your folder yet, with the links to get it. You will spend most of your time on this list.',
+    lead: 'Every playlist track that isn’t in your collection yet, with the links to get it. You will spend most of your time on this list.',
     s1: {
       h: 'Getting a track',
       i1: { name: 'Free DL', text: 'A free download: a Hypeddit-style gate, a Drive or Dropbox share, or SoundCloud’s own download button. Often an MP3. A blue button downloads right here, without the browser: Drive and Dropbox files, and SoundCloud’s button when you are signed in on Discover.' },
       i2: { name: 'Buy', text: 'A shop: Bandcamp, Beatport, Juno, Traxsource and friends. Listed first when a track has both, because shops sell lossless files. When the uploader gave no link, DJ HQ looks on Bandcamp by itself. If it found the wrong track, remove the link in the ⋯ menu. Hover a button to see where it goes.' },
-      i3: { name: 'Work through', text: 'One track at a time: artwork, the links, and a watch on your Downloads folder. Open the link, grab the file, and when it lands DJ HQ offers <b>Move into library</b> and steps on. Enter opens the link, the arrow keys step, N parks the track as not available, Esc closes.' },
+      i3: { name: 'Work through', text: 'One track at a time: artwork, the links, and a watch on your Downloads folder. Open the link, grab the file, and when it lands DJ HQ offers <b>Move into collection</b> and steps on. Enter opens the link, the arrow keys step, N parks the track as not available, Esc closes.' },
       i4: { name: 'Copy links', text: 'Puts every track on screen on your clipboard, one per line: artist and title, a tab, then the link. Handy for a shopping session in the browser.' },
     },
     s2: {
@@ -47,7 +47,7 @@ I18N.add('en', 'guide', {
     },
     s3: {
       h: 'Good to know',
-      t1: 'Downloaded files show up on the <b>Downloads</b> page; move them into the library from there. Nothing is renamed.',
+      t1: 'Downloaded files show up on the <b>Downloads</b> page; move them into the collection from there. Nothing is renamed.',
       t2: 'Already have the track under another name? Use <b>Match to a local file…</b> in the ⋯ menu instead of downloading it again.',
       t3: 'A track with no link is still worth a click on the artwork: SoundCloud sometimes lists a shop in the description.',
     },
@@ -55,7 +55,7 @@ I18N.add('en', 'guide', {
 
   have: {
     title: 'Have',
-    lead: 'Playlist tracks matched to a file in your folder. Each row shows the file and what it still needs before it’s ready for the booth.',
+    lead: 'Playlist tracks matched to a file in your collection. Each row shows the file and what it still needs before it’s ready for the booth.',
     s1: {
       h: 'The tags on a file',
       i1: { name: 'Needs tags', text: 'Artist and title in the file are missing or differ from the name shown, for example after you swapped or edited it. A WAV also needs them in the part of the file rekordbox reads, not only in its ID3 tag. <b>Write tags</b> fixes all of them at once.' },
@@ -73,7 +73,7 @@ I18N.add('en', 'guide', {
       h: 'The chips',
       t1: '<b>Lossless available</b>, <b>Needs tags</b> and <b>Needs convert</b> show only those tracks. The counts on the Prepare for player cards open the same chips.',
       t2: '<b>Check name</b> shows the tracks whose artist and title may be the wrong way round. Fix them before <b>Write tags</b>, so the right names go into the files.',
-      t3: 'A file that needs the same work but isn’t in the playlist is mentioned under the list, with a link to Not in playlist.',
+      t3: 'A file that needs the same work but isn’t in the playlist shows on the Collection page, whose <b>Tags</b> chip lists every file that needs tags.',
     },
   },
 
@@ -96,11 +96,11 @@ I18N.add('en', 'guide', {
 
   inbox: {
     title: 'Downloads',
-    lead: 'DJ HQ keeps an eye on your Downloads folder. Audio files there are compared with the playlist the same way your library is, and the ones that match a track show up here.',
+    lead: 'DJ HQ keeps an eye on your Downloads folder. Audio files there are compared with the playlist the same way your collection is, and the ones that match a track show up here.',
     s1: {
       h: 'Moving files in',
       i1: { name: 'A row', text: 'Which track the file belongs to, whether the length matches the playlist entry, and whether it’s an MP3.' },
-      i2: { name: 'Move into library', text: 'Moves the file as it is into the main library folder, without renaming, and links it to the track. It leaves Missing and appears in Have.' },
+      i2: { name: 'Move into collection', text: 'Moves the file as it is into the collection, to the folder for new tracks, without renaming, and links it to the track. It leaves Missing and appears in Have.' },
       i3: { name: 'Upgrade', text: 'A lossless download for a track you only had as an MP3. The old MP3 goes to the backup folder, not the bin.' },
       i4: { name: 'Zips', text: 'Bandcamp purchases arrive as zips. DJ HQ looks inside, lists the tracks that belong to the playlist (tagged “from Album.zip”) and unpacks only those. The zip stays where it is.' },
       i5: { name: 'Move all', text: 'The whole list at once, after telling you how many of them are upgrades.' },
@@ -108,33 +108,33 @@ I18N.add('en', 'guide', {
     s2: {
       h: 'Not in the playlist',
       i1: { name: 'Find on SoundCloud', text: 'For a download that matches no track: search for it, pick the right candidate, and the file moves in matched to that track. Tick the box and the track goes into the playlist on SoundCloud in the same step.' },
-      i2: { name: 'Move', text: 'Moves such a file into your library as it is. It shows up on Not in playlist, where you can find and add it later.' },
+      i2: { name: 'Move', text: 'Moves such a file into your collection as it is. It shows up on the Collection page, where you can find and add it later.' },
     },
     s3: {
       h: 'Good to know',
       t1: 'Unfinished downloads are ignored. Let them finish, then click <b>Rescan</b>.',
-      t2: 'Files that are already in your library by name are counted at the top but not listed.',
-      t3: 'With <b>Move exact matches automatically</b> on (Settings), a download whose name and length match a track exactly moves in on its own within a minute. Fuzzy matches and upgrades always wait for your click.',
+      t2: 'Files that are already in your collection by name are counted at the top but not listed.',
+      t3: 'With <b>Move exact matches into the collection automatically</b> on (Settings), a download whose name and length match a track exactly moves in on its own within a minute. Fuzzy matches and upgrades always wait for your click.',
       t4: 'Downloads land somewhere else? Change the watched folder in Settings.',
       t5: 'With <b>Do everything</b> on (Settings), its button sits next to Rescan: it moves these files in and takes them on through tags, Platinum Notes, Mixed In Key and your rekordbox XML. The Guide on Prepare for player has the details.',
     },
   },
 
   extras: {
-    title: 'Not in playlist',
-    lead: 'Files in your folder that match nothing in the playlist. The aim is to add them to the playlist, so that it lists all your tracks.',
+    title: 'Collection',
+    lead: 'Every file in your collection, with the playlists it is in. The <b>No playlist</b> chip shows the files that aren’t in any playlist yet. Find them on SoundCloud and add them to the active playlist, so that your playlists list all your tracks.',
     s1: {
       h: 'Finding them on SoundCloud',
-      i1: { name: 'Find all', text: 'Searches SoundCloud for every file at once. Sure matches are accepted on the spot; the rest are left for you.' },
-      i2: { name: 'Find on SoundCloud', text: 'Candidates with their length and how well they match. One that’s already in the playlist is marked, and picking it links the file to that track. Nothing fits? Shorten the search text: drop the remix part.' },
-      i3: { name: 'Add to playlist', text: 'Once a track is found, this opens it on SoundCloud so you can add it to the playlist there. On the next refresh the file is matched to its track and leaves this list.' },
-      i4: { name: 'Edit artist / title', text: 'DJ HQ reads them from the file name, which isn’t always right. Fix them from the ⋯ menu first, or swap the two for a file named “Title - Artist”; the search and the tags use your values.' },
+      i1: { name: 'Find all', text: 'Searches SoundCloud for every file in no playlist at once. Sure matches are accepted on the spot; the rest are left for you.' },
+      i2: { name: 'Find on SoundCloud', text: 'Candidates with their length and how well they match. One that’s already in the active playlist is marked, and picking it links the file to that track. Nothing fits? Shorten the search text: drop the remix part.' },
+      i3: { name: 'Add to playlist', text: 'Once a track is found, this adds it to the active playlist on SoundCloud with one click when you are signed in on Discover. Otherwise it opens the track there, so you can add it by hand. The file is then matched to its track, and its row shows the playlist’s name.' },
+      i4: { name: 'Edit artist / title', text: 'When a file is in no playlist, DJ HQ reads them from the file name, which isn’t always right. Fix them from the ⋯ menu first, or swap the two for a file named “Title - Artist”; the search uses your values.' },
     },
     s2: {
       h: 'Good to know',
-      t1: 'These files can need tags or a conversion too. <b>Write tags</b> and <b>Convert</b> on Prepare for player cover them as well.',
+      t1: 'A file can need tags or a conversion, and its row says so. <b>Write tags</b> and <b>Convert</b> on Prepare for player work on the active playlist’s files, so a file in no playlist is covered only after it is matched to a track.',
       t2: '<b>Forget this match</b> in the ⋯ menu drops a wrong pick so you can search again.',
-      t3: 'The play button in front of a file previews it, handy when the file name tells you nothing.',
+      t3: 'Clicking a cover previews its file, handy when the file name tells you nothing.',
     },
   },
 
@@ -144,22 +144,22 @@ I18N.add('en', 'guide', {
     s1: {
       h: 'The steps',
       i1: { name: 'Target player', text: 'What each player reads, from Pioneer’s manuals. Every one plays MP3, AAC, WAV and AIFF. The XDJ-700, XDJ-1000 and CDJ-2000NXS take only 16-bit WAV and AIFF at up to 48 kHz and read no FLAC or ALAC; the others take 24 bits. The XDJ-XZ and XDJ-RX3 add FLAC, the XDJ-1000MK2 FLAC and ALAC, all at up to 48 kHz. The CDJ-2000NXS2, CDJ-3000 and OPUS-QUAD play all of them at up to 96 kHz, and the CDJ-3000X also takes 32-bit files. Not sure? Keep the strictest: what it accepts plays everywhere.' },
-      i2: { name: 'Check names', text: 'Goes through artist and title one at a time: the SoundCloud title, the uploader, what DJ HQ made of them and why it isn’t sure. <b>Keep</b> (Enter), <b>Swap</b> (S) or <b>Edit</b> (E); the arrow keys skip and go back. <b>Names to check</b> are the doubtful ones; <b>All names</b> walks through the whole library. When the file already has a different name, it is shown under <b>In the file now</b>, and <b>Use the file’s</b> (F) takes it. Your choices are kept, and Write tags uses them.' },
+      i2: { name: 'Check names', text: 'Goes through artist and title one at a time: the SoundCloud title, the uploader, what DJ HQ made of them and why it isn’t sure. <b>Keep</b> (Enter), <b>Swap</b> (S) or <b>Edit</b> (E); the arrow keys skip and go back. <b>Names to check</b> are the doubtful ones; <b>All names</b> walks through the whole playlist. When the file already has a different name, it is shown under <b>In the file now</b>, and <b>Use the file’s</b> (F) takes it. Your choices are kept, and Write tags uses them.' },
       i3: { name: 'Write tags', text: 'Writes artist and title into every file where they are missing or differ from the names here, the way rekordbox reads them (it is strict about WAVs). The genre becomes the playlist name. Titles you edited, swapped or kept in Check names are used; where the file only spells the same name differently, its spelling stays. Files with a different artist or title in their tags are listed first, and you choose: <b>Keep the files’ tags</b> leaves them and DJ HQ takes them over, <b>Write DJ HQ’s tags</b> replaces them. The files on disk are never renamed. Mixed In Key’s key and Platinum Notes’ mark stay in the file.', textNoDa: 'Writes artist and title into every file where they are missing or differ from the names here, the way rekordbox reads them (it is strict about WAVs). The genre becomes the playlist name. Titles you edited, swapped or kept in Check names are used; where the file only spells the same name differently, its spelling stays. Files with a different artist or title in their tags are listed first, and you choose: <b>Keep the files’ tags</b> leaves them and DJ HQ takes them over, <b>Write DJ HQ’s tags</b> replaces them. The files on disk are never renamed. The key and the other tags stay in the file.' },
-      i4: { name: 'Write tags in every file', text: 'In the ⋯ of the Tags card: writes the names again into every file of the library, also the ones that already count as tagged. It is the repair for when another app damaged or removed tags without DJ HQ noticing. The same rules apply as for Write tags, the audio is not touched, and the button counts the files as it goes. Names already in a file stay there, and a file whose other marks a rewrite would lose is left as it is. Afterwards select the tracks in rekordbox, right-click them and choose <b>Reload Tag</b>.' },
+      i4: { name: 'Write tags in every file', text: 'In the ⋯ of the Tags card: writes the names again into every file of the playlist, also the ones that already count as tagged. It is the repair for when another app damaged or removed tags without DJ HQ noticing. The same rules apply as for Write tags, the audio is not touched, and the button counts the files as it goes. Names already in a file stay there, and a file whose other marks a rewrite would lose is left as it is. Afterwards select the tracks in rekordbox, right-click them and choose <b>Reload Tag</b>.' },
       i5: { name: 'Add cover art', text: 'In the ⋯ of the Tags card: puts the artwork of each track on SoundCloud into its file, as the front cover, where the file has no picture yet. It is fetched at 500 x 500 pixels (smaller only when SoundCloud has no such size), the most rekordbox and the players need. A picture already in a file is never replaced, and the audio and the other tags are not touched. Only tagged WAV, MP3 and AIFF files with an ID3v2.3 or v2.4 tag get one; the confirmation lists the others and why. rekordbox may not show pictures in WAV files (and then the players don’t either); it does in MP3 and AIFF. Afterwards select the tracks in rekordbox, right-click them and choose <b>Reload Tag</b>. That also replaces names you changed in rekordbox with the names in the files.' },
       i6: { name: 'Convert', text: 'Turns files your player can’t play into ones it can, in place: same file name, same length, so rekordbox keeps your hot cues and beat grids. A WAV with a header Pioneer players refuse (WAVE_FORMAT_EXTENSIBLE) only gets the plain header. A format the player can’t read at all (FLAC, ALAC or OGG on some players) becomes an AIFF file; update your rekordbox export afterwards in Settings > AIFF instead of WAV. The originals are backed up first.' },
       i7: { name: 'Restore originals', text: 'Puts the backed-up originals back whenever you like. <b>Clean up backups</b> in Settings frees the space once you’re sure you won’t need them.' },
-      i8: { name: 'Export XML…', text: 'Writes a rekordbox playlist with every matched file. In rekordbox: <i>Preferences > Advanced > Database > rekordbox xml</i>, browse to the file once. The playlist then appears under <i>rekordbox xml</i> in the tree; right-click it and choose <b>Import Playlist</b>. Tracks already in your collection keep their cues and grids. The file path stays the same, so export again whenever the playlist changes.' },
+      i8: { name: 'Export XML…', text: 'Writes a rekordbox playlist with every matched file. In rekordbox: <i>Preferences > Advanced > Database > rekordbox xml</i>, browse to the file once. The playlist then appears under <i>rekordbox xml</i> in the tree; right-click it and choose <b>Import Playlist</b>. Tracks already in your rekordbox collection keep their cues and grids. The file path stays the same, so export again whenever the playlist changes.' },
       i9: { name: 'Files needing attention', text: 'Exactly which files still need tags or a conversion, each with a play button. The counts on the cards open the same files on Have.' },
       i10: { name: 'Convert rules', text: 'Folded up at the end of the page. A format the player can’t read at all gets a copy in the chosen format next to the file; the original goes to the backups and everything DJ HQ remembers follows the copy. Bit-depth, sample-rate and WAV-header fixes always happen in place, whatever the rule says.' },
     },
     s2: {
       h: 'Do everything',
-      i1: { name: 'What it does', text: 'One click for all the steps, in this order: the matched downloads move into your library (exactly what <b>Move all</b> on Downloads would move), their tags are written, <b>Platinum Notes</b> evens out their loudness, <b>Mixed In Key</b> finds their keys, and the tracks go with their keys into your rekordbox XML, in a playlist called “DJ HQ”. rekordbox analyses the rest itself. A tick in the confirmation also takes library files that Platinum Notes or Mixed In Key haven’t processed yet.' },
+      i1: { name: 'What it does', text: 'One click for all the steps, in this order: the matched downloads move into your collection (exactly what <b>Move all</b> on Downloads would move), their tags are written, <b>Platinum Notes</b> evens out their loudness, <b>Mixed In Key</b> finds their keys, and the tracks go with their keys into your rekordbox XML, in a playlist called “DJ HQ”. rekordbox analyses the rest itself. A tick in the confirmation also takes the active playlist’s files that Platinum Notes or Mixed In Key haven’t processed yet.' },
       i2: { name: 'What it needs', text: 'Platinum Notes and Mixed In Key on this computer, Platinum Notes set to <b>Replace original files</b>, and the rekordbox XML file rekordbox imports from. Mixed In Key’s database is optional: it is only read for a file that ends up without a key tag. Switch the feature on in Settings; <b>Configure…</b> finds everything it can and asks for the rest. Until then the button is greyed out and says what is missing.' },
       i3: { name: 'Finding the apps', text: 'On a Mac both live in Applications, as “Platinum Notes 10” and “Mixed In Key 11” (the number is the version). On Windows they are usually in your user’s AppData\\Local\\Programs\\Mixed In Key folder; type %LOCALAPPDATA%\\Programs into the file window’s address bar, or use <i>Open file location</i> on the Start menu entry. Each step of Configure… has a <b>How do I find it?</b> with the details.' },
-      i4: { name: 'Replace original files', text: 'In Platinum Notes: <b>Personalise</b> > <b>Output Location</b> > <b>Replace original files</b>. Then the processed file takes the original’s place, so the library, the tags and rekordbox keep pointing at the same file. Platinum Notes copies every original to its backup folder first (on a Mac usually ~/Music/PN Backup), so nothing is lost. In any other mode Do everything doesn’t start.' },
+      i4: { name: 'Replace original files', text: 'In Platinum Notes: <b>Personalise</b> > <b>Output Location</b> > <b>Replace original files</b>. Then the processed file takes the original’s place, so DJ HQ, the tags and rekordbox keep pointing at the same file. Platinum Notes copies every original to its backup folder first (on a Mac usually ~/Music/PN Backup), so nothing is lost. In any other mode Do everything doesn’t start.' },
       i5: { name: 'The rekordbox XML', text: 'Use the file set in rekordbox under <i>Preferences > Advanced > Database > rekordbox xml</i> (Imported Library); otherwise rekordbox won’t see the new tracks. DJ HQ saves a backup next to it before every change and leaves everything else in the file as it was. Afterwards, in rekordbox: untick <b>KEY</b> in <i>Preferences > Analysis > Track Analysis Setting</i> (so rekordbox keeps these keys), click the refresh icon next to <i>rekordbox xml</i>, open its <b>DJ HQ</b> playlist, select all, right-click and choose <b>Import To Collection</b>.' },
       i6: { name: 'Waiting for the apps', text: 'DJ HQ opens Platinum Notes with the files, and you press <b>Start Processing</b> there (no window? click Platinum Notes in the Dock). Mixed In Key works in the background. DJ HQ notices by itself when each app has finished: every file Platinum Notes processed carries its mark, and a file Mixed In Key is done with has a key tag. There is nothing to press in DJ HQ; <b>Mark as done</b> (go on at once) and <b>Skip this step</b> (go on without it) are there for the odd case. Nothing waits with a time limit.' },
       i7: { name: 'Press Start for me', text: 'On a Mac, Settings > Do everything can press <b>Start Processing</b> in Platinum Notes for you: DJ HQ brings it to the front and presses that one button once all the files are listed, nothing else. macOS has to allow it, under <i>Privacy & Security > Accessibility</i> (and, when asked, DJ HQ controlling System Events); the setting shows whether it does, with an <b>Allow…</b> button. After an update of DJ HQ macOS may need you to allow it again. Whenever it can’t press it, you press it yourself.' },
@@ -168,7 +168,7 @@ I18N.add('en', 'guide', {
     s3: {
       h: 'Good to know',
       t1: 'Converting works one file at a time and can take a while for big WAVs. The window stays usable.',
-      t2: 'Files in Not in playlist are tagged and converted too, but they are not added to the rekordbox playlist.',
+      t2: 'Files on the Collection page that are in no playlist are not tagged, converted or added to the rekordbox playlist until they are matched to a track.',
       t3: 'Converting backs up the originals first, and <b>Restore originals</b> (in the ⋯ of Player compatibility, or its button once nothing is left to convert) brings them back. <b>Fix cues…</b> is in the ⋯ of the rekordbox card.',
     },
   },
@@ -178,23 +178,23 @@ I18N.add('en', 'guide', {
     lead: 'How DJ HQ works on this computer. Every change saves as you make it.',
     s1: {
       h: 'The cards',
-      i1: { name: 'Library', text: 'The folders and the playlist this library keeps in sync. <b>Add folder</b> adds another folder; the first one stays the main folder, where downloads are moved into. <b>Include subfolders</b> also scans the folders inside each one. <b>Change link…</b> points the library at another SoundCloud link, such as the share link of a playlist you made private; matches and edits stay. <b>Remove this library</b> forgets it in DJ HQ only; the files stay. <b>Change…</b> next to the main folder points the library at another folder; no files are moved and your matches carry over. <b>Make main folder</b> on an extra folder swaps the two: the old main folder stays in the library as an extra folder.' },
-      i2: { name: 'Watched downloads folder', text: 'Which folder is watched for fresh downloads, and whether exact matches are moved into the library automatically.' },
+      i1: { name: 'Collection folders · Playlist', text: '<b>Collection folders</b> lists the folders DJ HQ watches; every playlist is matched against all of them. <b>Add folder</b> adds one. Next to each folder, <b>Include subfolders</b> also scans the folders inside it, and the <b>×</b> stops watching it; its files stay. <b>New tracks go to</b> shows the folder downloads are moved into when a playlist has no folder of its own. The <b>Playlist</b> card holds the settings of the active playlist: <b>Change link…</b> points it at another SoundCloud link, such as the share link of a playlist you made private; matches and edits stay. <b>Change…</b> gives it a folder of its own for new tracks. <b>Remove this playlist…</b> forgets it in DJ HQ only; the files stay.' },
+      i2: { name: 'Watched downloads folder', text: 'Which folder is watched for fresh downloads, and whether exact matches are moved into the collection automatically.' },
       i3: { name: 'Do everything', text: 'Shows or hides the Do everything button, lists the apps and files it uses with their state, whether Platinum Notes and Mixed In Key are closed after their step and, on a Mac, whether DJ HQ presses Start Processing in Platinum Notes for you (with whether macOS allows it). <b>Configure…</b> opens the setup again. The Guide on Prepare for player explains all the steps.' },
       i4: { name: 'Checking the playlist', text: 'How often SoundCloud is checked for changes while the window is open. <b>Refresh</b> in the top right checks right away and rescans the folders too.' },
       i5: { name: 'Appearance', text: 'Light, dark, or whatever your computer is using.' },
       i6: { name: 'Language', text: 'English or Polish. <b>Automatic</b> follows your computer’s language: Polish on a Polish system, English on any other. The app switches at once, without a restart.' },
       i7: { name: 'Backups', text: 'The untouched originals of converted files and the MP3s that lossless downloads replaced. <b>Clean up</b> deletes them; after that Restore originals can’t bring those files back.' },
-      i8: { name: 'Move or back up your setup', text: '<b>Export configuration…</b> saves your libraries, matches, edits, marks and settings in one file; <b>Import configuration…</b> loads it on another computer, the Windows PC, or here again. On import you show DJ HQ where each library’s music is on this computer, and it counts the files it finds before anything changes. The music, the backed-up originals, the SoundCloud sign-in and the Do everything setup are not in the file. A private playlist link can be left out of the file; paste it again with <b>Change link…</b>.', textNoDa: '<b>Export configuration…</b> saves your libraries, matches, edits, marks and settings in one file; <b>Import configuration…</b> loads it on another computer, the Windows PC, or here again. On import you show DJ HQ where each library’s music is on this computer, and it counts the files it finds before anything changes. The music, the backed-up originals and the SoundCloud sign-in are not in the file. A private playlist link can be left out of the file; paste it again with <b>Change link…</b>.' },
+      i8: { name: 'Move or back up your setup', text: '<b>Export configuration…</b> saves your playlists, matches, edits, marks and settings in one file; <b>Import configuration…</b> loads it on another computer, the Windows PC, or here again. On import you show DJ HQ where the collection folders are on this computer, and it counts the files it finds before anything changes. The music, the backed-up originals, the SoundCloud sign-in and the Do everything setup are not in the file. A private playlist link can be left out of the file; paste it again with <b>Change link…</b>.', textNoDa: '<b>Export configuration…</b> saves your playlists, matches, edits, marks and settings in one file; <b>Import configuration…</b> loads it on another computer, the Windows PC, or here again. On import you show DJ HQ where the collection folders are on this computer, and it counts the files it finds before anything changes. The music, the backed-up originals and the SoundCloud sign-in are not in the file. A private playlist link can be left out of the file; paste it again with <b>Change link…</b>.' },
       i9: { name: 'About', text: 'The version, a manual update check, the tour, and where DJ HQ keeps its data. <b>Export raw data (JSON)</b> saves the data DJ HQ has stored (all but the appearance settings) in one file, for support or to go back to an older DJ HQ; it contains your private playlist links.' },
-      i10: { name: 'AIFF instead of WAV', text: 'Whether WAV files that enter the library are converted to AIFF, so rekordbox shows their cover art. <b>Convert WAV files to AIFF…</b> does it for the files already there. <b>Update a rekordbox export…</b> keeps cue points and playlists for the converted files.' },
+      i10: { name: 'AIFF instead of WAV', text: 'Whether WAV files that enter the collection are converted to AIFF, so rekordbox shows their cover art. <b>Convert WAV files to AIFF…</b> does it for the active playlist’s files. <b>Update a rekordbox export…</b> keeps cue points and playlists for the converted files.' },
     },
     s2: {
       h: 'Good to know',
-      t1: 'Another playlist with its own folder? <b>Add another library…</b> links them; switch libraries from the name at the top of the sidebar.',
+      t1: 'Another playlist? <b>Add another playlist…</b> links it to the same collection; switch playlists from the name at the top of the sidebar.',
       t2: 'The data folder holds the matches, edits and the backups. Deleting the app doesn’t touch it. Keep it on this computer’s own disk, not in a cloud folder.',
-      t3: 'An import replaces the libraries on this computer. The data from before is saved first, in the <i>backups</i> folder inside the data folder.',
-      t4: 'Imported before the music was copied? The library waits for its files and keeps every match until you press <b>The copy is complete</b>.',
+      t3: 'An import replaces the playlists and the collection folders on this computer. The data from before is saved first, in the <i>backups</i> folder inside the data folder.',
+      t4: 'Imported before the music was copied? The playlist waits for its files and keeps every match until you press <b>The copy is complete</b>.',
       t5: 'Converted a file yourself, or changed its extension? DJ HQ keeps its match as long as one file with that name is in the folder.',
     },
   },

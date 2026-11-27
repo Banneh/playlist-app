@@ -113,7 +113,7 @@ I18N.add('pl', 'discover', {
       s1: {
         h: 'Pasek nad stroną',
         i1: { name: 'Teraz gra', text: 'Tu pojawia się to, co gra odtwarzacz SoundCloud: z okładką, długością i informacją, czy utwór jest już na playliście.' },
-        i2: { name: 'Dodaj do playlisty', text: 'Dodaje grający utwór do playlisty na SoundCloud, więc od razu trafia na stronę Brakujące. W bibliotece polubień zamiast tego polubi utwór.' },
+        i2: { name: 'Dodaj do playlisty', text: 'Dodaje grający utwór do playlisty na SoundCloud, więc od razu trafia na stronę Brakujące. Gdy playlista śledzi twoje polubienia, zamiast tego polubi utwór.' },
         i3: { name: 'Serce', text: 'Dodaje grający utwór do polubień na SoundCloud albo cofa polubienie. Gdy w Ustawieniach włączona jest opcja „Dodawaj też do polubień utwory dodawane do playlisty”, dodanie utworu też go polubi.' },
         i4: { name: 'Podobne utwory', text: 'To, co SoundCloud proponuje po tym utworze. Ta sama pozycja jest w menu ⋯ każdego wiersza playlisty.' },
         i5: { name: 'Wstecz · Główna · Playlista', text: 'Cofa o jedną stronę, przechodzi na stronę główną SoundCloud albo otwiera twoją playlistę (lub polubienia) na SoundCloud.' },
@@ -121,7 +121,7 @@ I18N.add('pl', 'discover', {
       s2: {
         h: 'Klawisze',
         t1: '<kbd>Spacja</kbd> odtwarza i wstrzymuje, <kbd>←</kbd> i <kbd>→</kbd> przeskakują o 10 sekund do tyłu lub do przodu, <kbd>N</kbd> i <kbd>P</kbd> przechodzą do następnego lub poprzedniego utworu w kolejce SoundCloud.',
-        t2: '<kbd>A</kbd> dodaje grający utwór do playlisty (w bibliotece polubień: do twoich polubień), <kbd>L</kbd> dodaje go do polubień albo cofa polubienie.',
+        t2: '<kbd>A</kbd> dodaje grający utwór do playlisty (albo do twoich polubień, gdy playlista je śledzi), <kbd>L</kbd> dodaje go do polubień albo cofa polubienie.',
         t3: 'Działają niezależnie od tego, czy ostatnio kliknięto pasek, czy stronę SoundCloud, chyba że piszesz w polu tekstowym. Działają też na każdej innej stronie, gdy na dole widać pasek odtwarzania.',
       },
       s3: {
@@ -139,17 +139,17 @@ I18N.add('pl', 'discover', {
     },
     likes: {
       title: 'Twoje polubienia',
-      lead: 'Wszystkie utwory polubione przez zalogowane konto SoundCloud, porównane z plikami we wszystkich twoich bibliotekach.',
+      lead: 'Wszystkie utwory polubione przez zalogowane konto SoundCloud, porównane z plikami w twojej kolekcji.',
       s1: {
         h: 'Filtry',
-        i1: { name: 'Do zdobycia', text: 'Polubione utwory, których nie ma w żadnym z twoich folderów, z tymi samymi linkami Za darmo i Kup co na stronie Brakujące.' },
-        i2: { name: 'W twoich folderach', text: 'Polubione utwory, które już masz: przez playlistę, znaleziony plik albo plik o tej samej nazwie i długości w dowolnej bibliotece.' },
+        i1: { name: 'Do zdobycia', text: 'Polubione utwory, których nie ma nigdzie w kolekcji, z tymi samymi linkami Za darmo i Kup co na stronie Brakujące.' },
+        i2: { name: 'W kolekcji', text: 'Polubione utwory, które już masz: przez playlistę, znaleziony plik albo plik o tej samej nazwie i długości gdziekolwiek w kolekcji.' },
         i3: { name: 'Spoza playlisty', text: 'Polubione utwory, których jeszcze nie ma na aktywnej playliście. <b>Dodaj</b> wstawia je tam jednym kliknięciem.' },
       },
       s2: {
         h: 'Warto wiedzieć',
         t1: 'Lista polubień jest zapamiętywana na kilka minut. <b>Odśwież</b> na tej stronie wczytuje ją z SoundCloud od nowa.',
-        t2: 'Biblioteka polubień (link kończący się na /likes) z definicji jest tą listą, więc nie ma w niej przycisku „Dodaj”.',
+        t2: 'Playlista, która śledzi twoje polubienia (jej link kończy się na /likes), z definicji jest tą listą, więc gdy jest aktywna, przycisk „Dodaj” jest ukryty.',
       },
     },
     artwork: {

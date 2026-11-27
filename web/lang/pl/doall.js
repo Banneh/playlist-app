@@ -4,7 +4,7 @@
 I18N.add('pl', 'doall', {
   name: 'Zrób wszystko',
   configure: 'Skonfiguruj…',
-  lead: 'Przeprowadza nowe pobrane pliki przez wszystkie kroki w jednym przebiegu: do biblioteki, tagi, Platinum Notes, Mixed In Key i twój plik XML rekordbox.',
+  lead: 'Przeprowadza nowe pobrane pliki przez wszystkie kroki w jednym przebiegu: do kolekcji, tagi, Platinum Notes, Mixed In Key i twój plik XML rekordbox.',
   notReady: '<b>Funkcja Zrób wszystko nie jest jeszcze gotowa.</b> {reason}',
   btnRunning: 'W toku: {step}',
   btnWaitingPn: 'Czeka na Platinum Notes',
@@ -34,7 +34,7 @@ I18N.add('pl', 'doall', {
   toastFailed: 'Przebieg Zrób wszystko zatrzymał się na kroku „{step}”. Powód pokazuje przycisk „Zrób wszystko”.',
   supported: 'Funkcja Zrób wszystko działa tylko w systemach macOS i Windows.',
 
-  step: { move: 'Przenieś do biblioteki', tag: 'Zapisz tagi', pn: 'Platinum Notes', mik: 'Mixed In Key', xml: 'Dodaj do rekordbox', finish: 'Raport' },
+  step: { move: 'Przenieś do kolekcji', tag: 'Zapisz tagi', pn: 'Platinum Notes', mik: 'Mixed In Key', xml: 'Dodaj do rekordbox', finish: 'Raport' },
   app: { pn: 'Platinum Notes', mik: 'Mixed In Key' },
   // counters on a step: the files of the step are meant (plik, so masculine)
   cnt: {
@@ -57,12 +57,12 @@ I18N.add('pl', 'doall', {
 
   // the run dialog: the confirmation built from the preview
   pvSub: 'Oto, co się stanie po starcie. Na razie nic się nie zmieniło.',
-  pvLoading: 'Przeglądanie pobranych plików i biblioteki…',
+  pvLoading: 'Przeglądanie pobranych plików i kolekcji…',
   pvFailed: 'Nie udało się ustalić, co zrobić: {error}',
   pvMove: {
-    one: 'Przeniesienie <b>{n} pobranego pliku</b> z {dir} do biblioteki.',
-    few: 'Przeniesienie <b>{n} pobranych plików</b> z {dir} do biblioteki.',
-    many: 'Przeniesienie <b>{n} pobranych plików</b> z {dir} do biblioteki.',
+    one: 'Przeniesienie <b>{n} pobranego pliku</b> z {dir} do kolekcji.',
+    few: 'Przeniesienie <b>{n} pobranych plików</b> z {dir} do kolekcji.',
+    many: 'Przeniesienie <b>{n} pobranych plików</b> z {dir} do kolekcji.',
   },
   pvMoveNone: 'Tym razem nie ma pobranych plików do przeniesienia.',
   pvUpgrades: {
@@ -95,9 +95,9 @@ I18N.add('pl', 'doall', {
   pvXmlNone: 'Dodanie ich z tonacjami do twojego pliku XML rekordbox, na playlistę „DJ HQ”. Najpierw DJ HQ zapisuje kopię zapasową pliku.',
   pvXml: 'Dodanie ich z tonacjami do <b>{file}</b>, na playlistę „DJ HQ”. Najpierw DJ HQ zapisuje kopię zapasową pliku.',
   pvInclude: {
-    one: 'Uwzględnij też {n} plik z biblioteki, jeszcze nieprzetworzony przez Platinum Notes lub Mixed In Key',
-    few: 'Uwzględnij też {n} pliki z biblioteki, jeszcze nieprzetworzone przez Platinum Notes lub Mixed In Key',
-    many: 'Uwzględnij też {n} plików z biblioteki, jeszcze nieprzetworzonych przez Platinum Notes lub Mixed In Key',
+    one: 'Uwzględnij też {n} plik z tej playlisty, jeszcze nieprzetworzony przez Platinum Notes lub Mixed In Key',
+    few: 'Uwzględnij też {n} pliki z tej playlisty, jeszcze nieprzetworzone przez Platinum Notes lub Mixed In Key',
+    many: 'Uwzględnij też {n} plików z tej playlisty, jeszcze nieprzetworzonych przez Platinum Notes lub Mixed In Key',
   },
   pvNames: {
     one: '<b>{n} nazwa</b> może mieć zamienione miejscami wykonawcę i tytuł. Tagi i rekordbox dostaną nazwy w obecnej postaci.',
@@ -107,7 +107,7 @@ I18N.add('pl', 'doall', {
   pvNamesBtn: 'Najpierw sprawdź nazwy',
   pvBlocked: 'Na razie nie można zacząć:',
   pvFiles: { one: 'Plik ({n})', few: 'Pliki ({n})', many: 'Pliki ({n})' },
-  pvFromLib: 'już w bibliotece',
+  pvFromLib: 'już w kolekcji',
   pvAppsClose: 'Jeśli to DJ HQ otworzy Platinum Notes i Mixed In Key, po swoim kroku zostaną z powrotem zamknięte.',
   start: 'Rozpocznij',
 
@@ -189,7 +189,7 @@ I18N.add('pl', 'doall', {
 
   // Settings card
   stTitle: 'Zrób wszystko',
-  stText: 'Jedno kliknięcie przeprowadza nowe pobrane pliki przez wszystkie kroki: do biblioteki, tagi, Platinum Notes, Mixed In Key i twój plik XML rekordbox. Wymaga Platinum Notes i Mixed In Key na tym komputerze.',
+  stText: 'Jedno kliknięcie przeprowadza nowe pobrane pliki przez wszystkie kroki: do kolekcji, tagi, Platinum Notes, Mixed In Key i twój plik XML rekordbox. Wymaga Platinum Notes i Mixed In Key na tym komputerze.',
   stOn: 'Pokazuj przycisk Zrób wszystko',
   stOnHelp: 'Na stronach Pobrane i Przygotuj na odtwarzacz. „Skonfiguruj…” znajduje potrzebne programy i pliki, a potem włącza tę funkcję.',
   stClose: 'Zamykaj Platinum Notes i Mixed In Key po zakończeniu ich kroku',
@@ -249,7 +249,7 @@ I18N.add('pl', 'doall', {
     pn_app: { title: 'Platinum Notes', text: 'Platinum Notes wyrównuje głośność nowych plików i poprawia ich brzmienie. DJ HQ otwiera program z plikami, a ty klikasz tam <b>Start Processing</b>.' },
     mik_app: { title: 'Mixed In Key', text: 'Opcjonalnie. Mixed In Key znajduje tonację każdego nowego pliku i zapisuje ją w pliku; DJ HQ odczytuje ją stamtąd i przenosi do rekordbox. Bez niego ten krok jest po prostu pomijany.' },
     mik_db: { title: 'Baza danych Mixed In Key', text: 'Opcjonalnie. Baza jest używana tylko wtedy, gdy plik wyjdzie z Mixed In Key bez tonacji w tagach: DJ HQ szuka wtedy tonacji tutaj, tylko odczytując bazę. Jeśli chcesz, pomiń ten krok.' },
-    pn_mode: { title: 'Ustawienie zapisu Platinum Notes', text: 'Platinum Notes musi mieć ustawione <b>Replace original files</b>. Wtedy przetworzony plik zajmuje miejsce oryginału, więc biblioteka, tagi i rekordbox dalej wskazują ten sam plik. Platinum Notes zachowuje własną kopię zapasową każdego oryginału, więc nic nie ginie.' },
+    pn_mode: { title: 'Ustawienie zapisu Platinum Notes', text: 'Platinum Notes musi mieć ustawione <b>Replace original files</b>. Wtedy przetworzony plik zajmuje miejsce oryginału, więc DJ HQ, tagi i rekordbox dalej wskazują ten sam plik. Platinum Notes zachowuje własną kopię zapasową każdego oryginału, więc nic nie ginie.' },
     rb_xml: { title: 'Plik XML rekordbox', text: 'Utwory i ich tonacje trafiają do pliku XML, który czyta rekordbox. Musi to być plik ustawiony w rekordbox w <b>Preferences > Advanced > Database > rekordbox xml</b>. W przeciwnym razie rekordbox nie zobaczy nowych utworów. Przed każdą zmianą DJ HQ zapisuje kopię zapasową pliku.' },
     summary: { title: 'Gotowe do włączenia', text: 'Tego będzie używać Zrób wszystko. Każdy krok możesz później zmienić w Ustawieniach, na karcie Zrób wszystko, przyciskiem „Skonfiguruj…”.' },
   },
@@ -319,11 +319,11 @@ I18N.add('pl', 'doall', {
     mik_db_not_found: 'Nie ma już bazy danych Mixed In Key w miejscu z konfiguracji: {path}.',
     mik_db_not_sqlite: 'Ten plik nie jest bazą danych Mixed In Key.',
     mik_db_unreadable: 'DJ HQ nie może odczytać tej bazy danych.',
-    no_library: 'Najpierw dodaj bibliotekę z playlistą.',
+    no_library: 'Najpierw dodaj playlistę.',
     job_active: 'Inny przebieg jest jeszcze otwarty. Najpierw go dokończ, wznów albo wyczyść.',
-    nothing_to_do: 'Nie ma nic do przetworzenia: brak pasujących pobranych plików i żadne pliki w bibliotece nie czekają.',
-    library_changed: 'Biblioteka, w której zaczął się ten przebieg, nie jest już aktywna. Przełącz się na nią i spróbuj ponownie.',
-    library_away: 'Folder biblioteki jest niedostępny: {path}. Podłącz dysk, na którym się znajduje, albo odszukaj folder, a potem spróbuj ponownie.',
+    nothing_to_do: 'Nie ma nic do przetworzenia: brak pasujących pobranych plików i nie uwzględniono żadnego pliku z tej playlisty.',
+    library_changed: 'Playlista, dla której zaczął się ten przebieg, nie jest już aktywna. Przełącz się na nią i spróbuj ponownie.',
+    library_away: 'Folder na nowe utwory jest niedostępny: {path}. Podłącz dysk, na którym się znajduje, albo odszukaj folder, a potem spróbuj ponownie.',
     bad_request: 'Nie rozpoznano tego żądania.',
     step_changed: 'To już nie jest bieżący krok.',
     not_now: 'Teraz nie można tego zrobić.',
@@ -340,9 +340,9 @@ I18N.add('pl', 'doall', {
     app_left_open: 'Program {app} był już otwarty, więc pozostaje otwarty.',
     pn_app_invalid: 'Nie można użyć Platinum Notes: {error}',
     mik_app_invalid: 'Nie można użyć Mixed In Key: {error}',
-    in_library: 'Już w bibliotece.',
+    in_library: 'Już w kolekcji.',
     move_failed: 'Nie udało się przenieść: {error}',
-    file_gone: 'Tego pliku nie ma już w bibliotece.',
+    file_gone: 'Tego pliku nie ma już w kolekcji.',
     already_tagged: 'Tagi są już poprawne.',
     name_in_file: 'Plik ma już inną nazwę ({file_artist} - {file_title}), więc DJ HQ jej nie nadpisał. Otwórz Sprawdź nazwy i wybierz właściwą.',
     tag_failed: 'Nie udało się zapisać tagów: {error}',
@@ -390,7 +390,7 @@ I18N.add('pl', 'doall', {
     rb_refresh: 'Na pasku bocznym rekordbox kliknij ikonę odświeżania obok „rekordbox xml”.',
     rb_import: 'Otwórz „rekordbox xml > Playlists > {playlist}”, zaznacz wszystkie utwory, kliknij prawym przyciskiem i wybierz „Import To Collection”.',
     // the server says these too (the page shows its own words for most of them)
-    step_move: 'Przenieś do biblioteki',
+    step_move: 'Przenieś do kolekcji',
     step_tag: 'Zapisz tagi',
     step_pn: 'Platinum Notes',
     step_mik: 'Mixed In Key',

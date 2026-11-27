@@ -33,7 +33,7 @@ I18N.add('en', 'prepare', {
     checkAllTip: 'Go through every name one by one',
     all: 'Write tags in every file',
     allTip: 'Write the names again into every file, also the tagged ones: a repair after another app damaged tags',
-    noFilesTip: 'No files in the library yet',
+    noFilesTip: 'No files in the collection yet',
     art: 'Add cover art',
     artTip: 'Put the SoundCloud artwork of each track into its file, where the file has no picture yet',
     noArtTip: 'Nothing to add: no tagged WAV, MP3 or AIFF file is missing a picture that its track has on SoundCloud',
@@ -139,12 +139,12 @@ I18N.add('en', 'prepare', {
   xml: {
     failed: 'Export failed: {msg}',
     title: 'rekordbox playlist exported',
-    none: 'No libraries with a fetched playlist yet.',
+    none: 'No playlist has been fetched yet.',
     lead: 'In rekordbox:',
     s1: 'Open <b>Preferences > Advanced > Database</b> and, under <b>rekordbox xml</b>, browse to the file above.',
     s2: 'A <b>rekordbox xml</b> item appears in the tree on the left.',
     s3: 'Right-click the playlist in it and choose <b>Import Playlist</b>.',
-    after: 'Tracks already in your collection keep their cues and grids. Export again any time. The file path stays the same, so rekordbox picks up the changes on the next import.',
+    after: 'Tracks already in your rekordbox collection keep their cues and grids. Export again any time. The file path stays the same, so rekordbox picks up the changes on the next import.',
   },
   cues: {
     button: 'Fix cues…',

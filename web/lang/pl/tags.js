@@ -134,7 +134,7 @@ I18N.add('pl', 'tags', {
       few: 'Zapisać tagi jeszcze raz w {n} plikach?',
       many: 'Zapisać tagi jeszcze raz w {n} plikach?',
     },
-    p1: 'Wykonawca, tytuł i gatunek zostaną zapisane jeszcze raz w każdym pliku tej biblioteki, także w tych, które już mają tagi. Przydaje się, gdy inna aplikacja uszkodziła albo usunęła tagi.',
+    p1: 'Wykonawca, tytuł i gatunek zostaną zapisane jeszcze raz w każdym pliku z tej playlisty, także w tych, które już mają tagi. Przydaje się, gdy inna aplikacja uszkodziła albo usunęła tagi.',
     p2: 'Dźwięk zostaje nietknięty, tak samo tonacja i inne oznaczenia w tagach.',
     keep: 'Nazwy, które pliki już mają, zostają bez zmian.',
     hand: {
@@ -231,9 +231,9 @@ I18N.add('pl', 'tags', {
     },
     none: 'Żaden plik nie potrzebuje okładki.',
   },
-  moveIn: 'Przenieś do biblioteki',
+  moveIn: 'Przenieś do kolekcji',
   upgrade: 'Podmień na bezstratny',
-  movedIn: 'Przeniesiono do biblioteki',
+  movedIn: 'Przeniesiono do kolekcji',
   findOnSc: 'Znajdź na SoundCloud',
   find: {
     placeholder: 'Wykonawca i tytuł',

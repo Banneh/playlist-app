@@ -34,13 +34,13 @@ a zmienisz to w **Ustawienia > Język**.
   - [Discover: SoundCloud w aplikacji](#discover-soundcloud-w-aplikacji)
   - [Twoje polubienia](#twoje-polubienia)
   - [Nowe: co się zmieniło od ostatniego razu](#nowe-co-się-zmieniło-od-ostatniego-razu)
-  - [Pobrane: nowe pliki do biblioteki](#pobrane-nowe-pliki-do-biblioteki)
+  - [Pobrane: nowe pliki do kolekcji](#pobrane-nowe-pliki-do-kolekcji)
   - [Spoza playlisty: pliki, których SoundCloud nie zna](#spoza-playlisty-pliki-których-soundcloud-nie-zna)
   - [Przygotuj na odtwarzacz: tagi, konwersja i rekordbox](#przygotuj-na-odtwarzacz-tagi-konwersja-i-rekordbox)
   - [Wygląd, wyszukiwanie i pasek boczny](#wygląd-wyszukiwanie-i-pasek-boczny)
   - [Ustawienia](#ustawienia)
   - [Więcej niż jeden folder](#więcej-niż-jeden-folder)
-  - [AIFF zamiast WAV i przeniesienie folderu głównego](#aiff-zamiast-wav-i-przeniesienie-folderu-głównego)
+  - [AIFF zamiast WAV i przeniesienie folderu](#aiff-zamiast-wav-i-przeniesienie-folderu)
   - [Więcej niż jedna playlista](#więcej-niż-jedna-playlista)
   - [Inny komputer albo kopia zapasowa](#inny-komputer-albo-kopia-zapasowa)
 - [Wskazówki i rozwiązywanie problemów](#wskazówki-i-rozwiązywanie-problemów)
@@ -50,8 +50,10 @@ a zmienisz to w **Ustawienia > Język**.
 
 ## Co robi DJ HQ
 
-*Biblioteka* w DJ HQ to folder z muzyką (albo kilka folderów) połączony z jedną
-playlistą na SoundCloud: publiczną albo prywatną, przez jej link udostępniania.
+*Kolekcja* to folder (albo foldery), w którym trzymasz muzykę. *Playlista* to
+podłączona playlista z SoundCloud: publiczna, prywatna przez link udostępniania
+albo twoja strona polubień. Każda playlista jest dopasowywana do całej
+kolekcji, więc utwór, który jest na trzech playlistach, to nadal jeden plik.
 Aplikacja wczytuje playlistę, skanuje foldery i ustala, który plik należy do
 którego utworu, porównując nazwy i długości. Wszystko inne opiera się na tym:
 
@@ -67,8 +69,8 @@ którego utworu, porównując nazwy i długości. Wszystko inne opiera się na t
 - **Nowe** zbiera utwory dodane do playlisty i pliki, które trafiły do twojego
   folderu od ostatniego razu.
 - **Pobrane** obserwuje twój folder Pobrane i jednym kliknięciem przenosi nowe
-  pliki do biblioteki, bez zmiany nazw. DJ HQ zagląda do archiwów zip
-  z Bandcamp, a dokładne dopasowania mogą trafiać do biblioteki same.
+  pliki do kolekcji, bez zmiany nazw. DJ HQ zagląda do archiwów zip
+  z Bandcamp, a dokładne dopasowania mogą trafiać do kolekcji same.
 - **Spoza playlisty** znajduje utwór na SoundCloud dla plików, których jeszcze
   nie ma na playliście, żeby można było je tam dodać.
 - **Przygotuj na odtwarzacz** zapisuje tagi wykonawcy i tytułu tak, jak czyta
@@ -80,8 +82,8 @@ którego utworu, porównując nazwy i długości. Wszystko inne opiera się na t
   polubień to, co ci się podoba. Kliknięcie okładki w dowolnym miejscu DJ HQ odtwarza tam utwór.
 - **Twoje polubienia** porównuje każdy utwór polubiony na SoundCloud z twoimi
   folderami i pokazuje, co jeszcze trzeba zdobyć.
-- Każdy plik można **odsłuchać** w aplikacji, a biblioteka może zamiast
-  playlisty śledzić twoje **polubienia** na SoundCloud.
+- Każdy plik można **odsłuchać** w aplikacji, a twoją stronę **polubień**
+  na SoundCloud można podłączyć tak jak playlistę.
 
 Playlista jest sprawdzana ponownie co 15 minut, gdy okno jest otwarte, i za
 każdym razem, gdy klikniesz **Odśwież**. DJ HQ zapisuje coś na SoundCloud tylko
@@ -140,7 +142,7 @@ a potem **Uruchom mimo to**.
 
 DJ HQ raz dziennie sprawdza w serwisie GitHub, czy jest nowsza wersja. Gdy jest, na
 dole paska bocznego pojawia się mała informacja z przyciskiem **Pobierz** dla
-twojego komputera. Zainstaluj nową wersję w miejsce starej; biblioteka i ustawienia
+twojego komputera. Zainstaluj nową wersję w miejsce starej; playlisty i ustawienia
 zostają tam, gdzie były. **⋯ > Sprawdź aktualizacje…** sprawdza od razu.
 
 Pierwsze uruchomienie po aktualizacji pokazuje, co się zmieniło, wersja po wersji,
@@ -159,26 +161,26 @@ listę w dowolnej chwili.
    każdy, kto ma ten link, widzi playlistę, więc zachowaj go dla siebie. Jeśli
    zamiast tego zbierasz muzykę przez polubienia, wklej adres swojej strony
    polubień (`https://soundcloud.com/you/likes`); działa tak samo.
-3. Kliknij **Połącz bibliotekę**.
+3. Kliknij **Podłącz playlistę**.
 
 DJ HQ wczytuje playlistę, skanuje folder i dopasowuje pliki do utworów. Przy
 kilkuset utworach trwa to kilka sekund. Jeśli SoundCloud nie udostępni niektórych
 utworów (usuniętych, zablokowanych w twoim kraju albo prywatnych
 i nieudostępnionych przez link), wiersz stanu powie, ilu nie udało się odczytać.
 
-Żeby później skierować bibliotekę na inny link, na przykład po ustawieniu jej
-playlisty jako prywatnej, użyj **Ustawienia > Zmień link…**. Nowy link jest
+Żeby później zmienić link playlisty, na przykład po ustawieniu jej jako
+prywatnej, użyj **Ustawienia > Zmień link…**. Nowy link jest
 najpierw wczytywany; twoje dopasowania, zmienione nazwy i oznaczenia nowości zostają,
 a jeśli nowego linku nie da się odczytać, zostaje stary. Jeśli pod nowym
-linkiem brakuje utworów, które ma biblioteka (inna playlista albo utwory,
+linkiem brakuje utworów, które są teraz na playliście (inna playlista albo utwory,
 których nie da się odczytać), DJ HQ mówi, ilu, i pyta, zanim cokolwiek zmieni,
-bo te utwory znikną z biblioteki razem z dopasowaniami.
+bo te utwory znikną z playlisty razem z dopasowaniami.
 
 ![Zanim zaczniemy: folder pobranych plików, docelowy odtwarzacz, podfoldery i wygląd, pytanie zadawane raz](docs/screens/setup.png)
 
 Za pierwszym razem ekran **Zanim zaczniemy** pyta o podstawy: do którego
 folderu trafiają pobrane pliki i czy dokładne dopasowania mogą same trafiać do
-biblioteki, na jakim odtwarzaczu grasz, czy foldery wewnątrz folderu z muzyką
+kolekcji, na jakim odtwarzaczu grasz, czy foldery wewnątrz folderu z muzyką
 też się liczą, jasny czy ciemny wygląd i jaki język. Każde z tych pytań ma
 wartość domyślną, więc możesz od razu kliknąć **Zaczynamy**; wszystko można
 potem zmienić w Ustawieniach.
@@ -188,8 +190,8 @@ jest już w twoim folderze.
 
 Za pierwszym razem DJ HQ proponuje minutowe oprowadzanie, które pokazuje, do
 czego służy każda lista. Działa na kilku przykładowych utworach, więc możesz
-je obejrzeć, zanim cokolwiek połączysz (na ekranie powitalnym jest do tego
-przycisk), i nic w twojej bibliotece się nie zmieni. Kliknij **Nie teraz**,
+je obejrzeć, zanim cokolwiek podłączysz (na ekranie powitalnym jest do tego
+przycisk), a twoje playlisty i pliki zostają nietknięte. Kliknij **Nie teraz**,
 żeby je pominąć; **⋯ > Oprowadź mnie** powtarza je w każdej chwili.
 
 ![Oprowadzanie: krótka karta objaśnia każdą część aplikacji na przykładowych danych, a reszta jest przygaszona](docs/screens/tour.png)
@@ -233,7 +235,7 @@ ma w twoim folderze, z linkami, pod którymi go zdobędziesz.
 2. Kliknij **Za darmo** albo **Kup**. Link otworzy się w przeglądarce
    (niebieski przycisk pobiera sam); plik jak zwykle trafi do folderu Pobrane.
 3. Gdy pobierze się kilka plików, przejdź na pasku bocznym do **Pobrane**
-   i stamtąd przenieś je do biblioteki (zobacz niżej).
+   i stamtąd przenieś je do kolekcji (zobacz niżej).
 
 **Długa lista po kolei**
 
@@ -241,7 +243,7 @@ ma w twoim folderze, z linkami, pod którymi go zdobędziesz.
 
 **Przejdź po kolei** (w prawym górnym rogu) pokazuje listę po jednym utworze:
 okładka, linki i obserwowanie folderu Pobrane. Otwórz link, pobierz plik
-w przeglądarce, a gdy się pojawi, DJ HQ zaproponuje **Przenieś do biblioteki**
+w przeglądarce, a gdy się pojawi, DJ HQ zaproponuje **Przenieś do kolekcji**
 i przejdzie do następnego utworu. Enter otwiera link, strzałki przechodzą
 między utworami, N odkłada utwór jako niedostępny, Esc zamyka.
 
@@ -316,7 +318,7 @@ Pasek pokazuje utwór, który gra w odtwarzaczu SoundCloud, z okładką, długo�
 i informacją, czy jest już na playliście:
 
 - **Dodaj do playlisty** dodaje go do playlisty na SoundCloud, więc od razu
-  trafia na stronę Brakujące. W bibliotece, która śledzi twoje polubienia, Dodaj
+  trafia na stronę Brakujące. Gdy playlista śledzi twoje polubienia, Dodaj
   zamiast tego dodaje utwór do polubień.
 - **Serce** dodaje utwór do polubień albo cofa polubienie. Gdy w Ustawieniach
   jest włączone **Dodawaj też do polubień utwory dodawane do playlisty**, dodany utwór trafia
@@ -333,7 +335,7 @@ tekstowym):
 | `Spacja` | odtwórz / pauza |
 | `←` `→` | 10 sekund wstecz / do przodu |
 | `N` `P` | następny / poprzedni utwór: na Discover w kolejce SoundCloud, a dla utworu uruchomionego z listy na liście widocznej na ekranie |
-| `A` | dodaj grający utwór do playlisty (w bibliotece polubień: do polubień) |
+| `A` | dodaj grający utwór do playlisty (do polubień, gdy playlista je śledzi) |
 | `L` | polub go / cofnij polubienie |
 
 Odtwarzacz z Discover obsługuje też resztę aplikacji. Kliknij okładkę utworu
@@ -371,15 +373,15 @@ strona o tym mówi, a soundcloud.com otwierasz wtedy obok DJ HQ.
 ### Twoje polubienia
 
 Każdy utwór polubiony przez zalogowane konto SoundCloud, porównany z plikami
-we wszystkich twoich bibliotekach. **Do zdobycia** wypisuje polubione utwory,
+w twojej kolekcji. **Do zdobycia** wypisuje polubione utwory,
 których nie ma w żadnym z twoich folderów, z tymi samymi linkami Za darmo
 i Kup co na stronie Brakujące. **W twoich folderach** to te, które już masz:
 przez playlistę, przez znaleziony plik albo przez plik o tej samej nazwie
-i długości w dowolnej bibliotece. **Spoza playlisty** to te, których brakuje
+i długości gdziekolwiek w kolekcji. **Spoza playlisty** to te, których brakuje
 na aktywnej playliście, każdy z przyciskiem **Dodaj**. Lista jest
 przechowywana przez kilka minut; **Odśwież** czyta ją ponownie z SoundCloud.
-Biblioteka, która śledzi twoje polubienia, z definicji jest tą listą, więc
-przycisk Dodaj jest tam ukryty.
+Playlista, która śledzi twoje polubienia, z definicji jest tą listą, więc
+gdy jest aktywna, przycisk Dodaj jest ukryty.
 
 ### Nowe: co się zmieniło od ostatniego razu
 
@@ -391,17 +393,17 @@ wszystko jako przejrzane**. Traktuj to jako listę zadań: zapisanie tagów,
 konwersja i import do rekordbox. Gdy odświeżanie znajdzie zmiany, krótka
 informacja mówi, ile utworów dodano albo usunięto.
 
-### Pobrane: nowe pliki do biblioteki
+### Pobrane: nowe pliki do kolekcji
 
-![Lista Pobrane: pliki pasujące do utworów z playlisty, każdy z przyciskiem Przenieś do biblioteki](docs/screens/downloads.png)
+![Lista Pobrane: pliki pasujące do utworów z playlisty, każdy z przyciskiem Przenieś do kolekcji](docs/screens/downloads.png)
 
 DJ HQ obserwuje twój folder Pobrane. Pliki audio w nim są porównywane
-z playlistą tak samo jak twoja biblioteka, a te, które pasują do utworu,
+z playlistą tak samo jak pliki w twojej kolekcji, a te, które pasują do utworu,
 pojawiają się tutaj.
 
 1. Sprawdź wiersz: pokazuje, do którego utworu należy plik, czy zgadza się
    długość i czy jest to plik MP3.
-2. Kliknij **Przenieś do biblioteki**. Plik jest przenoszony bez zmian, bez
+2. Kliknij **Przenieś do kolekcji**. Plik jest przenoszony bez zmian, bez
    zmiany nazwy, i łączony z utworem. Znika ze strony Brakujące i pojawia się na stronie Mam.
 3. Dla bezstratnego pliku do utworu, który był tylko w MP3, przycisk brzmi
    **Podmień na bezstratny**. Stary plik MP3 trafia do folderu kopii
@@ -411,9 +413,9 @@ pojawiają się tutaj.
 
 Pliki audio, które nie pasują do żadnego utworu z playlisty, są wypisane
 niżej, w sekcji **Spoza playlisty**. **Przenieś** przenosi taki plik bez zmian
-do twojej biblioteki, gdzie wyłapie go strona Spoza playlisty. **Znajdź na
+do twojej kolekcji; pojawia się na stronie Kolekcja. **Znajdź na
 SoundCloud** najpierw szuka utworu: wybierz właściwy wynik, a plik trafi do
-biblioteki dopasowany do niego, a przy zaznaczonym polu (po zalogowaniu na
+kolekcji dopasowany do niego, a przy zaznaczonym polu (po zalogowaniu na
 Discover) utwór w tym samym kroku trafi na playlistę na SoundCloud, więc od
 razu pojawi się w Mam. Jeśli wynik jest już na playliście, plik zostaje
 dopasowany do tego utworu.
@@ -422,12 +424,12 @@ Zakupy z Bandcamp przychodzą jako archiwa zip; DJ HQ zagląda do nich,
 wypisuje utwory z playlisty (z oznaczeniem „z Album.zip”) i rozpakowuje tylko
 je, a archiwum zostaje na swoim miejscu. Niedokończone pobieranie jest
 pomijane; poczekaj, aż się skończy, i kliknij **Skanuj**. Pliki,
-które są już w twojej bibliotece pod tą samą nazwą, są policzone, ale nie są
+które są już w twojej kolekcji pod tą samą nazwą, są policzone, ale nie są
 wypisane.
 
 Gdy w Ustawieniach jest włączone **Automatycznie przenoś dokładne dopasowania
-do biblioteki**, pobrany plik, którego nazwa i długość dokładnie pasują do
-utworu, sam trafia do biblioteki w ciągu minuty, a aplikacja o tym informuje.
+do kolekcji**, pobrany plik, którego nazwa i długość dokładnie pasują do
+utworu, sam trafia do kolekcji w ciągu minuty, a aplikacja o tym informuje.
 Przybliżone dopasowania i podmiany na bezstratne zawsze czekają na twoje
 kliknięcie.
 
@@ -507,7 +509,7 @@ biorą twoje wartości.
    zostawiona w oknie **Sprawdź nazwy**, gdy pokazywało ono inną nazwę z pliku.
 
    **Zapisz we wszystkich plikach**, pod tymi przyciskami, zapisuje nazwy
-   jeszcze raz w każdym pliku biblioteki, także w tych, które już liczą się
+   jeszcze raz w każdym pliku z playlisty, także w tych, które już liczą się
    jako otagowane: to naprawa na wypadek, gdy inna aplikacja uszkodziła albo
    usunęła tagi, a DJ HQ tego nie zauważył. Obowiązują te same zasady, dźwięk
    zostaje nietknięty, a przycisk na bieżąco liczy pliki. Nazwy, które plik już
@@ -541,7 +543,7 @@ biorą twoje wartości.
    **Zostaw** (Enter), **Zamień** (S), **Edytuj** (E), pomijanie albo powrót
    strzałkami. Trafia tam też plik, który ma już inną nazwę: okno pokazuje ją
    w wierszu **Teraz w pliku**, a **Weź z pliku** (F) ją przejmuje. Przełącz na
-   **Wszystkie nazwy**, żeby przejść przez całą bibliotekę. Twoje wybory są zapamiętywane i mają pierwszeństwo przed tym, co
+   **Wszystkie nazwy**, żeby przejść przez całą playlistę. Twoje wybory są zapamiętywane i mają pierwszeństwo przed tym, co
    odczytuje DJ HQ; **Zapisz tagi** zapisuje je potem w plikach. **⋯ > Zamień
    wykonawcę z tytułem** w wierszu robi to samo dla jednego utworu.
 3. **Konwertuj** zamienia pliki, których twój odtwarzacz nie odtworzy, na
@@ -561,7 +563,7 @@ biorą twoje wartości.
    plikami i pokazuje, jak ją zaimportować. W rekordbox: *Preferences >
    Advanced > Database > rekordbox xml*, raz wskaż ten plik; w drzewie pojawi
    się pozycja *rekordbox xml*, a kliknięcie tam playlisty prawym przyciskiem
-   da opcję **Import Playlist**. Utwory, które już są w twojej kolekcji,
+   da opcję **Import Playlist**. Utwory, które już są w twojej kolekcji rekordbox,
    zachowują punkty cue i siatki. Eksportuj ponownie przy każdej zmianie
    playlisty; ścieżka pliku się nie zmienia.
 
@@ -591,30 +593,32 @@ tagów albo konwersji, każdy z okładką i przyciskiem odtwarzania.
 - Przycisk **?** w prawym górnym rogu otwiera Przewodnik po stronie, na której
   jesteś: co znaczy każdy wiersz, oznaczenie, przycisk i filtr oraz co z nimi
   zrobić, dokładniej niż oprowadzanie. To samo daje naciśnięcie `?`.
-- Karta biblioteki na górze paska bocznego pokazuje, ile utworów z playlisty
-  jest w twoim folderze; liczniki przy każdej liście aktualizują się na bieżąco.
+- Karta na górze paska bocznego pokazuje aktywną playlistę i to, ile jej utworów
+  jest w twojej kolekcji; liczniki przy każdej liście aktualizują się na bieżąco.
   **Wszystkie utwory** to cała playlista, a **Brakujące** i **Mam** dzielą ją
   na dwie części.
 - Przycisk **⋯** na dole paska bocznego otwiera playlistę na SoundCloud,
   ponownie skanuje folder z muzyką, eksportuje plik XML rekordbox, powtarza
-  oprowadzanie, sprawdza aktualizacje oraz dodaje i usuwa biblioteki. Zębatka
+  oprowadzanie, sprawdza aktualizacje oraz dodaje i usuwa playlisty. Zębatka
   obok otwiera Ustawienia.
 
 ### Ustawienia
 
-![Ustawienia: foldery biblioteki, folder pobranych plików, automatyczne przenoszenie, częstotliwość odświeżania, wygląd, kopie zapasowe](docs/screens/settings.png)
+![Ustawienia: foldery kolekcji, folder na nowe utwory i obserwowany folder pobranych z automatycznym przenoszeniem](docs/screens/settings.png)
 
-Zębatka na dole paska bocznego. Od góry: biblioteka (jej foldery, playlista,
-usuwanie), konto SoundCloud zalogowane na Discover (wylogowanie i przełącznik,
-który dodaje do polubień każdy dodany utwór), gdzie otwierają się utwory (Discover albo
-przeglądarka), folder Pobrane obserwowany przez DJ HQ i przełącznik
-automatycznego przenoszenia dokładnych dopasowań, AIFF zamiast WAV (zobacz
-[niżej](#aiff-zamiast-wav-i-przeniesienie-folderu-głównego)), jak często sprawdzana jest
-playlista, wygląd, język,
+Zębatka na dole paska bocznego. Karty są podzielone na cztery grupy.
+**Kolekcja**: foldery kolekcji i folder na nowe utwory, obserwowany folder
+pobranych i przełącznik automatycznego przenoszenia dokładnych dopasowań, AIFF
+zamiast WAV (zobacz [niżej](#aiff-zamiast-wav-i-przeniesienie-folderu)) oraz
 kopie zapasowe (ile miejsca zajmują oryginały przekonwertowanych plików
-i zastąpione pliki MP3, z przyciskiem **Wyczyść**, gdy masz pewność, że nie
-będą potrzebne), przenoszenie i kopia konfiguracji (**Eksportuj
-konfigurację…** i **Importuj konfigurację…**) oraz aktualizacje.
+i zastąpione pliki MP3, z przyciskiem **Wyczyść kopie zapasowe…**, gdy masz
+pewność, że nie będą potrzebne). **Ta playlista**: link aktywnej playlisty,
+jej własny folder na nowe utwory i **Usuń tę playlistę…**. **Integracje**,
+między innymi: konto SoundCloud zalogowane na Discover (wylogowanie
+i przełącznik, który dodaje do polubień każdy dodany utwór), gdzie otwierają
+się utwory (Discover albo przeglądarka) oraz przenoszenie i kopia konfiguracji
+(**Eksportuj konfigurację…** i **Importuj konfigurację…**). **Aplikacja**: jak
+często sprawdzana jest playlista, wygląd, język i aktualizacje.
 
 **Język.** DJ HQ działa po angielsku i po polsku. Przy ustawieniu
 **Automatycznie** aplikacja używa języka twojego komputera: po polsku
@@ -625,24 +629,24 @@ wykonawców i plików oraz komunikaty samego SoundCloud zostają takie, jakie s�
 
 ### Więcej niż jeden folder
 
-Biblioteka zaczyna od jednego folderu, ale utwory z playlisty mogą być
-rozrzucone po kilku albo posortowane w podfoldery. Oba przypadki działają:
+Twoje utwory mogą być rozrzucone po kilku folderach albo posortowane
+w podfoldery. Oba przypadki działają:
 
-- **Dodaj folder** na karcie biblioteki w Ustawieniach dodaje do biblioteki
-  kolejny folder. Pliki w każdym z jej folderów liczą się jako twoje. Pierwszy
-  folder pozostaje *główny*: do niego trafiają pobrane pliki, dopóki nie
-  klikniesz **Ustaw jako główny** w wierszu innego folderu. Folder można
-  potem usunąć z biblioteki; jego pliki zostają na miejscu.
-- **Uwzględnij podfoldery** skanuje też foldery wewnątrz każdego folderu
-  biblioteki. Domyślnie jest wyłączone, więc liczą się tylko pliki leżące
-  bezpośrednio w folderze.
+- **Dodaj folder** na karcie Foldery kolekcji w Ustawieniach dodaje folder do
+  kolekcji. Każda playlista jest dopasowywana do plików we wszystkich folderach
+  kolekcji. Przycisk **×** obok folderu przestaje go obserwować; jego pliki
+  zostają na miejscu. **Nowe utwory trafiają do** to folder, do którego
+  przenoszone są pobrane pliki.
+- **Uwzględnij podfoldery** przy każdym folderze skanuje też foldery wewnątrz
+  niego. Domyślnie jest włączone.
 
-Pliki spoza folderu głównego są wypisane z nazwą folderu na początku, na
-przykład `Deep/Artist - Title.wav` albo `Vinyl rips/Artist - Title.wav`, żeby
-było widać, gdzie leży każdy z nich. Tagi, konwersja, kopie zapasowe
-i przywracanie działają na nich jak na każdym innym pliku.
+Gdy w kolekcji jest więcej niż jeden folder, każdy plik jest wypisany z nazwą
+swojego folderu na początku, na przykład `Deep/Artist - Title.wav` albo
+`Vinyl rips/Artist - Title.wav`, żeby było widać, gdzie leży każdy z nich.
+Tagi, konwersja, kopie zapasowe i przywracanie działają tak samo w każdym
+folderze.
 
-### AIFF zamiast WAV i przeniesienie folderu głównego
+### AIFF zamiast WAV i przeniesienie folderu
 
 rekordbox pokazuje okładki plików AIFF, a plików WAV nie, dlatego DJ HQ może
 zamieniać pliki WAV na pliki AIFF z tym samym dźwiękiem, tą samą
@@ -655,30 +659,28 @@ wraca, a plik AIFF trafia do kopii zapasowych. rekordbox widzi
 potem nowe pliki bez punktów cue: wyeksportuj kolekcję w rekordbox przez Plik >
 Eksportuj kolekcję w formacie xml, wybierz ten plik przyciskiem **Zaktualizuj
 eksport z rekordbox…** i zaimportuj z nowego pliku, który DJ HQ zapisuje obok,
-playlisty, które wymienia (utwory spoza playlist trafiają do kolekcji przez
-Wszystkie utwory). Jeśli folder biblioteki został
-przeniesiony albo zmieniono jego nazwę, użyj **Zmień…** obok folderu głównego
-w Ustawienia > Biblioteka: żadne pliki nie są przenoszone, a dopasowania
-zostają, także gdy plik ma teraz tę samą nazwę z innym rozszerzeniem. Gdy kopie
-AIFF są już w dodatkowym folderze biblioteki, kliknij **Ustaw jako główny**
-w wierszu tego folderu: oba foldery zamieniają się rolami, dotychczasowy folder
-główny zostaje w bibliotece jako dodatkowy, a każde dopasowanie, przypięcie
-i poprawka zostają przy swoim pliku. Stary folder możesz potem usunąć
-z biblioteki: utwór dopasowany do pliku w nim zachowa dopasowanie, gdy
-biblioteka ma plik o tej samej nazwie w innym folderze, także z innym
-rozszerzeniem.
+playlisty, które wymienia (utwory spoza playlist trafiają do kolekcji rekordbox przez
+Wszystkie utwory). Jeśli folder kolekcji został
+przeniesiony albo zmieniono jego nazwę, dodaj go w nowym miejscu przyciskiem
+**Dodaj folder** w Ustawienia > Foldery kolekcji, a potem usuń stary wiersz
+przyciskiem **×**. Żadne pliki nie są przenoszone, a utwór dopasowany do pliku
+w starym folderze zachowa dopasowanie, gdy w kolekcji jest plik o tej samej
+nazwie, także z innym rozszerzeniem. Dzięki temu, gdy kopie AIFF są w innym
+folderze kolekcji, możesz usunąć folder z plikami WAV.
 
 ### Więcej niż jedna playlista
 
-Kliknij **+ Dodaj bibliotekę** na pasku bocznym, żeby połączyć inny folder
-z inną playlistą, a między bibliotekami przełączaj się, klikając nazwę biblioteki
-na górze. Każda biblioteka ma własne dopasowania, zmienione nazwy i oznaczenia nowości.
+Kliknij **+ Dodaj playlistę** na pasku bocznym, żeby połączyć kolejną
+playlistę SoundCloud z kolekcją, a między playlistami przełączaj się, klikając
+nazwę na górze. Dopasowanie i zmieniona nazwa należą do utworu, więc są
+wspólne dla wszystkich playlist, na których jest ten utwór; tylko oznaczenia
+nowości każda playlista ma własne.
 
 ### Inny komputer albo kopia zapasowa
 
 **Ustawienia > Przenoszenie i kopia konfiguracji > Eksportuj konfigurację…**
 zapisuje jeden plik, `DJ HQ config <date>.djhq.json`, ze wszystkim, co DJ HQ
-wie o twoich bibliotekach: link SoundCloud i listę utworów każdej biblioteki,
+wie o twoich playlistach i kolekcji: link SoundCloud i listę utworów każdej playlisty,
 jej dopasowania (ręczne i automatyczne), edytowane nazwy, oznaczenia Mam / Brak
 / niedostępny, nowości i twoje ustawienia (częstotliwość odświeżania,
 automatyczne przenoszenie, wygląd, docelowy odtwarzacz). Zapisz go na
@@ -690,11 +692,11 @@ Czego nie ma w pliku: samej muzyki, oryginałów z kopii zapasowej (więc
 *Przywróć oryginały* nie ma czego przywrócić na nowym komputerze), logowania
 do SoundCloud, ustawienia języka i ścieżek z tego komputera: folder Pobrane
 jest tam wyszukiwany od nowa. Pliki są zapisywane pod nazwą wewnątrz folderu
-biblioteki, nigdy pełną ścieżką, więc plik z Maca da się zaimportować na
+kolekcji, nigdy pełną ścieżką, więc plik z Maca da się zaimportować na
 Windows i na odwrót.
 
-Link udostępniania prywatnej playlisty działa jak hasło. Gdy biblioteka go
-używa, eksport o tym mówi i proponuje **Nie zapisuj linków**; biblioteka trafia
+Link udostępniania prywatnej playlisty działa jak hasło. Gdy playlista ma taki
+link, eksport o tym mówi i proponuje **Nie zapisuj linków**; playlista trafia
 wtedy na nowy komputer bez linku, mówi o tym na każdej stronie i nie jest
 sprawdzana pod kątem zmian, dopóki nie wkleisz linku ponownie przez **Zmień
 link…**. Cała reszta działa na podstawie listy utworów z pliku.
@@ -704,25 +706,25 @@ działa krokami i nic się nie zmienia przed ostatnim:
 
 1. Wybierz plik. DJ HQ go czyta i sprawdza; plik z nowszej wersji DJ HQ, plik
    uszkodzony albo ucięty, a także plik z nazwami plików wskazującymi poza
-   folder biblioteki, jest odrzucany.
-2. Co jest w środku: dla każdej biblioteki utwory, dopasowania (ręczne
+   folder kolekcji, jest odrzucany.
+2. Co jest w środku: dla każdej playlisty utwory, dopasowania (ręczne
    i znalezione przez DJ HQ), edytowane nazwy i oznaczenia oraz to, co import
    zastąpi na tym komputerze.
-3. Foldery z muzyką: dla każdego folderu biblioteki folder na tym komputerze
-   (Przeglądaj… albo wpisz ścieżkę). DJ HQ liczy, ile plików biblioteki tam
+3. Foldery z muzyką: dla każdego folderu kolekcji folder na tym komputerze
+   (Przeglądaj… albo wpisz ścieżkę). DJ HQ liczy, ile plików tego folderu tam
    znajduje, zanim cokolwiek zmieni. Pliki są znajdowane po nazwie, także gdy
    kopia zmieniła wielkość liter albo sposób zapisu liter z akcentami, oraz po
    nazwie pliku, która występuje w folderze dokładnie raz, gdziekolwiek (wtedy
    włącza się *Uwzględnij podfoldery*). Nazwa, która występuje dwa razy,
    zostaje bez dopasowania, zamiast zgadywania.
 4. Potwierdź. Dopasowania, których pliku nie ma w folderze, są usuwane. Gdy
-   nie ma tam jeszcze żadnego pliku biblioteki (nowy komputer, muzyka jeszcze
-   nieskopiowana), nadal możesz ją zaimportować: biblioteka czeka wtedy na
+   nie ma tam jeszcze żadnego pliku z playlisty (nowy komputer, muzyka jeszcze
+   nieskopiowana), nadal możesz ją zaimportować: playlista czeka wtedy na
    swoje pliki, zachowuje wszystkie dopasowania i wskazuje każdy plik, gdy się
    pojawi, dopóki nie klikniesz **Kopiowanie zakończone**. Nic, co wcześniej
    nie było nowe, nie pokaże się jako nowy plik.
 
-Import zastępuje biblioteki na tym komputerze (dodawanie biblioteki obok
+Import zastępuje playlisty i foldery kolekcji na tym komputerze (dodawanie playlisty obok
 istniejących pojawi się później). Zanim cokolwiek zapisze, robi kopię bieżących
 danych (`<time>-before-import.djhq.db`) w `backups/` w folderze danych
 (zachowywanych jest pięć ostatnich kopii i każda kopia z ostatniego tygodnia).
@@ -756,7 +758,7 @@ nowej bazy danych.
 - **Pobrany plik się nie pojawia.** Archiwa zip i niedokończone pobieranie są
   pomijane: rozpakuj, poczekaj, aż pobieranie się skończy, i kliknij
   **Skanuj**. Plik, którego nazwa już istnieje w twoim folderze,
-  liczy się jako „już w bibliotece”.
+  liczy się jako „już w kolekcji”.
 - **rekordbox po konwersji wciąż pokazuje starą głębię bitową.** Ta kolumna
   jest zapamiętana. Kliknij utwór prawym przyciskiem i wybierz *Analyze Track*
   (punkty hot cue przetrwają) albo to zignoruj: odtwarzanie używa prawdziwego
@@ -767,7 +769,7 @@ nowej bazy danych.
   kaprys rekordbox: import playlisty nie aktualizuje utworów, które już są
   w kolekcji. Kliknij prawym przyciskiem utwory w gałęzi *rekordbox xml*
   i zaimportuj także je.
-- **„Nie udało się wczytać biblioteki: operation not permitted” (macOS).** Daj
+- **„Nie można odczytać folderu z muzyką: operation not permitted” (macOS).** Daj
   aplikacji dostęp do folderu z muzyką: Ustawienia systemowe > Prywatność
   i ochrona > Pliki i foldery.
 - **macOS mówi, że aplikacja jest „uszkodzona” i należy ją przenieść do
@@ -792,9 +794,9 @@ folderu projektu. W środku:
 
 | | |
 | --- | --- |
-| `djhq.db` | baza danych: biblioteki, kopie playlist, ręczne dopasowania, zmienione nazwy, oznaczenia nowości, ustawienia i wygląd (`djhq.db-journal` leży obok, gdy DJ HQ działa) |
-| `originals/<library>/` | oryginały zapisane przed konwersją |
-| `originals/<library>/replaced/` | pliki MP3 zastąpione przez pobrane pliki bezstratne |
+| `djhq.db` | baza danych: playlisty i ich kopie, foldery kolekcji, ręczne dopasowania, zmienione nazwy, oznaczenia nowości, ustawienia i wygląd (`djhq.db-journal` leży obok, gdy DJ HQ działa) |
+| `originals/<playlist>/` | oryginały zapisane przed konwersją (`<playlist>` to wewnętrzny identyfikator playlisty) |
+| `originals/<playlist>/replaced/` | pliki MP3 zastąpione przez pobrane pliki bezstratne |
 | `rekordbox.xml` | ostatni eksport rekordbox |
 | `backups/` | kopie `djhq.db` sprzed każdego importu konfiguracji (ostatnie pięć i wszystkie z ostatniego tygodnia) |
 | `state.json.imported-<time>` | `state.json` z DJ HQ 1.7 lub starszego, taki, jaki był w chwili przeniesienia do `djhq.db` (zachowany, nigdy więcej nie czytany; tak samo `prefs.json`) |
@@ -837,7 +839,7 @@ surowy eksport) zostaje bez zmian, a informacja mówi, że nie jest używany.
 nowej bazy danych. Żeby zachować bazę danych, przenieś `state.json` poza folder
 danych.
 
-Gdy folderu biblioteki nie ma (odłączony dysk, folder w chmurze, który się
+Gdy folderu kolekcji nie ma (odłączony dysk, folder w chmurze, który się
 jeszcze nie zsynchronizował, folder o zmienionej nazwie), aplikacja o tym mówi
 i niczego nie zapomina: ręczne dopasowania i oznaczenia nowości wracają razem
 z folderem.

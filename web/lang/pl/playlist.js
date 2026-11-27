@@ -54,7 +54,7 @@ I18N.add('pl', 'playlist', {
   showThemTip: 'Pokaż pliki, które wymagają tagów',
   missing: {
     workThrough: 'Przejdź po kolei',
-    workThroughTip: 'Przejrzyj brakujące utwory jeden po drugim: otwórz link, poczekaj na pobrany plik, przenieś go do biblioteki',
+    workThroughTip: 'Przejrzyj brakujące utwory jeden po drugim: otwórz link, poczekaj na pobrany plik, przenieś go do kolekcji',
     toGet: {
       one: '{n} utwór do zdobycia',
       few: '{n} utwory do zdobycia',
@@ -114,9 +114,9 @@ I18N.add('pl', 'playlist', {
       many: 'Jeszcze {n} plików wymaga konwersji, ale nie ma ich na playliście.',
     },
     names: {
-      one: '{n} nazwa do sprawdzenia w bibliotece, łącznie z utworami, których jeszcze nie masz.',
-      few: '{n} nazwy do sprawdzenia w bibliotece, łącznie z utworami, których jeszcze nie masz.',
-      many: '{n} nazw do sprawdzenia w bibliotece, łącznie z utworami, których jeszcze nie masz.',
+      one: '{n} nazwa do sprawdzenia na playliście, łącznie z utworami, których jeszcze nie masz.',
+      few: '{n} nazwy do sprawdzenia na playliście, łącznie z utworami, których jeszcze nie masz.',
+      many: '{n} nazw do sprawdzenia na playliście, łącznie z utworami, których jeszcze nie masz.',
     },
     taggedTitle: 'Wszystkie dopasowane pliki mają tagi',
     taggedText: 'rekordbox pokazuje właściwego wykonawcę i tytuł dla każdego z nich.',

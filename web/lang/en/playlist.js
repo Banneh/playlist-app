@@ -107,8 +107,8 @@ I18N.add('en', 'playlist', {
       other: '{n} more files need converting but aren’t in the playlist.',
     },
     names: {
-      one: '{n} name to check in the library, including tracks you don’t have yet.',
-      other: '{n} names to check in the library, including tracks you don’t have yet.',
+      one: '{n} name to check in the playlist, including tracks you don’t have yet.',
+      other: '{n} names to check in the playlist, including tracks you don’t have yet.',
     },
     taggedTitle: 'All matched files are tagged',
     taggedText: 'rekordbox shows the right artist and title for every one.',

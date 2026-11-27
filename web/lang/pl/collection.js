@@ -16,7 +16,7 @@ I18N.add('pl', 'coll', {
     playlists: 'Playlisty', folders: 'Foldery', empty: 'pusty', clear: 'Pokaż wszystkie playlisty i foldery',
   },
   head: { track: 'Utwór · plik', key: 'Ton.', todo: 'Do zrobienia', playlists: 'Playlisty' },
-  inN: { one: 'W {n} playliście', few: 'W {n} playlistach', many: 'W {n} playlistach', other: 'W {n} playlisty' },
+  inN: { one: 'Na {n} playliście', few: 'Na {n} playlistach', many: 'Na {n} playlistach', other: 'Na {n} playlisty' },
   openLibTip: 'Otwórz playlistę {name}',
   found: 'Znaleziono: {name}',
   usedTip: 'Dopasowany do: {track}',
@@ -103,7 +103,7 @@ I18N.add('pl', 'settings', {
   toc: 'Sekcje',
   coll: {
     title: 'Foldery kolekcji',
-    text: 'DJ HQ obserwuje te foldery. Każda playlista dopasowuje swoje utwory do wszystkich plików, które w nich są; układ folderów należy do Ciebie.',
+    text: 'DJ HQ obserwuje te foldery. Każda playlista dopasowuje swoje utwory do wszystkich plików, które w nich są; układ folderów należy do ciebie.',
     none: 'Nie ma jeszcze folderów. Dodaj folder, w którym trzymasz muzykę.',
     addPh: 'Ścieżka do folderu z muzyką…',
     add: 'Dodaj folder',
@@ -122,7 +122,7 @@ I18N.add('pl', 'settings', {
   pl: {
     title: 'Playlista: {name}',
     text: 'Ustawienia tej playlisty. Playlista dopasowuje swoje utwory do całej kolekcji.',
-    textLikes: 'Ta lista podąża za Twoimi polubieniami na SoundCloud i dopasowuje je do całej kolekcji.',
+    textLikes: 'Ta playlista śledzi twoje polubienia na SoundCloud i dopasowuje je do całej kolekcji.',
     dest: 'Nowe utwory trafiają do <b>{dir}</b>',
     destNone: 'Najpierw dodaj folder kolekcji',
     src: { own: '(ustawione dla tej playlisty)', default: '(domyślny folder kolekcji)', last: '(ostatnio wybrany przy przenoszeniu)', first: '(pierwszy folder kolekcji)' },

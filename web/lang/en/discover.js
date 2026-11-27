@@ -115,7 +115,7 @@ I18N.add('en', 'discover', {
       s1: {
         h: 'The bar above the page',
         i1: { name: 'Now playing', text: 'Whatever SoundCloud’s player is playing shows up here with its cover, length and whether it is in the playlist already.' },
-        i2: { name: 'Add to playlist', text: 'Puts the playing track into the playlist on SoundCloud, so it lands in Missing right away. For a Likes library this likes the track instead.' },
+        i2: { name: 'Add to playlist', text: 'Puts the playing track into the playlist on SoundCloud, so it lands in Missing right away. When the playlist follows your Likes, this likes the track instead.' },
         i3: { name: 'The heart', text: 'Likes or unlikes the playing track on SoundCloud. With “Also like tracks you add” on in Settings, adding likes it as well.' },
         i4: { name: 'Related tracks', text: 'What SoundCloud suggests after this track. The same item sits in the ⋯ menu of every playlist row.' },
         i5: { name: 'Back · Home · Playlist', text: 'Steps back a page, goes to SoundCloud’s home, or opens your playlist (or Likes) on SoundCloud.' },
@@ -123,7 +123,7 @@ I18N.add('en', 'discover', {
       s2: {
         h: 'Keys',
         t1: '<kbd>Space</kbd> plays and pauses, <kbd>←</kbd> and <kbd>→</kbd> jump 10 seconds back or forward, <kbd>N</kbd> and <kbd>P</kbd> go to the next or previous track in SoundCloud’s queue.',
-        t2: '<kbd>A</kbd> adds the playing track to the playlist (to your Likes for a Likes library), <kbd>L</kbd> likes or unlikes it.',
+        t2: '<kbd>A</kbd> adds the playing track to the playlist (to your Likes when the playlist follows them), <kbd>L</kbd> likes or unlikes it.',
         t3: 'They work whether you last clicked the bar or the SoundCloud page, unless you are typing in a field. They also work on every other page while the bar at the bottom is up.',
       },
       s3: {
@@ -141,17 +141,17 @@ I18N.add('en', 'discover', {
     },
     likes: {
       title: 'Your Likes',
-      lead: 'Every track the signed-in SoundCloud account has liked, checked against the files in all your libraries.',
+      lead: 'Every track the signed-in SoundCloud account has liked, checked against the files in your collection.',
       s1: {
         h: 'The chips',
-        i1: { name: 'Still to get', text: 'Liked tracks that are in none of your folders, with the same Free DL and Buy links as Missing.' },
-        i2: { name: 'In your folders', text: 'Liked tracks you already have: through the playlist, a found file, or a file with the same name and length in any library.' },
+        i1: { name: 'Still to get', text: 'Liked tracks that are nowhere in your collection, with the same Free DL and Buy links as Missing.' },
+        i2: { name: 'In your collection', text: 'Liked tracks you already have: through a playlist, a found file, or a file with the same name and length anywhere in your collection.' },
         i3: { name: 'Not in the playlist', text: 'Liked tracks that aren’t in the active playlist yet. <b>Add</b> puts one in with one click.' },
       },
       s2: {
         h: 'Good to know',
         t1: 'The likes list is cached for a few minutes. <b>Refresh</b> on the page reads it from SoundCloud again.',
-        t2: 'A Likes library (a playlist link that ends in /likes) is this list by definition, so Add is hidden there.',
+        t2: 'A playlist that follows your Likes (its link ends in /likes) is this list by definition, so Add is hidden while it is the active one.',
       },
     },
     artwork: {

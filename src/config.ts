@@ -247,7 +247,7 @@ export function buildExport(opts: { leaveLinksOut?: boolean; theme?: unknown }):
 
 const fail = (code: string, text: string, vars?: Record<string, unknown>) => core.appError(code, text, vars);
 const invalid = (what: string) => fail("config_invalid", `this configuration file is damaged or not one DJ HQ wrote (${what})`, { what });
-const outside = (what: string) => fail("config_path_outside", `this configuration file is damaged or not one DJ HQ wrote (${what}: a file name that points outside the library folder)`, { what });
+const outside = (what: string) => fail("config_path_outside", `this configuration file is damaged or not one DJ HQ wrote (${what}: a file name that points outside the collection folder)`, { what });
 
 const isObj = (v: any) => !!v && typeof v === "object" && !Array.isArray(v);
 const isStr = (v: any) => typeof v === "string";
@@ -611,7 +611,7 @@ export function probe(data: any): any {
     return { root: ri, ...matchOut(matchRoot(p, ri, c.dir)) };
   }
   const l = p.libs[Number(data.lib)];
-  if (!l) throw fail("bad_request", "no such library in the file");
+  if (!l) throw fail("bad_request", "no such playlist in the file");
   const fi = Number(data.folder) || 0;
   if (!l.folders[fi]) throw fail("bad_request", "no such folder in the file");
   const c = checkDir(data.dir);
@@ -657,7 +657,7 @@ export async function apply(data: any, opts: { jobActive: boolean }): Promise<an
   if (opts.jobActive) throw fail("job_active", "a Do everything run is going; wait for it to finish (or cancel it) before importing");
   const S = core.STATE;
   if (S.libraries.length && data.confirm_replace !== true)
-    throw fail("confirm_replace", "importing replaces the libraries on this computer; confirm that first");
+    throw fail("confirm_replace", "importing replaces the playlists on this computer; confirm that first");
   const chosen: unknown[][] = Array.isArray(data.folders) ? data.folders : [];
   const noFiles = new Set((Array.isArray(data.no_files) ? data.no_files : []).map(Number));
   // the folders: each must exist; none may be the same as, or inside, another one
@@ -670,7 +670,7 @@ export async function apply(data: any, opts: { jobActive: boolean }): Promise<an
   }));
   const all = dirs.flat().filter((d): d is string => !!d);
   all.forEach((a, i) => all.forEach((b, j) => {
-    if (i !== j && sameOrInside(a, b)) throw fail("folder_twice", `${a} is ${a === b ? "chosen twice" : "inside " + b}; each library folder must be on its own`, { dir: a, other: b });
+    if (i !== j && sameOrInside(a, b)) throw fail("folder_twice", `${a} is ${a === b ? "chosen twice" : "inside " + b}; each collection folder must be on its own`, { dir: a, other: b });
   }));
   const matches = p.libs.map((l, li) => l.folders.map((_, fi) => dirs[li][fi] ? matchFolder(l, fi, dirs[li][fi]!) : null));
   const dormant = p.libs.map((l, li) => {
@@ -834,7 +834,7 @@ async function applyV2(p: Plan, data: any, opts: { jobActive: boolean }): Promis
   if (opts.jobActive) throw fail("job_active", "a Do everything run is going; wait for it to finish (or cancel it) before importing");
   const S = core.STATE;
   if (S.libraries.length && data.confirm_replace !== true)
-    throw fail("confirm_replace", "importing replaces the libraries on this computer; confirm that first");
+    throw fail("confirm_replace", "importing replaces the playlists on this computer; confirm that first");
   const chosen: unknown[] = Array.isArray(data.roots) ? data.roots : [];
   const dirs: (string | null)[] = p.roots.map((r, i) => {
     const raw = chosen[i];

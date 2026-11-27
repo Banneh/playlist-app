@@ -129,7 +129,7 @@ I18N.add('en', 'tags', {
       one: 'Write tags again in {n} file?',
       other: 'Write tags again in {n} files?',
     },
-    p1: 'Artist, title and genre are written again into every file of this library, also into the ones that already count as tagged. Use it when another app has damaged or removed tags.',
+    p1: 'Artist, title and genre are written again into every file of this playlist, also into the ones that already count as tagged. Use it when another app has damaged or removed tags.',
     p2: 'The audio is not touched, nor the musical key and the other marks in the tags.',
     keep: 'Names already in the files stay as they are.',
     hand: {
@@ -210,9 +210,9 @@ I18N.add('en', 'tags', {
     },
     none: 'No file needs a picture.',
   },
-  moveIn: 'Move into library',
+  moveIn: 'Move into collection',
   upgrade: 'Upgrade',
-  movedIn: 'Moved into your library',
+  movedIn: 'Moved into your collection',
   findOnSc: 'Find on SoundCloud',
   find: {
     placeholder: 'Artist and title',
