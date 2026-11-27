@@ -152,7 +152,7 @@ I18N.add('pl', 'settings', {
 
   // the About card
   about: {
-    text: 'Synchronizuje twój folder z muzyką z playlistą na SoundCloud i przygotowuje utwory do rekordbox.',
+    text: 'Synchronizuje twoje foldery z muzyką z playlistami na SoundCloud i przygotowuje utwory do rekordbox.',
     checkUpdates: 'Sprawdź aktualizacje',
     dataFolder: 'Folder danych',
     rawExport: 'Eksportuj surowe dane (JSON)',

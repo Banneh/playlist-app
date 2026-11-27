@@ -984,9 +984,13 @@ The macOS apps are ad-hoc signed; they aren't notarized, hence the one-time
 
 ### Out of scope
 
-Spotify and Apple Music playlists, private playlists read through a SoundCloud
-sign-in instead of their share link, automated downloading through gates, and
-editing the rekordbox database. Issues and PRs welcome.
+Spotify and Apple Music playlists, and private playlists read through a SoundCloud
+sign-in instead of their share link. Download gates are walked by the app itself only
+for the gates it has an adapter for, and only with the `DJ_HQ_DOWNLOAD_BYPASS` switch
+on; every other gate opens in your browser. The rekordbox database is only ever added
+to: with **Add moved files to rekordbox** on (Settings > Integrations), tracks DJ HQ
+moves into the collection are added while rekordbox is closed, after a backup of the
+database. Nothing already in rekordbox is changed or removed. Issues and PRs welcome.
 
 ## License
 

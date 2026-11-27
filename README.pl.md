@@ -855,6 +855,18 @@ starcie, co 15 minut, gdy okno jest otwarte, i gdy klikniesz Odśwież;
 wyszukiwanie utworów działa tylko wtedy, gdy używasz Znajdź na SoundCloud albo
 Znajdź wszystkie.
 
+## Poza zakresem
+
+Playlisty ze Spotify i Apple Music oraz prywatne playlisty czytane przez
+logowanie do SoundCloud zamiast przez link udostępniania. Bramki pobierania
+aplikacja przechodzi sama tylko wtedy, gdy ma adapter dla danej bramki, i tylko
+z włączonym przełącznikiem `DJ_HQ_DOWNLOAD_BYPASS`; każda inna bramka otwiera się
+w przeglądarce. Do bazy rekordbox DJ HQ tylko dopisuje: z włączonym **Dopisuj
+przeniesione pliki do rekordboxa** (Ustawienia > Integracje) utwory przeniesione
+do kolekcji trafiają do niej, gdy rekordbox jest zamknięty, po zrobieniu kopii
+bazy. Niczego, co już jest w rekordbox, nie zmienia ani nie usuwa. Zgłoszenia
+i PR-y mile widziane.
+
 ## Szczegóły techniczne
 
 Uruchamianie ze źródeł, tryb headless, budowa projektu, tłumaczenia (jak dodać

@@ -1,7 +1,8 @@
 /* DJ HQ strings: welcome, Polish. Owner: job A. */
 I18N.add('pl', 'welcome', {
   title: 'Witaj w DJ HQ',
-  lead: 'Utrzymuj folder z muzyką w zgodzie z playlistą na SoundCloud i przygotuj go do rekordbox i do grania w klubie.',
+  lead: 'Utrzymuj foldery z muzyką w zgodzie ze swoimi playlistami na SoundCloud i przygotuj je do rekordbox i do grania w klubie.',
+  addMore: 'Kolejne foldery i playlisty dodasz w każdej chwili.',
   connect: 'Połącz bibliotekę',
   connecting: 'Łączenie i wczytywanie playlisty…',
   or: 'albo',

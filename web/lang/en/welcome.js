@@ -1,7 +1,8 @@
 /* DJ HQ strings: welcome, English (the source). Owner: job A. */
 I18N.add('en', 'welcome', {
   title: 'Welcome to DJ HQ',
-  lead: 'Keep your music folder in sync with a SoundCloud playlist, and get it ready for rekordbox and the club.',
+  lead: 'Keep your music folders in sync with your SoundCloud playlists, and get them ready for rekordbox and the club.',
+  addMore: 'You can add more folders and playlists any time.',
   connect: 'Connect library',
   connecting: 'Connecting and fetching the playlist…',
   or: 'or',

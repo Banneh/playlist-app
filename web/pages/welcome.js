@@ -92,9 +92,6 @@ function wlWatchTheme() {
   WL_THEME_OBS.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 }
 
-const wlFeat = (ico, key) =>
-  `<div class="feat"><span class="wl-feat-ico">${icon(ico)}</span><b>${th('welcome.feat.' + key + 'Title')}</b><span>${th('welcome.feat.' + key + 'Text')}</span></div>`;
-
 /* ---------- the page ---------- */
 PAGES.welcome = {
   body: () => `
@@ -111,11 +108,7 @@ PAGES.welcome = {
         <button type="button" class="btn btn-block wl-tour" onclick="startTour()">${icon('sparkles')}${esc(t('welcome.tour'))}</button>
         ${typeof cfWelcomeLink === 'function' ? cfWelcomeLink() : ''}
       </form>
-      <div class="features">
-        ${wlFeat('download', 'missing')}
-        ${wlFeat('disc', 'booth')}
-        ${wlFeat('upload', 'rb')}
-      </div>
+      <p class="wl-more">${th('welcome.addMore')}</p>
       <p class="wl-privacy">${icon('lock')}${th('welcome.privacy')}</p>
 
     </div>`,

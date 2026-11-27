@@ -152,7 +152,7 @@ I18N.add('en', 'settings', {
 
   // the About card
   about: {
-    text: 'Keeps your music folder in sync with a SoundCloud playlist and gets your tracks ready for rekordbox.',
+    text: 'Keeps your music folders in sync with your SoundCloud playlists and gets your tracks ready for rekordbox.',
     checkUpdates: 'Check for updates',
     dataFolder: 'Data folder',
     rawExport: 'Export raw data (JSON)',
