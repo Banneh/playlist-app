@@ -23,7 +23,10 @@
 .wt-watch { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-3); padding: 6px 0; }
 .wt-ok { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--green); padding: 6px 0; }
 .wt-found .txt b { font-weight: 600; }
-.wt-found .wt-meta { display: block; font-size: 12px; color: var(--text-2); margin-top: 2px; }
+/* a file or zip name with no space in it breaks rather than run out of the note */
+.wt-found .txt { overflow-wrap: anywhere; }
+/* the match label (the tag Downloads shows), then MP3 and the zip as text; what does not fit beside the label goes under it */
+.wt-found .wt-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; font-size: 12px; color: var(--text-2); margin-top: 4px; }
 .wt-keys { margin-top: 14px; font-size: 11.5px; color: var(--text-3); }
 
 @media (max-width: 640px) {

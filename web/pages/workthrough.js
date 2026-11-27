@@ -170,9 +170,10 @@ function wtStatus() {
   if (foot && tr) foot.innerHTML = wtFoot(tr);
   if (keys) keys.innerHTML = th(it ? 'workthrough.keysMove' : 'workthrough.keys');
   if (it) {
-    const pct = Math.round(it.score * 100);
+    // the match label is the very one Downloads shows for this file (ibMatchTag in pages/inbox.js); MP3 and the zip follow as plain text
+    const facts = [it.lossy ? 'MP3' : '', it.zip ? t('workthrough.inside', { zip: it.zip }) : ''].filter(Boolean).join(' · ');
     st.innerHTML = `<div class="note note-green wt-found">${icon('inbox')}<div class="txt">${th('workthrough.found', { name: it.name })}
-        <span class="wt-meta">${esc(pct >= 100 ? t('tags.exactMatch') : t('tags.pctMatch', { pct }))} · ${esc(durDiff(it.dur_diff))}${it.lossy ? ' · MP3' : ''}${it.zip ? ' · ' + esc(t('workthrough.inside', { zip: it.zip })) : ''}</span></div>
+        <span class="wt-meta">${ibMatchTag(it)}${facts ? `<span>${esc(facts)}</span>` : ''}</span></div>
 </div>`;
     return;
   }

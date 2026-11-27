@@ -32,14 +32,7 @@ const ibUnmatched = () => (INBOX && INBOX.unmatched) || [];
 /* ---------- row ---------- */
 function ibRow(it) {
   const i = INBOX.items.indexOf(it);
-  const pct = Math.round(it.score * 100);
-  // one label: Exact match (name and length agree), or Close match with what differs
-  const diff = it.dur_diff === 0 ? t('tags.pctMatch', { pct }) : (it.dur_diff > 0 ? '+' : '−') + Math.abs(it.dur_diff) + ' s';
-  const tags = [
-    ibExact(it) ? tag(t('tags.exactMatch'), 'ok', 'check', t('inbox.exactTip'))
-      : tag(t('inbox.closeMatch', { diff }), Math.abs(it.dur_diff) > 10 ? 'warn' : 'outline', '', t('inbox.closeMatchTip', { pct })),
-    ...ibFileTags(it),
-  ].filter(Boolean).join('');
+  const tags = [ibMatchTag(it), ...ibFileTags(it)].filter(Boolean).join('');
   const up = it.action === 'upgrade';
   const curName = String(it.cur_file || '').split(/[\\/]/).pop();
   return `
@@ -130,8 +123,19 @@ async function ibMoveTo(i, other, btn) {
   await loadInbox();
 }
 
-/** the same name and the same length */
-const ibExact = it => Math.round(it.score * 100) >= 100 && it.dur_diff === 0;
+/** the same length: within the 2 s auto-move allows (core.ts inboxView). SoundCloud's length is cut to whole seconds
+ *  and the file's is rounded, so a file exactly as long as the track often reads +1 s */
+const ibSameLength = it => Math.abs(it.dur_diff) <= 2;
+/** the same name and the same length: what auto-move would move */
+const ibExact = it => Math.round(it.score * 100) >= 100 && ibSameLength(it);
+/** how well a download fits its track, as one label: Exact match, or Close match with what differs (the length, or the
+ *  name when the length agrees). Work through shows this same label on the file it finds (pages/workthrough.js) */
+function ibMatchTag(it) {
+  if (ibExact(it)) return tag(t('tags.exactMatch'), 'ok', 'check', t('inbox.exactTip'));
+  const pct = Math.round(it.score * 100);
+  const diff = ibSameLength(it) ? t('inbox.nameDiffers') : (it.dur_diff > 0 ? '+' : '−') + Math.abs(it.dur_diff) + ' s';
+  return tag(t('inbox.closeMatch', { diff }), Math.abs(it.dur_diff) > 10 ? 'warn' : '', '', t('inbox.closeMatchTip', { pct }));
+}
 /** the list's order: exact matches first, then the newest (when the scan says when a file came;
  *  otherwise the server's order). INBOX.items keeps its order: the buttons move by its index */
 function ibSorted(items) {
