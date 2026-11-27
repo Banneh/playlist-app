@@ -20,6 +20,9 @@ I18N.add('pl', 'err', {
   folder_other_library: 'ten folder jest już ustawiony dla playlisty „{name}”',
   main_folder_fixed: 'nie można usunąć tego folderu. Zamiast tego usuń playlistę',
   folder_not_in_library: 'ten folder nie należy do kolekcji',
+  root_not_found: 'ten folder nie należy do kolekcji',
+  target_outside_collection: 'nowe utwory mogą trafiać tylko do folderu w kolekcji',
+  no_collection_folder: 'żaden folder kolekcji nie jest dostępny; dodaj folder w Ustawieniach albo podłącz dysk, na którym jest',
   link_missing: 'ta playlista nie ma jeszcze linku SoundCloud. Ustaw go przyciskiem „Zmień link…” w Ustawieniach',
 
   // reading SoundCloud

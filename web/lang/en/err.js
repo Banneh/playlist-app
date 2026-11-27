@@ -22,6 +22,9 @@ I18N.add('en', 'err', {
   folder_other_library: 'this folder is already set for the playlist “{name}”',
   main_folder_fixed: 'this folder can’t be removed; remove the playlist instead',
   folder_not_in_library: 'that folder is not part of the collection',
+  root_not_found: 'that folder is not part of the collection',
+  target_outside_collection: 'new tracks can only go to a folder inside the collection',
+  no_collection_folder: 'no collection folder is available; add one in Settings or connect the drive it is on',
   link_missing: 'this playlist has no SoundCloud link yet; set it with Change link… in Settings',
 
   // reading SoundCloud
