@@ -49,7 +49,7 @@ function ibRow(it) {
       <div class="t-meta">
         <div class="t-title"><span title="${esc(it.title)}">${esc(it.title)}</span></div>
         <div class="t-sub">${esc(it.artist)}</div>
-        <div class="t-file">${(!it.zip && INBOX.dir ? playBtn(joinPath(INBOX.dir, it.name), it.title, it.artist) : '') || icon('inbox')}<span class="fn" title="${esc(it.name)}">${esc(it.name)}</span><span class="tags">${tags}</span></div>
+        <div class="t-file">${(!it.zip && INBOX.dir ? playBtn(joinPath(INBOX.dir, it.name), it.title, it.artist) : '') || icon('inbox')}${fileNameHtml(it.name, { title: it.name, tail: `<span class="tags">${tags}</span>` })}</div>
         ${up ? `<div class="t-file ib-up" title="${esc(it.cur_file + ' · ' + t('inbox.oldKeptTip'))}">${icon('arrowUp')}<span class="fn">${esc(t('inbox.replaces', { file: curName }))}</span></div>` : ''}
       </div>
       <span class="dur">${esc(it.dur)}</span>
@@ -156,7 +156,7 @@ function ibOtherRow(it) {
       <div class="t-meta">
         <div class="t-title"><span title="${esc(it.title || it.name)}">${esc(it.title || it.name)}</span></div>
         <div class="t-sub">${esc(it.artist || '')}</div>
-        <div class="t-file">${(!it.zip && INBOX.dir ? playBtn(joinPath(INBOX.dir, it.name), it.title || it.name, it.artist || '') : '') || icon('inbox')}<span class="fn" title="${esc(it.name)}">${esc(it.name)}</span>${tags ? `<span class="tags">${tags}</span>` : ''}</div>
+        <div class="t-file">${(!it.zip && INBOX.dir ? playBtn(joinPath(INBOX.dir, it.name), it.title || it.name, it.artist || '') : '') || icon('inbox')}${fileNameHtml(it.name, { title: it.name, tail: tags ? `<span class="tags">${tags}</span>` : '' })}</div>
       </div>
       <span class="dur">${esc(it.dur)}</span>
       <div class="cell r ib-acts">

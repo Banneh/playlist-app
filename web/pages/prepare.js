@@ -35,7 +35,8 @@ PAGES.prepare = {
   // the player the files are checked for: one line under the title, Change opens the list
   sub: () => {
     const p = ppDevice().label;
-    return `<span class="fact">${p ? th('prepare.checkingFor', { player: p }) : th('prepare.checkingForAny')}</span> <span class="fact">· <a href="#" class="pp-change" onclick="event.preventDefault();ppDevicePop(this)" aria-haspopup="dialog">${esc(t('prepare.change'))}</a></span>`;
+    return factsHtml([p ? th('prepare.checkingFor', { player: p }) : th('prepare.checkingForAny'),
+      `<a href="#" class="pp-change" onclick="event.preventDefault();ppDevicePop(this)" aria-haspopup="dialog">${esc(t('prepare.change'))}</a>`]);
   },
   search: false,
   body: () => {

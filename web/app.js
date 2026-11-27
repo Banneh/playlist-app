@@ -111,8 +111,22 @@ const I = new Proxy({}, { get: (_, k) => icon(k) });
 /* ---------- small html builders ---------- */
 const tag = (text, kind, ico, title) =>
   `<span class="tag${kind ? ' tag-' + kind : ''}"${title ? ` title="${esc(title)}"` : ''}>${ico ? icon(ico) : ''}<span class="tx">${esc(text)}</span></span>`;
-/** a page subtitle made of facts: each one (with its dot) a no-wrap span, so a line breaks between facts, never inside one */
-const factsHtml = parts => parts.filter(Boolean).map((p, i) => `<span class="fact">${i ? '· ' : ''}${p}</span>`).join(' ');
+/** a page subtitle made of facts: each one a span that wraps whole, so a line breaks between facts. The dot
+ *  stays with the fact before it: a line that wraps starts with a word, never with the dot */
+const factsHtml = parts => parts.filter(Boolean).map((p, i, all) => `<span class="fact">${p}${i < all.length - 1 ? '&nbsp;·' : ''}</span>`).join(' ');
+/** A file name for a line that may be too short for it, in three elements: the folder (all up to the last
+ *  slash), the stem and the extension. The css (.fn-line) lets them go in that order: the folder first and
+ *  whole, then the stem takes the ellipsis; the extension stays ("Glasshou….wav").
+ *  opts: title (the tooltip: the full path), click (an onclick attribute value; the name becomes a link),
+ *  tail (html that stays right behind the name: the labels), cls (classes of the whole element) */
+function fileNameHtml(name, { title = '', click = '', tail = '', cls = '' } = {}) {
+  const s = String(name == null ? '' : name), cut = s.lastIndexOf('/') + 1;
+  const ext = (/\.[a-z0-9]{1,5}$/i.exec(s.slice(cut)) || [''])[0];
+  // the folder and the name are two elements of one link: both carry the click and the tooltip
+  const link = click ? ' link' : '', attrs = (click ? ` onclick="${esc(click)}"` : '') + (title ? ` title="${esc(title)}"` : '');
+  return `<span class="fn-line${cls ? ' ' + cls : ''}">${cut ? `<span class="fn-dir${link}"${attrs}>${esc(s.slice(0, cut))}</span>` : ''}<span class="fn-keep"><span class="fn${link}"${attrs}><span class="fn-stem">${
+    esc(s.slice(cut, s.length - ext.length))}</span>${ext ? `<span class="fn-ext">${esc(ext)}</span>` : ''}</span>${tail}</span></span>`;
+}
 const badge = (n, kind) => `<span class="badge${kind ? ' badge-' + kind : ''}">${n}</span>`;
 /** a callout bar: noteHtml('text html', 'buttons html', 'green'|'amber'|'red'|'plain') */
 const noteHtml = (text, acts, kind, ico) =>

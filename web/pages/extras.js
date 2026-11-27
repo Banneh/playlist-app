@@ -103,8 +103,8 @@ function exRow(f, i) {
           f.edited ? `<span class="co-edited" title="${esc(t('tags.editedTip'))}">${esc(t('tags.edited'))}</span>` : ''}${
           f.check_name ? issueTag({ kind: 'name', label: t('tags.issue.name'), tip: ncTip(f), click: `openCheckNames('check', COLL.files[${i}].name)` }) : ''}</div>
         <div class="t-sub co-sub">${f.artist ? `<span class="co-artist">${esc(f.artist)}</span>`
-          : `<span class="ex-noartist" onclick="exEdit(${i})" title="${esc(t('extras.noArtistTip'))}">${icon('pencil')}${esc(t('extras.noArtist'))}</span>`}<span class="co-sep">·</span><span class="co-fn" title="${esc(f.path)}">${
-          root ? `<span class="co-root">${esc(root)}/</span>` : ''}${esc(base)}</span>${narrow ? `<span class="co-narrow">${narrow}</span>` : ''}</div>
+          : `<span class="ex-noartist" onclick="exEdit(${i})" title="${esc(t('extras.noArtistTip'))}">${icon('pencil')}${esc(t('extras.noArtist'))}</span>`}<span class="co-sep">·</span>${
+          fileNameHtml((root ? root + '/' : '') + base, { cls: 'co-fn', title: f.path })}${narrow ? `<span class="co-narrow">${narrow}</span>` : ''}</div>
       </div>
       <span class="co-key">${f.key ? keyTag(f) : ''}</span>
       <span class="dur">${esc(f.dur)}</span>
@@ -288,7 +288,7 @@ PAGES.collection = {
     if (COLL.error) return th('coll.sub.failed');
     const parts = [tnh('coll.sub.files', COLL.total)];
     if (COLL.unmatched) parts.push(th('coll.sub.unmatched', { n: I18N.num(COLL.unmatched) }));
-    return parts.join(' · ');
+    return factsHtml(parts);
   },
   actions: () => {
     const todo = COLL && !COLL.error ? COLL.files.filter(f => f.unmatched && !f.found).length : 0;

@@ -2,7 +2,7 @@
 I18N.add('pl', 'discover', {
   sub: {
     noApp: 'Słuchaj na SoundCloud i dodawaj utwory do playlisty jednym kliknięciem.',
-    signedIn: 'Zalogowano jako <b>{user}</b> · odtwórz cokolwiek poniżej i dodaj to z paska.',
+    signedIn: 'Zalogowano jako <b>{user}</b>\u00a0· odtwórz cokolwiek poniżej i dodaj to z paska.',
     signedOut: 'SoundCloud w DJ HQ. Zaloguj się poniżej, aby dodawać do playlisty to, czego słuchasz.',
   },
   noApp: {

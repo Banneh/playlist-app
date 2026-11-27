@@ -68,6 +68,7 @@ I18N.add('en', 'tags', {
   head: {
     track: 'Track',
     getIt: 'Get it',
+    upgrade: 'Upgrade',
   },
   reset: 'Reset',
   saved: 'Saved. Tags will use your values',

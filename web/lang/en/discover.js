@@ -4,7 +4,7 @@
 I18N.add('en', 'discover', {
   sub: {
     noApp: 'Listen on SoundCloud and add tracks to the playlist with one click.',
-    signedIn: 'Signed in as <b>{user}</b> · play anything below and add it from the bar.',
+    signedIn: 'Signed in as <b>{user}</b>\u00a0· play anything below and add it from the bar.',   // the dot stays with the name: a line never starts with it
     signedOut: 'SoundCloud, inside DJ HQ. Sign in below to add what you hear to the playlist.',
   },
   noApp: {

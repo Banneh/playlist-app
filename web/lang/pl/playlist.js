@@ -25,7 +25,7 @@ I18N.add('pl', 'playlist', {
   resetDone: 'Przywrócono wartości z SoundCloud',
   assign: {
     title: 'Dopasuj do pliku lokalnego',
-    sub: '<b>{name}</b> · {dur} na SoundCloud. Najbardziej prawdopodobne pliki są na górze.',
+    sub: '<b>{name}</b>\u00a0· {dur} na SoundCloud. Najbardziej prawdopodobne pliki są na górze.',
     filter: 'Filtruj pliki…',
     auto: 'Dopasuj automatycznie',
     autoTip: 'Cofnij ręczny wybór i znów dopasuj automatycznie',

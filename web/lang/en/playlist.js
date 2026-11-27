@@ -26,7 +26,7 @@ I18N.add('en', 'playlist', {
   resetDone: 'Back to the SoundCloud values',
   assign: {
     title: 'Match to a local file',
-    sub: '<b>{name}</b> · {dur} on SoundCloud. Likely files are listed first.',
+    sub: '<b>{name}</b>\u00a0· {dur} on SoundCloud. Likely files are listed first.',
     filter: 'Filter files…',
     auto: 'Auto-match',
     autoTip: 'Forget the pinned choice and auto-match again',

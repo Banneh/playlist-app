@@ -16,11 +16,12 @@
 .co-edited { flex: none; height: 16px; padding: 0 5px; border-radius: 4px; background: var(--surface-3); color: var(--text-2);
   font-family: var(--mono); font-size: 9.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; line-height: 16px; }
 .co-sub { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.co-sub .co-artist { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* as in the track lists (app.css): the artist whole up to half the line; the file name gives way, its folder first (.fn-line) */
+.co-sub .co-artist { flex: 0 0 auto; max-width: 50%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .co-sub .ex-noartist { flex: none; }
 .co-sep { flex: none; color: var(--text-3); }
-.co-fn { flex: 1 1 auto; min-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-3); }
-.co-root { color: var(--text-3); opacity: .75; }
+.co-fn { flex: 1 1 auto; min-width: 60px; font-size: 12px; color: var(--text-3); }
+.co-fn .fn-dir { opacity: .75; }
 .co-narrow { display: none; align-items: center; gap: 4px; flex: none; }
 .co-key { display: flex; align-items: center; min-width: 0; }
 .ex-row .dur { font-family: var(--mono); font-size: 12px; }

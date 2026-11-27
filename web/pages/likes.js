@@ -33,7 +33,7 @@ function lkHaveLine(r) {
   const tags = [tag(t('likes.inLib', { lib: h.lib }), 'ok', 'check', t('likes.inLibTip'))];
   if (h.score !== null && h.score < 0.995) tags.push(tag(t('tags.pctMatch', { pct: Math.round(h.score * 100) }), 'outline', '', t('likes.matchTip')));
   if (h.lossy) tags.push(tag('MP3', 'mono', '', t('tags.lossyTip')));
-  return `<div class="t-file">${playBtn(h.path, r.title, r.artist) || `<span class="ic">${icon('music')}</span>`}<span class="fn" title="${esc(h.file)}">${esc(h.file)}</span><span class="tags">${tags.join('')}</span></div>`;
+  return `<div class="t-file">${playBtn(h.path, r.title, r.artist) || `<span class="ic">${icon('music')}</span>`}${fileNameHtml(h.file, { title: h.file, tail: `<span class="tags">${tags.join('')}</span>` })}</div>`;
 }
 function lkRow(r) {
   const inPl = r.in_playlist.length ? tag(r.in_active ? t('likes.inPlaylist') : t('likes.inOther', { name: r.in_playlist[0] }), 'accent', 'listMusic',
@@ -73,7 +73,7 @@ PAGES.likes = {
     if (LIKES.error) return th('likes.sub.failed');
     const parts = [tnh('likes.sub.total', LIKES.total), th('likes.sub.have', { n: I18N.num(LIKES.have) }), th('likes.sub.missing', { n: I18N.num(LIKES.missing) })];
     if (LIKES.likes_lib) parts.push(th('likes.sub.likesLib'));
-    return parts.join(' · ');
+    return factsHtml(parts);
   },
   actions: () => APP.sc && SC.signed_in
     ? `<button class="btn" onclick="loadLikes({force:true})" ${LK_BUSY ? 'disabled' : ''} title="${esc(t('likes.refreshTip'))}">${LK_BUSY ? spin(t('likes.readingShort')) : icon('refresh') + esc(t('common.refresh'))}</button>` : '',

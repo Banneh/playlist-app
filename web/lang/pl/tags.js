@@ -66,6 +66,7 @@ I18N.add('pl', 'tags', {
   head: {
     track: 'Utwór',
     getIt: 'Zdobądź',
+    upgrade: 'Lepsza wersja',
   },
   reset: 'Przywróć',
   saved: 'Zapisano. Tagi użyją twoich wartości',

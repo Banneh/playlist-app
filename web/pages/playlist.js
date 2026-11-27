@@ -146,16 +146,17 @@ function fileLine(r) {
   if (!r.file) {
     if (r.manual_match) return `<span class="t-file link" onclick="openAssign(${r.id})" title="${esc(t('tags.noFileByHandTip'))}">${icon('pin')}<span class="fn">${esc(t('tags.noFileByHand'))}</span></span>`;
     // a fresh download waiting in the inbox already matches this track: its name, the sentence in the tooltip
-    if (r.in_inbox) return `<span class="t-file ib-pending link" onclick="go('inbox')" title="${esc(t('tags.inInbox', { name: r.in_inbox.name }) + ' · ' + t('tags.inInboxTip'))}">${icon('inbox')}<span class="fn">${esc(r.in_inbox.name)}</span></span>`;
+    if (r.in_inbox) return `<span class="t-file ib-pending link" onclick="go('inbox')" title="${esc(t('tags.inInbox', { name: r.in_inbox.name }) + ' · ' + t('tags.inInboxTip'))}">${icon('inbox')}${fileNameHtml(r.in_inbox.name)}</span>`;
     return '';
   }
   const items = fileIssues(r);
   const full = issueLine(items, 'full'), compact = issueLine(items, 'compact');
-  const disp = r.file_disp || r.file;
-  return `<span class="t-file">${playBtn(filePath(r, r.file), r.title, r.artist) || `<span class="ic">${icon('music')}</span>`}<span class="fn link" onclick="openAssign(${r.id})" title="${esc(t('tags.fileTip', { file: r.file }))}">${esc(disp)}</span>${
-    full ? `<span class="tags tags-full">${full}</span><span class="tags tags-compact">${compact}</span>` : ''}</span>`;
+  // the name in parts (fileNameHtml in app.js), the labels right behind it
+  return `<span class="t-file">${playBtn(filePath(r, r.file), r.title, r.artist) || `<span class="ic">${icon('music')}</span>`}${
+    fileNameHtml(r.file_disp || r.file, { click: `openAssign(${r.id})`, title: t('tags.fileTip', { file: r.file }),
+      tail: full ? `<span class="tags tags-full">${full}</span><span class="tags tags-compact">${compact}</span>` : '' })}</span>`;
 }
-/** line 2 of a row: the artist (it gives way first), then the file */
+/** line 2 of a row: the artist (whole, up to half the line), then the file, which gives way */
 function subLine(r) {
   const file = fileLine(r);
   return `<div class="t-sub${file ? ' has-file' : ''}"><span class="t-artist">${esc(r.artist)}${viaHtml(r)}</span>${file ? `<span class="t-dot">·</span>${file}` : ''}</div>`;
@@ -185,7 +186,8 @@ function editFormHtml(r, save, reset, resetTip) {
 const viaHtml = r => r.user && r.user !== r.artist ? ` <span class="via">${esc(t('tags.via', { user: r.user }))}</span>` : '';
 
 /** opts.status: the Status column (New, All tracks); without it a status set by hand (or N/A)
- *  shows as a pill in the title line and the ⋯ menu changes it (Missing, Have) */
+ *  shows as a pill in the title line and the ⋯ menu changes it (Missing, Have).
+ *  opts.get === false: no Get it cell (trackTable decides) */
 function trackRow(r, opts = {}) {
   const status = opts.status !== false;
   if (r.id === EDIT_ID) return `
@@ -209,7 +211,7 @@ function trackRow(r, opts = {}) {
       </div>
       <span class="dur">${esc(r.dur)}</span>
       ${status ? `<div class="cell">${statusPill(r)}</div>` : ''}
-      <div class="get">${!r.have || r.upgrade ? waitingBtn(r) || (linkBtn(r, 'buy') + linkBtn(r, 'free')) || bcRow(r) || `<span class="nolink">${esc(t('tags.link.none'))}</span>` : ''}</div>
+      ${opts.get === false ? '' : `<div class="get">${!r.have || r.upgrade ? waitingBtn(r) || (linkBtn(r, 'buy') + linkBtn(r, 'free')) || bcRow(r) || `<span class="nolink">${esc(t('tags.link.none'))}</span>` : ''}</div>`}
       <button class="btn btn-ghost btn-sm btn-icon more" onclick="rowMenu(this, ${r.id}${status ? '' : ', true'})" title="${esc(t('common.more'))}">${icon('more')}</button>
     </div>`;
 }
@@ -563,13 +565,22 @@ function tagReplaceAsk(list) {
 }
 
 /* ---------- list helpers ---------- */
+/** opts.upgrade: a page of tracks you have (Have), where the column only ever offers the better version */
 const theadHtml = (opts = {}) => `<div class="thead">${opts.num ? '<span class="num">#</span>' : ''}<span></span><span>${esc(t('tags.head.track'))}</span><span class="r">${esc(t('common.length'))}</span>${
-  opts.status !== false ? `<span>${esc(t('common.status'))}</span>` : ''}<span>${esc(t('tags.head.getIt'))}</span><span></span></div>`;
-/** the class of a track table: no-num (positions only on All tracks), no-status (Missing, Have) */
-const tableCls = (opts = {}) => `table${opts.num ? '' : ' no-num'}${opts.status === false ? ' no-status' : ''}`;
-/** opts: {num, status} (see trackRow); head: false for a table under a section heading */
+  opts.status !== false ? `<span>${esc(t('common.status'))}</span>` : ''}${opts.get === false ? '' : `<span>${esc(t(opts.upgrade ? 'tags.head.upgrade' : 'tags.head.getIt'))}</span>`}<span></span></div>`;
+/** the class of a track table: no-num (positions only on All tracks), no-status (Missing, Have), and what
+ *  Get it holds: get-1 (one button), get-2 (Buy next to Free DL) or no-get (the column is not drawn) */
+const tableCls = (opts = {}) => `table${opts.num ? '' : ' no-num'}${opts.status === false ? ' no-status' : ''}${opts.get === false ? ' no-get' : opts.pair ? ' get-2' : ' get-1'}`;
+/** a row whose Get it cell holds Buy next to Free DL: the widest the cell gets */
+const getsPair = r => (!r.have || r.upgrade) && !waitingFile(r) && hasLink(r, 'buy') && hasLink(r, 'free');
+/** opts: {num, status} (see trackRow), {upgrade} (see theadHtml) and {page}: every row of the page, before
+ *  the search and the chips. Get it follows those rows, not the ones shown: its width (and, on Have, whether
+ *  it is there at all) stays put while a search or a chip narrows the list.
+ *  head: false for a table under a section heading */
 function trackTable(rows, emptyOpts, opts = {}, head = true) {
-  return `<div class="${tableCls(opts)}">${head ? theadHtml(opts) : ''}${rows.length ? rows.map(r => trackRow(r, opts)).join('') : emptyHtml(emptyOpts)}</div>`;
+  const page = opts.page || rows;
+  const o = { ...opts, pair: page.some(getsPair), get: !opts.upgrade || page.some(r => r.upgrade) };
+  return `<div class="${tableCls(o)}">${head ? theadHtml(o) : ''}${rows.length ? rows.map(r => trackRow(r, o)).join('') : emptyHtml(emptyOpts)}</div>`;
 }
 /** the filter rail: single-select chips drawn as one segmented control; items are [value, label key, count, icon] */
 function chipsHtml(varName, cur, items) {
@@ -613,7 +624,7 @@ PAGES.missing = {
     const empty = q || MFILTER !== 'all'
       ? emptyOf('search', 'tags.empty.noTracks', q ? 'common.tryOtherSearch' : MFILTER === 'names' ? 'playlist.missing.noNamesLeft' : 'tags.empty.filter')
       : emptyOf('checkCircle', 'playlist.missing.nothingTitle', 'playlist.missing.nothingText', 'green');
-    const opts = { status: false };
+    const opts = { status: false, page: DATA.tracks.filter(r => !r.have || r.na) };   // the list and the section under it: the same columns
     return trackTable(rows, empty, opts) + (na.length ? `
       <div class="section">${esc(t('playlist.missing.naSection'))} ${badge(na.length)}<span class="hint">${esc(t('playlist.missing.naHint'))}</span></div>
       ${trackTable(na, null, opts, false)}` : '');
@@ -650,7 +661,7 @@ PAGES.have = {
       : HFILTER === 'upgrade' ? emptyOf('checkCircle', 'playlist.have.noUpgradesTitle', 'playlist.have.noUpgradesText', 'green')
       : HFILTER === 'names' ? emptyOf('checkCircle', 'names.none', 'playlist.have.noNamesText', 'green')
       : emptyOf('folder', 'playlist.have.noneTitle', 'playlist.have.noneText');
-    return tagNote() + trackTable(rows, empty, { status: false }) + strayLine + nameLine;
+    return tagNote() + trackTable(rows, empty, { status: false, upgrade: true, page: DATA.tracks.filter(r => r.have) }) + strayLine + nameLine;
   },
 };
 
@@ -662,7 +673,7 @@ PAGES.all = {
   body: q => {
     const rows = DATA.tracks.filter(r => matchesQ(r, q));
     LAST_ROWS = rows;
-    return trackTable(rows, emptyOf('search', 'tags.empty.noTracks', 'common.tryOtherSearch'), { num: true });
+    return trackTable(rows, emptyOf('search', 'tags.empty.noTracks', 'common.tryOtherSearch'), { num: true, page: DATA.tracks });
   },
 };
 
@@ -680,7 +691,7 @@ PAGES.new = {
     LAST_ROWS = rows;
     return trackTable(rows, q
       ? emptyOf('search', 'tags.empty.noTracks', 'common.tryOtherSearch')
-      : emptyOf('sparkles', 'playlist.new.upToDate', 'playlist.new.upToDateText', 'accent'));
+      : emptyOf('sparkles', 'playlist.new.upToDate', 'playlist.new.upToDateText', 'accent'), { page: DATA.tracks.filter(r => r.is_new || r.is_new_file) });
   },
 };
 async function markSeen() {

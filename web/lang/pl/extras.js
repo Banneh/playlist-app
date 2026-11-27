@@ -16,7 +16,7 @@ I18N.add('pl', 'extras', {
     searchSite: 'Szukaj na soundcloud.com',
   },
   find: {
-    sub: '<b>{name}</b> · {dur}. Wybierz pasujący utwór, a potem dodaj go do playlisty na SoundCloud.',
+    sub: '<b>{name}</b>\u00a0· {dur}. Wybierz pasujący utwór, a potem dodaj go do playlisty na SoundCloud.',
     browserTip: 'Szukaj zamiast tego w przeglądarce',
     matched: 'Plik dopasowano do utworu #{num} z playlisty',
     found: 'Znaleziono. Teraz dodaj go do playlisty na SoundCloud',
