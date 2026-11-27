@@ -18,7 +18,8 @@ function openWorkThrough() {
       const onControl = /^(BUTTON|A)$/.test((document.activeElement && document.activeElement.tagName) || '') && dlg.contains(document.activeElement);
       if (e.key === 'ArrowRight') { e.preventDefault(); wtNext(); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); wtBack(); }
-      else if (e.key === 'Enter' && !onControl) { e.preventDefault(); wtOpenLink(); }
+      // once the file has landed, Enter moves it in; before that it opens the link
+      else if (e.key === 'Enter' && !onControl) { e.preventDefault(); if (WT.found) wtMove(WT.found); else wtOpenLink(); }
       else if ((e.key === 'n' || e.key === 'N') && !onControl) { e.preventDefault(); wtNotAvailable(); }
     };
     document.addEventListener('keydown', WT.onKey);
@@ -117,7 +118,8 @@ function wtRender() {
   const tr = wtCurrent();
   const n = WT.ids.length;
   const head = `<div class="dlg-head">
-      <div class="wt-top"><span class="wt-step">${esc(tr ? t('common.iOfN', { i: I18N.num(WT.i + 1), n: I18N.num(n) }) : t('tags.allDone'))}${WT.moved ? ' · ' + esc(tn('workthrough.moved', WT.moved)) : ''}</span>
+      <div class="wt-top">${tr ? `<button class="btn btn-ghost btn-sm btn-icon wt-nav" onclick="wtBack()" ${WT.i ? '' : 'disabled'} aria-label="${esc(t('workthrough.prev'))}" title="${esc(t('workthrough.prev'))} (←)">${icon('arrowLeft')}</button>` : ''}<span class="wt-step">${esc(tr ? t('common.iOfN', { i: I18N.num(WT.i + 1), n: I18N.num(n) }) : t('tags.allDone'))}${WT.moved ? ' · ' + esc(tn('workthrough.moved', WT.moved)) : ''}</span>${
+        tr ? `<button class="btn btn-ghost btn-sm btn-icon wt-nav" onclick="wtNext()" aria-label="${esc(t('workthrough.next'))}" title="${esc(t('workthrough.next'))} (→)">${icon('arrowRight')}</button>` : ''}
         <span class="wt-bar"><i style="width:${n ? Math.round(100 * Math.min(WT.i, n) / n) : 100}%"></i></span></div>
       <h3>${th('workthrough.title')}</h3>
       <div class="sub">${th('workthrough.sub')}</div>
@@ -143,29 +145,35 @@ function wtRender() {
           <div class="wt-status" id="wt-status"></div>
         </div>
       </div>
-      <div class="wt-keys">${th('workthrough.keys')}</div>
+      <div class="wt-keys" id="wt-keys"></div>
     </div>
-    <div class="dlg-foot">
-      <button class="btn btn-ghost" onclick="wtNotAvailable()" title="${esc(t('workthrough.notAvailableTip'))}">${icon('cloudOff')}${esc(t('workthrough.notAvailable'))}</button>
-      <button class="btn btn-ghost" onclick="wtNext()">${esc(t('common.skip'))}</button>
-      <span class="spacer"></span>
-      <button class="btn" onclick="wtBack()" ${WT.i ? '' : 'disabled'}>${esc(t('common.back'))}</button>
-      <button class="btn btn-primary" onclick="wtOpenLink()" title="${esc(tr.links[0].host)}">${icon(tr.links[0].kind === 'free' ? 'download' : 'bag')}${esc(t('workthrough.openLink'))}</button>
-      <button class="btn" data-a="done">${esc(t('common.done'))}</button>
-    </div>`;
-  dlg.querySelector('[data-a=done]').onclick = () => done(true);
+    <div class="dlg-foot" id="wt-foot"></div>`;
   wtStatus();
+}
+/** the footer: Not available, then Done and one lit button, Open link, or Move into library once
+ *  the file has landed (Open link stays, unlit) */
+function wtFoot(tr) {
+  const it = WT.found;
+  const open = lit => `<button class="btn${lit ? ' btn-primary' : ''}" onclick="wtOpenLink()" title="${esc(tr.links[0].host)}">${icon(tr.links[0].kind === 'free' ? 'download' : 'bag')}${esc(t('workthrough.openLink'))}</button>`;
+  return `<button class="btn btn-ghost" onclick="wtNotAvailable()" title="${esc(t('workthrough.notAvailableTip'))}">${icon('cloudOff')}${esc(t('workthrough.notAvailable'))}</button>
+      <span class="spacer"></span>
+      ${it ? open(false) : ''}
+      <button class="btn" onclick="WT.done(true)">${esc(t('common.done'))}</button>
+      ${it ? `<button class="btn btn-primary" id="wt-move" onclick="wtMove(WT.found)">${icon(it.action === 'upgrade' ? 'arrowUp' : 'folderIn')}${esc(t(it.action === 'upgrade' ? 'tags.upgrade' : 'tags.moveIn'))}</button>` : open(true)}`;
 }
 
 function wtStatus() {
   if (!WT) return;
   const st = WT.dlg.querySelector('#wt-status'); if (!st) return;
   const it = WT.found;
+  const tr = wtCurrent(), foot = WT.dlg.querySelector('#wt-foot'), keys = WT.dlg.querySelector('#wt-keys');
+  if (foot && tr) foot.innerHTML = wtFoot(tr);
+  if (keys) keys.innerHTML = th(it ? 'workthrough.keysMove' : 'workthrough.keys');
   if (it) {
     const pct = Math.round(it.score * 100);
     st.innerHTML = `<div class="note note-green wt-found">${icon('inbox')}<div class="txt">${th('workthrough.found', { name: it.name })}
         <span class="wt-meta">${esc(pct >= 100 ? t('tags.exactMatch') : t('tags.pctMatch', { pct }))} · ${esc(durDiff(it.dur_diff))}${it.lossy ? ' · MP3' : ''}${it.zip ? ' · ' + esc(t('workthrough.inside', { zip: it.zip })) : ''}</span></div>
-      <div class="acts"><button class="btn btn-sm btn-green" id="wt-move" onclick="wtMove(WT.found)">${icon('folderIn')}${esc(t(it.action === 'upgrade' ? 'tags.upgrade' : 'tags.moveIn'))}</button></div></div>`;
+</div>`;
     return;
   }
   st.innerHTML = `<div class="wt-watch"><span class="spin"></span>${th(WT.opened ? 'workthrough.watchingOpened' : 'workthrough.watching')}</div>`;

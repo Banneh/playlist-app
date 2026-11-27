@@ -1,5 +1,6 @@
 /* Work-through mode (pages/workthrough.js): one missing track at a time inside a wide dialog */
 .wt-top { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.wt-nav { flex-shrink: 0; width: 24px; height: 24px; margin: 0 -4px; }
 .wt-step { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-text); white-space: nowrap; }
 .wt-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
 .wt-bar i { display: block; height: 100%; border-radius: 2px; background: var(--accent); transition: width .25s; }
