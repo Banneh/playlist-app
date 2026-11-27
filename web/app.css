@@ -91,7 +91,10 @@ body {
   background: var(--bg); color: var(--text);
   font: 14px/1.45 var(--font); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
   overflow: hidden;
+  /* an app, not a page: titles, labels and lists don't select; what is typed into does */
+  -webkit-user-select: none; user-select: none;
 }
+input, textarea, select, [contenteditable]:not([contenteditable="false"]) { -webkit-user-select: text; user-select: text; }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: var(--accent-text); text-decoration: none; }
@@ -547,6 +550,7 @@ html.mac-inset .page-head { padding-top: 30px; }
 .get .btn { width: 89px; padding: 0 6px; }
 .get a.btn:only-of-type { margin-left: 95px; }     /* keeps Free DL in its own column when there is no Buy */
 .get .btn.first { margin-left: 0; }
+.get .btn.wait { width: 184px; }   /* In Downloads stands for both buttons: as wide as Buy and Free DL together */
 .more { opacity: 1; color: var(--text-3); transition: color .12s; }
 .tr:hover .more, .more:focus-visible, .more[aria-expanded="true"] { color: var(--text); }
 /* developer mode: the provider a Free DL was recognised as, next to the button */
@@ -729,6 +733,7 @@ body.devmode .table:has(.tr > .get) > .thead, body.devmode .tr:has(> .get) { gri
   .thead .num, .tr .num { display: none; }
   .get { flex-direction: column; align-items: stretch; gap: 4px; }
   .get .btn, .get a.btn:only-of-type { margin-left: 0; width: 92px; }
+  .get .btn.wait { width: 92px; height: auto; min-height: var(--ctl); padding: 4px 6px; white-space: normal; line-height: 1.2; }
   .page-head { padding-left: 22px; padding-right: 22px; }
   .page-body { padding-left: 22px; padding-right: 22px; }
 }

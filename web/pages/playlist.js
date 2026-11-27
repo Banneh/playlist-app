@@ -16,7 +16,7 @@ const waitingFile = r => ((typeof INBOX !== 'undefined' && INBOX && INBOX.items)
 /** in place of the links while the file is there: getting it again makes no sense */
 function waitingBtn(r) {
   const it = waitingFile(r);
-  return it ? `<button class="btn btn-sm first" onclick="go('inbox')" title="${esc(t('tags.link.waitingTip', { name: it.name }))}">${icon('inbox')}${esc(t('tags.link.waiting'))}</button>` : '';
+  return it ? `<button class="btn btn-sm first wait" onclick="go('inbox')" title="${esc(t('tags.link.waitingTip', { name: it.name }))}">${icon('inbox')}${esc(t('tags.link.waiting'))}</button>` : '';
 }
 function linkBtn(r, kind) {
   const l = (r.links || []).find(x => x.kind === kind);
