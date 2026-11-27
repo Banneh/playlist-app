@@ -538,9 +538,10 @@ html.mac-inset .page-head { padding-top: 30px; }
 .t-sub .via { color: var(--text-3); }
 /* line 2 of a track row: Artist · ▶ file [labels]. The artist gives way first, the file name keeps 120 px */
 .t-sub.has-file { display: flex; align-items: center; gap: 6px; min-width: 0; height: 20px; }
-.t-sub .t-artist { flex: 0 100 auto; min-width: 5.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t-sub .t-artist { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .t-sub .t-dot { flex: none; color: var(--text-3); }
-.t-sub .t-file { flex: 0 1 auto; margin-top: 0; overflow: hidden; }
+/* the file never takes the artist's last 6em: a short name keeps its own width, a long one is cut there */
+.t-sub .t-file { flex: 0 1 auto; margin-top: 0; overflow: hidden; max-width: calc(100% - 6.5em); }
 .t-sub .itag.it-f, .t-title .itag.it-f { height: 20px; }
 .t-sub .tag { height: 18px; }
 /* a status set by hand, in the title line of a list without a Status column */
