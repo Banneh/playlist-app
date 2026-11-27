@@ -6,6 +6,11 @@ I18N.add('en', 'news', {
   subSince: 'Your last version was {version}. Here is what changed since then. You can open this list again from the ⋯ menu.',
   menu: 'What’s new…',
   v: {
+    '3_1_0': {
+      i1: '<b>Free DL from the release card</b>: some uploaders put their free download only on the release card of SoundCloud’s new track page. Open such a track on the Discover page once and its Free DL button shows up in DJ HQ too.',
+      i2: 'A Bandcamp link is always <b>Buy</b>, name your price releases included, and a pre-save link is no longer shown as Free DL or Buy.',
+      i3: 'The Collection page is tidier: shorter rows and the filters in two groups. Convert shows only in Prepare.',
+    },
     '3_0_0': {
       i1: '<b>One collection, many playlists</b>: DJ HQ now watches a set of folders of your choice and every playlist matches its tracks against all of them. Folders no longer belong to a playlist, so several playlists can share one music folder tree, and files can lie wherever you keep them. Your folders and matches moved over by themselves, with a backup made first.',
       i2: '<b>Collection page</b>: every file of your folders in one place, with the playlists that use it, and filters for files in no playlist, files that need tags and files to convert. Fresh downloads show on their track as "in the downloads folder" before you move them, and moving lets you pick the destination folder.',

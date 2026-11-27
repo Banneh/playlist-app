@@ -6,6 +6,11 @@ I18N.add('pl', 'news', {
   subSince: 'Twoja poprzednia wersja to {version}. Oto, co się od niej zmieniło. Tę listę otworzysz ponownie z menu ⋯.',
   menu: 'Co nowego…',
   v: {
+    '3_1_0': {
+      i1: '<b>Free DL z karty wydania</b>: niektórzy wgrywający dają darmowe pobieranie tylko na karcie wydania w nowej stronie utworu SoundCloud. Otwórz taki utwór raz na stronie Discover, a przycisk Free DL pojawi się też w DJ HQ.',
+      i2: 'Link do Bandcamp to zawsze <b>Kup</b>, także przy wydaniach „zapłać, ile chcesz”, a link do pre-save nie pokazuje się już jako Free DL ani Kup.',
+      i3: 'Strona Kolekcja jest bardziej uporządkowana: niższe wiersze i filtry w dwóch grupach. Konwertuj jest tylko w Przygotuj.',
+    },
     '3_0_0': {
       i1: '<b>Jedna kolekcja, wiele playlist</b>: DJ HQ obserwuje teraz wybrane przez Ciebie foldery, a każda playlista dopasowuje swoje utwory do wszystkich plików, które w nich są. Foldery nie należą już do playlisty, więc kilka playlist może dzielić jedno drzewo folderów, a pliki mogą leżeć tam, gdzie je trzymasz. Twoje foldery i dopasowania przeniosły się same, z kopią zapasową zrobioną wcześniej.',
       i2: '<b>Strona Kolekcja</b>: wszystkie pliki Twoich folderów w jednym miejscu, z playlistami, które z nich korzystają, oraz filtrami plików spoza playlist, plików bez tagów i plików do konwersji. Świeże pobrania pokazują się przy swoim utworze jako "w folderze pobranych", zanim je przeniesiesz, a przy przenoszeniu wybierzesz folder docelowy.',
