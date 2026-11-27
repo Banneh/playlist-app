@@ -136,4 +136,4 @@ fs.writeFileSync(path.join(DATA, "state.json"), JSON.stringify({
 }));
 fs.writeFileSync(path.join(DATA, "prefs.json"), JSON.stringify({ tourDone: true, theme: "light", newsSeen: require("../package.json").version }));
 
-module.exports = { ROOT, HOME, DATA, naId, cleanup };
+module.exports = { ROOT, HOME, DATA, naId, art, cleanup };

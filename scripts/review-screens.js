@@ -5,7 +5,9 @@
  * Runs on the same throw-away sample home as the README screenshots (sample-home.js), so nothing
  * of yours is touched, and shows the app as it ships: no developer mode, no Free DL bypass, no
  * Do everything. Discover has no soundcloud.com here (no network, no sign-in): its bar is shown
- * over a stand-in page, with /api/sc/* answered in the window and a sample track playing.
+ * over a stand-in page, with /api/sc/* answered in the window. It comes in three pictures: a track
+ * from outside the sample playlist playing (Add), a track of the playlist (its state, and the ⋯
+ * menu with Remove), and the Keys popover.
  * Writes review-screens/<version>/<width>x<height>/NN-name.png (light), plus a
  * dark/ folder at one size. Long pages come in parts (-2, -3, ...) as they scroll.
  * The pictures are 2x (Retina), as the app looks on a Mac: on a Retina screen Electron renders
@@ -19,7 +21,7 @@ const SCALE = Number(process.env.DJHQ_SCREENS_SCALE) || 2;
 app.commandLine.appendSwitch("force-device-scale-factor", String(SCALE));
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
-const { ROOT, DATA, naId, cleanup } = require("./sample-home");
+const { ROOT, DATA, naId, art, cleanup } = require("./sample-home");
 const VERSION = require("../package.json").version;
 /** DJHQ_SCREENS_LANG=pl: the same screens in Polish, in review-screens/<version>-pl/ */
 const LANG = process.env.DJHQ_SCREENS_LANG === "pl" ? "pl" : "en";
@@ -27,6 +29,8 @@ const OUT = path.join(ROOT, "review-screens", VERSION + (LANG === "en" ? "" : "-
 /** the smallest window the app allows (main.ts), a small laptop, the common Mac sizes, full HD */
 const SIZES = [[900, 600], [1024, 768], [1280, 800], [1440, 900], [1920, 1080]];
 const DARK_SIZE = [1440, 900];
+/** what Discover plays in its Add picture: the sample home's file from outside the playlist (found on SoundCloud there) */
+const OUTSIDE = { id: 900101, url: "https://soundcloud.com/rook-finch/velvet-hours", title: "Velvet Hours", user: "Rook & Finch", dur: 363, art: art("RF", 232) };
 
 const { startServer } = require(path.join(ROOT, "dist", "server.js"));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -99,26 +103,48 @@ app.whenReady().then(async () => {
     qToggle(document.getElementById('btn-queue'));`);
 
   /** Discover: its bar over a stand-in for the soundcloud.com view, which needs the desktop app's
-   *  SoundCloud session. /api/sc/* is answered here, as a signed-in account playing a track that is
-   *  missing from the playlist. Everything is put back afterwards. */
-  const discover = async (name) => {
-    await js(`
-      const tr = DATA.tracks.find(x => !x.have && !x.na) || DATA.tracks[0];
-      const fake = { available: true, signed_in: true, me: { username: 'djyou', avatar: '' }, can: { ok: true, likes: false }, captcha: false,
-        url: 'https://soundcloud.com/discover', now: { playing: true, url: tr.url, title: tr.title, artist: tr.artist, in_playlist: false, liked: false,
-        pos: 84, track: { id: tr.id, url: tr.url, title: tr.title, user: tr.user || tr.artist, dur: 402, art: tr.art || '' } } };
-      window.__fetch = window.__fetch || window.fetch;
-      window.fetch = (u, o) => String(u).startsWith('/api/sc/')
-        ? Promise.resolve(new Response(JSON.stringify(String(u).endsWith('/status') ? fake : { ok: true }), { headers: { 'Content-Type': 'application/json' } }))
-        : window.__fetch(u, o);
-      window.__sc = APP.sc; APP.sc = true; SC = fake;
-      go('discover');`);
-    await sleep(600);
-    await js(`
+   *  SoundCloud session. /api/sc/* is answered here, as a signed-in account. Three pictures: a track
+   *  from outside the playlist is playing (Add is lit); a track of the playlist is, with its state
+   *  where Add stood and the ⋯ menu open on Remove; the Keys popover. Everything is put back afterwards. */
+  const discover = async () => {
+    /** the frame under the native view; while a menu or a popover is open the app takes that view away */
+    const standIn = (covered) => js(`
       const f = document.getElementById('dc-frame');
       if (f) f.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:24px;color:var(--text-3);font-size:13px">'
-        + '<b style="font-size:15px;color:var(--text-2)">soundcloud.com</b><span>Stand-in for the SoundCloud page: the review screens run offline, without a sign-in.</span></div>';`);
-    await shot(name);
+        + '<b style="font-size:15px;color:var(--text-2)">soundcloud.com</b><span>${covered
+          ? "The app takes the SoundCloud page away while a menu or a popover is open (a native view would cover it) and shows a spinner here."
+          : "Stand-in for the SoundCloud page: the review screens run offline, without a sign-in."}</span></div>';`);
+    /** a click as the mouse makes it: a bare .click() counts as the keyboard, which puts the focus ring on what opens */
+    const press = (id) => js(`document.getElementById('${id}').dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));`);
+    await js(`
+      const secs = s => String(s).split(':').reduce((a, b) => a * 60 + +b, 0);
+      const now = (t, dur, inPl) => ({ playing: true, url: t.url, title: t.title, artist: t.user, in_playlist: inPl, liked: false, pos: 84,
+        track: { id: t.id, url: t.url, title: t.title, user: t.user, dur, art: t.art || '' } });
+      const out = ${JSON.stringify(OUTSIDE)}, own = DATA.tracks.find(x => !x.have && !x.na) || DATA.tracks[0];
+      // what SoundCloud "plays": a track from outside the playlist, then the playlist's first missing track
+      window.__scNow = [now(out, out.dur, false), now(own, secs(own.dur), true)];
+      window.__scFake = { available: true, signed_in: true, me: { username: 'djyou', avatar: '' }, can: { ok: true, likes: false }, captcha: false,
+        url: 'https://soundcloud.com/discover', now: window.__scNow[0] };
+      window.__fetch = window.__fetch || window.fetch;
+      window.fetch = (u, o) => String(u).startsWith('/api/sc/')
+        ? Promise.resolve(new Response(JSON.stringify(String(u).endsWith('/status') ? window.__scFake : { ok: true }), { headers: { 'Content-Type': 'application/json' } }))
+        : window.__fetch(u, o);
+      window.__sc = APP.sc; APP.sc = true; SC = window.__scFake;
+      go('discover');`);
+    await sleep(600);
+    await standIn(false);
+    await shot("discover");
+    // the next track is one of the playlist (a status still on its way must not bring the first one back)
+    await js(`window.__scFake.now = window.__scNow[1]; DC.epoch = (DC.epoch || 0) + 1; SC = window.__scFake; dcRenderBar();`);
+    await press("dc-more");
+    await standIn(true);
+    await sleep(250);
+    await shot("discover-in-playlist");
+    await esc();
+    await press("dc-keys");
+    await sleep(250);
+    await shot("discover-keys");
+    await esc();
     await js(`
       go('missing');
       window.fetch = window.__fetch; APP.sc = window.__sc;
@@ -141,7 +167,7 @@ app.whenReady().then(async () => {
     await shot("tour");
     await js(`endTour();`);
 
-    await discover("discover");
+    await discover();
 
     await js(`go('new');`);
     await shotPage("new");

@@ -22,6 +22,24 @@ body.has-player .page-body.dc-host { padding-bottom: 92px; }
 .dc-sub .tag { margin-left: 2px; }
 .dc-keys kbd { font: 600 10.5px/1 var(--mono); padding: 2px 5px; border-radius: 5px; background: var(--surface-3); color: var(--text-2); border: 1px solid var(--line-2); margin: 0 1px; }
 .dc-acts { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+/* a track that is in: its state stands where Add stood, in a place as wide as Add was (an unseen copy of the
+   button holds the width), at the end of it next to its ⋯. The bottom bar draws the same (dcActsHtml) */
+.dc-in { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 4px; }
+.dc-in > .dc-ghost { grid-area: 1 / 1 / 2 / 3; visibility: hidden; }
+.dc-in > .tag { grid-area: 1 / 1; justify-self: end; }
+.dc-in > .btn-icon { grid-area: 1 / 2; }
+/* ⋯ and ? while their menu or popover is open */
+#dc-more[aria-expanded="true"], #pl-more[aria-expanded="true"], #dc-keys[aria-expanded="true"] { background: var(--surface-2); color: var(--text); }
+/* ? ends the bar: a quiet button brings its own air, so it stands 4 px closer to its neighbour and to the card's edge */
+#dc-keys { margin-left: -4px; }
+.dc-bar:has(#dc-keys) { padding-right: 8px; }
+/* the key a button answers to, at its end like a count badge: from 1100 px up, as the file labels go full */
+.dc-acts .btn kbd { margin-left: 2px; padding: 2px 5px; border-radius: 5px; background: rgba(0,0,0,.16); color: var(--on-accent); font: 600 10.5px/1 var(--mono); }
+@media (max-width: 1099px) { .dc-acts .btn kbd { display: none; } }
+/* Keys: a ? key cap in the quiet look of the bar's key line, at every width */
+.dc-acts #dc-keys kbd { display: inline-block; margin: 0; padding: 3px 6px; border-radius: 5px; background: var(--surface-3); color: var(--text-2); border: 1px solid var(--line-2); font: 600 11px/1 var(--mono); }
+/* the Keys popover (dcKeysPop): one line per key */
+.dc-keylist { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px 12px; padding: 3px 9px 6px; font-size: 12.5px; color: var(--text-2); white-space: nowrap; }
 
 /* the heart: like / unlike the playing track */
 .dc-heart.on { color: var(--red); border-color: var(--red-line); background: var(--red-soft); }
@@ -48,4 +66,12 @@ body.has-player .page-body.dc-host { padding-bottom: 92px; }
 
 @media (max-width: 1040px) {
   .dc-nav .btn:not(.btn-icon) span, .dc-nav .btn:not(.btn-icon) { padding: 0 8px; }
+}
+/* below 1280 px the bar is short of room (most of all just past 1040 px, where the sidebar is wide again):
+   a bar with ? in it closes up by as much as ? takes, so the title keeps the width it had */
+@media (max-width: 1279px) {
+  .dc-bar:has(#dc-keys) .dc-row, .dc-bar:has(#dc-keys) .dc-now { gap: 8px; }
+  .dc-bar:has(#dc-keys) .dc-nav { padding-right: 6px; }
+  .dc-bar:has(#dc-keys) .dc-acts { gap: 6px; }
+  .dc-bar:has(#dc-keys) .dc-acts .btn:not(.btn-icon) { padding: 0 8px; }
 }

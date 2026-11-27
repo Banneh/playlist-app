@@ -12,6 +12,8 @@
    from disk, see player.js) shows what SoundCloud is playing on every other page, with a seek line and the same keys.
    SoundCloud's bot check (a captcha, SC.captcha) blocks all of that until it is solved in the view: every other
    page shows a note that leads to Discover (scCaptchaRender), and a track is not started meanwhile.
+   A track that is in the playlist already says so where Add stood, in both bars; Remove sits in the ⋯ menu
+   next to that (dcMore), and ? at the end of the Discover bar lists the player keys (dcKeysPop).
    Globals used elsewhere: SC (last status), scAddUrl(url), dcOpen(url), dcToast(), dcLike(), dcKey(key), scBarRender(), scCaptchaRender(). */
 
 let SC = { available: false, signed_in: false, me: null, can: null, now: null, url: '', captcha: false };
@@ -43,22 +45,36 @@ PAGES.discover = {
 
 /* ---------- the bar ---------- */
 const dcLikes = () => SC.can ? SC.can.likes : /\/likes\/?$/.test(DATA.playlist_url || '');
+/** the quiet state of a track that is in: "In playlist ✓", the words first and the check after them */
+const dcInTag = likes => `<span class="tag tag-ok"><span class="tx">${esc(t(likes ? 'discover.bar.inLikes' : 'discover.bar.inPlaylist'))}</span>${icon('check')}</span>`;
 const dcSignin = () => `<button class="btn btn-sm btn-primary" onclick="dcOpen('https://soundcloud.com/signin')" title="${esc(t('discover.bar.signInHint'))}">${icon('cloud')}${esc(t('discover.bar.signIn'))}</button>`;
-/** the heart and Add / Remove for the playing track n; compact (the bottom bar) leaves out
- *  Related tracks and the sign-in button, which belong on the Discover page */
+/** the account can add to the playlist: the bar's buttons then hold Add, or the state of a track that is in */
+const dcCanSet = () => SC.signed_in && !(SC.can && !SC.can.ok);
+/** the heart and Add for the playing track n. A track that is in says so where Add stood, at the
+ *  width Add had (an unseen copy of the button holds it), so nothing moves under a second click there;
+ *  Remove is in the ⋯ menu at the end of that place. compact (the bottom bar) leaves out Related tracks,
+ *  the sign-in button, the key on Add and the Keys button, which belong on the Discover page */
 function dcActsHtml(n, compact) {
   const tr = n && n.track, likes = dcLikes();
-  if (!n) return !SC.signed_in && !compact ? dcSignin() : '';
+  // Keys: the whole list in a popover, also with nothing playing (the bar's own key line is cut in a narrow
+  // window). Its face is a ? key cap, so it does not look like the page's Guide button (?) beside it
+  const keys = compact ? '' : `<button class="btn btn-ghost btn-sm btn-icon" id="dc-keys" onclick="dcKeysPop(this, event)" aria-haspopup="dialog" aria-label="${esc(t('discover.bar.keysTitle'))}" title="${esc(t('discover.bar.keysTitle'))}"><kbd aria-hidden="true">?</kbd></button>`;
+  if (!n) return (!SC.signed_in && !compact ? dcSignin() : '') + keys;
   const related = compact ? '' : `<button class="btn btn-sm" onclick="scPost('nav',{url:scRelated('${esc(n.url)}')})" title="${esc(t('discover.bar.relatedHint'))}">${icon('sparkles')}${esc(t('discover.bar.related'))}</button>`;
   // the heart: like / unlike the playing track (not for a Likes library, where Add is the like)
   const heart = SC.signed_in && tr && !likes
-    ? `<button class="btn btn-sm btn-icon dc-heart${n.liked ? ' on' : ''}" ${DC.busy ? 'disabled' : ''} onclick="this.blur();dcLike('${esc(n.url)}',${n.liked ? 'false' : 'true'})" title="${esc(t(n.liked ? 'discover.bar.likedHint' : 'discover.bar.likeHint'))}" aria-label="${esc(t(n.liked ? 'discover.bar.unlike' : 'discover.bar.like'))}">${icon('heart')}</button>`
+    ? `<button class="btn btn-sm btn-icon dc-heart${n.liked ? ' on' : ''}" ${DC.busy ? 'disabled' : ''} onclick="this.blur();dcLike('${esc(n.url)}',${n.liked ? 'false' : 'true'})" title="${esc(t(n.liked ? 'discover.bar.likedHint' : 'discover.bar.likeHint'))}" aria-label="${esc(t(n.liked ? 'discover.bar.unlike' : 'discover.bar.like'))}" aria-keyshortcuts="L">${icon('heart')}</button>`
     : '';
-  if (!SC.signed_in) return `${related}${compact ? '' : dcSignin()}`;
-  if (SC.can && !SC.can.ok) return `${related}${heart}`;
-  if (n.in_playlist) return `${related}${heart}<button class="btn btn-sm" ${DC.busy ? 'disabled' : ''} onclick="this.blur();dcSet('${esc(n.url)}',false)" title="${esc(t(likes ? 'discover.bar.removeHintLikes' : 'discover.bar.removeHintPlaylist'))}">${icon('xCircle')}${esc(t('common.remove'))}</button>`;
+  if (!SC.signed_in) return `${related}${compact ? '' : dcSignin()}${keys}`;
+  if (!dcCanSet()) return `${related}${heart}${keys}`;
+  // Add's face; on the Discover page it ends in its key, from 1100 px up (discover.css)
+  const addLabel = t(likes ? 'discover.bar.addLikes' : 'discover.bar.addPlaylist');
+  const addFace = `${icon('plus')}${esc(addLabel)}${compact ? '' : kbd('A')}`;
+  if (n.in_playlist) return `${related}${heart}<span class="dc-in"><span class="btn btn-sm btn-primary dc-ghost" aria-hidden="true">${addFace}</span>${
+    dcInTag(likes)
+    }<button class="btn btn-ghost btn-sm btn-icon" id="${compact ? 'pl-more' : 'dc-more'}" data-url="${esc(n.url)}" ${DC.busy ? 'disabled' : ''} onclick="dcMore(this, event)" aria-haspopup="menu" aria-label="${esc(t('common.more'))}" title="${esc(t('common.more'))}">${icon('more')}</button></span>${keys}`;
   const addHint = likes ? 'discover.bar.addHintLikes' : DATA.settings && DATA.settings.like_on_add ? 'discover.bar.addHintPlaylistLike' : 'discover.bar.addHintPlaylist';
-  return `${related}${heart}<button class="btn btn-sm btn-primary" ${DC.busy || !tr ? 'disabled' : ''} onclick="this.blur();dcSet('${esc(n.url)}',true)" title="${esc(t(addHint))}">${icon('plus')}${esc(t(likes ? 'discover.bar.addLikes' : 'discover.bar.addPlaylist'))}</button>`;
+  return `${related}${heart}<button class="btn btn-sm btn-primary" ${DC.busy || !tr ? 'disabled' : ''} onclick="this.blur();dcSet('${esc(n.url)}',true)" title="${esc(t(addHint))}" aria-label="${esc(addLabel)}" aria-keyshortcuts="A">${addFace}</button>${keys}`;
 }
 function dcBarHtml() {
   const likes = dcLikes();
@@ -77,7 +93,8 @@ function dcBarHtml() {
       <div class="dc-text">
         <div class="dc-title"><span title="${esc(title)}">${esc(title)}</span>${n.playing ? '<span class="dc-eq" aria-hidden="true"><i></i><i></i><i></i></span>' : ''}</div>
         <div class="dc-sub">${esc(user)}${tr ? ' · ' + fmtSecs(tr.dur) : ''}${
-          n.in_playlist ? ` · ${tag(t(likes ? 'discover.bar.inLikes' : 'discover.bar.inPlaylist'), 'ok', 'check')}` : ''}</div>
+          // said here only when the buttons don't say it (signed out, or a playlist the account can't change)
+          n.in_playlist && !dcCanSet() ? ` · ${dcInTag(likes)}` : ''}</div>
       </div>`;
   }
   const acts = dcActsHtml(n, false);
@@ -92,7 +109,60 @@ function dcRenderBar() {
   const bar = $('#dc-bar'); if (!bar) return;
   const html = dcBarHtml();
   if (html === DC.html) return;   // nothing changed: keep hover / focus
-  DC.html = html; bar.innerHTML = html;
+  DC.html = html; dcKeep(() => { bar.innerHTML = html; });
+}
+const DC_POP_IDS = /^(dc-more|dc-keys|pl-more)$/;   // ⋯ and ? of the Discover bar, ⋯ of the bottom bar
+/** redraw part of a bar (draw) without dropping what its ⋯ and ? buttons hold: the keyboard's focus and an
+ *  open menu or popover, which goes on with the new button, or closes when that is gone or is another track's */
+function dcKeep(draw) {
+  const was = document.activeElement, id = was && DC_POP_IDS.test(was.id) ? was.id : '';
+  draw();
+  const now = id && !was.isConnected ? document.getElementById(id) : null;
+  if (now) now.focus();
+  const a = MENU && MENU._anchor;
+  if (!a || !DC_POP_IDS.test(a.id)) return;
+  if (a.isConnected) { if (!a.getClientRects().length) closeMenu(); return; }   // still there, unless its bar went away
+  const b = document.getElementById(a.id);
+  if (!b || b.dataset.url !== a.dataset.url) return closeMenu();
+  MENU._anchor = b; b.setAttribute('aria-expanded', 'true');
+}
+/** ⋯ next to the state of a track that is in: Remove is here, and nowhere a click on Add could land */
+function dcMore(anchor, ev) {
+  if (ev && ev.detail > 1) return;   // the second click of a double click on Add, when the track is in by then
+  const url = anchor.dataset.url;
+  dcPopSetup(showMenu(anchor, [{ label: t(dcLikes() ? 'discover.bar.removeHintLikes' : 'discover.bar.removeHintPlaylist'), icon: 'xCircle', danger: true, onclick: () => dcSet(url, false) }],
+    { align: 'right' }), ev, 'menu', t('common.more'));
+}
+/** ? at the end of the bar: every player key, one a line; they go on working while the list is open (dcOnPage) */
+function dcKeysPop(anchor, ev) {
+  const k = 'discover.bar.keysList.', title = t('discover.bar.keysTitle');
+  const rows = [[[t('discover.bar.space')], t(k + 'toggle')], [['←', '→'], t(k + 'seek')], [['N', 'P'], t(k + 'step')],
+    // a Likes link: Add is the like, so both keys add
+    ...(dcLikes() ? [[['A', 'L'], t('discover.bar.addLikes')]] : [[['A'], t('discover.bar.addPlaylist')], [['L'], t(k + 'like')]])];
+  dcPopSetup(showPopover(anchor, `<div class="pop-title">${esc(title)}</div><dl class="dc-keys dc-keylist">${
+    rows.map(([ks, what]) => `<dt>${ks.map(x => kbd(esc(x))).join('')}</dt><dd>${esc(what)}</dd>`).join('')}</dl>`, { align: 'right', cls: 'dc-keys-pop' }), ev, 'dialog', title);
+}
+/** what a menu or popover of the bar (m, null when the click closed it) gets on top of showMenu / showPopover:
+ *  its role and name, and a way in for the keyboard. A click blurs the button, so Space stays with the player;
+ *  opened from the keyboard, the focus goes into it (Tab or ↓ reach its items) and back to the button on the way out */
+function dcPopSetup(m, ev, role, label) {
+  if (!m) return;
+  m.setAttribute('role', role); m.setAttribute('aria-label', label);
+  if (role === 'menu') m.querySelectorAll('.menu-item').forEach(b => b.setAttribute('role', 'menuitem'));
+  if (ev && ev.detail) return void m._anchor.blur();
+  m.tabIndex = -1; m.focus();
+  m.addEventListener('keydown', e => {
+    const its = [...m.querySelectorAll('button:not(:disabled)')], i = its.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (its.length) its[e.key === 'ArrowDown' ? (i + 1) % its.length : (Math.max(i, 0) + its.length - 1) % its.length].focus();
+    } else if (e.key === 'Escape' || (e.key === 'Tab' && (e.shiftKey ? i <= 0 : i === its.length - 1))) {
+      e.preventDefault();
+      const a = m._anchor;
+      closeMenu();
+      if (a.isConnected) a.focus();
+    }
+  });
 }
 
 /* ---------- the bottom bar: SoundCloud's player on every other page ----------
@@ -133,13 +203,14 @@ function scBarModel() {
     src: 'sc', loading: !!meta, playing: !meta && !!n.playing, at: pos.at, of: pos.of,
     title: meta ? meta.title || t('common.starting') : tr ? tr.title : n.title,
     art: meta ? meta.art || '' : tr && tr.art ? tr.art.replace('-large', '-t120x120') : '',
-    sub: meta ? th('discover.bottom.startingOn') : `${esc(artist)}${n.in_playlist ? ' · ' + esc(t(dcLikes() ? 'discover.bar.inLikes' : 'discover.bar.inPlaylist')) : ''}`,
+    // "in the playlist" stands among the buttons, where Add was; only an account that has no Add reads it here
+    sub: meta ? th('discover.bottom.startingOn') : `${esc(artist)}${n.in_playlist && !dcCanSet() ? ' · ' + esc(t(dcLikes() ? 'discover.bar.inLikes' : 'discover.bar.inPlaylist')) : ''}`,
     acts: dcActsHtml(meta ? null : n, true)
       + `<button class="btn btn-ghost btn-sm btn-icon" onclick="go('discover')" title="${esc(t('discover.bottom.openHint'))}" aria-label="${esc(t('common.openOnDiscover'))}">${icon('cloud')}</button>`,
   };
 }
 function scBarRender() {
-  if (typeof plRender === 'function') plRender();
+  if (typeof plRender === 'function') dcKeep(plRender);
   scMarkRows();
   clearTimeout(DC.markSoon); DC.markSoon = setTimeout(scMarkRows, 0);   // a list drawn right after this (render()) gets its mark too
 }
@@ -226,7 +297,8 @@ const DC_KEYS = { ' ': 'toggle', ArrowLeft: 'back', ArrowRight: 'fwd', n: 'next'
 const kbd = k => `<kbd>${k}</kbd>`;
 const dcKeysHtml = () => th('discover.bar.keys');
 const dcKeyAction = key => DC_KEYS[key && key.length === 1 ? key.toLowerCase() : key];
-const dcOnPage = () => PAGE === 'discover' && DC.active && !DC.covered;
+// a menu or dialog over the page takes the keys away; the Keys popover does not, so a key can be tried from its list
+const dcOnPage = () => PAGE === 'discover' && DC.active && (!DC.covered || !!(MENU && MENU.classList.contains('dc-keys-pop')));
 /** a player key, wherever it was pressed (the Discover page, the SoundCloud page, or any page
  *  while the bottom bar is up); true when it was one of ours */
 function dcKey(key) {
@@ -307,6 +379,9 @@ function dcMount() {
   const f = $('#dc-frame');
   if (f && typeof ResizeObserver !== 'undefined') { DC.ro = new ResizeObserver(() => dcShow()); DC.ro.observe(f); }
   dcTicker(); dcPoll();
+  // covered is what really lies over the view now: a menu closed after the page was left (go() closes it on the
+  // new page) must not keep the SoundCloud page hidden when Discover comes back
+  DC.covered = !!(MENU || (typeof GUIDE !== 'undefined' && GUIDE) || document.querySelector('.overlay'));
   dcShow();
 }
 function dcUnmount() {
