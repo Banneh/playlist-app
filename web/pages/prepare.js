@@ -19,11 +19,15 @@ function ppIssueTags(r) {
   return fileIssueTags(r, p ? t('prepare.convertTip', { player: p }) : t('tags.convertTip')).join('');
 }
 function ppRow(r) {
+  const disp = r.disp || r.name, head = r.title || disp.slice(disp.lastIndexOf('/') + 1);   // line 1: the track; a file not in the playlist: its name
+  // line 2 as in the other lists: artist · ▶ file name, the folder giving way first (fileNameHtml in app.js)
+  const who = r.title ? esc(r.artist || '') : `<span class="via">${esc(t('tags.notInPlaylist'))}</span>`;
   return `<div class="tr pp-tr">
     ${r.art ? artHtml({ art: r.art, url: r.url }) : `<span class="pp-fico">${icon('music')}</span>`}
     <div class="t-meta">
-      <div class="t-title">${playBtn(filePath(r, r.name), r.title || r.disp || r.name, r.artist || '')}<span title="${esc(r.name)}">${esc(r.disp || r.name)}</span></div>
-      <div class="t-sub">${r.title ? `${esc(r.artist ? r.artist + ' - ' : '')}${esc(r.title)}` : `<span class="via">${esc(t('tags.notInPlaylist'))}</span>`}</div>
+      <div class="t-title"><span title="${esc(head)}">${esc(head)}</span></div>
+      <div class="t-sub has-file">${who ? `<span class="t-artist">${who}</span><span class="t-dot">·</span>` : ''}<span class="t-file">${
+        playBtn(filePath(r, r.name), head, r.artist || '') || `<span class="ic">${icon('music')}</span>`}${fileNameHtml(disp, { title: r.path || r.name })}</span></div>
     </div>
     <div class="pp-issues">${ppIssueTags(r)}</div>
     <span class="dur">${esc(r.dur)}</span>
@@ -40,7 +44,7 @@ PAGES.prepare = {
   },
   search: false,
   body: () => {
-    const dev = ppDevice(), n = DATA.untagged || 0, files = DATA.local_count || 0, c = DATA.incompatible || 0, b = DATA.backups || 0, nc = DATA.name_checks || 0;
+    const n = DATA.untagged || 0, files = DATA.local_count || 0, c = DATA.incompatible || 0, b = DATA.backups || 0, nc = DATA.name_checks || 0;
     const na = (DATA.art && DATA.art.add) || 0, run = PP_ALL ? PP_ALL.kind : '';
     const rows = ppAttention();
     ppAllResume();   // once: a run started before a reload
@@ -65,18 +69,19 @@ PAGES.prepare = {
       ? `<button class="btn${pri('compat')}" id="pp-convert" onclick="ppConvert()" ${PP_ALL ? 'disabled' : ''}${busyTip || ` title="${esc(t('prepare.compat.convertTip'))}"`}>${icon('sliders')}${esc(t('prepare.compat.convert'))} ${badge(c)}</button>`
       : b ? `<button class="btn" id="pp-restore" onclick="ppRestore()" ${PP_ALL ? 'disabled' : ''}${busyTip || ` title="${esc(t('prepare.compat.restoreTip'))}"`}>${icon('history')}${esc(t('prepare.compat.restore'))} ${badge(b)}</button>` : '';
     const rbActs = DATA.have ? `<button class="btn${pri('rb')}" id="pp-export" onclick="exportXml()">${icon('upload')}${esc(t('prepare.rb.export'))}</button>` : '';
+    // the Player compatibility sentence never names the player: the page header already does
     const cards = `
       <div class="cards pp-cards">
         ${card('tag', '', th('prepare.tags.title'), tagsNum, th('prepare.tags.text'), tagsActs, 'tags')}
         ${card('sliders', 'amber', th('prepare.compat.title'), compatNum,
-          c ? (dev.label ? tnh('prepare.compat.wontPlay', c, { player: dev.label }) : tnh('prepare.compat.wontPlayAny', c)) : th('prepare.compat.text'),
+          c ? tnh('prepare.compat.wontPlayAny', c) : th('prepare.compat.text'),
           compatActs, c && b ? 'compat' : '')}
         ${card('upload', 'blue', 'rekordbox', `<span class="big">${DATA.have}<small>${tnh('prepare.rb.ready', DATA.have)}</small></span>`, th('prepare.rb.text'), rbActs, 'rb')}
       </div>`;
     const list = rows.length ? `
       <div class="section">${esc(t('prepare.attention'))} ${badge(rows.length)}</div>
       <div class="table pp-table">
-        <div class="thead pp-tr"><span></span><span>${esc(t('common.file'))}</span><span>${esc(t('prepare.needed'))}</span><span class="r">${esc(t('common.length'))}</span></div>
+        <div class="thead pp-tr"><span></span><span>${esc(t('coll.head.track'))}</span><span>${esc(t('prepare.needed'))}</span><span class="r">${esc(t('common.length'))}</span></div>
         ${rows.map(ppRow).join('')}
       </div>` : `
       <div class="section">${esc(t('prepare.attention'))}</div>

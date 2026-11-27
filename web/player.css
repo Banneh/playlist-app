@@ -52,8 +52,11 @@ body.has-player .welcome { padding-bottom: 80px; }
 .btn.play-btn.is-playing { color: var(--on-accent); background: var(--accent); }
 .btn.play-btn.is-playing:hover { background: var(--accent-hover); }
 .t-file .play-btn { margin-right: -2px; }
+/* line 2 of a row clips at its 20 px: there the button is 20 px too, and its focus ring goes inside it (dark on the playing one) */
+.t-sub .btn.play-btn { width: 20px; height: 20px; }
+.t-sub .play-btn:focus-visible { outline-offset: -3px; }
+.t-sub .play-btn.is-playing:focus-visible { outline-color: var(--on-accent); }
 .opt .play-btn.lead { margin-left: -4px; }
-.t-title .play-btn { margin-right: 2px; }
 @media (max-width: 1040px) {
   .player { padding-left: 22px; padding-right: 22px; }
   .pl-meta { flex-basis: 180px; }

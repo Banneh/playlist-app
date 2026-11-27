@@ -13,7 +13,7 @@
 .pp-cards .card h3 { gap: 10px; }
 .pp-cards .card .pp-ico { width: 30px; height: 30px; border-radius: 8px; margin: 0; flex-shrink: 0; }
 .pp-cards .card .pp-ico .ic { color: inherit; }
-.pp-cards .card p { margin-top: 0; }
+.pp-cards .card p { margin-top: 0; text-wrap: pretty; }   /* no lone last word in the cards' sentences */
 .pp-cards .card .card-acts { margin-top: auto; padding-top: 14px; align-items: center; flex-wrap: nowrap; }
 .pp-cards .card .pp-more { flex-shrink: 0; }
 .pp-run { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12.5px; color: var(--text-2); }

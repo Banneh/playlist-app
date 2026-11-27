@@ -45,10 +45,7 @@ I18N.add('en', 'prepare', {
       other: 'files to convert',
     },
     ready: 'Ready for this player',
-    wontPlay: {
-      one: 'This file won’t play on {player} as it is.',
-      other: 'These files won’t play on {player} as they are.',
-    },
+    // also when a player is picked: the page header names it, the card does not
     wontPlayAny: {
       one: 'This file won’t play on your player as it is.',
       other: 'These files won’t play on your player as they are.',

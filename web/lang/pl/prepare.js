@@ -20,7 +20,7 @@ I18N.add('pl', 'prepare', {
       many: 'plików wymaga tagów',
     },
     allTagged: 'Wszystkie pliki mają tagi',
-    text: 'Wykonawca i tytuł są zapisywane w każdym pliku, a rekordbox pokazuje je jako nazwy utworów.',
+    text: 'Wykonawca i tytuł są zapisywane w\u00a0każdym pliku, a rekordbox pokazuje je jako nazwy utworów.',
     names: {
       one: '<b>{n} nazwa</b> do sprawdzenia przed zapisaniem tagów: wykonawca i tytuł mogą być zamienione miejscami albo podzielone w złym miejscu.',
       few: '<b>{n} nazwy</b> do sprawdzenia przed zapisaniem tagów: wykonawca i tytuł mogą być zamienione miejscami albo podzielone w złym miejscu.',
@@ -46,15 +46,10 @@ I18N.add('pl', 'prepare', {
       many: 'plików do konwersji',
     },
     ready: 'Gotowe na ten odtwarzacz',
-    wontPlay: {
-      one: 'Ten plik nie zagra w obecnej postaci na odtwarzaczu {player}.',
-      few: 'Te pliki nie zagrają w obecnej postaci na odtwarzaczu {player}.',
-      many: 'Te pliki nie zagrają w obecnej postaci na odtwarzaczu {player}.',
-    },
     wontPlayAny: {
-      one: 'Ten plik nie zagra w obecnej postaci na twoim odtwarzaczu.',
-      few: 'Te pliki nie zagrają w obecnej postaci na twoim odtwarzaczu.',
-      many: 'Te pliki nie zagrają w obecnej postaci na twoim odtwarzaczu.',
+      one: 'Ten plik nie zagra na wybranym odtwarzaczu w\u00a0obecnej postaci.',
+      few: 'Te pliki nie zagrają na wybranym odtwarzaczu w\u00a0obecnej postaci.',
+      many: 'Te pliki nie zagrają na wybranym odtwarzaczu w\u00a0obecnej postaci.',
     },
     text: 'Konwersja zachowuje nazwę i długość pliku, więc rekordbox zachowa punkty cue i siatki beatów.',
     convert: 'Konwertuj',
