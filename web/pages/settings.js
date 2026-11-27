@@ -71,6 +71,8 @@ PAGES.settings = {
 
     // only with the gate switch (DJ_HQ_DOWNLOAD_BYPASS): which gate adapters run, and the walker
     const gates = !APP.dl_bypass ? '' : stCard('bolt', 'amber', esc(t('settings.gates.title')), th('settings.gates.text'), stGatesControls(S));
+    // developer mode only: the step by step logs of every gate walk
+    const gateLogs = APP.dev_mode ? stGlogCard() : '';
 
     const A = DATA.aiff || { on: !!S.aiff_auto, wav: 0 };
     const aiff = stCard('image', 'green', esc(t('settings.aiff.title')),
@@ -163,10 +165,10 @@ PAGES.settings = {
     return `<div class="st-list">
       ${group('settings.group.collection')}${collection}${downloads}${aiff}${backups}
       ${group('settings.group.playlist')}${playlist}
-      ${group('settings.group.integrations')}${gates}${rekordbox}${account}${links}${bandcamp}${doAll}${config}
+      ${group('settings.group.integrations')}${gates}${gateLogs}${rekordbox}${account}${links}${bandcamp}${doAll}${config}
       ${group('settings.group.app')}${refresh}${appearance}${language}${about}</div>`;
   },
-  onShow: () => stRbxLoad(),
+  onShow: () => { stRbxLoad(); if (APP.dev_mode) stGlogLoad(); },
   after: () => stAiffResume(),
 };
 
@@ -487,6 +489,42 @@ async function stToggleGate(id, on) {
   }
   if (on) off.delete(id); else off.add(id);
   await stSave({ gate_off: [...off] }, t(on ? 'settings.gates.on' : 'settings.gates.off', { id }));
+}
+/* ---------- gate logs (Integrations, developer mode): src/gates/trace.ts writes one file per walk ---------- */
+let ST_GLOGS = null;   // last GET /api/gate-logs; null until the page asked
+async function stGlogLoad() {
+  try { ST_GLOGS = await api('/api/gate-logs'); } catch (e) { ST_GLOGS = { error: errText(e), files: [] }; }
+  if (PAGE === 'settings') render();
+}
+function stGlogCard() {
+  const s = ST_GLOGS;
+  const files = (s && s.files) || [];
+  const list = !s ? `<span class="faint">${esc(t('settings.glogs.checking'))}</span>`
+    : s.error ? `<span class="faint">${esc(s.error)}</span>`
+    : !files.length ? `<span class="faint">${esc(t('settings.glogs.none'))}</span>`
+    : `<div class="st-gatelist">${files.slice(0, 10).map(f => `<div class="st-gatehost">
+        <a href="#" onclick="stGlogShow(${esc(JSON.stringify(f.name))}); return false">${esc(f.name)}</a>
+        <span class="faint">${esc(fmtTime(f.at))} · ${esc(stBytes(f.bytes))}</span></div>`).join('')}</div>`;
+  return stCard('file', 'amber', esc(t('settings.glogs.title')), th('settings.glogs.text'),
+    `<button class="btn btn-sm" onclick="stGlogOpen()">${icon('folder')}${esc(t('settings.glogs.open'))}</button>
+     <button class="btn btn-sm" onclick="stGlogLoad()">${icon('refresh')}${esc(t('settings.glogs.reload'))}</button>
+     ${list}`);
+}
+async function stGlogOpen() {
+  try {
+    const r = await api('/api/gate-logs-open');
+    if (r.unsupported) toast(t('settings.glogs.cannotOpen'), true);
+  } catch (e) { toast(errText(e), true); }
+}
+async function stGlogShow(name) {
+  let text = '';
+  try { text = (await api('/api/gate-logs/' + encodeURIComponent(name))).text || ''; } catch (e) { toast(errText(e), true); return; }
+  dialog({
+    title: esc(name), wide: true,
+    body: `<pre class="st-glog">${esc(text || t('settings.glogs.empty'))}</pre>`,
+    foot: `<span class="spacer"></span><button class="btn btn-primary" data-close>${esc(t('common.done'))}</button>`,
+    open(dlg) { const p = dlg.querySelector('pre'); p.scrollTop = p.scrollHeight; dlg.querySelector('[data-close]').focus(); },
+  });
 }
 async function stBrowseInbox() {
   try {

@@ -95,15 +95,19 @@ async function seedSoundcloudSession(ses: Session): Promise<void> {
   }
 }
 
+import * as trace from "./trace";
+
 /** Walk one gate. Resolves with the saved file; throws when the gate hands out nothing. */
 export async function walk(adapter: GateAdapter, url: string, email: string): Promise<WalkResult> {
   const ses = session.fromPartition(GATE_PARTITION);
   // the same plain Chrome user agent the Discover view uses, or SoundCloud treats the walk as a
   // different client than the session it was seeded from
   ses.setUserAgent(ses.getUserAgent().replace(/ ?(Electron|dj-hq|DJ HQ)\/\S+/gi, ""));
-  await seedSoundcloudSession(ses).catch(() => {});
-  await seedProviderSessions(ses).catch(() => {});
-  const log = (m: string) => console.log(`[gate:${adapter.id}] ${m}`);
+  const log = trace.open(adapter.id);
+  log(`walk ${url}`);
+  await seedSoundcloudSession(ses).catch((e) => log("[seed] soundcloud failed: " + e));
+  await seedProviderSessions(ses).catch((e) => log("[seed] providers failed: " + e));
+  log(`[seed] ${(await ses.cookies.get({})).length} cookies in the gate partition`);
   const w = new WalkWindow(ses, log);
   const ac = new AbortController();
   const s = core.getSettings();
@@ -121,12 +125,17 @@ export async function walk(adapter: GateAdapter, url: string, email: string): Pr
   active++;
   try {
     const res = await adapter.walk(ctx);
+    log(`saved ${res.bytes} bytes ${res.mime}`);
     if (s.undo_after_download !== false && res.performed.length) {
       await undo(w, res.performed).catch((e) => log("[undo] failed: " + e));
     }
     return res;
+  } catch (e: any) {
+    log(`FAILED ${e?.message || e}`);
+    throw e;
   } finally {
     active--;
     w.destroy();
+    trace.close();
   }
 }

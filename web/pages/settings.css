@@ -59,3 +59,4 @@
 .st-gatehost { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px solid var(--line-1); font-size: 13px; }
 .st-gatehost:last-child { border-bottom: 0; }
 .st-gatehost .faint { font-size: 12px; flex-shrink: 0; }
+.st-glog { max-height: 60vh; overflow: auto; margin: 0; padding: 10px 12px; font: 12px/1.5 var(--mono); white-space: pre-wrap; word-break: break-all; background: var(--surface-2); color: var(--text); border-radius: var(--r-md); }

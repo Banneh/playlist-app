@@ -71,6 +71,8 @@ export class WalkWindow {
       w.webContents.setAudioMuted(!this.visible);
       this.popups.push(w);
       if (this.visible) w.showInactive();
+      w.webContents.on("did-navigate", (_e, u) => this.log("[popup] " + u.slice(0, 100)));
+      w.on("closed", () => this.log("[popup] closed"));
     });
     win.on("closed", () => this.log("[auth] window closed"));
     return win;
@@ -95,6 +97,7 @@ export class WalkWindow {
   private show(): void {
     if (this.destroyed || this.visible) return;
     this.visible = true;
+    this.log("[window] shown");
     // shown to a human: sound as in any window they look at
     if (!this.win.isDestroyed()) { this.win.webContents.setAudioMuted(false); this.win.showInactive(); }
     for (const p of this.popups) if (!p.isDestroyed()) { p.webContents.setAudioMuted(false); p.showInactive(); }
@@ -132,6 +135,7 @@ export class WalkWindow {
   private hide(): void {
     if (!this.visible) return;
     this.visible = false;
+    this.log("[window] hidden");
     if (!this.win.isDestroyed()) { this.win.hide(); this.win.webContents.setAudioMuted(true); }
     for (const p of this.popups) if (!p.isDestroyed()) { p.hide(); p.webContents.setAudioMuted(true); }
   }

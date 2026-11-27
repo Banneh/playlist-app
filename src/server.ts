@@ -5,6 +5,7 @@
 import * as fs from "fs";
 import * as http from "http";
 import * as path from "path";
+import { app } from "electron";
 import * as core from "./core";
 import * as config from "./config";
 import * as bandcamp from "./bandcamp";
@@ -275,6 +276,34 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
         let version = "";
         try { version = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || ""; } catch {}
         return json({ version, platform: process.platform, arch: process.arch, packaged: !!opts.packaged, sc: !!opts.sc, do_all: core.DO_ALL_FEATURE, dl_bypass: core.DOWNLOAD_BYPASS, dev_mode: core.DEV_MODE, gate_hosts: gates.hostSources() });
+      }
+      // developer mode only: the gate traces, newest first, so a failed walk can be read back
+      if (req.url === "/api/gate-logs") {
+        if (!core.DEV_MODE) return json({ dir: "", files: [] });
+        const dir = path.join(app.getPath("userData"), "gate-logs");
+        let files: Array<{ name: string; bytes: number; at: number }> = [];
+        try {
+          files = fs.readdirSync(dir).filter((f) => f.endsWith(".log")).map((f) => {
+            const st = fs.statSync(path.join(dir, f));
+            return { name: f, bytes: st.size, at: st.mtimeMs };
+          }).sort((a, b) => b.at - a.at).slice(0, 50);
+        } catch {}
+        return json({ dir, files });
+      }
+      if (req.url?.startsWith("/api/gate-logs/")) {
+        if (!core.DEV_MODE) return json({ text: "" });
+        const name = path.basename(decodeURIComponent(req.url.slice(15)));
+        const p = path.join(app.getPath("userData"), "gate-logs", name);
+        let text = "";
+        try { text = fs.readFileSync(p, "utf8"); } catch {}
+        return json({ name, text: text.slice(-200000) });
+      }
+      if (req.url === "/api/gate-logs-open") {
+        if (!core.DEV_MODE || !opts.reveal) return json({ unsupported: true });
+        const dir = path.join(app.getPath("userData"), "gate-logs");
+        try { fs.mkdirSync(dir, { recursive: true }); } catch {}
+        opts.reveal(dir);
+        return json({ ok: true, dir });
       }
       // static UI assets (web/app.css, web/app.js, web/pages/*.js)
       const rel = decodeURIComponent((req.url || "/").split("?")[0]);

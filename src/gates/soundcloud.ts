@@ -54,7 +54,9 @@ export async function scWrite(w: WalkWindow, method: string, apiPath: string, bo
       new Promise<string>((_, rej) => setTimeout(() => rej(new Error("sc_write_timeout")), 20000)),
     ]);
     const sp = out.indexOf(" ");
-    return { status: Number(out.slice(0, sp)), text: out.slice(sp + 1) };
+    const res = { status: Number(out.slice(0, sp)), text: out.slice(sp + 1) };
+    w.log(`[sc] ${method} ${apiPath} ${res.status} ${res.text.slice(0, 80).replace(/\s+/g, " ")}`);
+    return res;
   };
   // DataDome answers 403 with a captcha URL while the page's own scripts are still settling; a
   // second pass a few seconds later goes through. When it still refuses, the challenge is real:

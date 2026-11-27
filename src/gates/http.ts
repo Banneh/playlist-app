@@ -5,6 +5,7 @@ import * as path from "path";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import * as core from "../core";
+import { trace } from "./trace";
 
 export const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -19,13 +20,21 @@ export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function req(url: string, init: RequestInit = {}, timeoutMs = REQ_TIMEOUT_MS): Promise<Response> {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), timeoutMs);
+  const t0 = Date.now();
+  const method = init.method || "GET";
+  trace(`${method} ${url.slice(0, 160)}`);
   try {
-    return await fetch(url, {
+    const r = await fetch(url, {
       ...init,
       redirect: init.redirect ?? "follow",
       headers: { "user-agent": UA, ...(init.headers as Record<string, string> | undefined) },
       signal: ac.signal,
     });
+    trace(`${method} ${r.status} ${r.headers.get("content-type") || ""} ${Date.now() - t0}ms ${url.slice(0, 100)}`);
+    return r;
+  } catch (e: any) {
+    trace(`${method} FAILED ${e?.name || e} ${Date.now() - t0}ms ${url.slice(0, 100)}`);
+    throw e;
   } finally {
     clearTimeout(t);
   }
