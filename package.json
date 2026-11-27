@@ -15,7 +15,8 @@
     "start": "npm run build && electron .",
     "headless": "npm run build && node dist/server.js",
     "dist": "npm run build && electron-builder",
-    "screens": "npm run build && electron scripts/screenshots.js"
+    "screens": "npm run build && electron scripts/screenshots.js",
+    "screens:review": "npm run build && electron scripts/review-screens.js"
   },
   "build": {
     "appId": "com.djhq.app",

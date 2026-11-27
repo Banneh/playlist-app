@@ -20,3 +20,4 @@ state.json.README.txt
 # local gate scratch: test scripts and a saved copy of the gate's page script
 tools/gate-test/
 gate ui preview
+review-screens/
