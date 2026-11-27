@@ -43,8 +43,8 @@ const GUIDES = {
   new: guidePage('new', 'sparkles', [['sparkles', 'file', 'eye'], 3]),
   inbox: guidePage('inbox', 'inbox', [['inbox', 'folderIn', 'arrowUpCircle', 'file', 'check'], ['search', 'folderIn'], 5]),
   collection: guidePage('extras', 'folder', [['search', 'search', 'plus', 'pencil'], 3]),
-  prepare: guidePage('prepare', 'disc', [['disc', 'listMusic', 'tag', 'refresh', 'image', 'sliders', 'history', 'upload', 'alert'],
-    ['wand', 'settings', 'folder', 'sparkles', 'upload', 'check', 'wand', 'x'], 2]),
+  prepare: guidePage('prepare', 'disc', [['disc', 'listMusic', 'tag', 'refresh', 'image', 'sliders', 'history', 'upload', 'alert', 'sliders'],
+    ['wand', 'settings', 'folder', 'sparkles', 'upload', 'check', 'wand', 'x'], 3]),
   settings: guidePage('settings', 'settings', [['folder', 'inbox', 'wand', 'refresh', 'sun', 'languages', 'history', 'copy', 'info', 'image'], 5]),
 };
 

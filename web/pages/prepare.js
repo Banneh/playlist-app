@@ -32,72 +32,45 @@ function ppRow(r) {
 
 PAGES.prepare = {
   title: () => t('prepare.title'),
-  sub: () => th('prepare.sub'),
+  // the player the files are checked for: one line under the title, Change opens the list
+  sub: () => {
+    const p = ppDevice().label;
+    return `<span class="fact">${p ? th('prepare.checkingFor', { player: p }) : th('prepare.checkingForAny')}</span> <span class="fact">· <a href="#" class="pp-change" onclick="event.preventDefault();ppDevicePop(this)" aria-haspopup="dialog">${esc(t('prepare.change'))}</a></span>`;
+  },
   search: false,
   body: () => {
     const dev = ppDevice(), n = DATA.untagged || 0, files = DATA.local_count || 0, c = DATA.incompatible || 0, b = DATA.backups || 0, nc = DATA.name_checks || 0;
     const na = (DATA.art && DATA.art.add) || 0, run = PP_ALL ? PP_ALL.kind : '';
     const rows = ppAttention();
     ppAllResume();   // once: a run started before a reload
-    const deviceCard = `
-      <div class="card pp-device">
-        <div class="card-icon pp-inline-icon">${icon('disc')}</div>
-        <div class="pp-txt">
-          <h3>${th('prepare.device.title')}</h3>
-          <p>${th('prepare.device.text')}</p>
-        </div>
-        <div class="select-wrap pp-select"><select id="pp-device" aria-label="${esc(t('prepare.device.title'))}" onchange="ppSetDevice(this.value)">${
-          (DATA.devices || []).map(d => `<option value="${esc(d.id)}"${d.id === DATA.device ? ' selected' : ''}>${esc(d.label)}</option>`).join('')}</select></div>
-        <div class="pp-rules">
-          <h4>${th('prepare.rules.title')}</h4>
-          <p>${th('prepare.rules.text')}</p>
-          ${['flac', 'alac', 'other'].map(k => {
-            const v = (DATA.convert_rules || {})[k] || 'aiff';
-            return `<div class="pp-rule"><span class="lbl">${esc(t('prepare.rules.' + k))}</span>
-              <div class="select-wrap"><select aria-label="${esc(t('prepare.rules.' + k))}" onchange="ppSetRule('${k}', this.value)">${
-                ['aiff', 'wav', 'skip'].map(o => `<option value="${o}"${v === o ? ' selected' : ''}>${esc(t('prepare.rules.to.' + o))}</option>`).join('')}</select></div></div>`;
-          }).join('')}
-        </div>
-      </div>`;
+    // the accent goes to the first card with work left: Tags, then Player compatibility, then rekordbox
+    const lit = n ? 'tags' : c ? 'compat' : DATA.have ? 'rb' : '';
+    const pri = k => lit === k ? ' btn-primary' : '';
+    const busyTip = PP_ALL ? ` title="${esc(errText({ code: ppRunCode() }))}"` : '';
+    const card = (ico, color, title, num, text, acts, more) => `
+        <div class="card">
+          <h3><span class="card-icon pp-ico${color ? ' ' + color : ''}">${icon(ico)}</span>${title}</h3>
+          <div class="pp-num">${num}</div>
+          <p>${text}</p>
+          <div class="card-acts">${acts}${more ? `<span class="spacer"></span><button class="btn btn-ghost btn-icon pp-more" onclick="ppMore(this, '${more}')" aria-haspopup="menu" aria-label="${esc(t('prepare.more'))}" title="${esc(t('prepare.more'))}">${icon('more')}</button>` : ''}</div>
+          ${more === 'tags' && run ? `<div class="pp-run" id="pp-run">${spin(ppAllText())}</div>` : ''}
+        </div>`;
+    const tagsNum = n ? `<button class="big link" onclick="HFILTER='tags';go('have')" title="${esc(t('prepare.showOnHave'))}">${n}<small>${tnh('prepare.tags.need', n)}</small></button>` : tag(t('prepare.tags.allTagged'), 'ok', 'check');
+    const tagsActs = n
+      ? `<button class="btn${pri('tags')}" id="pp-tag" onclick="ppTag()" ${PP_ALL ? 'disabled' : ''}${busyTip || ` title="${esc(t('prepare.tags.writeTip'))}"`}>${icon('tag')}${esc(t('tags.writeTags'))} ${badge(n)}</button>`
+      : `<button class="btn" onclick="openCheckNames('${nc ? 'check' : 'all'}')" title="${esc(t(nc ? 'prepare.tags.checkTip' : 'prepare.tags.checkAllTip'))}">${icon('listMusic')}${esc(t('names.title'))}${nc ? ` ${badge(nc)}` : ''}</button>`;
+    const compatNum = c ? `<button class="big link" onclick="HFILTER='convert';go('have')" title="${esc(t('prepare.showOnHave'))}">${c}<small>${tnh('prepare.compat.toConvert', c)}</small></button>` : tag(t('prepare.compat.ready'), 'ok', 'check');
+    const compatActs = c
+      ? `<button class="btn${pri('compat')}" id="pp-convert" onclick="ppConvert()" ${PP_ALL ? 'disabled' : ''}${busyTip || ` title="${esc(t('prepare.compat.convertTip'))}"`}>${icon('sliders')}${esc(t('prepare.compat.convert'))} ${badge(c)}</button>`
+      : b ? `<button class="btn" id="pp-restore" onclick="ppRestore()" ${PP_ALL ? 'disabled' : ''}${busyTip || ` title="${esc(t('prepare.compat.restoreTip'))}"`}>${icon('history')}${esc(t('prepare.compat.restore'))} ${badge(b)}</button>` : '';
+    const rbActs = DATA.have ? `<button class="btn${pri('rb')}" id="pp-export" onclick="exportXml()">${icon('upload')}${esc(t('prepare.rb.export'))}</button>` : '';
     const cards = `
       <div class="cards pp-cards">
-        <div class="card">
-          <div class="card-icon">${icon('tag')}</div>
-          <h3>${th('prepare.tags.title')}</h3>
-          <div class="pp-num">${n ? `<button class="big link" onclick="HFILTER='tags';go('have')" title="${esc(t('prepare.showOnHave'))}">${n}<small>${tnh('prepare.tags.need', n)}</small></button>` : tag(t('prepare.tags.allTagged'), 'ok', 'check')}</div>
-          <p>${th('prepare.tags.text')}</p>
-          <div class="pp-names${nc ? '' : ' ok'}">${nc
-            ? `${icon('alert')}<span>${tnh('prepare.tags.names', nc)}</span>`
-            : `${icon('checkCircle')}<span>${th('prepare.tags.noNames')}</span>`}</div>
-          <div class="card-acts">
-            <button class="btn ${n ? 'btn-primary' : ''}" id="pp-tag" onclick="ppTag()" ${n && !PP_ALL ? '' : 'disabled'} title="${esc(t(n ? 'prepare.tags.writeTip' : 'prepare.tags.allDoneTip'))}">${icon('tag')}${esc(t('tags.writeTags'))}${n ? ` ${badge(n)}` : ''}</button>
-            <button class="btn" onclick="openCheckNames('${nc ? 'check' : 'all'}')" title="${esc(t(nc ? 'prepare.tags.checkTip' : 'prepare.tags.checkAllTip'))}">${icon('listMusic')}${esc(t('names.title'))}${nc ? ` ${badge(nc)}` : ''}</button>
-            <span class="pp-break"></span><button class="btn btn-sm btn-ghost pp-again" id="pp-tag-all" onclick="ppTagAll()" ${PP_ALL || PP_ALL_ASKING || !files ? 'disabled' : ''}
-            title="${esc(t(files ? 'prepare.tags.allTip' : 'prepare.tags.noFilesTip'))}">${run === 'tags' ? spin(ppAllText()) : icon('refresh') + esc(t('prepare.tags.all'))}</button>
-            <span class="pp-break"></span><button class="btn btn-sm btn-ghost pp-again" id="pp-art" onclick="ppArt()" ${PP_ALL || PP_ALL_ASKING || !na ? 'disabled' : ''}
-            title="${esc(t(na ? 'prepare.tags.artTip' : 'prepare.tags.noArtTip'))}">${run === 'art' ? spin(ppAllText()) : icon('image') + esc(t('prepare.tags.art')) + (na ? ` ${badge(na)}` : '')}</button>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-icon amber">${icon('sliders')}</div>
-          <h3>${th('prepare.compat.title')}</h3>
-          <div class="pp-num">${c ? `<button class="big link" onclick="HFILTER='convert';go('have')" title="${esc(t('prepare.showOnHave'))}">${c}<small>${tnh('prepare.compat.toConvert', c)}</small></button>` : tag(t('prepare.compat.ready'), 'ok', 'check')}</div>
-          <p>${c ? (dev.label ? tnh('prepare.compat.wontPlay', c, { player: dev.label }) : tnh('prepare.compat.wontPlayAny', c)) + ' ' : ''}${th('prepare.compat.text')}</p>
-          <div class="card-acts">
-            <button class="btn" id="pp-convert" onclick="ppConvert()" ${c && !PP_ALL ? '' : 'disabled'} title="${esc(PP_ALL ? errText({ code: ppRunCode() }) : t(c ? 'prepare.compat.convertTip' : 'prepare.compat.allOkTip'))}">${icon('sliders')}${esc(t('prepare.compat.convert'))}${c ? ` ${badge(c)}` : ''}</button>
-            <button class="btn" id="pp-restore" onclick="ppRestore()" ${b && !PP_ALL ? '' : 'disabled'} title="${esc(PP_ALL ? errText({ code: ppRunCode() }) : t(b ? 'prepare.compat.restoreTip' : 'prepare.compat.noRestoreTip'))}">${icon('history')}${esc(t('prepare.compat.restore'))}${b ? ` ${badge(b)}` : ''}</button>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-icon blue">${icon('upload')}</div>
-          <h3>rekordbox</h3>
-          <div class="pp-num"><span class="big">${DATA.have}<small>${tnh('prepare.rb.ready', DATA.have)}</small></span></div>
-          <p>${th('prepare.rb.text')}</p>
-          <div class="card-acts">
-            <button class="btn" id="pp-export" onclick="exportXml()" ${DATA.have ? '' : 'disabled'}>${icon('upload')}${esc(t('prepare.rb.export'))}</button>
-            <button class="btn" id="pp-cues" onclick="ppCueFix()" title="${esc(t('prepare.cues.tip'))}">${icon('wand')}${esc(t('prepare.cues.button'))}</button>
-          </div>
-        </div>
+        ${card('tag', '', th('prepare.tags.title'), tagsNum, th('prepare.tags.text'), tagsActs, 'tags')}
+        ${card('sliders', 'amber', th('prepare.compat.title'), compatNum,
+          c ? (dev.label ? tnh('prepare.compat.wontPlay', c, { player: dev.label }) : tnh('prepare.compat.wontPlayAny', c)) : th('prepare.compat.text'),
+          compatActs, c && b ? 'compat' : '')}
+        ${card('upload', 'blue', 'rekordbox', `<span class="big">${DATA.have}<small>${tnh('prepare.rb.ready', DATA.have)}</small></span>`, th('prepare.rb.text'), rbActs, 'rb')}
       </div>`;
     const list = rows.length ? `
       <div class="section">${esc(t('prepare.attention'))} ${badge(rows.length)}</div>
@@ -108,10 +81,48 @@ PAGES.prepare = {
       <div class="section">${esc(t('prepare.attention'))}</div>
       <div class="table">${emptyHtml({ ico: 'checkCircle', kind: 'green', title: ppOn('prepare.readyTitle', 'prepare.readyTitleAny', true),
         text: th('prepare.readyText') })}</div>`;
+    // last, folded: what a format the player can't read at all becomes
+    const R = DATA.convert_rules || {};
+    const rules = `
+      <details class="card pp-rules"${PP_RULES_OPEN ? ' open' : ''} ontoggle="PP_RULES_OPEN = this.open">
+        <summary><span class="pp-rules-h">${esc(t('prepare.rules.title'))}</span><span class="pp-rules-sum">${
+          esc(['flac', 'alac', 'other'].map(k => t('prepare.rules.short.' + k) + ' → ' + t('prepare.rules.shortTo.' + (R[k] || 'aiff'))).join(' · '))}</span>${icon('chevronDown', 'pp-rules-chev')}</summary>
+        <p>${th('prepare.rules.text')}</p>
+        ${['flac', 'alac', 'other'].map(k => {
+          const v = R[k] || 'aiff';
+          return `<div class="pp-rule"><span class="lbl">${esc(t('prepare.rules.' + k))}</span>
+            <div class="select-wrap"><select aria-label="${esc(t('prepare.rules.' + k))}" onchange="ppSetRule('${k}', this.value)">${
+              ['aiff', 'wav', 'skip'].map(o => `<option value="${o}"${v === o ? ' selected' : ''}>${esc(t('prepare.rules.to.' + o))}</option>`).join('')}</select></div></div>`;
+        }).join('')}
+      </details>`;
     const doAll = typeof daCardHtml === 'function' ? daCardHtml() : '';   // Do everything (pages/doall.js); nothing while it is switched off
-    return doAll + deviceCard + cards + list;
+    return doAll + cards + list + rules;
   },
 };
+let PP_RULES_OPEN = false;   // the Convert rules stay open across a redraw
+/** Change next to the player's name: the list of players in a small popover */
+function ppDevicePop(anchor) {
+  const m = showPopover(anchor, `<div class="pop-title">${esc(t('prepare.device.title'))}</div>
+    <div class="pp-dev-pop"><div class="select-wrap pp-select"><select id="pp-device" aria-label="${esc(t('prepare.device.title'))}" onchange="ppSetDevice(this.value)">${
+      (DATA.devices || []).map(d => `<option value="${esc(d.id)}"${d.id === DATA.device ? ' selected' : ''}>${esc(d.label)}</option>`).join('')}</select></div>
+    <p class="pop-tx">${th('prepare.device.text')}</p></div>`, { cls: 'pp-dev' });
+  const sel = m && m.querySelector('select'); if (sel) sel.focus();
+}
+/** a card's ⋯: its other actions; one with nothing to do is left out */
+function ppMore(anchor, which) {
+  const files = DATA.local_count || 0, nc = DATA.name_checks || 0, na = (DATA.art && DATA.art.add) || 0, b = DATA.backups || 0;
+  const free = !PP_ALL && !PP_ALL_ASKING;
+  const items = which === 'tags' ? [
+    { label: t('names.title') + (nc ? ` (${I18N.num(nc)})` : ''), icon: 'listMusic', hint: t(nc ? 'prepare.tags.checkTip' : 'prepare.tags.checkAllTip'), onclick: () => openCheckNames(nc ? 'check' : 'all') },
+    ...(files && free ? [{ label: t('prepare.tags.all'), icon: 'refresh', hint: t('prepare.tags.allTip'), onclick: ppTagAll }] : []),
+    ...(na && free ? [{ label: t('prepare.tags.art') + ` (${I18N.num(na)})`, icon: 'image', hint: t('prepare.tags.artTip'), onclick: ppArt }] : []),
+  ] : which === 'compat' ? [
+    ...(b && !PP_ALL ? [{ label: t('prepare.compat.restore') + ` (${I18N.num(b)})`, icon: 'history', hint: t('prepare.compat.restoreTip'), onclick: ppRestore }] : []),
+  ] : [
+    { label: t('prepare.cues.button'), icon: 'wand', hint: t('prepare.cues.tip'), onclick: ppCueFix },
+  ];
+  if (items.length) showMenu(anchor, items, { align: 'right' });
+}
 
 /* ---------- actions ---------- */
 async function ppSetDevice(id) {
@@ -145,12 +156,11 @@ const ppAllText = () => {
     : t(art ? 'tags.art.adding' : 'tags.writingTags');
 };
 const ppRunCode = () => PP_ALL && PP_ALL.kind === 'art' ? 'art_running' : 'tag_running';
-const ppAllShow = p => { PP_ALL = { ...p, kind: PP_ALL ? PP_ALL.kind : p.kind }; const b = $(PP_ALL.kind === 'art' ? '#pp-art' : '#pp-tag-all'); if (b) b.innerHTML = spin(ppAllText()); };
+const ppAllShow = p => { PP_ALL = { ...p, kind: PP_ALL ? PP_ALL.kind : p.kind }; const b = $('#pp-run'); if (b) b.innerHTML = spin(ppAllText()); };
 /** one every-file run from a click: `ask(progress)` previews, confirms and runs it (pages/playlist.js) */
 async function ppRun(kind, ask) {
   if (PP_ALL || PP_ALL_ASKING) return;   // a double click: one preview, one dialog, one run
   PP_ALL_ASKING = true;
-  const b = $(kind === 'art' ? '#pp-art' : '#pp-tag-all'); if (b) b.disabled = true;
   try {
     await ask(p => { if (!PP_ALL) { PP_ALL = { ...p, kind }; render(); } else ppAllShow(p); });
   } finally { PP_ALL_ASKING = false; PP_ALL = null; render(); }

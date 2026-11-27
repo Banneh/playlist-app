@@ -1,39 +1,43 @@
 /* page-specific styles for pages/prepare.js (tokens and components come from app.css) */
 
-/* target player card: icon · text · select, in one row */
-.pp-device { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
-.pp-device .pp-inline-icon { margin-bottom: 0; flex-shrink: 0; }
-.pp-device .pp-txt { flex: 1; min-width: 240px; }
-.pp-device .pp-txt p { margin-top: 3px; }
-.pp-device .pp-select { flex: 0 0 auto; min-width: 280px; }
-@media (max-width: 1000px) { .pp-device .pp-select { flex: 1 1 100%; } }
+/* the player, in the page's subtitle: Change opens the list in a popover */
+.pp-change { font-weight: 600; }
+.pp-change:hover { text-decoration: underline; text-underline-offset: 2px; }
+.menu.pp-dev { width: 340px; max-width: calc(100vw - 16px); }
+.pp-dev-pop { display: flex; flex-direction: column; gap: 8px; padding: 2px 9px 8px; }
+.pp-dev-pop .select-wrap { display: block; }
+.pp-dev-pop .pop-tx { min-width: 0; }
 
-/* convert rules: what a format the player can't read at all becomes */
-.pp-rules { flex: 1 1 100%; margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
-.pp-rules h4 { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
-.pp-rules p { margin: 0; font-size: 12.5px; color: var(--text-2); max-width: 72ch; }
-.pp-rule { display: flex; align-items: center; gap: 10px; max-width: 470px; }
+/* the three job cards, one layout: icon and title · count · one sentence · buttons on the bottom edge */
+.pp-cards .card { display: flex; flex-direction: column; min-height: 0; padding: 16px 18px; }
+.pp-cards .card h3 { gap: 10px; }
+.pp-cards .card .pp-ico { width: 30px; height: 30px; border-radius: 8px; margin: 0; flex-shrink: 0; }
+.pp-cards .card .pp-ico .ic { color: inherit; }
+.pp-cards .card p { margin-top: 0; }
+.pp-cards .card .card-acts { margin-top: auto; padding-top: 14px; align-items: center; flex-wrap: nowrap; }
+.pp-cards .card .pp-more { flex-shrink: 0; }
+.pp-run { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12.5px; color: var(--text-2); }
+
+/* the convert rules: last on the page, folded to one line */
+.pp-rules { margin-top: 16px; padding: 0; }
+.pp-rules summary { display: flex; align-items: center; gap: 12px; padding: 14px 18px; cursor: pointer; list-style: none; min-width: 0; }
+.pp-rules summary::-webkit-details-marker { display: none; }
+.pp-rules-h { font-size: 14px; font-weight: 600; flex-shrink: 0; }
+.pp-rules-sum { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-rules-chev { color: var(--text-3); transition: transform .15s; }
+.pp-rules[open] .pp-rules-chev { transform: rotate(180deg); }
+.pp-rules > p { margin: 0 18px 10px; font-size: 12.5px; color: var(--text-2); max-width: 72ch; }
+.pp-rule { display: flex; align-items: center; gap: 10px; max-width: 470px; margin: 0 18px 8px; }
+.pp-rules .pp-rule:last-child { margin-bottom: 16px; }
 .pp-rule .lbl { flex: 1; min-width: 0; font-size: 13px; }
 .pp-rule .select-wrap { flex: 0 0 auto; min-width: 220px; }
-
-/* the three action cards */
-.pp-cards .card { display: flex; flex-direction: column; min-height: 0; }
-.pp-cards .card p { flex: 1; }
-.pp-cards .card .card-acts { margin-top: 16px; }
-/* Write tags in every file: the quiet third action, on a line of its own under the two buttons */
-.pp-cards .card .pp-break { flex-basis: 100%; height: 0; }
-.pp-cards .card .pp-again { margin: -4px 0 -6px -10px; max-width: calc(100% + 10px); }
-/* a narrow card (900 px window): the label wraps inside the card instead of running out of it */
-.pp-cards .card .pp-again { height: auto; min-height: var(--ctl-sm); padding-block: 5px; white-space: normal; text-align: left; line-height: 1.25; }
-/* Add cover art: the second quiet action, on the line under it, its icon in line with the first */
-.pp-cards .card .pp-again + .pp-break + .pp-again { margin-top: -12px; }
 /* the Add cover art confirmation: what is left, and why */
 .dlg-body .art-left-head { margin-bottom: 4px; }
 .dlg-body .art-left { margin: 0 0 10px; padding-left: 20px; color: var(--text-2); font-size: 13.5px; }
 .dlg-body .art-left li + li { margin-top: 2px; }
 .pp-num { display: flex; align-items: center; min-height: 32px; margin: 6px 0 8px; }
 .pp-num .big { display: inline-flex; align-items: baseline; }
-.pp-num button.big { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; border-radius: var(--r-sm); }
+.pp-num button.big { background: none; border: 0; padding: 0; margin: 0; font-family: inherit; color: inherit; cursor: pointer; border-radius: var(--r-sm); }
 .pp-num button.big:hover { color: var(--accent-text); }
 .pp-num button.big:hover small { text-decoration: underline; text-underline-offset: 3px; }
 .pp-num button.big:focus-visible { outline: none; box-shadow: var(--ring); }
@@ -55,12 +59,6 @@
 .dlg-body .path + .pp-steps-lead { margin-top: 14px; }
 .dlg-body .steps + p { margin-top: 12px; }
 
-
-/* the "names to check" line on the Tags card */
-.pp-names { display: flex; align-items: flex-start; gap: 7px; margin-top: 10px; font-size: 12.5px; color: var(--text-2); }
-.pp-names .ic { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; color: var(--amber); }
-.pp-names.ok .ic { color: var(--green); }
-.pp-names b { color: var(--text); font-weight: 600; }
 
 /* cue points one beat late: the tracks in the preview */
 .pp-cue-list { list-style: none; margin: 12px 0 0; padding: 0; max-height: 260px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-sm); }
