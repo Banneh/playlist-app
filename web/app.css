@@ -800,6 +800,8 @@ body.devmode .table.no-num.no-status:has(.tr > .get) > .thead, body.devmode .tab
   .table.no-num.no-status > .thead, .table.no-num.no-status > .tr,
   body.devmode .table.no-num.no-status:has(.tr > .get) > .thead, body.devmode .table.no-num.no-status > .tr:has(> .get) { grid-template-columns: 40px minmax(0, 1fr) 48px 112px 30px; }   /* the dev label stacks under the buttons */
   .thead .num, .tr .num { display: none; }
+  /* the inline artist / title form keeps its columns inline (with the 30 px number on All tracks): without the number it is art + form */
+  .tr.tr-edit { grid-template-columns: 40px minmax(0, 1fr) !important; }
   .t-meta { padding-right: 2px; }   /* with the 10 px gap: the track stays 12 px clear of the length */
   .get { flex-direction: column; align-items: flex-start; gap: 4px; }
   .get .btn { width: 112px; }
