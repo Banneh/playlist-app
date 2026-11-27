@@ -6,6 +6,13 @@ I18N.add('en', 'news', {
   subSince: 'Your last version was {version}. Here is what changed since then. You can open this list again from the ⋯ menu.',
   menu: 'What’s new…',
   v: {
+    '3_2_0': {
+      i1: '<b>Discover</b>: a track that is already in the playlist says “In playlist ✓” where Add stood, and Remove moved into the ⋯ menu beside it, so a second click never takes a track out. The keys show while a track plays: A sits on Add, and <kbd>?</kbd> at the end of the bar lists them all.',
+      i2: '<b>Playlist and collection</b>: the SoundCloud link you connect is a playlist everywhere, and your music folders with their files are the collection. In Settings the folder your browser saves to is the <b>Watched downloads folder</b>, and <b>New tracks go to</b> shows the real folder a move lands in.',
+      i3: '<b>Lists</b>: the artist keeps its full width before the file name, the folder gives way first and the file’s extension always stays. Get it is as wide as its buttons, Missing and Have no longer repeat the page in a Status column, and a file that waits in Downloads moves in right from its row.',
+      i4: '<b>One match label</b> on Downloads and in Work through: Exact match, or Close match with what differs. A file as long as the track counts as exact, as it does for auto-move. Once the file lands in Work through, <kbd>Enter</kbd> moves it into the collection.',
+      i5: '<b>Prepare for player</b> puts the work first, and its file list starts with the track. <b>Tasks</b> opens a bulk action into its tracks, and a download that brought no file can be opened in the browser or tried again. Settings has an index of its sections, and on a Mac the window moves by the strip across its top.',
+    },
     '3_1_0': {
       i1: '<b>Free DL from the release card</b>: some uploaders put their free download only on the release card of SoundCloud’s new track page. Open such a track on the Discover page once and its Free DL button shows up in DJ HQ too.',
       i2: 'A Bandcamp link is always <b>Buy</b>, name your price releases included, and a pre-save link is no longer shown as Free DL or Buy.',

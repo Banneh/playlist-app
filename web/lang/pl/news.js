@@ -6,6 +6,13 @@ I18N.add('pl', 'news', {
   subSince: 'Twoja poprzednia wersja to {version}. Oto, co się od niej zmieniło. Tę listę otworzysz ponownie z menu ⋯.',
   menu: 'Co nowego…',
   v: {
+    '3_2_0': {
+      i1: '<b>Discover</b>: utwór, który już jest na playliście, pokazuje „Na playliście ✓” tam, gdzie stał przycisk Dodaj, a Usuń przeniosło się do menu ⋯ obok, więc drugie kliknięcie nigdy nie usunie utworu. Klawisze są widoczne, gdy coś gra: A na przycisku Dodaj, a <kbd>?</kbd> na końcu paska pokazuje wszystkie.',
+      i2: '<b>Playlista i kolekcja</b>: podłączony link SoundCloud wszędzie nazywa się playlistą, a foldery z muzyką i pliki w nich to kolekcja. W Ustawieniach folder, do którego zapisuje przeglądarka, to <b>Obserwowany folder pobranych</b>, a <b>Nowe utwory trafiają do</b> pokazuje prawdziwy folder, do którego trafi przeniesiony plik.',
+      i3: '<b>Listy</b>: wykonawca zachowuje pełną szerokość przed nazwą pliku, najpierw znika folder, a rozszerzenie pliku zawsze zostaje. Kolumna Zdobądź jest tak szeroka jak jej przyciski, Brakujące i Mam nie powtarzają strony w kolumnie Status, a plik czekający w Pobranych przeniesiesz prosto z jego wiersza.',
+      i4: '<b>Jedna etykieta dopasowania</b> w Pobranych i w Przejdź po kolei: Dokładne dopasowanie albo Bliskie dopasowanie z tym, co się różni. Plik tak długi jak utwór liczy się jako dokładny, tak jak przy automatycznym przenoszeniu. Gdy plik pojawi się w Przejdź po kolei, <kbd>Enter</kbd> przenosi go do kolekcji.',
+      i5: '<b>Przygotuj na odtwarzacz</b> zaczyna od tego, co jest do zrobienia, a lista plików zaczyna się od utworu. <b>Zadania</b> rozwijają zbiorczą akcję na jej utwory, a pobieranie, które nie przyniosło pliku, można otworzyć w przeglądarce albo powtórzyć. Ustawienia mają spis swoich sekcji, a na Macu okno przesuwa się za pasek na jego górze.',
+    },
     '3_1_0': {
       i1: '<b>Free DL z karty wydania</b>: niektórzy wgrywający dają darmowe pobieranie tylko na karcie wydania w nowej stronie utworu SoundCloud. Otwórz taki utwór raz na stronie Discover, a przycisk Free DL pojawi się też w DJ HQ.',
       i2: 'Link do Bandcamp to zawsze <b>Kup</b>, także przy wydaniach „zapłać, ile chcesz”, a link do pre-save nie pokazuje się już jako Free DL ani Kup.',
