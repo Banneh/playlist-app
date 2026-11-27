@@ -59,12 +59,14 @@ function ibRow(it) {
     </div>`;
 }
 
-/** where a plain Move lands right now (the playlist's folder, the last pick, the default, the first root) */
-function ibDest() {
-  const lib = (DATA.libraries || []).find(l => l.id === DATA.active) || {};
+/** where a plain Move lands right now, in the server's order (core.ts moveDest): the playlist's own
+ *  folder, the collection's default, the folder picked last, the first root; {dir, src} */
+function ibDestOf(lib) {
   const c = DATA.collection || { roots: [] };
-  return lib.target || c.last_target || c.move_target || (c.roots[0] && c.roots[0].path) || '';
+  return lib && lib.target ? { dir: lib.target, src: 'own' } : c.move_target ? { dir: c.move_target, src: 'default' }
+    : c.last_target ? { dir: c.last_target, src: 'last' } : c.roots[0] ? { dir: c.roots[0].path, src: 'first' } : { dir: '', src: '' };
 }
+function ibDest() { return ibDestOf((DATA.libraries || []).find(l => l.id === DATA.active)).dir; }
 const ibDestShort = () => shortPath(ibDest());
 
 /** pick a destination folder of the collection: the roots, their subfolders one level at a

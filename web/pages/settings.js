@@ -23,6 +23,7 @@ PAGES.settings = {
   title: () => t('settings.title'),
   sub: () => th('settings.sub'),
   search: false,
+  tools: () => stTocHtml(' st-toc-row'),   // the segments under the heading, below 1100 px (css)
   body: () => {
     const S = DATA.settings || {};
     const lib = (DATA.libraries || []).find(l => l.id === DATA.active) || {};
@@ -161,16 +162,48 @@ PAGES.settings = {
     const config = typeof cfSettingsCard === 'function' ? cfSettingsCard() : '';  // pages/config.js: export / import
     const rekordbox = stRbxCard();
 
-    const group = key => `<h3 class="st-group">${esc(t(key))}</h3>`;
-    return `<div class="st-list">
-      ${group('settings.group.collection')}${collection}${downloads}${aiff}${backups}
-      ${group('settings.group.playlist')}${playlist}
-      ${group('settings.group.integrations')}${gates}${gateLogs}${rekordbox}${account}${links}${bandcamp}${doAll}${config}
-      ${group('settings.group.app')}${refresh}${appearance}${language}${about}</div>`;
+    const group = key => `<h3 class="st-group" id="st-sec-${key}">${esc(t('settings.group.' + key))}</h3>`;
+    // the sections' index: sticky on the left from 1100 px, a row of segments above the cards below that
+    const toc = stTocHtml('');
+    return `<div class="st-layout">${toc}<div class="st-list">
+      ${group('collection')}${collection}${downloads}${aiff}${backups}
+      ${group('playlist')}${playlist}
+      ${group('integrations')}${gates}${gateLogs}${rekordbox}${account}${links}${bandcamp}${doAll}${config}
+      ${group('app')}${refresh}${appearance}${language}${about}</div></div>`;
   },
-  onShow: () => { stRbxLoad(); if (APP.dev_mode) stGlogLoad(); },
-  after: () => stAiffResume(),
+  onShow: () => { ST_SEC = 'collection'; stRbxLoad(); if (APP.dev_mode) stGlogLoad(); },
+  after: () => { stAiffResume(); stTocWatch(); },
 };
+
+/* ---------- the sections' index ---------- */
+const ST_SECTIONS = ['collection', 'playlist', 'integrations', 'app'];
+const stTocHtml = cls => `<nav class="st-toc${cls}" aria-label="${esc(t('settings.toc'))}">${ST_SECTIONS.map(k =>
+  `<button class="${ST_SEC === k ? 'on' : ''}" data-sec="${k}" onclick="stJump('${k}')">${esc(t('settings.group.' + k))}</button>`).join('')}</nav>`;
+let ST_SEC = 'collection', ST_TOC_ON = false;
+function stJump(k) {
+  const h = $('#st-sec-' + k), body = $('#page-body');
+  if (!h || !body) return;
+  body.scrollTo({ top: h.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop - 4, behavior: 'smooth' });
+  stTocMark(k);
+}
+function stTocMark(k) {
+  ST_SEC = k;
+  document.querySelectorAll('.st-toc button').forEach(b => b.classList.toggle('on', b.dataset.sec === k));
+}
+/** light the section being read while the page scrolls (one listener, for good) */
+function stTocWatch() {
+  if (ST_TOC_ON) return;
+  const body = $('#page-body'); if (!body) return;
+  ST_TOC_ON = true;
+  body.addEventListener('scroll', () => {
+    if (PAGE !== 'settings') return;
+    const top = body.getBoundingClientRect().top + 90;
+    let cur = ST_SECTIONS[0];
+    for (const k of ST_SECTIONS) { const h = $('#st-sec-' + k); if (h && h.getBoundingClientRect().top <= top) cur = k; }
+    if (body.scrollTop + body.clientHeight >= body.scrollHeight - 4) cur = ST_SECTIONS[ST_SECTIONS.length - 1];
+    if (cur !== ST_SEC) stTocMark(cur);
+  }, { passive: true });
+}
 
 /* ---------- the rekordbox connection (Integrations) ---------- */
 let ST_RBX = null;   // last /api/rekordbox status; null until the page asked
@@ -190,8 +223,9 @@ function stRbxCard() {
     else lines.push(esc(t(s.running ? 'settings.rbx.dbRunning' : 'settings.rbx.dbFound')));
     if (s.on && s.pending) lines.push(esc(tn('settings.rbx.pending', s.pending)));
     if (s.on && s.last) lines.push(esc(s.last.error ? t('settings.rbx.lastFailed', { msg: s.last.error }) : tn('settings.rbx.lastAdded', s.last.added)));
-    controls = `<label class="st-switch">
-        <input type="checkbox" ${s.on ? 'checked' : ''} ${s.driver && s.db_found ? '' : 'disabled'} onchange="stRbxToggle(this)">
+    // not in this build: the note alone, no switch that can't be switched
+    if (s.driver) controls = `<label class="st-switch">
+        <input type="checkbox" ${s.on ? 'checked' : ''} ${s.db_found ? '' : 'disabled'} onchange="stRbxToggle(this)">
         <span class="st-track" aria-hidden="true"></span>
         <span class="st-lbl"><b>${esc(t('settings.rbx.on'))}</b>
           <span>${th('settings.rbx.onHint')}</span></span>
@@ -236,14 +270,15 @@ async function stRbxRestore() {
 /* ---------- the Collection card (roots, default move target, rescan) ---------- */
 function stCollectionCard() {
   const coll = DATA.collection || { roots: [] };
-  const rootRows = coll.roots.map(r => `<div class="st-path-row">
-       <div class="path" title="${esc(r.path)}">${icon('folder')}<span>${esc(shortPath(r.path))}</span>${r.subfolders ? tag(t('common.subfolders'), 'outline', '', t('settings.coll.subOnTag')) : ''}</div>
+  // one row per folder: path · Include subfolders · ×
+  const rootRows = coll.roots.map(r => `<div class="st-path-row st-root-row">
+       <div class="path" title="${esc(r.path)}">${icon('folder')}<span>${esc(shortPath(r.path))}</span></div>
        <label class="st-switch st-switch-sm" title="${esc(t('settings.coll.subHint'))}">
          <input type="checkbox" ${r.subfolders ? 'checked' : ''} onchange="stRootSub('${esc(r.id)}', this)">
          <span class="st-track" aria-hidden="true"></span>
          <span class="st-lbl"><span>${esc(t('common.subfolders'))}</span></span>
        </label>
-       <button class="btn btn-sm" onclick="stRemoveRoot('${esc(r.id)}', ${JSON.stringify(r.path).replace(/"/g, '&quot;')})" title="${esc(t('settings.coll.removeHint'))}">${icon('x')}${esc(t('common.remove'))}</button>
+       <button class="btn btn-sm btn-ghost btn-icon" onclick="stRemoveRoot('${esc(r.id)}', ${JSON.stringify(r.path).replace(/"/g, '&quot;')})" title="${esc(t('settings.coll.removeHint'))}" aria-label="${esc(t('settings.coll.removeAria', { dir: shortPath(r.path) }))}">${icon('x')}</button>
      </div>`).join('');
   const target = coll.move_target || '';
   return stCard('folder', 'green', esc(t('settings.coll.title')), th('settings.coll.text'),
@@ -258,21 +293,24 @@ function stCollectionCard() {
        <button class="btn btn-sm" onclick="stPickMoveTarget()" title="${esc(t('settings.coll.targetHint'))}">${icon('folder')}${esc(t('common.change'))}</button>
        ${target ? `<button class="btn btn-sm btn-ghost" onclick="stClearMoveTarget()">${icon('undo')}${esc(t('settings.coll.targetClear'))}</button>` : ''}
      </div>
+     <a href="#" class="st-link st-wide" onclick="event.preventDefault();stJump('playlist')">${esc(t('settings.coll.toPlaylist'))} ${icon('arrowRight')}</a>
      <button class="btn btn-sm" onclick="rescanFolder()">${icon('refresh')}${esc(t('app.libMenu.rescan'))}</button>`);
 }
 
 /* ---------- the Playlist card's controls (also the gear dialog next to the playlist switcher) ---------- */
 function stPlaylistControls(lib, isLikes) {
   const target = lib.target || '';
+  // where a download moved for this playlist really lands, and which setting says so (ibDest)
+  const d = ibDestOf(lib);
   return `${DATA.playlist_url ? `<button class="btn btn-sm" onclick="scOpen(DATA.playlist_url)">${icon(scInApp() ? 'cloud' : 'external')}${esc(t(isLikes ? 'common.openLikesSc' : 'common.openPlaylistSc'))}</button>` : ''}
      <button class="btn btn-sm" onclick="stChangeLink()" title="${esc(t('settings.lib.changeLinkHint'))}">${icon('link')}${esc(t('common.changeLink'))}</button>
-     <div class="st-path-row st-wide"><span class="faint">${esc(t('settings.pl.target'))}</span>
-       <div class="path" title="${esc(target)}">${icon('folderIn')}<span>${esc(target ? shortPath(target) : t('settings.pl.targetNone'))}</span></div>
+     <button class="btn btn-sm" onclick="uiAddLibrary()">${icon('plus')}${esc(t('common.addAnotherLibrary'))}</button>
+     <div class="st-path-row st-wide st-dest" title="${esc(d.dir)}">${icon('folderIn')}<span class="st-dest-tx">${d.dir
+         ? th('settings.pl.dest', { dir: shortPath(d.dir) }) + ` <span class="faint">${esc(t('settings.pl.src.' + d.src))}</span>` : esc(t('settings.pl.destNone'))}</span>
        <button class="btn btn-sm" onclick="stPickPlTarget()" title="${esc(t('settings.pl.targetHint'))}">${icon('folder')}${esc(t('common.change'))}</button>
        ${target ? `<button class="btn btn-sm btn-ghost" onclick="stClearPlTarget()">${icon('undo')}${esc(t('settings.pl.targetClear'))}</button>` : ''}
      </div>
-     <button class="btn btn-sm" onclick="uiAddLibrary()">${icon('plus')}${esc(t('common.addAnotherLibrary'))}</button>
-     <button class="btn btn-sm btn-danger" onclick="removeLibrary()">${icon('trash')}${esc(t('common.removeThisLibrary'))}</button>`;
+     <div class="st-danger-row"><button class="btn btn-sm btn-danger" onclick="removeLibrary()">${icon('trash')}${esc(t('common.removeThisLibrary'))}</button></div>`;
 }
 /** the gear next to the playlist switcher: the playlist's own settings in one dialog */
 function plSettingsDialog() {

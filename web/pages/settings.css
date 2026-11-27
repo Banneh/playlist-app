@@ -60,3 +60,39 @@
 .st-gatehost:last-child { border-bottom: 0; }
 .st-gatehost .faint { font-size: 12px; flex-shrink: 0; }
 .st-glog { max-height: 60vh; overflow: auto; margin: 0; padding: 10px 12px; font: 12px/1.5 var(--mono); white-space: pre-wrap; word-break: break-all; background: var(--surface-2); color: var(--text); border-radius: var(--r-md); }
+
+/* the sections' index: a sticky column on the left from 1100 px, a sticky row of segments below */
+.st-layout { display: grid; grid-template-columns: 168px minmax(0, 900px); gap: 24px; align-items: start; }
+.st-toc { position: sticky; top: 0; display: flex; flex-direction: column; gap: 2px; padding-top: 2px; }
+.st-toc button { height: 32px; padding: 0 10px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-2);
+  font-size: 13px; font-weight: 500; text-align: left; white-space: nowrap; }
+.st-toc button:hover { background: var(--surface-2); color: var(--text); }
+.st-toc button.on { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+.st-toc.st-toc-row { position: static; flex-direction: row; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 12px;
+  background: var(--sb-bg); box-shadow: inset 0 0 0 1px var(--line); }
+.st-toc.st-toc-row button { height: 28px; padding: 0 11px; font-size: 12.5px; }
+.st-toc.st-toc-row button.on { background: var(--surface); color: var(--text); box-shadow: 0 0 0 1px var(--line-2), var(--shadow-1); }
+@media (min-width: 1100px) { .ph-tools:has(> .st-toc-row) { display: none; } }
+@media (max-width: 1099px) {
+  .st-layout { grid-template-columns: minmax(0, 1fr); }
+  .st-layout > .st-toc { display: none; }
+}
+.st-group { scroll-margin-top: 8px; }
+
+/* a collection folder in one row: path · Include subfolders · × */
+.st-root-row { flex-wrap: nowrap; }
+.st-root-row .path { min-width: 0; }
+.st-root-row .path span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-root-row .st-switch { width: auto; margin-top: 0; align-items: center; flex-shrink: 0; }
+.st-root-row .st-lbl span { white-space: nowrap; }
+.st-link { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; }
+.st-link .ic { width: 14px; height: 14px; }
+.st-link:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+/* where this playlist's downloads land: the folder and the setting it comes from, in one row */
+.st-dest { padding: 8px 10px; border-radius: var(--r-sm); background: var(--surface-2); font-size: 13px; }
+.st-dest > .ic { color: var(--text-3); }
+.st-dest-tx { flex: 1; min-width: 200px; }
+.st-dest-tx .faint { font-size: 12px; }
+/* Remove this playlist: the end of the card, after a line, on the right */
+.st-danger-row { display: flex; justify-content: flex-end; width: 100%; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
