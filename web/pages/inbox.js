@@ -44,7 +44,6 @@ function ibRow(it) {
   const curName = String(it.cur_file || '').split(/[\\/]/).pop();
   return `
     <div class="tr ib-row">
-      <span class="num">${it.n}</span>
       ${(() => { const tr = DATA.tracks.find(x => x.id === it.id); return tr ? artHtml(tr) : '<span class="art none">' + icon('music') + '</span>'; })()}
       <div class="t-meta">
         <div class="t-title"><span title="${esc(it.title)}">${esc(it.title)}</span></div>
@@ -151,7 +150,6 @@ function ibOtherRow(it) {
   const tags = ibFileTags(it).filter(Boolean).join('');
   return `
     <div class="tr ib-row ib-other">
-      <span class="num">${it.n}</span>
       <span class="art none">${icon('music')}</span>
       <div class="t-meta">
         <div class="t-title"><span title="${esc(it.title || it.name)}">${esc(it.title || it.name)}</span></div>
@@ -286,14 +284,15 @@ PAGES.inbox = {
   actions: () => {
     const n = INBOX && !INBOX.error ? INBOX.items.length : 0;
     const da = typeof daButtonsHtml === 'function' ? daButtonsHtml('header') : '';   // Do everything (pages/doall.js)
-    return da + `<button class="btn" onclick="loadInbox()" ${IB_BUSY ? 'disabled' : ''} title="${esc(t('inbox.rescanTip'))}">${IB_BUSY ? spin(t('inbox.scanningShort')) : icon('folderSearch') + esc(t('common.rescan'))}</button>${
+    // while it scans, the spinner stands in for the icon and the label stays ("Scanning…" is only read out): a button that grew pushed the actions under the title for as long as the scan ran
+    return da + `<button class="btn" onclick="loadInbox()" ${IB_BUSY ? `disabled aria-label="${esc(t('inbox.scanningShort'))}"` : ''} title="${esc(t('inbox.rescanTip'))}">${IB_BUSY ? '<span class="spin ib-scanning"></span>' : icon('folderSearch')}${esc(t('common.rescan'))}</button>${
       n > 1 ? `<button class="btn btn-primary" id="ib-moveall" onclick="inboxMoveAll()" title="${esc(t('inbox.moveAll.tip'))}">${icon('folderIn')}${esc(t('inbox.moveAll.button', { n: I18N.num(n) }))}</button>` : ''}`;
   },
   body: q => (typeof daNoteHtml === 'function' ? daNoteHtml() : '') + ibBody(q),
 };
 /** the Downloads list (the page body under the Do everything note) */
 function ibBody(q) {
-  const head = `<div class="thead ib-row"><span class="num">#</span><span></span><span>${esc(t('inbox.head'))}</span><span class="r">${esc(t('common.length'))}</span><span></span></div>`;
+  const head = `<div class="thead ib-row"><span></span><span>${esc(t('inbox.head'))}</span><span class="r">${esc(t('common.length'))}</span><span></span></div>`;
   const frame = inner => `<div class="table">${head}${inner}</div>`;
   if (!INBOX) return `<div class="table"><div class="empty"><span class="spin ib-spin"></span><p>${th('inbox.scanningDir', { dir: ibDir() })}</p></div></div>`;
   if (INBOX.error) return frame(emptyHtml({ ico: 'alert', title: th('inbox.failedTitle'), text: errHtml(INBOX.err || INBOX.error),

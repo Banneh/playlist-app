@@ -112,11 +112,11 @@ I18N.add('pl', 'guide', {
     },
     s3: {
       h: 'Warto wiedzieć',
-      t1: 'Niedokończone pobieranie jest pomijane. Poczekaj, aż się skończy, i kliknij <b>Przeskanuj ponownie</b>.',
+      t1: 'Niedokończone pobieranie jest pomijane. Poczekaj, aż się skończy, i kliknij <b>Skanuj</b>.',
       t2: 'Pliki, które są już w twojej bibliotece pod tą samą nazwą, są policzone na górze, ale nie są wypisane.',
       t3: 'Gdy w Ustawieniach jest włączone <b>Automatycznie przenoś dokładne dopasowania do biblioteki</b>, pobrany plik, którego nazwa i długość dokładnie pasują do utworu, sam trafia do biblioteki w ciągu minuty. Przybliżone dopasowania i podmiany na bezstratne zawsze czekają na twoje kliknięcie.',
       t4: 'Pliki pobierają się gdzie indziej? Zmień obserwowany folder w Ustawieniach.',
-      t5: 'Gdy w Ustawieniach jest włączone <b>Zrób wszystko</b>, jego przycisk jest obok <b>Przeskanuj ponownie</b>: przenosi te pliki do biblioteki i prowadzi je dalej przez tagi, Platinum Notes, Mixed In Key i twój plik XML rekordbox. Szczegóły są w Przewodniku na stronie Przygotuj na odtwarzacz.',
+      t5: 'Gdy w Ustawieniach jest włączone <b>Zrób wszystko</b>, jego przycisk jest obok <b>Skanuj</b>: przenosi te pliki do biblioteki i prowadzi je dalej przez tagi, Platinum Notes, Mixed In Key i twój plik XML rekordbox. Szczegóły są w Przewodniku na stronie Przygotuj na odtwarzacz.',
     },
   },
 

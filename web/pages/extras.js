@@ -210,7 +210,9 @@ async function clearFound(i) {
 }
 async function findAll() {
   const b = $('#btn-findall');
-  if (b) { b.disabled = true; b.innerHTML = spin(t('common.searching')); }
+  // the spinner takes the icon's place and the label and count stay, so the button keeps its width (as Rescan does);
+  // "Searching SoundCloud…" is read out
+  if (b) { b.disabled = true; b.setAttribute('aria-label', t('common.searching')); const ic = b.querySelector('svg.ic'); if (ic) ic.outerHTML = '<span class="spin ib-scanning"></span>'; }
   try {
     DATA = await api('/api/find-all', {});
     const r = DATA.find_report || {};
@@ -292,8 +294,8 @@ PAGES.collection = {
   },
   actions: () => {
     const todo = COLL && !COLL.error ? COLL.files.filter(f => f.unmatched && !f.found).length : 0;
-    // with files to look up, Find all is the main button and Rescan an ordinary one
-    return `<button class="btn" onclick="loadCollection()" ${COLL_BUSY ? 'disabled' : ''} title="${esc(t('coll.rescanTip'))}">${COLL_BUSY ? spin(t('inbox.scanningShort')) : icon('folderSearch') + esc(t('common.rescan'))}</button>`
+    // with files to look up, Find all is the main button and Rescan an ordinary one (it keeps its label and its width while it scans, as on Downloads)
+    return `<button class="btn" onclick="loadCollection()" ${COLL_BUSY ? `disabled aria-label="${esc(t('inbox.scanningShort'))}"` : ''} title="${esc(t('coll.rescanTip'))}">${COLL_BUSY ? '<span class="spin ib-scanning"></span>' : icon('folderSearch')}${esc(t('common.rescan'))}</button>`
       + (todo ? `<button class="btn btn-primary" id="btn-findall" onclick="findAll()" title="${esc(t('extras.findAll.tip'))}">${icon('search')}${esc(t('extras.findAll.button'))}${badge(todo)}</button>` : '');
   },
   tools: () => {

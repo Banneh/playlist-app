@@ -1,21 +1,20 @@
 /* page-specific styles for pages/inbox.js (tokens and components come from app.css) */
 
-/* #, download, length, action. The action cell never shrinks below its buttons and the length
-   keeps its digits: nothing slides under a button at 900 px */
-.thead.ib-row, .tr.ib-row { grid-template-columns: 30px 40px minmax(0, 1fr) 48px minmax(216px, max-content); }
+/* art, download, length, action; no # column, which mixed playlist positions with a plain count. The action cell
+   never shrinks below its buttons and the length keeps its digits: nothing slides under a button at 900 px */
+.thead.ib-row, .tr.ib-row { grid-template-columns: 40px minmax(0, 1fr) 48px minmax(216px, max-content); }
 .ib-row .ib-act { flex: 1; }
 .ib-row .dur { min-width: 48px; }
 .ib-acts { display: flex; justify-content: flex-end; gap: 6px; min-width: max-content; flex-shrink: 0; }
 .ib-acts .btn { white-space: nowrap; flex-shrink: 0; }
 .t-file.ib-up, .t-file.ib-up .ic { color: var(--amber); }
 .ib-spin { width: 22px; height: 22px; margin-bottom: 8px; }
-@media (max-width: 1040px) {
-  .thead.ib-row, .tr.ib-row { grid-template-columns: 40px minmax(0, 1fr) 48px minmax(216px, max-content); }
-}
+/* Rescan while it scans (here and on Collection) and Find all while it searches: the spinner takes the icon's 16 px, so the button is exactly as wide as at rest */
+.spin.ib-scanning { margin: 0 1px; }
 
 /* downloads that match nothing: two buttons in the action column, the find dialog's add option */
 .ib-other .art.none { display: grid; place-items: center; }
 .ib-addopt { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
 .ib-addopt input { accent-color: var(--accent); }
-.tr.ib-row.ib-other { grid-template-columns: 30px 40px minmax(0, 1fr) 48px minmax(262px, max-content); }
+.tr.ib-row.ib-other { grid-template-columns: 40px minmax(0, 1fr) 48px minmax(262px, max-content); }
 @media (max-width: 1040px) { .tr.ib-row.ib-other { grid-template-columns: 40px minmax(0, 1fr) 48px max-content; } }

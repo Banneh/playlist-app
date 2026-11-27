@@ -421,7 +421,7 @@ dopasowany do tego utworu.
 Zakupy z Bandcamp przychodzą jako archiwa zip; DJ HQ zagląda do nich,
 wypisuje utwory z playlisty (z oznaczeniem „z Album.zip”) i rozpakowuje tylko
 je, a archiwum zostaje na swoim miejscu. Niedokończone pobieranie jest
-pomijane; poczekaj, aż się skończy, i kliknij **Przeskanuj ponownie**. Pliki,
+pomijane; poczekaj, aż się skończy, i kliknij **Skanuj**. Pliki,
 które są już w twojej bibliotece pod tą samą nazwą, są policzone, ale nie są
 wypisane.
 
@@ -755,7 +755,7 @@ nowej bazy danych.
   Discover, rozwiąż ją, a odtwarzanie, Dodaj i serce znowu zadziałają.
 - **Pobrany plik się nie pojawia.** Archiwa zip i niedokończone pobieranie są
   pomijane: rozpakuj, poczekaj, aż pobieranie się skończy, i kliknij
-  **Przeskanuj ponownie**. Plik, którego nazwa już istnieje w twoim folderze,
+  **Skanuj**. Plik, którego nazwa już istnieje w twoim folderze,
   liczy się jako „już w bibliotece”.
 - **rekordbox po konwersji wciąż pokazuje starą głębię bitową.** Ta kolumna
   jest zapamiętana. Kliknij utwór prawym przyciskiem i wybierz *Analyze Track*

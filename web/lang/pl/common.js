@@ -14,7 +14,7 @@ I18N.add('pl', 'common', {
   search: 'Szukaj',
   browse: 'Przeglądaj…',
   refresh: 'Odśwież',
-  rescan: 'Przeskanuj ponownie',
+  rescan: 'Skanuj',
   tryAgain: 'Spróbuj ponownie',
   more: 'Więcej',
   copied: 'Skopiowano',
