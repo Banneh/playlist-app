@@ -4,10 +4,13 @@
  *
  * Runs on the same throw-away sample home as the README screenshots (sample-home.js), so nothing
  * of yours is touched, and shows the app as it ships: no developer mode, no Free DL bypass, no
- * Do everything. Writes review-screens/<version>/<width>x<height>/NN-name.png (light), plus a
+ * Do everything. Discover has no soundcloud.com here (no network, no sign-in): its bar is shown
+ * over a stand-in page, with /api/sc/* answered in the window and a sample track playing.
+ * Writes review-screens/<version>/<width>x<height>/NN-name.png (light), plus a
  * dark/ folder at one size. Long pages come in parts (-2, -3, ...) as they scroll.
  * The pictures are 2x (Retina), as the app looks on a Mac: on a Retina screen Electron renders
- * at 2x even when told 1, so 2 is the default; DJHQ_SCREENS_SCALE sets another factor. */
+ * at 2x even when told 1, so 2 is the default; DJHQ_SCREENS_SCALE sets another factor.
+ * DJHQ_SCREENS_LANG=pl takes them in Polish, into review-screens/<version>-pl/. */
 const { app, BrowserWindow, nativeTheme } = require("electron");
 const fs = require("fs");
 const path = require("path");
@@ -18,7 +21,9 @@ app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 const { ROOT, DATA, naId, cleanup } = require("./sample-home");
 const VERSION = require("../package.json").version;
-const OUT = path.join(ROOT, "review-screens", VERSION);
+/** DJHQ_SCREENS_LANG=pl: the same screens in Polish, in review-screens/<version>-pl/ */
+const LANG = process.env.DJHQ_SCREENS_LANG === "pl" ? "pl" : "en";
+const OUT = path.join(ROOT, "review-screens", VERSION + (LANG === "en" ? "" : "-" + LANG));
 /** the smallest window the app allows (main.ts), a small laptop, the common Mac sizes, full HD */
 const SIZES = [[900, 600], [1024, 768], [1280, 800], [1440, 900], [1920, 1080]];
 const DARK_SIZE = [1440, 900];
@@ -36,7 +41,7 @@ app.whenReady().then(async () => {
   });
   const wc = win.webContents;
   wc.setAudioMuted(true);
-  await wc.loadURL(`http://127.0.0.1:${port}/?titlebar=inset&lang=en`);
+  await wc.loadURL(`http://127.0.0.1:${port}/?titlebar=inset&lang=${LANG}`);
   wc.setZoomFactor(1);
   const js = (code) => wc.executeJavaScript(`(async () => { ${code} })()`, true);
   let dir = "", n = 0;
@@ -93,6 +98,34 @@ app.whenReady().then(async () => {
     Q_OPEN.add(9001);
     qToggle(document.getElementById('btn-queue'));`);
 
+  /** Discover: its bar over a stand-in for the soundcloud.com view, which needs the desktop app's
+   *  SoundCloud session. /api/sc/* is answered here, as a signed-in account playing a track that is
+   *  missing from the playlist. Everything is put back afterwards. */
+  const discover = async (name) => {
+    await js(`
+      const tr = DATA.tracks.find(x => !x.have && !x.na) || DATA.tracks[0];
+      const fake = { available: true, signed_in: true, me: { username: 'djyou', avatar: '' }, can: { ok: true, likes: false }, captcha: false,
+        url: 'https://soundcloud.com/discover', now: { playing: true, url: tr.url, title: tr.title, artist: tr.artist, in_playlist: false, liked: false,
+        pos: 84, track: { id: tr.id, url: tr.url, title: tr.title, user: tr.user || tr.artist, dur: 402, art: tr.art || '' } } };
+      window.__fetch = window.__fetch || window.fetch;
+      window.fetch = (u, o) => String(u).startsWith('/api/sc/')
+        ? Promise.resolve(new Response(JSON.stringify(String(u).endsWith('/status') ? fake : { ok: true }), { headers: { 'Content-Type': 'application/json' } }))
+        : window.__fetch(u, o);
+      window.__sc = APP.sc; APP.sc = true; SC = fake;
+      go('discover');`);
+    await sleep(600);
+    await js(`
+      const f = document.getElementById('dc-frame');
+      if (f) f.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:24px;color:var(--text-3);font-size:13px">'
+        + '<b style="font-size:15px;color:var(--text-2)">soundcloud.com</b><span>Stand-in for the SoundCloud page: the review screens run offline, without a sign-in.</span></div>';`);
+    await shot(name);
+    await js(`
+      go('missing');
+      window.fetch = window.__fetch; APP.sc = window.__sc;
+      SC = { available: false, signed_in: false, me: null, can: null, now: null, url: '', captcha: false };
+      if (typeof scBarRender === 'function') scBarRender(); render();`);
+  };
+
   /** every screen at the current size */
   const all = async () => {
     // welcome: the first-run screen, with the fields filled in
@@ -107,6 +140,8 @@ app.whenReady().then(async () => {
     await sleep(500);
     await shot("tour");
     await js(`endTour();`);
+
+    await discover("discover");
 
     await js(`go('new');`);
     await shotPage("new");
@@ -192,6 +227,7 @@ app.whenReady().then(async () => {
     await sleep(p === "inbox" ? 2500 : 600);
     await shot(p === "inbox" ? "downloads" : p);
   }
+  await discover("discover");
   await js(`go('missing'); openGuide();`);
   await sleep(400);
   await shot("guide");
