@@ -245,7 +245,9 @@ async function inboxMove(i, btn) {
   if (btn) { btn.disabled = true; btn.innerHTML = spin(t(it.action === 'upgrade' ? 'inbox.upgrading' : 'common.moving')); }
   try {
     DATA = await api('/api/inbox-move', { file: it.name, id: it.id, zip: it.zip || undefined });
-    toast(t(it.action === 'upgrade' ? 'inbox.upgraded' : 'common.movedIn', { name: (DATA.move_report && DATA.move_report.key) || it.name }) + ibAiffKept(DATA.move_report && DATA.move_report.aiff_kept));
+    // the moved file's name (move_report.key is its whole new path; an AIFF made on the way in keeps its .aiff name)
+    const movedName = String((DATA.move_report && DATA.move_report.key) || it.name).split(/[\\/]/).pop();
+    toast(t(it.action === 'upgrade' ? 'inbox.upgraded' : 'common.movedIn', { name: movedName }) + ibAiffKept(DATA.move_report && DATA.move_report.aiff_kept));
   } catch (e) { toast(t('common.moveFailed', { msg: errText(e) }), true); }
   await loadInbox();
 }
