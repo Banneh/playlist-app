@@ -24,21 +24,26 @@ const adapter: GateAdapter = {
     const before = await snapshot(ctx.session);
     ctx.log(`gate ${fangateId}`);
 
-    ctx.window.load(ctx.url);
-    await sleep(2500);
-    await ctx.window.js(`document.querySelector('.sn-connect-with-soundcloud')?.click()`).catch(() => {});
+    const connect = async (): Promise<string> => {
+      ctx.window.load(ctx.url);
+      await sleep(2500);
+      await ctx.window.js(`document.querySelector('.sn-connect-with-soundcloud')?.click()`).catch(() => {});
 
-    // The consent happens in the popup the button opened.
-    let popup: Electron.BrowserWindow | null = null;
-    for (let i = 0; i < 40 && !popup; i++) {
-      await sleep(700);
-      popup = ctx.window.popups.find((w) => !w.isDestroyed() && /secure\.soundcloud\.com/.test(w.webContents.getURL())) || null;
-    }
-    if (!popup) throw new Error("no consent popup");
-    await ctx.window.consentPopup(popup, (u) => /pumpyoursound\.com/.test(u), ctx.signal);
-    await sleep(3000);
+      // The consent happens in the popup the button opened.
+      let popup: Electron.BrowserWindow | null = null;
+      for (let i = 0; i < 40 && !popup; i++) {
+        await sleep(700);
+        popup = ctx.window.popups.find((w) => !w.isDestroyed() && /secure\.soundcloud\.com/.test(w.webContents.getURL())) || null;
+      }
+      if (!popup) throw new Error("no consent popup");
+      await ctx.window.consentPopup(popup, (u) => /pumpyoursound\.com/.test(u), ctx.signal);
+      await sleep(3000);
+      return ctx.window.js<string>(`fetch('/?do=mySoundcloudAccessToken').then((r) => r.text())`).catch(() => "");
+    };
 
-    const tok = await ctx.window.js<string>(`fetch('/?do=mySoundcloudAccessToken').then((r) => r.text())`).catch(() => "");
+    // A dead SoundCloud session makes the consent popup bounce straight back without a token.
+    let tok = await connect();
+    if (!tok && (await ctx.window.signIn())) tok = await connect();
     if (!tok) throw new Error("no access token");
     ctx.log("token");
 

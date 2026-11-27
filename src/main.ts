@@ -8,7 +8,7 @@ import * as path from "path";
 import * as core from "./core";
 import * as gatewalk from "./gatewalk";
 import * as gates from "./gates/registry";
-import { SC_PARTITION } from "./gates/types";
+import { GATE_PARTITION, SC_PARTITION } from "./gates/types";
 import * as hypeddit from "./hypeddit";
 import { IN_USE_TEXT, PickKind, ScRect, ScView, startServer } from "./server";
 import { Lang, mainLang, mt } from "./lang";
@@ -82,6 +82,35 @@ const SC_HOSTS = /(^|\.)(soundcloud\.com|sndcdn\.com|google\.com|googleapis\.com
 const inView = (url: string) => { try { return SC_HOSTS.test(new URL(url).hostname); } catch { return false; } };
 
 let scView: WebContentsView | null = null;
+/** SoundCloud's own pages loop — "you were logged out", reload, same — when an `oauth_token`
+ *  cookie is present but expired: the page trusts the cookie, the API rejects it, and the reload
+ *  starts over. Dropping the dead token makes the page render as signed out instead, which is a
+ *  state the user can act on. */
+async function scHeal(): Promise<void> {
+  const ses = session.fromPartition(SC_PARTITION);
+  const now = Math.floor(Date.now() / 1000);
+  for (const c of await ses.cookies.get({ name: "oauth_token" }).catch(() => [])) {
+    let exp = 0;
+    try { exp = Number(JSON.parse(Buffer.from(c.value.split(".")[1], "base64url").toString("utf8")).exp) || 0; } catch {}
+    if (exp && exp < now) {
+      await ses.cookies.remove(`https://${(c.domain || "").replace(/^\./, "")}${c.path || "/"}`, c.name).catch(() => {});
+    }
+  }
+}
+
+/** A token refreshed by the page itself lands as a host-only `soundcloud.com` cookie, which
+ *  `api-v2.soundcloud.com` never receives — every API call then answers 401 while the page looks
+ *  signed in. Mirror it onto `.soundcloud.com`, the form the login flow writes. */
+async function scTokenDomain(): Promise<void> {
+  const ses = session.fromPartition(SC_PARTITION);
+  for (const c of await ses.cookies.get({ name: "oauth_token" }).catch(() => [])) {
+    if (!c.hostOnly || c.domain !== "soundcloud.com") continue;
+    await ses.cookies.set({ url: "https://soundcloud.com/", name: c.name, value: c.value, domain: ".soundcloud.com", path: "/",
+      secure: true, httpOnly: c.httpOnly, sameSite: c.sameSite, expirationDate: c.expirationDate }).catch(() => {});
+    await ses.cookies.remove("https://soundcloud.com/", c.name).catch(() => {});
+  }
+}
+
 let scShown = false;
 
 function scEnsure(): WebContentsView {
@@ -108,7 +137,7 @@ function scEnsure(): WebContentsView {
     return { action: "deny" };
   });
   wc.on("will-navigate", (e, url) => { if (!inView(url)) { e.preventDefault(); shell.openExternal(url); } });
-  wc.on("did-finish-load", () => { if (scView && scShown) scFit(scView, scView.getBounds().width); });
+  wc.on("did-finish-load", () => { if (scView && scShown) scFit(scView, scView.getBounds().width); scHeal().then(scTokenDomain).catch(() => {}); });
   // player keys pressed while the SoundCloud page has the focus: a small listener in the page
   // reports them through the console (the view is sandboxed, with no preload), and they are
   // handed to the UI's dcKey(), the same place that handles keys pressed on the app's own page
@@ -510,6 +539,10 @@ const sc: ScView = {
     const ses = session.fromPartition(SC_PARTITION);
     await ses.clearStorageData();
     await ses.clearCache();
+    // the gates hold a copy of the same session; leaving it behind would keep a dead token around
+    const gates = session.fromPartition(GATE_PARTITION);
+    await gates.clearStorageData().catch(() => {});
+    await gates.clearCache().catch(() => {});
     if (scView) scView.webContents.loadURL(SC_HOME);
   },
 };
@@ -598,6 +631,8 @@ async function freeDownload(url: string, email: string): Promise<{ file: string 
 
 
 app.whenReady().then(async () => {
+  await scHeal().catch(() => {});
+  await scTokenDomain().catch(() => {});
   let server: Awaited<ReturnType<typeof startServer>>;
   try {
     server = await startServer({

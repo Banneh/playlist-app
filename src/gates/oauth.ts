@@ -19,6 +19,7 @@ import type { AttentionReason } from "./types";
 const AUTH_HOST = /secure\.soundcloud\.com|api-auth\.soundcloud\.com|accounts\.google\.com|about:blank/;
 const CONSENT_TIMEOUT_MS = 120000;
 const ATTENTION_TIMEOUT_MS = 5 * 60 * 1000;
+const SIGNIN_TIMEOUT_MS = 3 * 60 * 1000;
 
 const CLICK_JS = (patterns: string[]) => `(() => {
   const pats = ${JSON.stringify(patterns)};
@@ -97,6 +98,35 @@ export class WalkWindow {
     // shown to a human: sound as in any window they look at
     if (!this.win.isDestroyed()) { this.win.webContents.setAudioMuted(false); this.win.showInactive(); }
     for (const p of this.popups) if (!p.isDestroyed()) { p.webContents.setAudioMuted(false); p.showInactive(); }
+  }
+
+  /** Show the window without waiting for anything (a captcha the human has to solve). */
+  reveal(): void {
+    this.show();
+    if (!this.win.isDestroyed()) this.win.focus();
+  }
+
+  /** Hide it again after a `reveal()`. */
+  conceal(): void { this.hide(); }
+
+  /** Show the window on the SoundCloud login page and wait for a token to appear or change. */
+  async signIn(stale?: string): Promise<boolean> {
+    const before = stale ?? (await this.ses.cookies.get({ name: "oauth_token", domain: "soundcloud.com" })).find((x) => x.value)?.value ?? "";
+    this.log("[auth] signed out, showing the window");
+    this.reveal();
+    try {
+      this.load("https://soundcloud.com/signin");
+      const deadline = Date.now() + SIGNIN_TIMEOUT_MS;
+      while (Date.now() < deadline) {
+        await sleep(1500);
+        const c = (await this.ses.cookies.get({ name: "oauth_token", domain: "soundcloud.com" })).find((x) => x.value)?.value || "";
+        if (c && c !== before) { this.log("[auth] signed in"); return true; }
+      }
+      this.log("[auth] still signed out");
+      return false;
+    } finally {
+      this.conceal();
+    }
   }
 
   private hide(): void {

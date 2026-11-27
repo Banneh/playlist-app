@@ -8,7 +8,7 @@ import * as core from "../core";
 import { WalkWindow } from "./oauth";
 import { undo } from "./soundcloud";
 import { UA } from "./http";
-import { SC_PARTITION, type GateAdapter, type WalkContext, type WalkResult } from "./types";
+import { GATE_PARTITION, SC_PARTITION, type GateAdapter, type WalkContext, type WalkResult } from "./types";
 import droploud from "./droploud";
 import downloadgater from "./downloadgater";
 import gaterush from "./gaterush";
@@ -73,9 +73,35 @@ async function seedProviderSessions(ses: Session): Promise<void> {
   }
 }
 
+/** Copy the app's SoundCloud session into the gate session so the consent page renders without a
+ *  login. `oauth_refresh_token` is deliberately left behind: SoundCloud rotates it on use, and a
+ *  second holder would invalidate the app's copy. The `oauth_token` itself is always taken from the
+ *  app, so a walk starts on the freshest one. */
+async function seedSoundcloudSession(ses: Session): Promise<void> {
+  const src = session.fromPartition(SC_PARTITION);
+  const have = new Map((await ses.cookies.get({})).map((c) => [(c.domain || "") + (c.path || "/") + c.name, c]));
+  for (const c of await src.cookies.get({})) {
+    const domain = c.domain || "";
+    const cpath = c.path || "/";
+    if (!/(^|\.)soundcloud\.com$/i.test(domain)) continue;
+    if (c.name === "oauth_refresh_token") continue;
+    const old = have.get(domain + cpath + c.name);
+    if (old && c.name !== "oauth_token" && old.value === c.value) continue;
+    await ses.cookies.set({
+      url: `https://${domain.replace(/^\./, "")}${cpath}`,
+      name: c.name, value: c.value, domain, path: cpath,
+      secure: c.secure, httpOnly: c.httpOnly, sameSite: c.sameSite, expirationDate: c.expirationDate,
+    }).catch(() => {});
+  }
+}
+
 /** Walk one gate. Resolves with the saved file; throws when the gate hands out nothing. */
 export async function walk(adapter: GateAdapter, url: string, email: string): Promise<WalkResult> {
-  const ses = session.fromPartition(SC_PARTITION);
+  const ses = session.fromPartition(GATE_PARTITION);
+  // the same plain Chrome user agent the Discover view uses, or SoundCloud treats the walk as a
+  // different client than the session it was seeded from
+  ses.setUserAgent(ses.getUserAgent().replace(/ ?(Electron|dj-hq|DJ HQ)\/\S+/gi, ""));
+  await seedSoundcloudSession(ses).catch(() => {});
   await seedProviderSessions(ses).catch(() => {});
   const log = (m: string) => console.log(`[gate:${adapter.id}] ${m}`);
   const w = new WalkWindow(ses, log);
