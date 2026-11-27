@@ -95,8 +95,6 @@ button.co-in:hover { background: var(--surface); }
 
 
 /* ---------- collection model additions ---------- */
-.lib-row { display: flex; align-items: center; gap: 2px; min-width: 0; }
-.lib-row select { min-width: 0; flex: 1; }
 .st-group { margin: 18px 4px 2px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; opacity: .6; }
 .st-group:first-child { margin-top: 0; }
 .st-switch-sm .st-lbl { font-size: 12px; }

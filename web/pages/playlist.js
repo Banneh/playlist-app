@@ -13,10 +13,15 @@ const isDirect = l => !!l.direct && (l.direct !== 'soundcloud' || !!APP.sc);
 /* ---------- the track row ---------- */
 /** this track's file that waits in the downloads folder (the Downloads page moves it in), or null */
 const waitingFile = r => ((typeof INBOX !== 'undefined' && INBOX && INBOX.items) || []).find(it => it.id === r.id) || null;
-/** in place of the links while the file is there: getting it again makes no sense */
+/** in place of the links while the file is there: getting it again makes no sense. The button
+ *  moves it in right here, as the Downloads page does (inboxMove); a lossless file for a track
+ *  you have already is an Upgrade, with its own word and arrow */
 function waitingBtn(r) {
   const it = waitingFile(r);
-  return it ? `<button class="btn btn-sm first wait" onclick="go('inbox')" title="${esc(t('tags.link.waitingTip', { name: it.name }))}">${icon('inbox')}${esc(t('tags.link.waiting'))}</button>` : '';
+  if (!it) return '';
+  const up = it.action === 'upgrade' || (r.have && r.upgrade);
+  return `<button class="btn btn-sm btn-get first wait" onclick="inboxMove(${INBOX.items.indexOf(it)}, this)" title="${esc(t('tags.link.waitingTip', { name: it.name }))}">${
+    icon(up ? 'arrowUp' : 'folderIn')}${esc(t(up ? 'tags.link.upgradeWaiting' : 'tags.link.waiting'))}</button>`;
 }
 function linkBtn(r, kind) {
   const l = (r.links || []).find(x => x.kind === kind);
@@ -134,17 +139,26 @@ function fileIssueTags(r, convertTip) {
 }
 const keyTag = r => r.key ? tag(r.key, 'outline', '', t(r.pn ? 'tags.keyTipPn' : 'tags.keyTip')) : '';
 
+/** the file part of a row: play · name · labels. It sits on the artist's line (subLine), so every
+ *  row is 60 px. Labels come twice, full (word and fact) and compact (icon and fact): the css
+ *  shows the full ones from 1100 px up, the compact ones below. */
 function fileLine(r) {
   if (!r.file) {
-    if (r.manual_match) return `<div class="t-file link" onclick="openAssign(${r.id})" title="${esc(t('tags.noFileByHandTip'))}">${icon('pin')}<span class="fn">${esc(t('tags.noFileByHand'))}</span></div>`;
-    // a fresh download waiting in the inbox already matches this track
-    if (r.in_inbox) return `<div class="t-file ib-pending link" onclick="go('inbox')" title="${esc(t('tags.inInboxTip'))}">${icon('inbox')}<span class="fn">${esc(t('tags.inInbox', { name: r.in_inbox.name }))}</span></div>`;
+    if (r.manual_match) return `<span class="t-file link" onclick="openAssign(${r.id})" title="${esc(t('tags.noFileByHandTip'))}">${icon('pin')}<span class="fn">${esc(t('tags.noFileByHand'))}</span></span>`;
+    // a fresh download waiting in the inbox already matches this track: its name, the sentence in the tooltip
+    if (r.in_inbox) return `<span class="t-file ib-pending link" onclick="go('inbox')" title="${esc(t('tags.inInbox', { name: r.in_inbox.name }) + ' · ' + t('tags.inInboxTip'))}">${icon('inbox')}<span class="fn">${esc(r.in_inbox.name)}</span></span>`;
     return '';
   }
-  const tags = issueLine(fileIssues(r), 'compact');
+  const items = fileIssues(r);
+  const full = issueLine(items, 'full'), compact = issueLine(items, 'compact');
   const disp = r.file_disp || r.file;
-  return `<div class="t-file">${playBtn(filePath(r, r.file), r.title, r.artist) || `<span class="ic">${icon('music')}</span>`}<span class="fn link" onclick="openAssign(${r.id})" title="${esc(t('tags.fileTip', { file: r.file }))}">${esc(disp)}</span>${
-    tags ? `<span class="tags">${tags}</span>` : ''}</div>`;
+  return `<span class="t-file">${playBtn(filePath(r, r.file), r.title, r.artist) || `<span class="ic">${icon('music')}</span>`}<span class="fn link" onclick="openAssign(${r.id})" title="${esc(t('tags.fileTip', { file: r.file }))}">${esc(disp)}</span>${
+    full ? `<span class="tags tags-full">${full}</span><span class="tags tags-compact">${compact}</span>` : ''}</span>`;
+}
+/** line 2 of a row: the artist (it gives way first), then the file */
+function subLine(r) {
+  const file = fileLine(r);
+  return `<div class="t-sub${file ? ' has-file' : ''}"><span class="t-artist">${esc(r.artist)}${viaHtml(r)}</span>${file ? `<span class="t-dot">·</span>${file}` : ''}</div>`;
 }
 
 function statusPill(r) {
@@ -170,30 +184,33 @@ function editFormHtml(r, save, reset, resetTip) {
 }
 const viaHtml = r => r.user && r.user !== r.artist ? ` <span class="via">${esc(t('tags.via', { user: r.user }))}</span>` : '';
 
-function trackRow(r) {
+/** opts.status: the Status column (New, All tracks); without it a status set by hand (or N/A)
+ *  shows as a pill in the title line and the ⋯ menu changes it (Missing, Have) */
+function trackRow(r, opts = {}) {
+  const status = opts.status !== false;
   if (r.id === EDIT_ID) return `
-    <div class="tr tr-edit" style="grid-template-columns:30px 40px minmax(0,1fr)">
-      <span class="num">${r.n}</span>
+    <div class="tr tr-edit" style="grid-template-columns:${opts.num ? '30px ' : ''}40px minmax(0,1fr)">
+      ${opts.num ? `<span class="num">${r.n}</span>` : ''}
       ${artHtml(r)}
       ${editFormHtml(r, `saveEdit(${r.id})`, `resetEdit(${r.id})`, t('playlist.resetTip'))}
     </div>`;
   return `
     <div class="tr${r.na ? ' dim' : ''}">
-      <span class="num">${r.n}</span>
+      ${opts.num ? `<span class="num">${r.n}</span>` : ''}
       ${artHtml(r)}
       <div class="t-meta">
         <div class="t-title"><span title="${esc(r.title)}">${esc(r.title)}</span>${typeof titleLink === 'function' ? titleLink(r.url) : ''}${
           r.is_new ? tag(t('tags.isNew'), 'new', '', t('tags.isNewTip', { date: fmtDate(r.added) })) : ''}${
           r.is_new_file ? tag(t('tags.newFile'), 'newfile', '', t('tags.newFileTip', { date: fmtDate(r.acquired) })) : ''}${
           r.edited ? tag(t('tags.edited'), 'outline', 'pencil', t('tags.editedTip')) : ''}${
-          r.check_name ? issueTag({ kind: 'name', label: t('tags.issue.name'), tip: ncTip(r), click: `openCheckNames('check', ${r.id})` }) : ''}</div>
-        <div class="t-sub">${esc(r.artist)}${viaHtml(r)}</div>
-        ${fileLine(r)}
+          r.check_name ? issueTag({ kind: 'name', label: t('tags.issue.name'), tip: ncTip(r), click: `openCheckNames('check', ${r.id})` }) : ''}${
+          !status && (r.override || r.na) ? statusPill(r) : ''}</div>
+        ${subLine(r)}
       </div>
       <span class="dur">${esc(r.dur)}</span>
-      <div class="cell">${statusPill(r)}</div>
+      ${status ? `<div class="cell">${statusPill(r)}</div>` : ''}
       <div class="get">${!r.have || r.upgrade ? waitingBtn(r) || (linkBtn(r, 'buy') + linkBtn(r, 'free')) || bcRow(r) || `<span class="nolink">${esc(t('tags.link.none'))}</span>` : ''}</div>
-      <button class="btn btn-ghost btn-sm btn-icon more" onclick="rowMenu(this, ${r.id})" title="${esc(t('common.more'))}">${icon('more')}</button>
+      <button class="btn btn-ghost btn-sm btn-icon more" onclick="rowMenu(this, ${r.id}${status ? '' : ', true'})" title="${esc(t('common.more'))}">${icon('more')}</button>
     </div>`;
 }
 function artHtml(r) {
@@ -213,26 +230,31 @@ function scMenuItems(url, meta, related) {
 }
 
 /* ---------- row menus ---------- */
-function statusMenu(anchor, id) {
-  const r = DATA.tracks.find(x => x.id === id); if (!r) return;
+/** Have · Missing · Not available · Back to automatic: the status menu, and the top of the ⋯ menu on the pages without a Status column */
+function statusItems(r) {
   const cur = r.na ? 'na' : r.have ? 'have' : 'missing';
-  const set = status => applyStatus(id, status);
-  showMenu(anchor, [
+  const set = status => applyStatus(r.id, status);
+  return [
     { label: t('common.status'), header: true },
     { label: t('playlist.status.have'), icon: 'checkCircle', checked: cur === 'have', onclick: () => set('have') },
     { label: t('playlist.status.missing'), icon: 'download', checked: cur === 'missing', onclick: () => set('missing') },
     { label: t('playlist.status.na'), icon: 'cloudOff', checked: cur === 'na', hint: t('playlist.status.naHint'), onclick: () => set('na') },
     '-',
     { label: t('tags.backToAuto'), icon: 'wand', disabled: !r.override && !r.na, hint: t('playlist.status.autoHint'), onclick: () => set(null) },
-  ]);
+  ];
+}
+function statusMenu(anchor, id) {
+  const r = DATA.tracks.find(x => x.id === id); if (!r) return;
+  showMenu(anchor, statusItems(r));
 }
 async function applyStatus(id, status) {
   try { DATA = await api('/api/override', { id, status }); render(); inboxChanged(); }
   catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
 }
-function rowMenu(anchor, id) {
+function rowMenu(anchor, id, withStatus) {
   const r = DATA.tracks.find(x => x.id === id); if (!r) return;
   const items = [
+    ...(withStatus ? [...statusItems(r), '-'] : []),
     { label: t('playlist.menu.match'), icon: 'link', onclick: () => openAssign(id) },
     { label: t('tags.menu.edit'), icon: 'pencil', onclick: () => { EDIT_ID = id; render(); const a = $('#e-artist'); a && a.focus(); } },
     { label: t('tags.menu.swap'), icon: 'swap', disabled: !r.artist, hint: t('tags.menu.swapHintUpload'), onclick: () => swapName(id) },
@@ -541,10 +563,13 @@ function tagReplaceAsk(list) {
 }
 
 /* ---------- list helpers ---------- */
-const theadHtml = () => `<div class="thead"><span class="num">#</span><span></span><span>${esc(t('tags.head.track'))}</span><span class="r">${esc(t('common.length'))}</span><span>${
-  esc(t('common.status'))}</span><span class="c">${esc(t('tags.head.getIt'))}</span><span></span></div>`;
-function trackTable(rows, emptyOpts) {
-  return `<div class="table">${theadHtml()}${rows.length ? rows.map(trackRow).join('') : emptyHtml(emptyOpts)}</div>`;
+const theadHtml = (opts = {}) => `<div class="thead">${opts.num ? '<span class="num">#</span>' : ''}<span></span><span>${esc(t('tags.head.track'))}</span><span class="r">${esc(t('common.length'))}</span>${
+  opts.status !== false ? `<span>${esc(t('common.status'))}</span>` : ''}<span>${esc(t('tags.head.getIt'))}</span><span></span></div>`;
+/** the class of a track table: no-num (positions only on All tracks), no-status (Missing, Have) */
+const tableCls = (opts = {}) => `table${opts.num ? '' : ' no-num'}${opts.status === false ? ' no-status' : ''}`;
+/** opts: {num, status} (see trackRow); head: false for a table under a section heading */
+function trackTable(rows, emptyOpts, opts = {}, head = true) {
+  return `<div class="${tableCls(opts)}">${head ? theadHtml(opts) : ''}${rows.length ? rows.map(r => trackRow(r, opts)).join('') : emptyHtml(emptyOpts)}</div>`;
 }
 /** the filter rail: single-select chips drawn as one segmented control; items are [value, label key, count, icon] */
 function chipsHtml(varName, cur, items) {
@@ -564,10 +589,10 @@ PAGES.missing = {
   actions: () => DATA.missing ? `<button class="btn btn-primary" onclick="openWorkThrough()" title="${esc(t('playlist.missing.workThroughTip'))}">${icon('play')}${esc(t('playlist.missing.workThrough'))}</button>` : '',
   sub: () => {
     const withLink = DATA.tracks.filter(r => !r.have && !r.na && r.links.length).length;
+    // "not available" is left to the section under the list
     return DATA.missing
-      ? [tnh('playlist.missing.toGet', DATA.missing), withLink ? th('playlist.missing.withLink', { n: I18N.num(withLink) }) : '',
-         DATA.in_inbox ? tnh('playlist.missing.inInbox', DATA.in_inbox) : '',
-         DATA.na_count ? tnh('playlist.missing.na', DATA.na_count) : ''].filter(Boolean).join(' · ')
+      ? factsHtml([tnh('playlist.missing.toGet', DATA.missing), withLink ? th('playlist.missing.withLink', { n: I18N.num(withLink) }) : '',
+         DATA.in_inbox ? tnh('playlist.missing.inInbox', DATA.in_inbox) : ''])
       : th('playlist.missing.allHere');
   },
   tools: () => {
@@ -588,9 +613,10 @@ PAGES.missing = {
     const empty = q || MFILTER !== 'all'
       ? emptyOf('search', 'tags.empty.noTracks', q ? 'common.tryOtherSearch' : MFILTER === 'names' ? 'playlist.missing.noNamesLeft' : 'tags.empty.filter')
       : emptyOf('checkCircle', 'playlist.missing.nothingTitle', 'playlist.missing.nothingText', 'green');
-    return tagNote() + trackTable(rows, empty) + (na.length ? `
+    const opts = { status: false };
+    return trackTable(rows, empty, opts) + (na.length ? `
       <div class="section">${esc(t('playlist.missing.naSection'))} ${badge(na.length)}<span class="hint">${esc(t('playlist.missing.naHint'))}</span></div>
-      <div class="table">${na.map(trackRow).join('')}</div>` : '');
+      ${trackTable(na, null, opts, false)}` : '');
   },
 };
 
@@ -601,9 +627,7 @@ const haveFilter = r => HFILTER === 'all' ? true : HFILTER === 'upgrade' ? !!r.u
 PAGES.have = {
   title: () => t('app.nav.have'),
   sub: () => {
-    const parts = [tnh('playlist.have.matched', DATA.have)];
-    if (DATA.upgrades) parts.push(th('playlist.have.upgrades', { n: I18N.num(DATA.upgrades) }));
-    return parts.join(' · ');
+    return factsHtml([tnh('playlist.have.matched', DATA.have), DATA.upgrades ? th('playlist.have.upgrades', { n: I18N.num(DATA.upgrades) }) : '']);
   },
   tools: () => {
     const rows = DATA.tracks.filter(r => r.have && matchesQ(r, Q.trim().toLowerCase()));
@@ -626,19 +650,19 @@ PAGES.have = {
       : HFILTER === 'upgrade' ? emptyOf('checkCircle', 'playlist.have.noUpgradesTitle', 'playlist.have.noUpgradesText', 'green')
       : HFILTER === 'names' ? emptyOf('checkCircle', 'names.none', 'playlist.have.noNamesText', 'green')
       : emptyOf('folder', 'playlist.have.noneTitle', 'playlist.have.noneText');
-    return tagNote() + trackTable(rows, empty) + strayLine + nameLine;
+    return tagNote() + trackTable(rows, empty, { status: false }) + strayLine + nameLine;
   },
 };
 
 PAGES.all = {
   title: () => t('app.nav.all'),
-  sub: () => [DATA.playlist ? tnh('playlist.all.sub', DATA.tracks.length, { playlist: DATA.playlist }) : tnh('playlist.all.subNoName', DATA.tracks.length),
+  sub: () => factsHtml([DATA.playlist ? tnh('playlist.all.sub', DATA.tracks.length, { playlist: DATA.playlist }) : tnh('playlist.all.subNoName', DATA.tracks.length),
     th('playlist.all.have', { n: I18N.num(DATA.have) }), th('playlist.all.missing', { n: I18N.num(DATA.missing) }),
-    DATA.na_count ? th('playlist.all.na', { n: I18N.num(DATA.na_count) }) : ''].filter(Boolean).join(' · '),
+    DATA.na_count ? th('playlist.all.na', { n: I18N.num(DATA.na_count) }) : '']),
   body: q => {
     const rows = DATA.tracks.filter(r => matchesQ(r, q));
     LAST_ROWS = rows;
-    return tagNote() + trackTable(rows, emptyOf('search', 'tags.empty.noTracks', 'common.tryOtherSearch'));
+    return trackTable(rows, emptyOf('search', 'tags.empty.noTracks', 'common.tryOtherSearch'), { num: true });
   },
 };
 

@@ -32,6 +32,7 @@ I18N.add('pl', 'app', {
   lib: {
     addOption: '＋ Dodaj playlistę…',
     plSettings: 'Ustawienia playlisty',
+    plSettingsOption: 'Ustawienia playlisty…',
     noRoots: 'Nie ma jeszcze folderów kolekcji',
     haveOf: '{have} z {n} w kolekcji',
   },

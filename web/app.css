@@ -164,7 +164,6 @@ b, strong { font-weight: 600; }
   font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1;
 }
 .badge-accent { background: var(--accent); color: var(--on-accent); }
-.badge-soft { background: var(--accent-soft); color: var(--accent-text); }
 
 /* status LED (HAVE / MISSING / N/A) — a button that opens a menu. A small pad with a dot
    that reports the state; only Have is lit. */
@@ -361,20 +360,21 @@ html.mac-inset :is(.overlay, .menu, .tour, .guide-ov.show) { -webkit-app-region:
 .mosaic.one { grid-template-columns: 1fr; grid-template-rows: 1fr; }
 .mosaic .ph { display: grid; place-items: center; color: var(--text-3); grid-column: 1 / -1; grid-row: 1 / -1; }
 .lib-name { position: relative; min-width: 0; flex: 1; }
-.lib-name select {
-  appearance: none; -webkit-appearance: none; width: 100%; padding: 0 18px 0 0; border: 0; background: transparent;
+/* the playlist switcher: the name has the card's whole first line, the chevron at its end; the
+   menu also holds Playlist settings… and Add a playlist… */
+.lib-row { position: relative; margin: 0 0 8px; }
+.lib-row select {
+  appearance: none; -webkit-appearance: none; width: 100%; padding: 0 20px 0 2px; border: 0; background: transparent;
   font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; outline: none; text-overflow: ellipsis;
 }
-/* the switcher's chevron sits at the select's right edge, inside the row (left of the gear) */
-.lib-row { position: relative; }
 .lib-row::after {
-  content: ""; position: absolute; right: 32px; top: 50%; width: 14px; height: 14px; transform: translateY(-50%); pointer-events: none;
+  content: ""; position: absolute; right: 2px; top: 50%; width: 14px; height: 14px; transform: translateY(-50%); pointer-events: none;
   background: var(--text-3);
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E") center/contain no-repeat;
           mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E") center/contain no-repeat;
 }
 .lib-name .sub { font-size: 11.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lib-progress { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.lib-progress { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .bar { flex: 1; height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
 .bar i { display: block; height: 100%; border-radius: 3px; background: var(--green); transition: width .5s; }
 .lib-progress b { font-size: 11.5px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
@@ -424,7 +424,7 @@ html.mac-inset :is(.overlay, .menu, .tour, .guide-ov.show) { -webkit-app-region:
 @media (max-width: 1040px) {
   :root { --sb-w: 64px; }
   .sidebar { padding-left: 8px; padding-right: 8px; align-items: stretch; }
-  .sb-brand h1, .sb-brand .ver, .nav-item .lbl, .lib-name, .lib-progress, .lib-foot, .sb-status, .sb-row .seg, .sb-row .lbl, .sb-update { display: none; }
+  .sb-brand h1, .sb-brand .ver, .nav-item .lbl, .lib-row, .lib-name, .lib-progress, .lib-foot, .sb-status, .sb-row .seg, .sb-row .lbl, .sb-update { display: none; }
   /* the rail keeps the icons; section headers become thin dividers */
   .nav-item > .ic { display: block; }
   .nav-item > .ic.nav-spark + .led, .nav-item .led { display: none; }
@@ -432,10 +432,9 @@ html.mac-inset :is(.overlay, .menu, .tour, .guide-ov.show) { -webkit-app-region:
   .nav-sec .lbl-sec { display: none; }
   .nav-item { justify-content: center; padding: 0; }
   .nav-item { position: relative; }
-  /* counts become dots in the rail; the number lives in the tooltip */
-  .nav-item .badge { position: absolute; top: 7px; right: 9px; margin: 0; width: 7px; height: 7px; min-width: 0; padding: 0; font-size: 0; background: var(--text-3); }
-  .nav-item .badge-accent { background: var(--accent); }
-  .nav-item .badge-soft { background: var(--accent-text); }
+  /* a count that waits for you becomes a dot in the rail; totals show none. The number lives in the tooltip */
+  .nav-item .badge { position: absolute; top: 7px; right: 9px; margin: 0; width: 7px; height: 7px; min-width: 0; padding: 0; font-size: 0; background: var(--accent); }
+  .nav-item .badge:not(.badge-accent) { display: none; }
   .lib-card { padding: 6px; }
   .lib-top { justify-content: center; }
   .sb-row { flex-direction: column; }
@@ -449,6 +448,7 @@ html.mac-inset .page-head { padding-top: 30px; }
 .ph-title { min-width: 0; flex: 1 1 360px; }
 .ph-title h2 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; display: flex; align-items: center; gap: 10px; }
 .ph-title .sub { margin-top: 4px; font-size: 13px; color: var(--text-2); }
+.ph-title .sub .fact { white-space: nowrap; }
 .ph-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ph-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 28px; }
 .page-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 28px 48px; }
@@ -495,8 +495,11 @@ html.mac-inset .page-head { padding-top: 30px; }
 .table + .table, .table + .section { margin-top: 16px; }
 .thead, .tr {
   display: grid; align-items: center; gap: 12px; padding: 0 14px;
-  grid-template-columns: 30px 40px minmax(0, 1fr) 48px 112px 184px 30px;   /* #, art, track, length, status, get, more */
+  grid-template-columns: 30px 40px minmax(0, 1fr) 48px 112px 230px 30px;   /* #, art, track, length, status, get, more */
 }
+/* the track lists: positions only on All tracks (no-num elsewhere), no Status column on Missing and Have */
+.table.no-num > .thead, .table.no-num > .tr { grid-template-columns: 40px minmax(0, 1fr) 48px 112px 230px 30px; }
+.table.no-num.no-status > .thead, .table.no-num.no-status > .tr { grid-template-columns: 40px minmax(0, 1fr) 48px 230px 30px; }
 .thead {
   position: sticky; top: 0; z-index: 2; height: 34px; background: var(--surface); border-bottom: 1px solid var(--line);
   font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3);
@@ -533,6 +536,21 @@ html.mac-inset .page-head { padding-top: 30px; }
 .t-title .tag { flex-shrink: 0; }
 .t-sub { font-size: 12.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .t-sub .via { color: var(--text-3); }
+/* line 2 of a track row: Artist · ▶ file [labels]. The artist gives way first, the file name keeps 120 px */
+.t-sub.has-file { display: flex; align-items: center; gap: 6px; min-width: 0; height: 20px; }
+.t-sub .t-artist { flex: 0 100 auto; min-width: 5.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t-sub .t-dot { flex: none; color: var(--text-3); }
+.t-sub .t-file { flex: 0 1 auto; margin-top: 0; overflow: hidden; }
+.t-sub .itag.it-f, .t-title .itag.it-f { height: 20px; }
+.t-sub .tag { height: 18px; }
+/* a status set by hand, in the title line of a list without a Status column */
+.t-title .pill { flex-shrink: 0; height: 20px; padding: 0 6px 0 7px; font-size: 10px; }
+/* the file's labels: word and fact from 1100 px up, icon and fact below (the same width switch as the sidebar's) */
+.t-file .tags.tags-compact { display: none; }
+@media (max-width: 1099px) {
+  .t-file .tags.tags-full { display: none; }
+  .t-file .tags.tags-compact { display: flex; }
+}
 .t-file { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; color: var(--text-3); margin-top: 1px; }
 .t-file .ic { width: 13px; height: 13px; flex-shrink: 0; }
 .t-file .fn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 120px; flex: 0 1 auto; }
@@ -546,16 +564,16 @@ html.mac-inset .page-head { padding-top: 30px; }
 .dur { color: var(--text-2); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
 .cell { display: flex; align-items: center; min-width: 0; }
 .cell.r { justify-content: flex-end; }
-.get { display: flex; align-items: center; gap: 6px; }
-.get .btn { width: 89px; padding: 0 6px; }
-.get a.btn:only-of-type { margin-left: 95px; }     /* keeps Free DL in its own column when there is no Buy */
-.get .btn.first { margin-left: 0; }
-.get .btn.wait { width: 184px; }   /* In Downloads stands for both buttons: as wide as Buy and Free DL together */
+/* Get it: one left edge for everything in it, buttons at least 112 px, labels never wrap */
+.get { display: flex; align-items: center; justify-content: flex-start; gap: 6px; min-width: 0; }
+.get .btn { min-width: 112px; padding: 0 10px; white-space: nowrap; }
 .more { opacity: 1; color: var(--text-3); transition: color .12s; }
 .tr:hover .more, .more:focus-visible, .more[aria-expanded="true"] { color: var(--text); }
 /* developer mode: the provider a Free DL was recognised as, next to the button */
 /* only the track lists with a Get it column: other tables keep their own grid */
-body.devmode .table:has(.tr > .get) > .thead, body.devmode .tr:has(> .get) { grid-template-columns: 30px 40px minmax(0, 1fr) 48px 112px 284px 30px; }
+body.devmode .table:has(.tr > .get) > .thead, body.devmode .tr:has(> .get) { grid-template-columns: 30px 40px minmax(0, 1fr) 48px 112px 330px 30px; }
+body.devmode .table.no-num:has(.tr > .get) > .thead, body.devmode .table.no-num > .tr:has(> .get) { grid-template-columns: 40px minmax(0, 1fr) 48px 112px 330px 30px; }
+body.devmode .table.no-num.no-status:has(.tr > .get) > .thead, body.devmode .table.no-num.no-status > .tr:has(> .get) { grid-template-columns: 40px minmax(0, 1fr) 48px 330px 30px; }
 .dev-prov { flex-shrink: 0; max-width: 94px; height: 20px; line-height: 20px; padding: 0 6px; border-radius: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-family: var(--mono); font-size: 10.5px; background: var(--surface-3); color: var(--text-3); }
 .dev-prov.own { background: var(--blue-soft); color: var(--blue); }   /* same blue as the Free DL the app fetches itself */
@@ -728,12 +746,14 @@ body.devmode .table:has(.tr > .get) > .thead, body.devmode .tr:has(> .get) { gri
 /* responsive rows: below 1040px the sidebar is a rail; the row loses its number column
    and Buy / Free DL stack vertically so the title keeps its room */
 @media (max-width: 1040px) {
-  .thead, .tr { gap: 10px; grid-template-columns: 40px minmax(0, 1fr) 48px 104px 92px 30px; }
-  body.devmode .table:has(.tr > .get) > .thead, body.devmode .tr:has(> .get) { grid-template-columns: 40px minmax(0, 1fr) 48px 104px 92px 30px; }   /* the label stacks under the buttons */
+  .thead, .tr, .table.no-num > .thead, .table.no-num > .tr,
+  body.devmode .table:has(.tr > .get) > .thead, body.devmode .tr:has(> .get),
+  body.devmode .table.no-num:has(.tr > .get) > .thead, body.devmode .table.no-num > .tr:has(> .get) { gap: 10px; grid-template-columns: 40px minmax(0, 1fr) 48px 104px 112px 30px; }
+  .table.no-num.no-status > .thead, .table.no-num.no-status > .tr,
+  body.devmode .table.no-num.no-status:has(.tr > .get) > .thead, body.devmode .table.no-num.no-status > .tr:has(> .get) { grid-template-columns: 40px minmax(0, 1fr) 48px 112px 30px; }   /* the dev label stacks under the buttons */
   .thead .num, .tr .num { display: none; }
-  .get { flex-direction: column; align-items: stretch; gap: 4px; }
-  .get .btn, .get a.btn:only-of-type { margin-left: 0; width: 92px; }
-  .get .btn.wait { width: 92px; height: auto; min-height: var(--ctl); padding: 4px 6px; white-space: normal; line-height: 1.2; }
+  .get { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .get .btn { width: 112px; }
   .page-head { padding-left: 22px; padding-right: 22px; }
   .page-body { padding-left: 22px; padding-right: 22px; }
 }

@@ -111,6 +111,8 @@ const I = new Proxy({}, { get: (_, k) => icon(k) });
 /* ---------- small html builders ---------- */
 const tag = (text, kind, ico, title) =>
   `<span class="tag${kind ? ' tag-' + kind : ''}"${title ? ` title="${esc(title)}"` : ''}>${ico ? icon(ico) : ''}<span class="tx">${esc(text)}</span></span>`;
+/** a page subtitle made of facts: each one (with its dot) a no-wrap span, so a line breaks between facts, never inside one */
+const factsHtml = parts => parts.filter(Boolean).map((p, i) => `<span class="fact">${i ? '· ' : ''}${p}</span>`).join(' ');
 const badge = (n, kind) => `<span class="badge${kind ? ' badge-' + kind : ''}">${n}</span>`;
 /** a callout bar: noteHtml('text html', 'buttons html', 'green'|'amber'|'red'|'plain') */
 const noteHtml = (text, acts, kind, ico) =>
@@ -706,20 +708,22 @@ function applyLang(redraw) {
 }
 
 /* ---------- navigation: in the order a track travels (Dig, Get, Crate, Ready) ---------- */
+/* A filled (accent) count waits for you: New, Missing, Downloads, Prepare. A plain count is a
+   total: All tracks, Have, Collection. In the narrow rail only the waiting ones keep a dot. */
 const NAV = [   // labels are keys (app.nav.*), looked up when the sidebar is drawn
   { id: 'new', label: 'app.nav.new', icon: 'sparkles', spark: true, count: () => DATA.new_count, kind: () => DATA.new_count ? 'accent' : '' },
   { sec: 'app.nav.secDig', n: 1, when: () => !!APP.sc },
   { id: 'discover', label: 'app.nav.discover', icon: 'cloud', count: () => '', when: () => !!APP.sc },
   { id: 'likes', label: 'app.nav.likes', icon: 'heart', count: () => typeof LIKES !== 'undefined' && LIKES && LIKES.tracks ? LIKES.missing : '', hideZero: true, when: () => !!APP.sc },
   { sec: 'app.nav.secGet', n: 2 },
-  { id: 'missing', label: 'app.nav.missing', icon: 'download', count: () => DATA.missing, kind: () => DATA.missing ? '' : 'soft' },
+  { id: 'missing', label: 'app.nav.missing', icon: 'download', count: () => DATA.missing, kind: () => DATA.missing ? 'accent' : '' },
   { id: 'inbox', label: 'app.nav.inbox', icon: 'inbox', count: () => INBOX ? INBOX.items.length : '', kind: () => INBOX && INBOX.items.length ? 'accent' : '', hideZero: true },
   { sec: 'app.nav.secCrate', n: 3 },
   { id: 'all', label: 'app.nav.all', icon: 'listMusic', count: () => DATA.tracks.length },
   { id: 'have', label: 'app.nav.have', icon: 'checkCircle', count: () => DATA.have },
   { id: 'collection', label: 'app.nav.collection', icon: 'folder', count: () => DATA.local_count || 0 },
   { sec: 'app.nav.secReady', n: 4 },
-  { id: 'prepare', label: 'app.nav.prepare', icon: 'disc', count: () => (DATA.untagged || 0) + (DATA.incompatible || 0), kind: () => 'soft', hideZero: true },
+  { id: 'prepare', label: 'app.nav.prepare', icon: 'disc', count: () => (DATA.untagged || 0) + (DATA.incompatible || 0), kind: () => (DATA.untagged || 0) + (DATA.incompatible || 0) ? 'accent' : '', hideZero: true },
 ];
 function go(page) {
   if (!PAGES[page]) return;
@@ -848,13 +852,14 @@ function renderTop() { render(); const b = $('#page-body'); if (b) b.scrollTop =
 function renderSidebar() {
   const libs = DATA.libraries || [];
   const sel = $('#lib');
+  // the switcher also carries this playlist's settings and "Add a playlist"
   sel.innerHTML = libs.map(l => `<option value="${esc(l.id)}" ${l.id === DATA.active ? 'selected' : ''}>${esc(l.name)}</option>`).join('')
+    + `<option disabled>──────────</option>`
+    + (libs.length ? `<option value="__settings">${esc(t('app.lib.plSettingsOption'))}</option>` : '')
     + `<option value="__add">${esc(t('app.lib.addOption'))}</option>`;
   sel.value = DATA.active || '';
-  $('#lib-name').classList.remove('single');   // the dropdown always opens: it carries "Add a playlist"
-  sel.title = t('app.lib.switch');
-  const gear = $('#btn-plsettings');
-  if (gear) gear.hidden = !libs.length;
+  const cur = libs.find(l => l.id === DATA.active);
+  sel.title = cur ? cur.name : t('app.lib.switch');   // the full name, when the line cuts it
   const arts = DATA.ready ? [...new Set(DATA.tracks.map(tr => tr.art).filter(Boolean))].slice(0, 4) : [];
   $('#mosaic').className = 'mosaic' + (arts.length < 4 ? ' one' : '');
   $('#mosaic').innerHTML = arts.length >= 4 ? arts.map(a => `<img src="${esc(a)}" alt="">`).join('')
@@ -1054,11 +1059,13 @@ async function boot() {
       e.target.value = DATA && DATA.active || '';
       return void (typeof uiAddLibrary === 'function' && uiAddLibrary());
     }
+    if (e.target.value === '__settings') {   // this playlist's own settings, in one dialog
+      e.target.value = DATA && DATA.active || '';
+      return void (typeof plSettingsDialog === 'function' && plSettingsDialog());
+    }
     try { DATA = await api('/api/library', { op: 'select', id: e.target.value }); EDIT_ID = null; render(); bandcampRun(); if (typeof loadInbox === 'function') loadInbox(); }
     catch (err) { toast(t('common.error', { msg: errText(err) }), true); }
   };
-  const gear = $('#btn-plsettings');
-  if (gear) gear.onclick = e => { e.stopPropagation(); typeof plSettingsDialog === 'function' && plSettingsDialog(); };
   $('#btn-libmenu').onclick = e => { e.stopPropagation(); libraryMenu(e.currentTarget); };
   $('#btn-queue').onclick = e => { e.stopPropagation(); qToggle(e.currentTarget); };
   $('#btn-addlib').onclick = () => typeof uiAddLibrary === 'function' && uiAddLibrary();
