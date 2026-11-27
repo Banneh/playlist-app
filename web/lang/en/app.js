@@ -85,6 +85,13 @@ I18N.add('en', 'app', {
     bandcamp: 'Looking for tracks on Bandcamp',
     bandcampFound: { one: '{n} track found', other: '{n} tracks found' },
     bandcampStopped: 'Bandcamp asked for a break, DJ HQ goes on later.',
+    noFileBulk: 'no file came back',
+    showItems: 'Show each track',
+    hideItems: 'Hide the tracks',
+    nDone: '{n} done',
+    nMiss: '{n} not there',
+    nFailed: '{n} failed',
+    nRunning: '{n} in progress',
   },
 
   // the Bandcamp search's card

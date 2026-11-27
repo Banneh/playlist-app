@@ -640,6 +640,22 @@ body.devmode .table:has(.tr > .get) > .thead, body.devmode .tr:has(> .get) { gri
 .q-when { flex: none; font-variant-numeric: tabular-nums; }
 .q-bar { height: 4px; margin-top: 6px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
 .q-bar i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+/* a bulk action's tracks: the arrow with the counts, then one line per track */
+.q-more { display: inline-flex; align-items: center; gap: 4px; margin: 6px 0 0 -4px; padding: 2px 6px 2px 2px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text-2); font: inherit; font-size: 12px; cursor: pointer; }
+.q-more:hover { background: var(--surface-2); color: var(--text); }
+.q-more .ic { width: 14px; height: 14px; }
+.q-items { margin-top: 4px; max-height: 240px; overflow-y: auto; border-left: 2px solid var(--line); padding-left: 8px; }
+.q-item { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 12px; min-width: 0; }
+.q-item .q-ic { width: 14px; padding: 0; }
+.q-item .q-ic .ic, .q-item .q-ring { width: 14px; height: 14px; }
+.q-item.done .ic { color: var(--green); }
+.q-item.failed .ic { color: var(--red); }
+.q-item.miss .ic, .q-item.miss .q-iname { color: var(--text-3); }
+.q-item .q-ring { color: var(--accent); }
+.q-iname { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.q-imsg { flex: 0 1 45%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3); }
+.q-item.failed .q-imsg { color: var(--red); }
 
 /* ---------- the Bandcamp search's card, and its mark in a row ---------- */
 #bc-card { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; align-items: flex-start; gap: 10px; width: 370px; padding: 12px 8px 12px 14px;

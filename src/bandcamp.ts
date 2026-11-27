@@ -307,11 +307,18 @@ export async function find(w: Wanted): Promise<Hit | null> {
 // ---------------- the background run ----------------
 
 /** now: the track being looked up; pending: the tracks without any link still to come; links: what the
- *  tracks found in this run have now, so the list can show it without a new view */
+ *  tracks found in this run have now, so the list can show it without a new view; log: how each
+ *  track of this run went (the newest last, at most LOG_MAX), for the Tasks list */
+const LOG_MAX = 500;
 export const RUN = {
   running: false, done: 0, total: 0, found: 0, error: "", now: "", now_id: 0, paused_until: 0,
   pending: [] as number[], links: {} as Record<string, core.BuyLink[]>,
+  log: [] as { id: number; name: string; found: string; err: string }[],
 };
+function logged(w: Wanted, found: string, err: string): void {
+  RUN.log.push({ id: w.id, name: [w.artist, w.title].filter(Boolean).join(" - "), found, err });
+  if (RUN.log.length > LOG_MAX) RUN.log.splice(0, RUN.log.length - LOG_MAX);
+}
 /** a lookup from the menu is going on: the run waits with its next track */
 let manual = 0;
 let todo: Wanted[] = [];
@@ -340,7 +347,7 @@ export async function start(opts: { force?: boolean } = {}): Promise<typeof RUN>
   // from here on nothing waits: two calls at once can't both begin, and a run can't end in between
   const begin = !RUN.running;
   if (begin) {
-    Object.assign(RUN, { done: 0, total: 0, found: 0, error: "", now: "", now_id: 0, pending: [], links: {} });
+    Object.assign(RUN, { done: 0, total: 0, found: 0, error: "", now: "", now_id: 0, pending: [], links: {}, log: [] });
     todo = []; current = null;
   }
   const known = new Set([...todo.map((w) => w.id), ...(current ? [current.id] : [])]);
@@ -368,9 +375,11 @@ async function run(): Promise<void> {
       const h = await find(w);
       record(w, h);
       if (h) { RUN.found++; RUN.links[String(w.id)] = core.linksOf(w.id); core.saveState(); }
+      logged(w, h ? h.title || h.url : "", "");
       failed = 0; waits = 0;
     } catch (e: any) {
       if (e instanceof Limited && e.ms <= LIMIT_MAX_MS && waits < 2) { waits++; await sleep(e.ms); continue; }   // wait as told, then the same track again
+      logged(w, "", String(e?.message || e));
       if (e instanceof Refused || ++failed >= 3) {
         RUN.error = String(e?.message || e);
         RUN.paused_until = Date.now() + PAUSE_MS;

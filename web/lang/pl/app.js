@@ -89,6 +89,13 @@ I18N.add('pl', 'app', {
     bandcamp: 'Szukanie utworów na Bandcamp',
     bandcampFound: { one: 'znaleziono {n} utwór', few: 'znaleziono {n} utwory', many: 'znaleziono {n} utworów' },
     bandcampStopped: 'Bandcamp poprosił o przerwę, DJ HQ dokończy później.',
+    noFileBulk: 'nie przyszedł żaden plik',
+    showItems: 'Pokaż każdy utwór',
+    hideItems: 'Ukryj utwory',
+    nDone: 'gotowe: {n}',
+    nMiss: 'brak: {n}',
+    nFailed: 'nieudane: {n}',
+    nRunning: 'w toku: {n}',
   },
 
   // the Bandcamp search's card

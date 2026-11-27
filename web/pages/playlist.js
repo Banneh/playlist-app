@@ -363,7 +363,7 @@ async function downloadAll() {
         if (run.stop) break;
         // the row may have been drawn again meanwhile: its button now, for the spinner
         const btn = [...document.querySelectorAll('a[data-freedl]')].find(a => a.dataset.freedl === l.url) || null;
-        const res = await freeDownload(l.url, btn, { id: isDirect(l) ? r.id : '', name: [r.artist, r.title].filter(Boolean).join(' - '), bulk: true });
+        const res = await freeDownload(l.url, btn, { id: isDirect(l) ? r.id : '', name: [r.artist, r.title].filter(Boolean).join(' - '), bulk: true, parent: task });
         if (res === 'ok') ok++; else bad++;
         task.done++; qRender();
       }
