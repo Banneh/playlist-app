@@ -33,12 +33,15 @@ const ibUnmatched = () => (INBOX && INBOX.unmatched) || [];
 function ibRow(it) {
   const i = INBOX.items.indexOf(it);
   const pct = Math.round(it.score * 100);
+  // one label: Exact match (name and length agree), or Close match with what differs
+  const diff = it.dur_diff === 0 ? t('tags.pctMatch', { pct }) : (it.dur_diff > 0 ? '+' : '−') + Math.abs(it.dur_diff) + ' s';
   const tags = [
-    pct >= 100 ? tag(t('tags.exactMatch'), 'ok', 'check', t('inbox.exactTip')) : tag(t('tags.pctMatch', { pct }), 'outline', '', t('inbox.pctTip')),
-    tag(durDiff(it.dur_diff), it.dur_diff === 0 ? '' : Math.abs(it.dur_diff) > 10 ? 'warn' : '', '', t('inbox.durTip')),
+    ibExact(it) ? tag(t('tags.exactMatch'), 'ok', 'check', t('inbox.exactTip'))
+      : tag(t('inbox.closeMatch', { diff }), Math.abs(it.dur_diff) > 10 ? 'warn' : 'outline', '', t('inbox.closeMatchTip', { pct })),
     ...ibFileTags(it),
   ].filter(Boolean).join('');
   const up = it.action === 'upgrade';
+  const curName = String(it.cur_file || '').split(/[\\/]/).pop();
   return `
     <div class="tr ib-row">
       <span class="num">${it.n}</span>
@@ -47,11 +50,10 @@ function ibRow(it) {
         <div class="t-title"><span title="${esc(it.title)}">${esc(it.title)}</span></div>
         <div class="t-sub">${esc(it.artist)}</div>
         <div class="t-file">${(!it.zip && INBOX.dir ? playBtn(joinPath(INBOX.dir, it.name), it.title, it.artist) : '') || icon('inbox')}<span class="fn" title="${esc(it.name)}">${esc(it.name)}</span><span class="tags">${tags}</span></div>
-        ${up ? `<div class="t-file ib-up">${icon('arrowUp')}<span class="fn" title="${esc(it.cur_file)}">${esc(t('inbox.replaces', { file: it.cur_file }))}</span><span class="tags">${
-          tag(t('inbox.oldKept'), 'warn', 'history', t('inbox.oldKeptTip'))}</span></div>` : ''}
+        ${up ? `<div class="t-file ib-up" title="${esc(it.cur_file + ' · ' + t('inbox.oldKeptTip'))}">${icon('arrowUp')}<span class="fn">${esc(t('inbox.replaces', { file: curName }))}</span></div>` : ''}
       </div>
       <span class="dur">${esc(it.dur)}</span>
-      <div class="cell r ib-acts"><button class="btn btn-sm ${up ? 'btn-green' : 'btn-accent'} ib-act" onclick="inboxMove(${i}, this)" title="${
+      <div class="cell r ib-acts"><button class="btn btn-sm btn-get ib-act" onclick="inboxMove(${i}, this)" title="${
         esc(t(up ? 'inbox.upgradeTip' : 'inbox.moveTip', { dir: ibDestShort() }))}">${
         up ? icon('arrowUp') + esc(t('tags.upgrade')) : icon('folderIn') + esc(t('tags.moveIn'))}</button><button class="btn btn-sm btn-ghost btn-icon" onclick="ibMoveTo(${i}, false, this)" title="${esc(t('inbox.moveToTip'))}">${icon('chevronDown')}</button></div>
     </div>`;
@@ -127,11 +129,20 @@ async function ibMoveTo(i, other, btn) {
   await loadInbox();
 }
 
+/** the same name and the same length */
+const ibExact = it => Math.round(it.score * 100) >= 100 && it.dur_diff === 0;
+/** the list's order: exact matches first, then the newest (when the scan says when a file came;
+ *  otherwise the server's order). INBOX.items keeps its order: the buttons move by its index */
+function ibSorted(items) {
+  const when = it => it.mtime || it.added || 0;
+  return items.map((it, k) => [it, k]).sort(([a, i], [b, j]) => (ibExact(b) - ibExact(a)) || (when(b) - when(a)) || (i - j)).map(([it]) => it);
+}
+
 /* ---------- a download that matches nothing in the playlist ---------- */
-/** MP3 · from a zip */
+/** MP3 · zip (its name in the tooltip, so the file name keeps its room) */
 const ibFileTags = it => [
   it.lossy ? tag('MP3', 'mono', '', t('tags.lossyTip')) : '',
-  it.zip ? tag(t('inbox.fromZip', { zip: it.zip }), 'info', 'folder', t('inbox.fromZipTip')) : '',
+  it.zip ? tag(t('inbox.zip'), 'info', 'folder', t('inbox.fromZip', { zip: it.zip }) + ' · ' + t('inbox.fromZipTip')) : '',
 ];
 function ibOtherRow(it) {
   const i = ibUnmatched().indexOf(it);
@@ -262,18 +273,18 @@ PAGES.inbox = {
     if (INBOX.error) return th('inbox.sub.failed', { dir });
     if (INBOX.exists === false) return th('inbox.sub.noFolder', { dir });
     const n = INBOX.items.length;
-    const parts = [n ? tnh('inbox.sub.matches', n, { dir }) : th('inbox.sub.noMatches', { dir })];
+    const parts = [n ? tnh('inbox.sub.matches', n, { dir }) : th('inbox.sub.noMatches', { dir })];   // facts that wrap whole
     if (INBOX.already) parts.push(th('inbox.sub.already', { n: I18N.num(INBOX.already) }));
     const o = ibUnmatched().length;
     if (o) parts.push(tnh('inbox.sub.others', o));
     const zipErrs = INBOX.zip_error_items && INBOX.zip_error_items.length ? INBOX.zip_error_items : (INBOX.zip_errors || []);
     if (zipErrs.length) parts.push(`<span title="${esc(zipErrs.map(it => errLine(it)).join('\n'))}">${tnh('inbox.sub.zipErrors', zipErrs.length)}</span>`);
-    return parts.join(' · ');
+    return factsHtml(parts);
   },
   actions: () => {
     const n = INBOX && !INBOX.error ? INBOX.items.length : 0;
     const da = typeof daButtonsHtml === 'function' ? daButtonsHtml('header') : '';   // Do everything (pages/doall.js)
-    return da + `<button class="btn" onclick="loadInbox()" ${IB_BUSY ? 'disabled' : ''} title="${esc(t('inbox.rescanTip'))}">${IB_BUSY ? spin(t('inbox.scanningShort')) : icon('refresh') + esc(t('common.rescan'))}</button>${
+    return da + `<button class="btn" onclick="loadInbox()" ${IB_BUSY ? 'disabled' : ''} title="${esc(t('inbox.rescanTip'))}">${IB_BUSY ? spin(t('inbox.scanningShort')) : icon('folderSearch') + esc(t('common.rescan'))}</button>${
       n > 1 ? `<button class="btn btn-primary" id="ib-moveall" onclick="inboxMoveAll()" title="${esc(t('inbox.moveAll.tip'))}">${icon('folderIn')}${esc(t('inbox.moveAll.button', { n: I18N.num(n) }))}</button>` : ''}`;
   },
   body: q => (typeof daNoteHtml === 'function' ? daNoteHtml() : '') + ibBody(q),
@@ -296,5 +307,5 @@ function ibBody(q) {
     text: th('inbox.emptyText') + (INBOX.already ? `<br><span class="faint">${tnh('inbox.emptyAlready', INBOX.already, { dir: ibDir() })}</span>` : '') }));
   if (!items.length && !others.length) return frame(emptyHtml(emptyOf('search', 'inbox.noMatchTitle', 'common.tryOtherSearch')));
   if (!items.length) return (q ? '' : frame(emptyHtml(emptyOf('inbox', 'inbox.nothingTitle', 'inbox.nothingText')))) + otherSec;
-  return frame(items.map(ibRow).join('')) + otherSec;
+  return frame(ibSorted(items).map(ibRow).join('')) + otherSec;
 }
