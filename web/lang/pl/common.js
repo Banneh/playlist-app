@@ -57,7 +57,7 @@ I18N.add('pl', 'common', {
   signInDiscover: 'Zaloguj się na Discover',
   defaultTag: 'domyślny',
   showInFolder: 'Pokaż w folderze',
-  watchingDownloads: 'Folder Pobrane: {dir}',
+  watchingDownloads: 'Obserwowany folder pobranych: {dir}',
   lang: {
     title: 'Język',
     auto: 'Automatycznie',

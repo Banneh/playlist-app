@@ -4,7 +4,7 @@ I18N.add('pl', 'setup', {
   lead: 'Kilka informacji o tym komputerze, których potrzebuje DJ HQ. Wszystko to możesz później zmienić w Ustawieniach.',
   go: 'Zaczynamy',
   downloads: {
-    title: 'Gdzie trafiają pobrane pliki',
+    title: 'Obserwowany folder pobranych',
     text: 'DJ HQ obserwuje ten folder. Pobrany plik, który pasuje do utworu z playlisty, pojawia się na stronie Pobrane i jednym kliknięciem przeniesiesz go do biblioteki.',
     change: 'Zmień…',
     placeholder: '/ścieżka/do/folderu',

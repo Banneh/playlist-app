@@ -13,7 +13,7 @@ I18N.add('pl', 'tags', {
     notFoundTip: 'Sprawdzono {date}. Kiedy ponowić, ustawisz w Ustawienia > Bandcamp',
     waiting: 'Przenieś',
     upgradeWaiting: 'Podmień',
-    waitingTip: 'Plik {name} czeka w folderze pobrań',
+    waitingTip: 'Plik {name} czeka w folderze pobranych',
     fmtLossless: 'bezstratny',
     devNone: 'brak: {host}',
     devOff: '{id} (wył.)',

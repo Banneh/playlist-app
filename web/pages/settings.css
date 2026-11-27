@@ -16,6 +16,8 @@
 .st-path-row .path .tag { margin-left: auto; flex-shrink: 0; }
 .st-path-row.st-wide { margin-top: 4px; }
 .st-path-row .faint { font-size: 12px; flex-shrink: 0; }
+/* the note after a path nobody chose, "(first folder)": in the reading font (line-height 1, so the box stays as tall as its neighbours), wrapping as one piece */
+.st-path-row .path .st-src { font-family: var(--font); line-height: 1; white-space: nowrap; }
 .st-inboxrow { width: 100%; flex-wrap: wrap; }
 .st-inboxrow .input { flex: 1 1 260px; }
 
@@ -89,10 +91,10 @@
 .st-link .ic { width: 14px; height: 14px; }
 .st-link:hover { text-decoration: underline; text-underline-offset: 2px; }
 
-/* where this playlist's downloads land: the folder and the setting it comes from, in one row */
+/* where this playlist's new tracks go: the folder and the setting it comes from, in one row */
 .st-dest { padding: 8px 10px; border-radius: var(--r-sm); background: var(--surface-2); font-size: 13px; }
-.st-dest > .ic { color: var(--text-3); }
-.st-dest-tx { flex: 1; min-width: 200px; }
-.st-dest-tx .faint { font-size: 12px; }
+/* 224 = 200 plus the 24 px a leading folder icon and its gap took: in a narrow row (the playlist dialog) the buttons still move below at the same width */
+.st-dest-tx { flex: 1; min-width: 224px; }
+.st-dest-tx .faint { font-size: 12px; white-space: nowrap; }
 /* Remove this playlist: the end of the card, after a line, on the right */
 .st-danger-row { display: flex; justify-content: flex-end; width: 100%; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }

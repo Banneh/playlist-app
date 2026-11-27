@@ -77,8 +77,8 @@ function demoView() {
   const have = tracks.filter(x => x.have).length;
   const playlist = t('demo.playlist');
   return {
-    collection: { roots: [{ id: 'r1', path: DEMO_LIB.dir, subfolders: false }], move_target: null, last_target: null },
-    libraries: [{ ...DEMO_LIB, name: t('demo.library') }], active: DEMO_LIB.id,
+    collection: { roots: [{ id: 'r1', path: DEMO_LIB.dir, subfolders: false }], move_target: null, last_target: null, dest: DEMO_LIB.dir },
+    libraries: [{ ...DEMO_LIB, name: t('demo.library'), dest: DEMO_LIB.dir }], active: DEMO_LIB.id,
     device: 'xdj-700', devices: DEMO_DEVICES,
     backups: 0, backup_dir: DEMO_DATA_DIR + '/originals/demo', can_pick: false, can_reveal: false,
     ready: true, playlist, playlist_url: 'https://soundcloud.com/sample/sets/sample-playlist',

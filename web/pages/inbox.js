@@ -51,21 +51,25 @@ function ibRow(it) {
     </div>`;
 }
 
-/** where a plain Move lands right now, in the server's order (core.ts moveDest): the playlist's own
- *  folder, the collection's default, the folder picked last, the first root; {dir, src} */
+/** where a plain Move lands right now: the server's own answer (view dest, core.ts moveDest), which skips a stored
+ *  folder that is gone from disk; src says which setting it is: the playlist's own folder, the collection's
+ *  default, the folder picked last, the first root; {dir, src}. lib && lib.id: Settings passes {} when it has none */
 function ibDestOf(lib) {
   const c = DATA.collection || { roots: [] };
-  return lib && lib.target ? { dir: lib.target, src: 'own' } : c.move_target ? { dir: c.move_target, src: 'default' }
-    : c.last_target ? { dir: c.last_target, src: 'last' } : c.roots[0] ? { dir: c.roots[0].path, src: 'first' } : { dir: '', src: '' };
+  const dir = (lib && lib.id ? lib.dest : c.dest) || '';
+  if (!dir) return { dir: '', src: '' };
+  const is = p => !!p && p.replace(/[\\/]+$/, '') === dir.replace(/[\\/]+$/, '');
+  return { dir, src: lib && is(lib.target) ? 'own' : is(c.move_target) ? 'default' : is(c.last_target) ? 'last' : 'first' };
 }
 function ibDest() { return ibDestOf((DATA.libraries || []).find(l => l.id === DATA.active)).dir; }
 const ibDestShort = () => shortPath(ibDest());
 
 /** pick a destination folder of the collection: the roots, their subfolders one level at a
-    time (expand with the chevron); resolves an absolute path or null */
-function ibPickDest() {
+    time (expand with the chevron); resolves an absolute path or null. Settings chooses with it
+    where new tracks go; nothing moves then, so it passes its own heading and row label (text keys) */
+function ibPickDest({ title = 'inbox.dest.title', pick = 'inbox.dest.pick' } = {}) {
   return dialog({
-    title: th('inbox.dest.title'),
+    title: th(title),
     sub: th('inbox.dest.sub'),
     body: `<div class="optlist" id="dest-list"><div class="empty ex-wait">${spin('')}</div></div>`,
     foot: `<span class="spacer"></span><button class="btn" data-close>${esc(t('common.cancel'))}</button>`,
@@ -76,7 +80,7 @@ function ibPickDest() {
         list.innerHTML = rows.map((r, i) => `<div class="opt dest-row" data-i="${i}" style="padding-left:${10 + r.depth * 22}px">
             ${r.has_dirs ? `<span class="btn btn-ghost btn-sm btn-icon dest-x" data-x="${i}">${icon(r.expanded ? 'chevronDown' : 'chevronRight')}</span>` : `<span class="ic">${icon('folder')}</span>`}
             <span class="opt-main"><span class="fn" title="${esc(r.path)}">${esc(r.name)}</span></span>
-            <span class="tag tag-outline dest-pick">${esc(t('inbox.dest.pick'))}</span>
+            <span class="tag tag-outline dest-pick">${esc(t(pick))}</span>
           </div>`).join('') || emptyHtml({ ico: 'folder', title: th('coll.noRootsTitle'), text: th('coll.noRootsText') });
         list.querySelectorAll('.dest-row').forEach(el => el.onclick = e => {
           const i = +el.dataset.i;

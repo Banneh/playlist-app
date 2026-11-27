@@ -2734,10 +2734,11 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
   if (!DEVICES[dev]) dev = "xdj-700";
   const coll = collection();
   const base: any = {
-    libraries: STATE.libraries.map((l) => ({ id: l.id, name: libName(l), url: l.url, target: l.target || null })),
+    // dest: where a plain move for this playlist lands right now (moveDest: a stored folder that is gone is skipped)
+    libraries: STATE.libraries.map((l) => ({ id: l.id, name: libName(l), url: l.url, target: l.target || null, dest: moveDest(l) })),
     active: lib ? lib.id : null,
     collection: { roots: coll.roots.map((r) => ({ id: r.id, path: r.path, subfolders: !!r.subfolders })),
-                  move_target: coll.move_target || null, last_target: coll.last_target || null },
+                  move_target: coll.move_target || null, last_target: coll.last_target || null, dest: moveDest(null) },
     device: dev,
     devices: Object.entries(DEVICES).map(([id, d]) => ({ id, label: d.label })),
     backups: restorableCount(lib),
@@ -4380,8 +4381,8 @@ export async function inboxMove(data: any): Promise<any> {
  *  pinned, and the key returned is the AIFF's; `aiff` says how that went. A WAV that can't be
  *  converted stays as it is and is moved all the same ({ok: false, item}: the reason). */
 /** Where a move out of the inbox lands: the folder asked for (`dest`, a collection folder
- *  from the picker), else the playlist's own target, the folder picked last, the default
- *  move target, the first root. The explicit pick is remembered as the last one. */
+ *  from the picker), else the playlist's own target, the default move target, the folder
+ *  picked last, the first root. The explicit pick is remembered as the last one. */
 function resolveMoveDest(lib: Library | null, dest: unknown): { dir: string; chosen: boolean } {
   const coll = collection();
   const ok = (d: string | undefined | null): string | null => {

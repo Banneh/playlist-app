@@ -50,9 +50,9 @@ I18N.add('en', 'settings', {
     toastOff: 'Bandcamp search off',
   },
 
-  // the Downloads card
+  // the Watched downloads folder card
   inbox: {
-    title: 'Downloads',
+    title: 'Watched downloads folder',
     text: 'DJ HQ watches this folder for fresh downloads that match a track in the playlist.',
     resetHint: 'Back to {dir}',
     reset: 'Use the default folder',
@@ -177,7 +177,7 @@ I18N.add('en', 'settings', {
     },
     subfoldersOn: 'Subfolders are scanned too',
     subfoldersOff: 'Only the library folders themselves are scanned',
-    inboxReset: 'Back to the default Downloads folder',
+    inboxReset: 'Watching the default downloads folder again',
     openBrowser: 'SoundCloud links open in your browser',
     openDiscover: 'SoundCloud links open on Discover',
     likeOnAddOn: 'Tracks you add are liked as well',

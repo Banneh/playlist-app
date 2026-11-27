@@ -50,9 +50,9 @@ I18N.add('pl', 'settings', {
     toastOff: 'Wyłączono szukanie na Bandcamp',
   },
 
-  // the Downloads card
+  // the Watched downloads folder card
   inbox: {
-    title: 'Pobrane',
+    title: 'Obserwowany folder pobranych',
     text: 'DJ HQ obserwuje ten folder i wyszukuje w nim świeżo pobrane pliki, które pasują do utworów z playlisty.',
     resetHint: 'Wróć do {dir}',
     reset: 'Użyj domyślnego folderu',
@@ -178,7 +178,7 @@ I18N.add('pl', 'settings', {
     },
     subfoldersOn: 'Podfoldery też są skanowane',
     subfoldersOff: 'Skanowane są tylko same foldery biblioteki',
-    inboxReset: 'Przywrócono domyślny folder Pobrane',
+    inboxReset: 'Znów obserwowany jest domyślny folder pobranych',
     openBrowser: 'Linki SoundCloud otwierają się w przeglądarce',
     openDiscover: 'Linki SoundCloud otwierają się na Discover',
     likeOnAddOn: 'Dodawane utwory będą też trafiać do polubień',

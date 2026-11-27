@@ -281,6 +281,10 @@ function stCollectionCard() {
        <button class="btn btn-sm btn-ghost btn-icon" onclick="stRemoveRoot('${esc(r.id)}', ${JSON.stringify(r.path).replace(/"/g, '&quot;')})" title="${esc(t('settings.coll.removeHint'))}" aria-label="${esc(t('settings.coll.removeAria', { dir: shortPath(r.path) }))}">${icon('x')}</button>
      </div>`).join('');
   const target = coll.move_target || '';
+  // where a new track really lands when its playlist has no folder of its own (ibDestOf): the folder chosen here,
+  // else the one picked last or the first one, and then the field says in brackets which of the two it is
+  const dest = ibDestOf(null);
+  const destSrc = dest.src === 'last' || dest.src === 'first' ? ` <span class="faint st-src">${esc(t('settings.coll.src.' + dest.src))}</span>` : '';
   return stCard('folder', 'green', esc(t('settings.coll.title')), th('settings.coll.text'),
     `${rootRows || `<p class="faint">${th('settings.coll.none')}</p>`}
      <div class="fieldrow st-inboxrow">
@@ -289,7 +293,7 @@ function stCollectionCard() {
        <button class="btn" onclick="stAddRoot()">${icon('plus')}${esc(t('settings.coll.add'))}</button>
      </div>
      <div class="st-path-row st-wide"><span class="faint">${esc(t('settings.coll.target'))}</span>
-       <div class="path" title="${esc(target)}">${icon('folderIn')}<span>${esc(target ? shortPath(target) : t('settings.coll.targetAuto'))}</span></div>
+       <div class="path" title="${esc(dest.dir)}">${icon('folderIn')}<span>${dest.dir ? esc(shortPath(dest.dir)) + destSrc : `<span class="faint st-src">${esc(t('settings.pl.destNone'))}</span>`}</span></div>
        <button class="btn btn-sm" onclick="stPickMoveTarget()" title="${esc(t('settings.coll.targetHint'))}">${icon('folder')}${esc(t('common.change'))}</button>
        ${target ? `<button class="btn btn-sm btn-ghost" onclick="stClearMoveTarget()">${icon('undo')}${esc(t('settings.coll.targetClear'))}</button>` : ''}
      </div>
@@ -305,7 +309,7 @@ function stPlaylistControls(lib, isLikes) {
   return `${DATA.playlist_url ? `<button class="btn btn-sm" onclick="scOpen(DATA.playlist_url)">${icon(scInApp() ? 'cloud' : 'external')}${esc(t(isLikes ? 'common.openLikesSc' : 'common.openPlaylistSc'))}</button>` : ''}
      <button class="btn btn-sm" onclick="stChangeLink()" title="${esc(t('settings.lib.changeLinkHint'))}">${icon('link')}${esc(t('common.changeLink'))}</button>
      <button class="btn btn-sm" onclick="uiAddLibrary()">${icon('plus')}${esc(t('common.addAnotherLibrary'))}</button>
-     <div class="st-path-row st-wide st-dest" title="${esc(d.dir)}">${icon('folderIn')}<span class="st-dest-tx">${d.dir
+     <div class="st-path-row st-wide st-dest" title="${esc(d.dir)}"><span class="st-dest-tx">${d.dir
          ? th('settings.pl.dest', { dir: shortPath(d.dir) }) + ` <span class="faint">${esc(t('settings.pl.src.' + d.src))}</span>` : esc(t('settings.pl.destNone'))}</span>
        <button class="btn btn-sm" onclick="stPickPlTarget()" title="${esc(t('settings.pl.targetHint'))}">${icon('folder')}${esc(t('common.change'))}</button>
        ${target ? `<button class="btn btn-sm btn-ghost" onclick="stClearPlTarget()">${icon('undo')}${esc(t('settings.pl.targetClear'))}</button>` : ''}
@@ -378,14 +382,16 @@ async function stRootSub(id, el) {
   if (!ok) { el.checked = !on; render(); }
 }
 async function stPickMoveTarget() {
-  const dest = await ibPickDest();
+  const dest = await ibPickDest({ title: 'inbox.dest.setTitle', pick: 'inbox.dest.setPick' });
   if (dest) await stCollection({ op: 'set_move_target', dir: dest }, t('settings.coll.targetSet', { dir: shortPath(dest) }));
 }
 async function stClearMoveTarget() {
-  await stCollection({ op: 'set_move_target', dir: '' }, t('settings.coll.targetCleared'));
+  if (!await stCollection({ op: 'set_move_target', dir: '' })) return;
+  const dir = ibDestOf(null).dir;   // the folder picked last or the first one again: the toast names it, as the field does
+  if (dir) toast(t('settings.coll.targetCleared', { dir: shortPath(dir) }));
 }
 async function stPickPlTarget() {
-  const dest = await ibPickDest();
+  const dest = await ibPickDest({ title: 'inbox.dest.setPlTitle', pick: 'inbox.dest.setPick' });
   if (dest) await stLibrary({ op: 'set_target', dir: dest }, t('settings.pl.targetSet', { dir: shortPath(dest) }));
 }
 async function stClearPlTarget() {

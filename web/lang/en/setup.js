@@ -4,7 +4,7 @@ I18N.add('en', 'setup', {
   lead: 'A few things DJ HQ should know about this computer. All of it can be changed later in Settings.',
   go: 'Let’s go',
   downloads: {
-    title: 'Where your downloads land',
+    title: 'Watched downloads folder',
     text: 'DJ HQ watches this folder. A download that matches a playlist track shows up on the Downloads page, and one click moves it into your library.',
     change: 'Change…',
     placeholder: '/path/to/the/folder',
