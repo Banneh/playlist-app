@@ -678,6 +678,13 @@ body.devmode .table.no-num.no-status:has(.tr > .get) > .thead, body.devmode .tab
 .q-iname { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .q-imsg { flex: 0 1 45%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3); }
 .q-item.failed .q-imsg { color: var(--red); }
+/* a download's result is one short word: it keeps its room, the track's name gives way */
+.q-imsg.q-res { flex: none; }
+.q-item { flex-wrap: wrap; }
+.q-acts { display: flex; gap: 4px; flex-basis: 100%; padding-left: 20px; margin: 2px 0 2px -6px; }
+.q-main > .q-acts { padding-left: 0; margin: 6px 0 0 -6px; }
+.q-acts .btn { height: 24px; padding: 0 8px; font-size: 12px; }
+.q-acts .btn .ic { width: 13px; height: 13px; }
 
 /* ---------- the Bandcamp search's card, and its mark in a row ---------- */
 #bc-card { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; align-items: flex-start; gap: 10px; width: 370px; padding: 12px 8px 12px 14px;

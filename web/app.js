@@ -228,7 +228,7 @@ function qRowHtml(q) {
     ? `<button class="q-more" onclick="qOpen(${q.id})" aria-expanded="${open ? 'true' : 'false'}" title="${esc(t(open ? 'app.queue.hideItems' : 'app.queue.showItems'))}">${icon(open ? 'chevronDown' : 'chevronRight')}<span>${esc(qCounts(items))}</span></button>`
     : '';
   return `<div class="q-row ${q.status}">${ic}<div class="q-main"><div class="q-label" title="${esc(q.label)}">${esc(q.label)}</div>
-    <div class="q-st"><span>${esc(st)}</span><span class="q-when">${esc(when)}</span></div>${bar}${arrow}${
+    <div class="q-st"><span>${esc(st)}</span><span class="q-when">${esc(when)}</span></div>${bar}${qDlActs(q)}${arrow}${
     open ? `<div class="q-items">${items.slice().reverse().map(qItemHtml).join('')}</div>` : ''}</div></div>`;
 }
 /** "3 done · 1 failed" for the arrow of a bulk action */
@@ -237,11 +237,30 @@ function qCounts(items) {
   return [[n('done'), 'app.queue.nDone'], [n('miss'), 'app.queue.nMiss'], [n('failed'), 'app.queue.nFailed'], [n('running'), 'app.queue.nRunning']]
     .filter(([c]) => c).map(([c, k]) => t(k, { n: c })).join(' · ');
 }
-/** one track of a bulk action: running, done (with the file or what was found), miss (nothing there) or failed */
+/** one track of a bulk action, on one line: the track, then how it went. A download says Saved or
+ *  No file (the file name, or why, in the tooltip); others (Bandcamp) say what was found */
 function qItemHtml(i) {
   const ic = i.status === 'running' ? qRing(null) : icon(i.status === 'failed' ? 'xCircle' : i.status === 'miss' ? 'minusCircle' : 'checkCircle');
+  const res = i.dl && i.status === 'done' ? t('app.queue.saved') : i.dl && i.status === 'failed' ? t('app.queue.noFileShort') : i.msg;
   return `<div class="q-item ${i.status}"><span class="q-ic">${ic}</span><span class="q-iname" title="${esc(i.label)}">${esc(i.label)}</span>${
-    i.msg ? `<span class="q-imsg" title="${esc(i.msg)}">${esc(i.msg)}</span>` : ''}</div>`;
+    res ? `<span class="q-imsg${i.dl ? ' q-res' : ''}" title="${esc(i.msg || res)}">${esc(res)}</span>` : ''}${qDlActs(i)}</div>`;
+}
+/** a download that brought no file: open its Free DL in the browser, or try again (freeDownload) */
+function qDlActs(q) {
+  if (!q.dl || q.status !== 'failed') return '';
+  return `<span class="q-acts"><button class="btn btn-ghost btn-sm" onclick="qOpenLink(${q.id})" title="${esc(t('app.queue.openBrowserTip'))}">${icon('external')}${esc(t('app.queue.openBrowser'))}</button><button class="btn btn-ghost btn-sm" onclick="qRetry(${q.id})" title="${esc(t('app.queue.retryTip'))}">${icon('refresh')}${esc(t('app.queue.retry'))}</button></span>`;
+}
+/** a task or a bulk action's track, by id */
+const qFind = id => { for (const q of QUEUE) { if (q.id === id) return q; const i = (q.items || []).find(x => x.id === id); if (i) return i; } return null; };
+function qOpenLink(id) { const q = qFind(id); if (q && q.dl) window.open(q.dl.url, '_blank', 'noopener'); }
+function qRetry(id) {
+  const q = qFind(id); if (!q || !q.dl) return;
+  q.status = 'retried'; q.msg = '';   // the new attempt is a task of its own
+  for (const p of QUEUE) if (p.items) p.items = p.items.filter(x => x !== q);
+  QUEUE = QUEUE.filter(x => x !== q);
+  qRender();
+  freeDownload(q.dl.url, null, { id: q.dl.id, name: q.dl.name })
+    .then(ok => { if (ok === false) window.open(q.dl.url, '_blank', 'noopener'); });   // not one the app can get here now
 }
 function qOpen(id) { if (Q_OPEN.has(id)) Q_OPEN.delete(id); else Q_OPEN.add(id); qRender(); }
 function qDrop(id) { QUEUE = QUEUE.filter(q => q.id !== id); Q_OPEN.delete(id); qRender(); }
@@ -317,6 +336,7 @@ async function freeDownload(url, btn, opts = {}) {
   let out = 'failed';
   try {
     const r = await qTask(opts.parent ? name : t('app.queue.download', { name }), async (task) => {
+      task.dl = { url, id, name };   // Open in browser and Retry on a failed row
       const r = id ? await api('/api/direct-download', { id, url }) : await api('/api/free-download', { url });
       if (r.file) task.msg = r.file.split(/[\\/]/).pop();
       else if (!r.unsupported) { task.status = 'failed'; task.msg = t(opts.parent ? 'app.queue.noFileBulk' : 'app.queue.noFile'); }

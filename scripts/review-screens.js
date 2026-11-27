@@ -81,10 +81,10 @@ app.whenReady().then(async () => {
     QUEUE = []; Q_OPEN.clear();
     const now = Date.now();
     QUEUE.push({ id: 9001, label: tn('playlist.missing.dlAllTask', 4), status: 'running', started: now - 40000, done: 3, total: 4, msg: '', items: [
-      { label: 'Nova Pulse - Daybreak', status: 'done', msg: 'Nova Pulse - Daybreak.wav' },
-      { label: 'Perihelion - Wavelength', status: 'failed', msg: t('app.queue.noFileBulk') },
-      { label: 'Marrow & Vane - Cold Fusion', status: 'done', msg: 'Marrow & Vane - Cold Fusion.wav' },
-      { label: 'Oriel - Tidal (Original Mix)', status: 'running', msg: '' } ] });
+      { id: 9011, label: 'Nova Pulse - Daybreak', status: 'done', msg: 'Nova Pulse - Daybreak.wav', dl: { url: 'https://hypeddit.com/x/daybreak', id: '', name: 'Nova Pulse - Daybreak' } },
+      { id: 9012, label: 'Perihelion - Wavelength', status: 'failed', msg: t('app.queue.noFileBulk'), dl: { url: 'https://hypeddit.com/x/wavelength', id: '', name: 'Perihelion - Wavelength' } },
+      { id: 9013, label: 'Marrow & Vane - Cold Fusion', status: 'done', msg: 'Marrow & Vane - Cold Fusion.wav', dl: { url: 'https://hypeddit.com/x/cold-fusion', id: '', name: 'Marrow & Vane - Cold Fusion' } },
+      { id: 9014, label: 'Oriel - Tidal (Original Mix)', status: 'running', msg: '', dl: { url: 'https://hypeddit.com/x/tidal', id: '', name: 'Oriel - Tidal (Original Mix)' } } ] });
     QUEUE.push({ id: 9002, label: t('app.queue.bandcamp'), status: 'done', started: now - 600000, ended: now - 540000, done: 3, total: 3, msg: tn('app.queue.bandcampFound', 1), items: [
       { label: 'Faye Idris - Paper Lanterns', status: 'miss', msg: t('tags.link.notFound') },
       { label: 'Kessler & Monroe - Half Light', status: 'done', msg: 'Half Light (Original Mix)' },
