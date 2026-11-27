@@ -51,7 +51,7 @@ function lkRow(r) {
       </div>
       <span class="dur">${esc(r.dur)}</span>
       <div class="cell">${r.have ? `<span class="pill pill-have">${esc(t('common.have'))}</span>` : `<span class="pill pill-miss">${esc(t('common.missing'))}</span>`}</div>
-      <div class="get">${!r.have ? linkBtn(r, 'buy') + linkBtn(r, 'free') : ''}</div>
+      <div class="get">${!r.have ? waitingBtn(r) || linkBtn(r, 'buy') + linkBtn(r, 'free') : ''}</div>
       <div class="lk-add">${add}</div>
     </div>`;
 }

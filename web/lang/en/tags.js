@@ -13,6 +13,8 @@ I18N.add('en', 'tags', {
     queuedTip: 'This track is about to be looked up on Bandcamp',
     notFound: 'Not on Bandcamp',
     notFoundTip: 'Looked up on {date}. Settings > Bandcamp says when it is tried again',
+    waiting: 'In Downloads',
+    waitingTip: '{name} is in the downloads folder. Move it into the library on the Downloads page',
     fmtLossless: 'lossless',
     devNone: 'none: {host}',
     devOff: '{id} (off)',

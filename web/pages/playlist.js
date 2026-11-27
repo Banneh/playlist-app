@@ -11,6 +11,13 @@ const matchesQ = (r, q) => !q || (r.artist + ' ' + r.title + ' ' + (r.user || ''
 const isDirect = l => !!l.direct && (l.direct !== 'soundcloud' || !!APP.sc);
 
 /* ---------- the track row ---------- */
+/** this track's file that waits in the downloads folder (the Downloads page moves it in), or null */
+const waitingFile = r => ((typeof INBOX !== 'undefined' && INBOX && INBOX.items) || []).find(it => it.id === r.id) || null;
+/** in place of the links while the file is there: getting it again makes no sense */
+function waitingBtn(r) {
+  const it = waitingFile(r);
+  return it ? `<button class="btn btn-sm first" onclick="go('inbox')" title="${esc(t('tags.link.waitingTip', { name: it.name }))}">${icon('inbox')}${esc(t('tags.link.waiting'))}</button>` : '';
+}
 function linkBtn(r, kind) {
   const l = (r.links || []).find(x => x.kind === kind);
   if (!l) return '';
@@ -185,7 +192,7 @@ function trackRow(r) {
       </div>
       <span class="dur">${esc(r.dur)}</span>
       <div class="cell">${statusPill(r)}</div>
-      <div class="get">${!r.have || r.upgrade ? (linkBtn(r, 'buy') + linkBtn(r, 'free')) || bcRow(r) || `<span class="nolink">${esc(t('tags.link.none'))}</span>` : ''}</div>
+      <div class="get">${!r.have || r.upgrade ? waitingBtn(r) || (linkBtn(r, 'buy') + linkBtn(r, 'free')) || bcRow(r) || `<span class="nolink">${esc(t('tags.link.none'))}</span>` : ''}</div>
       <button class="btn btn-ghost btn-sm btn-icon more" onclick="rowMenu(this, ${r.id})" title="${esc(t('common.more'))}">${icon('more')}</button>
     </div>`;
 }
@@ -334,7 +341,7 @@ function openAssign(id) {
    current file. A link that gives no file keeps its row and its button, nothing opens in the browser. */
 let DLALL = null;   // { stop } while a run goes
 const dlAllItems = rows => rows.map(r => ({ r, l: (r.links || []).find(x => x.kind === 'free') }))
-  .filter(({ r, l }) => !r.have && l && (isDirect(l) || isHypeddit(l.url)));
+  .filter(({ r, l }) => !r.have && l && (isDirect(l) || isHypeddit(l.url)) && !waitingFile(r));
 function dlAllButton(rows) {
   if (!APP.dl_bypass) return '';
   if (DLALL) return `<button class="btn btn-ghost btn-sm" onclick="downloadAll()" title="${esc(t('playlist.missing.dlAllStopTip'))}"><span class="spin"></span>${esc(t('playlist.missing.dlAllStop'))}</button>`;

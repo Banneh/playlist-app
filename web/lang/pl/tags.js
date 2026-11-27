@@ -11,6 +11,8 @@ I18N.add('pl', 'tags', {
     queuedTip: 'Ten utwór zaraz będzie szukany na Bandcamp',
     notFound: 'Nie ma na Bandcamp',
     notFoundTip: 'Sprawdzono {date}. Kiedy ponowić, ustawisz w Ustawienia > Bandcamp',
+    waiting: 'W pobranych',
+    waitingTip: 'Plik {name} czeka w folderze pobrań. Przeniesiesz go do biblioteki w zakładce Pobrane',
     fmtLossless: 'bezstratny',
     devNone: 'brak: {host}',
     devOff: '{id} (wył.)',
