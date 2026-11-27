@@ -268,6 +268,12 @@ const isHypeddit = (url) => {
  *  gate is walked in the app's hidden window: the gate's skip steps are taken and the email step is
  *  filled from Settings. The button shows a spinner while it runs. Returns false when the link is not
  *  one the app can get itself. */
+/** Look at the downloads folder again shortly, quietly: once for a run of saved files. */
+let INBOX_SOON = 0;
+function inboxSoon() {
+  clearTimeout(INBOX_SOON);
+  INBOX_SOON = setTimeout(() => { if (typeof loadInbox === 'function') loadInbox({ quiet: true }); }, 1500);
+}
 async function freeDownload(url, btn, opts = {}) {
   const id = opts.id || (btn && btn.dataset.direct) || '';
   if (!id && !isHypeddit(url)) return false;
@@ -285,6 +291,7 @@ async function freeDownload(url, btn, opts = {}) {
     });
     if (r.unsupported) return opts.bulk ? 'failed' : false;   // no Electron window (headless): let the browser have it
     out = r.file ? 'ok' : 'nofile';
+    if (r.file) inboxSoon();   // the Downloaded count goes up now, not when that page is opened
     if (opts.bulk) return out;
     if (r.file) toast(t('app.freedl.saved', { name: r.file.split(/[\\/]/).pop() }), false, 8000);
     else { toast(t(id ? 'app.freedl.noFileDirect' : 'app.freedl.noFile')); window.open(url, '_blank', 'noopener'); }
