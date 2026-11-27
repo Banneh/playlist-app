@@ -98,12 +98,15 @@ async function seedSoundcloudSession(ses: Session): Promise<void> {
 import * as trace from "./trace";
 
 /** Walk one gate. Resolves with the saved file; throws when the gate hands out nothing. */
-export async function walk(adapter: GateAdapter, url: string, email: string): Promise<WalkResult> {
+export function walk(adapter: GateAdapter, url: string, email: string): Promise<WalkResult> {
+  return trace.withTrace(adapter.id, (log) => walkTraced(adapter, url, email, log));
+}
+
+async function walkTraced(adapter: GateAdapter, url: string, email: string, log: (m: string) => void): Promise<WalkResult> {
   const ses = session.fromPartition(GATE_PARTITION);
   // the same plain Chrome user agent the Discover view uses, or SoundCloud treats the walk as a
   // different client than the session it was seeded from
   ses.setUserAgent(ses.getUserAgent().replace(/ ?(Electron|dj-hq|DJ HQ)\/\S+/gi, ""));
-  const log = trace.open(adapter.id);
   log(`walk ${url}`);
   await seedSoundcloudSession(ses).catch((e) => log("[seed] soundcloud failed: " + e));
   await seedProviderSessions(ses).catch((e) => log("[seed] providers failed: " + e));
@@ -136,6 +139,5 @@ export async function walk(adapter: GateAdapter, url: string, email: string): Pr
   } finally {
     active--;
     w.destroy();
-    trace.close();
   }
 }
