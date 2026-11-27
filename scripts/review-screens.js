@@ -6,12 +6,13 @@
  * of yours is touched, and shows the app as it ships: no developer mode, no Free DL bypass, no
  * Do everything. Writes review-screens/<version>/<width>x<height>/NN-name.png (light), plus a
  * dark/ folder at one size. Long pages come in parts (-2, -3, ...) as they scroll.
- * DJHQ_SCREENS_SCALE=2 renders at 2x (Retina); the default is 1x. */
+ * The pictures are 2x (Retina), as the app looks on a Mac: on a Retina screen Electron renders
+ * at 2x even when told 1, so 2 is the default; DJHQ_SCREENS_SCALE sets another factor. */
 const { app, BrowserWindow, nativeTheme } = require("electron");
 const fs = require("fs");
 const path = require("path");
 
-const SCALE = Number(process.env.DJHQ_SCREENS_SCALE) || 1;
+const SCALE = Number(process.env.DJHQ_SCREENS_SCALE) || 2;
 app.commandLine.appendSwitch("force-device-scale-factor", String(SCALE));
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
