@@ -10,6 +10,7 @@ import * as core from "./core";
 import * as config from "./config";
 import * as bandcamp from "./bandcamp";
 import * as directdl from "./directdl";
+import * as dlstop from "./dlstop";
 import * as pipeline from "./pipeline";
 import { platformApps } from "./extapps";
 import { cueFixRoute } from "./cuefix";
@@ -431,6 +432,8 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/free-download": return opts.freeDl && core.DOWNLOAD_BYPASS
             ? direct(() => opts.freeDl!(String(data.url || ""), String(data.email || core.getSettings().dl_email || "")))
             : json({ unsupported: true });
+          // the Stop of Download all: every walk, window and file transfer in flight ends now
+          case "/api/free-download/stop": dlstop.stopAll(); return json({ ok: true });
           // not queued either: a public Drive / Dropbox file or SoundCloud's own download button
           case "/api/direct-download": return direct(() => directdl.download(data.id, String(data.url || ""),
             async () => opts.sc ? opts.sc.token() : null));

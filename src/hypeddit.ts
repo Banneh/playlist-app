@@ -19,6 +19,7 @@ import * as path from "path";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import * as core from "./core";
+import * as dlstop from "./dlstop";
 
 /** a plain Chrome UA: gates serve a different page to browsers they don't recognise */
 const UA =
@@ -65,7 +66,7 @@ async function req(jar: Jar, url: string, opts: RequestInit = {}, timeout = REQ_
     redirect: "follow",
     ...opts,
     headers: { "user-agent": UA, cookie: jar.header(), ...((opts.headers as Record<string, string>) || {}) },
-    signal: AbortSignal.timeout(timeout),
+    signal: dlstop.fetchSignal(timeout),   // its time limit, and the Stop of Download all
   });
   jar.absorb(res);
   return res;

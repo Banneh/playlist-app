@@ -50,6 +50,8 @@ I18N.add('en', 'err', {
   not_signed_in: 'not signed in to SoundCloud',
   sc_no_download: 'SoundCloud gave no file for this track',
   dl_cut_off: 'the download was cut off',
+  dl_stopped: 'stopped',
+  dl_timeout: 'took too long and was given up',
   bandcamp_failed: 'Bandcamp could not be searched: {error}',
   sc_sign_in_first: 'sign in to SoundCloud on the Discover page first',
   playlist_not_fetched: 'refresh the playlist first',

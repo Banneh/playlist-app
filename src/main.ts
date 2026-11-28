@@ -6,6 +6,7 @@ import { app, BrowserWindow, dialog, Menu, nativeTheme, session, shell, systemPr
 import * as fs from "fs";
 import * as path from "path";
 import * as core from "./core";
+import * as dlstop from "./dlstop";
 import * as gatewalk from "./gatewalk";
 import * as gates from "./gates/registry";
 import { GATE_PARTITION, SC_PARTITION } from "./gates/types";
@@ -613,21 +614,36 @@ function axTrusted(prompt: boolean): boolean {
  *  with the saved path, or null when none got a file (the caller then opens the page in the
  *  browser). */
 async function freeDownload(url: string, email: string): Promise<{ file: string | null }> {
+  // a Stop (Download all) ends the whole try, not just the way that runs now
+  const stop = dlstop.signal();
+  const stopped = () => { if (stop.aborted) throw stop.reason; };
   const adapter = gates.match(new URL(url));
   if (adapter) {
     const viaAdapter = await gates.walk(adapter, url, email).catch((e) => {
       console.error(`[gate:${adapter.id}] failed:`, e);
       return null;
     });
+    stopped();
     if (viaAdapter) return { file: viaAdapter.filePath };
   }
   if (!core.isHypeddit(url)) return { file: null };
   const viaHttp = await hypeddit.freeDownload(url, email).catch(() => ({ file: null as string | null }));
+  stopped();
   if (viaHttp.file) return viaHttp;
   if (core.getSettings().gate_walker === false) return { file: null };
   const viaWindow = await gatewalk.walk(url, email).catch(() => null);
+  stopped();
   return { file: viaWindow };
 }
+
+/** A Stop closes every hidden window a download opened, popups and login windows included; the
+ *  walks close their own too, this also gets the ones a gate opened on its own. */
+dlstop.onStop(() => {
+  const parts = [GATE_PARTITION, "persist:hypeddit"].map((p) => session.fromPartition(p));
+  for (const b of BrowserWindow.getAllWindows()) {
+    if (b !== win && !b.isDestroyed() && parts.includes(b.webContents.session)) b.destroy();
+  }
+});
 
 
 app.whenReady().then(async () => {

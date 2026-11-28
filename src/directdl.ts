@@ -6,6 +6,7 @@ import * as path from "path";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import * as core from "./core";
+import * as dlstop from "./dlstop";
 
 const FILE_TIMEOUT_MS = 15 * 60 * 1000;
 const AUDIO_OR_ZIP = /\.(wav|mp3|aiff?|flac|m4a|ogg|zip)$/i;
@@ -54,7 +55,7 @@ export function safeName(s: string): string {
  *  file, a download limit) or not audio or a zip: the caller opens the link in the browser then.
  *  `name` (without extension) is used when the server names no file. */
 export async function save(url: string, name: string): Promise<string | null> {
-  const abort = AbortSignal.timeout(FILE_TIMEOUT_MS);
+  const abort = dlstop.fetchSignal(FILE_TIMEOUT_MS);   // its time limit, and the Stop of Download all
   const res = await fetch(url, { headers: { "User-Agent": core.UA }, redirect: "follow", signal: abort });
   const type = res.headers.get("content-type") || "";
   if (!res.ok || !res.body || /text\/html|json/i.test(type)) { await res.body?.cancel().catch(() => {}); return null; }

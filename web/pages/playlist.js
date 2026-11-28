@@ -374,7 +374,8 @@ function dlAllButton(rows) {
 }
 const dlAllTools = () => { if (PAGE === 'missing') { const el = $('#ph-tools'); if (el) el.innerHTML = PAGES.missing.tools(); } };
 async function downloadAll() {
-  if (DLALL) { DLALL.stop = true; return; }
+  // Stop: no next link, and the ones running now end at once, their hidden windows closed
+  if (DLALL) { DLALL.stop = true; dlStopAll(); return; }
   const items = dlAllItems(LAST_ROWS);
   if (!items.length) return;
   const run = DLALL = { stop: false };

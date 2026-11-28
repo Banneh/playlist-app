@@ -380,12 +380,18 @@ async function freeDownload(url, btn, opts = {}) {
     else { toast(t(id ? 'app.freedl.noFileDirect' : 'app.freedl.noFile')); window.open(url, '_blank', 'noopener'); }
   } catch (e) {
     if (opts.bulk) return 'failed';
+    if (e && e.code === 'dl_stopped') return true;   // Stop was pressed: no page opens for it
     toast(t('app.freedl.failed', { msg: errText(e) }), true);
     window.open(url, '_blank', 'noopener');   // it did not work out: let the user have the page
   } finally {
     if (btn) { btn.classList.remove('busy'); if (btn.dataset.was) btn.innerHTML = btn.dataset.was; }
   }
   return opts.bulk ? out : true;
+}
+/** End every free download in flight: the walks give up, their hidden windows close, and each
+ *  task says Stopped. Plain fetch: a Stop must not wait for the busy count. */
+function dlStopAll() {
+  fetch('/api/free-download/stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
 }
 
 // one listener for every Free DL button that carries data-freedl (the playlist rows)

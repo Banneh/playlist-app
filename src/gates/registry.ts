@@ -5,6 +5,7 @@
  *  main.ts state. */
 import { session, type Session } from "electron";
 import * as core from "../core";
+import * as dlstop from "../dlstop";
 import { WalkWindow } from "./oauth";
 import { undo } from "./soundcloud";
 import { UA } from "./http";
@@ -50,6 +51,10 @@ export function claims(url: string): string | null {
   for (const a of ADAPTERS) { try { if (a.match(u)) return a.id; } catch {} }
   return null;
 }
+
+/** The longest one gate walk may take, a login a human solves and the file itself included. A walk
+ *  past it is given up and its windows are closed, so no task waits forever. */
+const WALK_LIMIT_MS = 6 * 60 * 1000;
 
 /** A walk is in flight: `window-all-closed` must not quit the app under it. */
 let active = 0;
@@ -125,18 +130,25 @@ async function walkTraced(adapter: GateAdapter, url: string, email: string, log:
     signal: ac.signal,
     needAttention: (r) => w.needAttention(r),
   };
+  // the Stop of Download all and the time limit both end the walk: the adapter's own waits see
+  // the signal, and `until` lets go of an adapter that waits on something that never comes
+  const offStop = dlstop.onStop(() => ac.abort(dlstop.stopped()));
+  const limit = setTimeout(() => { log("[limit] gave up"); ac.abort(dlstop.timedOut()); }, WALK_LIMIT_MS);
+  ac.signal.addEventListener("abort", () => w.destroy(), { once: true });
   active++;
   try {
-    const res = await adapter.walk(ctx);
+    const res = await dlstop.until(adapter.walk(ctx), ac.signal);
     log(`saved ${res.bytes} bytes ${res.mime}`);
     if (s.undo_after_download !== false && res.performed.length) {
-      await undo(w, res.performed).catch((e) => log("[undo] failed: " + e));
+      await dlstop.until(undo(w, res.performed), ac.signal).catch((e) => log("[undo] failed: " + e));
     }
     return res;
   } catch (e: any) {
     log(`FAILED ${e?.message || e}`);
     throw e;
   } finally {
+    clearTimeout(limit);
+    offStop();
     active--;
     w.destroy();
   }

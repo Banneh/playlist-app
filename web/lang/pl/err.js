@@ -48,6 +48,8 @@ I18N.add('pl', 'err', {
   not_signed_in: 'brak zalogowanego konta SoundCloud',
   sc_no_download: 'SoundCloud nie podał pliku dla tego utworu',
   dl_cut_off: 'pobieranie zostało przerwane',
+  dl_stopped: 'zatrzymane',
+  dl_timeout: 'trwało za długo i zostało przerwane',
   bandcamp_failed: 'Nie udało się przeszukać Bandcamp: {error}',
   sc_sign_in_first: 'najpierw zaloguj się na SoundCloud na stronie Discover',
   playlist_not_fetched: 'najpierw odśwież playlistę',

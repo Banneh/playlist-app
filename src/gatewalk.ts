@@ -10,18 +10,22 @@
  *  The window lives in a persistent partition, so the Spotify login survives: the first time the
  *  popup is shown so the user can log in, after that it stays hidden and the whole walk is
  *  invisible. The file is caught by will-download and put in the downloads folder. */
-import { BrowserWindow, session, type Session } from "electron";
+import { BrowserWindow, session, type DownloadItem, type Session } from "electron";
 import * as fs from "fs";
 import * as path from "path";
 import * as core from "./core";
+import * as dlstop from "./dlstop";
 
 const PARTITION = "persist:hypeddit";
 /** a gate that never hands out a file (dead link, a step that will not move on) */
 const TIMEOUT_MS = 150000;
+/** once the file is coming in: a big WAV on a slow line, but not forever */
+const FILE_TIMEOUT_MS = 10 * 60 * 1000;
 
 let win: BrowserWindow | null = null;
 let ses: Session | null = null;
-let pending: { file: string | null; resolve: (p: string | null) => void } | null = null;
+type Pending = { file: string | null; item: DownloadItem | null; started?: () => void; resolve: (p: string | null) => void };
+let pending: Pending | null = null;
 
 /** A name in the downloads folder that is not taken yet ("track.mp3" → "track (2).mp3"). */
 function freeName(dir: string, name: string): string {
@@ -45,7 +49,10 @@ function getSession(): Session {
     const target = freeName(dir, item.getFilename() || "download");
     item.setSavePath(target);
     p.file = target;
-    item.once("done", (_ev, state) => p.resolve(state === "completed" ? target : p.file));
+    p.item = item;
+    p.started?.();
+    // a cut off or cancelled file is no file
+    item.once("done", (_ev, state) => p.resolve(state === "completed" ? target : null));
   });
   ses = s;
   return ses;
@@ -183,35 +190,57 @@ const WALK_JS = (email: string) => `(async () => {
   return 'stuck';
 })()`;
 
+/** Walks take the one window in turn: a second walk loading its gate in the same window would
+ *  pull the page out from under the first, whose script then never answers. */
+let queue: Promise<unknown> = Promise.resolve();
+
 /** Walk a gate in the hidden window and bring the file into the downloads folder.
- *  Resolves with the saved path, or null when the gate handed out no file. */
-export async function walk(url: string, email: string): Promise<string | null> {
+ *  Resolves with the saved path, or null when the gate handed out no file. Throws dl_stopped
+ *  when Download all is stopped, also while it still waits for its turn. */
+export function walk(url: string, email: string): Promise<string | null> {
+  const sig = dlstop.signal();
+  const run = queue.then(() => walkOne(url, email, sig));
+  queue = run.catch(() => {});
+  return run;
+}
+
+async function walkOne(url: string, email: string, stop: AbortSignal): Promise<string | null> {
+  if (stop.aborted) throw stop.reason;
+  // the whole walk, loading included, has TIMEOUT_MS; a Stop ends it at once
+  const ac = new AbortController();
+  const offStop = dlstop.onStop(() => ac.abort(dlstop.stopped()));
+  const giveUp = () => ac.abort(dlstop.timedOut());
+  let t = setTimeout(giveUp, TIMEOUT_MS);
+  const step = <T>(x: Promise<T>) => dlstop.until(x, ac.signal);
   const w = getWindow();
-  const prev = pending;
   let resolve!: (p: string | null) => void;
   const done = new Promise<string | null>((res) => { resolve = res; });
-  const p = { file: null as string | null, resolve };
+  const p: Pending = { file: null, item: null, resolve, started: () => { clearTimeout(t); t = setTimeout(giveUp, FILE_TIMEOUT_MS); } };
   pending = p;
-  if (prev) prev.resolve(prev.file);
-  const t = setTimeout(() => resolve(p.file), TIMEOUT_MS);
   let file: string | null = null;
   try {
-    await w.webContents.loadURL(url);
-    await new Promise((r) => setTimeout(r, 1500));
+    await step(w.webContents.loadURL(url));
+    await step(new Promise((r) => setTimeout(r, 1500)));
     // a hidden window counts as "not visible", so the gate's own visit ping has to be nudged
-    await w.webContents.executeJavaScript("try { sgp(); } catch (e) {}").catch(() => {});
-    await w.webContents.executeJavaScript("window.__dbg = " + (process.env.DJHQ_DL_DEBUG ? "1" : "0")).catch(() => {});
-    const verdict = await w.webContents.executeJavaScript(WALK_JS(email), true).catch(() => "stuck");
+    await step(w.webContents.executeJavaScript("try { sgp(); } catch (e) {}").catch(() => {}));
+    await step(w.webContents.executeJavaScript("window.__dbg = " + (process.env.DJHQ_DL_DEBUG ? "1" : "0")).catch(() => {}));
+    const verdict = await step(w.webContents.executeJavaScript(WALK_JS(email), true).catch(() => "stuck"));
     if (process.env.DJHQ_DL_DEBUG) console.log("[gate] verdict", verdict);
     if (verdict !== "pressed") return null;
-    file = await done;
+    file = await step(done);
     return file;
+  } catch (e) {
+    // past the time limit the gate simply handed out nothing; a Stop is said as such
+    if (ac.signal.aborted && !dlstop.isStop(ac.signal.reason)) return null;
+    throw e;
   } finally {
     clearTimeout(t);
+    offStop();
     if (pending === p) pending = null;
-    // got the file and no other walk took the window over: close it and the popups it opened
-    // (the partition keeps the cookies and the Spotify login, so the next walk starts fresh)
-    if (file && !pending) closeAll();
+    if (ac.signal.aborted) { try { p.item?.cancel(); } catch {} }
+    // got the file, or gave up: close the window and the popups it opened (the partition keeps
+    // the cookies and the Spotify login, so the next walk starts fresh)
+    if (file || ac.signal.aborted) closeAll();
   }
 }
 
