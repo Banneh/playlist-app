@@ -181,11 +181,16 @@ const busy = () => INFLIGHT > 0 || EDIT_ID !== null || !!document.querySelector(
    parent's row opens with its arrow, one line per track with how it went. */
 let QUEUE = [], Q_SEQ = 0, Q_RUN = null, Q_UNSEEN = 0;
 const Q_OPEN = new Set();   // ids of the rows whose items are shown
-/* opts.quiet: a background task nobody pressed a button for: no notification, no dot */
+/* opts.quiet: a background task nobody pressed a button for: no notification, no dot.
+   opts.task: a row already on the list that runs again where it is (Retry), not as a new row */
 async function qTask(label, fn, opts = {}) {
-  const task = { id: ++Q_SEQ, label, status: 'running', started: Date.now(), done: 0, total: 0, msg: '', quiet: !!opts.quiet };
   const parent = opts.parent || null;
-  if (parent) (parent.items ||= []).push(task);
+  const again = opts.task || null;
+  const task = again
+    ? Object.assign(again, { label, status: 'running', started: Date.now(), ended: 0, done: 0, total: 0, msg: '' })
+    : { id: ++Q_SEQ, label, status: 'running', started: Date.now(), done: 0, total: 0, msg: '', quiet: !!opts.quiet };
+  if (again) { /* it keeps its place */ }
+  else if (parent) (parent.items ||= []).push(task);
   else {
     QUEUE.unshift(task);
     // only finished tasks make way: a long run stays on the list however much happens after it
@@ -267,14 +272,25 @@ function qDlActs(q) {
 /** a task or a bulk action's track, by id */
 const qFind = id => { for (const q of QUEUE) { if (q.id === id) return q; const i = (q.items || []).find(x => x.id === id); if (i) return i; } return null; };
 function qOpenLink(id) { const q = qFind(id); if (q && q.dl) window.open(q.dl.url, '_blank', 'noopener'); }
+/** Retry runs the download again in its own row: a track of a bulk action stays in its group, and
+ *  the group's count and result are worked out again when it is through */
 function qRetry(id) {
-  const q = qFind(id); if (!q || !q.dl) return;
-  q.status = 'retried'; q.msg = '';   // the new attempt is a task of its own
-  for (const p of QUEUE) if (p.items) p.items = p.items.filter(x => x !== q);
-  QUEUE = QUEUE.filter(x => x !== q);
+  const q = qFind(id); if (!q || !q.dl || q.status === 'running') return;
+  const parent = QUEUE.find(p => (p.items || []).includes(q)) || null;
+  freeDownload(q.dl.url, null, { id: q.dl.id, name: q.dl.name, task: q, parent, bulk: !!parent })
+    .then(ok => {
+      if (ok === false) window.open(q.dl.url, '_blank', 'noopener');   // not one the app can get here now
+      if (parent && parent.status !== 'running') qBulkResult(parent);
+    });
+}
+/** a finished Download all: its result line and mark from how its tracks stand now */
+function qBulkResult(p) {
+  const items = (p.items || []).filter(i => i.dl);
+  if (!items.length || items.some(i => i.status === 'running')) return;
+  const ok = items.filter(i => i.status === 'done').length, bad = items.length - ok;
+  p.msg = t('playlist.missing.dlAllResult', { ok, bad });
+  p.status = !ok && bad ? 'failed' : 'done';
   qRender();
-  freeDownload(q.dl.url, null, { id: q.dl.id, name: q.dl.name })
-    .then(ok => { if (ok === false) window.open(q.dl.url, '_blank', 'noopener'); });   // not one the app can get here now
 }
 function qOpen(id) { if (Q_OPEN.has(id)) Q_OPEN.delete(id); else Q_OPEN.add(id); qRender(); }
 function qDrop(id) { QUEUE = QUEUE.filter(q => q.id !== id); Q_OPEN.delete(id); qRender(); }
@@ -355,7 +371,7 @@ async function freeDownload(url, btn, opts = {}) {
       if (r.file) task.msg = r.file.split(/[\\/]/).pop();
       else if (!r.unsupported) { task.status = 'failed'; task.msg = t(opts.parent ? 'app.queue.noFileBulk' : 'app.queue.noFile'); }
       return r;
-    }, { parent: opts.parent });
+    }, { parent: opts.parent, task: opts.task });
     if (r.unsupported) return opts.bulk ? 'failed' : false;   // no Electron window (headless): let the browser have it
     out = r.file ? 'ok' : 'nofile';
     if (r.file) inboxSoon();   // the Downloaded count goes up now, not when that page is opened
