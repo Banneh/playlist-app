@@ -39,6 +39,21 @@ I18N.add('en', 'playlist', {
     autoDone: 'Back to auto-matching',
     noneDone: 'Marked as having no local file',
     fileDone: 'File matched to this track',
+    reject: 'Not this file',
+    rejectTip: 'This file is not this track. It will not be matched to it again, and the track looks for another file.',
+    rejectDone: 'File unmatched. It will not be matched to this track again.',
+    undo: 'Undo',
+    undone: 'Match change undone',
+  },
+  check: {
+    title: 'Is this the right file?',
+    sub: 'The file was matched by its name and length, but not with certainty. Play it to be sure.',
+    track: 'Playlist',
+    file: 'File',
+    yes: 'This is it',
+    no: 'Not this file',
+    other: 'Pick another file',
+    yesDone: 'Match confirmed',
   },
   copiedLinks: {
     one: 'Copied {n} link',
@@ -97,6 +112,7 @@ I18N.add('en', 'playlist', {
     upgrades: '<b>{n}</b> could be upgraded to lossless',
     chip: {
       convert: 'Needs convert',
+      match: 'Check file',
     },
     strayTags: {
       one: '{n} more file needs tags but isn’t in the playlist.',

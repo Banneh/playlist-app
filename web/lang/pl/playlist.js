@@ -38,6 +38,21 @@ I18N.add('pl', 'playlist', {
     autoDone: 'Przywrócono automatyczne dopasowanie',
     noneDone: 'Oznaczono jako bez pliku lokalnego',
     fileDone: 'Plik dopasowano do tego utworu',
+    reject: 'To nie ten plik',
+    rejectTip: 'Ten plik to nie ten utwór. Nie zostanie do niego dopasowany ponownie, a utwór poszuka innego pliku.',
+    rejectDone: 'Odłączono plik. Nie zostanie już dopasowany do tego utworu.',
+    undo: 'Cofnij',
+    undone: 'Cofnięto zmianę dopasowania',
+  },
+  check: {
+    title: 'Czy to właściwy plik?',
+    sub: 'Plik dopasowano po nazwie i długości, ale bez pewności. Odsłuchaj go, żeby mieć pewność.',
+    track: 'Playlista',
+    file: 'Plik',
+    yes: 'To ten',
+    no: 'To nie ten plik',
+    other: 'Wybierz inny plik',
+    yesDone: 'Potwierdzono dopasowanie',
   },
   copiedLinks: {
     one: 'Skopiowano {n} link',
@@ -102,6 +117,7 @@ I18N.add('pl', 'playlist', {
     upgrades: 'do podmiany na bezstratne: <b>{n}</b>',
     chip: {
       convert: 'Do konwersji',
+      match: 'Sprawdź plik',
     },
     strayTags: {
       one: 'Jeszcze {n} plik wymaga tagów, ale nie ma go na playliście.',

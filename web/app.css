@@ -747,6 +747,9 @@ body.devmode .table.no-num.no-status:has(.tr > .get) > .thead, body.devmode .tab
 .toast .ic { color: var(--green); }
 .toast.err .ic { color: var(--red); }
 .toast.err { border-color: var(--red-line); }
+/* a toast with a button (Undo) takes clicks while it shows */
+.toast.act.show { pointer-events: auto; padding-right: 8px; }
+.toast-act { margin-left: 4px; color: var(--accent, var(--text)); }
 
 /* ---------- dialogs ---------- */
 .overlay {

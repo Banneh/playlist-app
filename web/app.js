@@ -137,14 +137,18 @@ const emptyHtml = ({ ico = 'music', kind = '', title = '', text = '', acts = '' 
 
 /* ---------- toast ---------- */
 /** ms: how long it stays (default 2.6 s, an error 5 s) */
-function toast(msg, isErr, ms) {
+/** action: { label, onclick } puts a button in the toast (Undo); the toast then stays a little longer */
+function toast(msg, isErr, ms, action) {
   const pg = PAGES[PAGE];
-  if (pg && pg.toast && pg.toast(msg, isErr, ms)) return;
+  if (!action && pg && pg.toast && pg.toast(msg, isErr, ms)) return;
   const el = $('#toast');
-  el.innerHTML = `${icon(isErr ? 'alert' : 'checkCircle')}<span>${esc(msg)}</span>`;
-  el.classList.toggle('err', !!isErr); el.classList.add('show');
+  el.innerHTML = `${icon(isErr ? 'alert' : 'checkCircle')}<span>${esc(msg)}</span>`
+    + (action ? `<button class="btn btn-sm btn-ghost toast-act">${icon('undo')}${esc(action.label)}</button>` : '');
+  el.classList.toggle('err', !!isErr); el.classList.toggle('act', !!action); el.classList.add('show');
+  const btn = el.querySelector('.toast-act');
+  if (btn) btn.onclick = () => { clearTimeout(el._h); el.classList.remove('show'); action.onclick(); };
   clearTimeout(el._h);
-  el._h = setTimeout(() => el.classList.remove('show'), ms || (isErr ? 5000 : 2600));
+  el._h = setTimeout(() => el.classList.remove('show'), ms || (action ? 7000 : isErr ? 5000 : 2600));
 }
 
 /* ---------- API ---------- */
@@ -356,6 +360,11 @@ function inboxSoon() {
  *  gate is walked in the app's hidden window: the gate's skip steps are taken and the email step is
  *  filled from Settings. The button shows a spinner while it runs. Returns false when the link is not
  *  one the app can get itself. opts.parent: the bulk action's task, which lists this one. */
+/** the playlist track that has this link, '' when none or more than one has it */
+function trackOfLink(url) {
+  const ts = ((typeof DATA !== 'undefined' && DATA && DATA.tracks) || []).filter(r => (r.links || []).some(l => l.url === url));
+  return ts.length === 1 ? ts[0].id : '';
+}
 async function freeDownload(url, btn, opts = {}) {
   const id = opts.id || (btn && btn.dataset.direct) || '';
   if (!id && !isHypeddit(url)) return false;
@@ -367,7 +376,8 @@ async function freeDownload(url, btn, opts = {}) {
   try {
     const r = await qTask(opts.parent ? name : t('app.queue.download', { name }), async (task) => {
       task.dl = { url, id, name };   // Open in browser and Retry on a failed row
-      const r = id ? await api('/api/direct-download', { id, url }) : await api('/api/free-download', { url });
+      // a gate link goes with its track too: the file that comes is bound to that track in the inbox
+      const r = id ? await api('/api/direct-download', { id, url }) : await api('/api/free-download', { url, track: opts.track || trackOfLink(url) });
       if (r.file) task.msg = r.file.split(/[\\/]/).pop();
       else if (!r.unsupported) { task.status = 'failed'; task.msg = t(opts.parent ? 'app.queue.noFileBulk' : 'app.queue.noFile'); }
       return r;

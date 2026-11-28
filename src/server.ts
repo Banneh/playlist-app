@@ -429,14 +429,24 @@ export function startServer(opts: ServerOpts): Promise<http.Server> {
           case "/api/found":    return route(() => core.setFound(data));
           case "/api/find-all": return route(() => core.findAll());
           // not queued: a gate can take a minute and touches no library file
+          // `track`: whose link this is; the file that comes is remembered as that track's (core.noteDownload)
           case "/api/free-download": return opts.freeDl && core.DOWNLOAD_BYPASS
-            ? direct(() => opts.freeDl!(String(data.url || ""), String(data.email || core.getSettings().dl_email || "")))
+            ? direct(async () => {
+                const url = String(data.url || "");
+                const r = await opts.freeDl!(url, String(data.email || core.getSettings().dl_email || ""));
+                core.noteDownload(data.track, url, r);
+                return r;
+              })
             : json({ unsupported: true });
           // the Stop of Download all: every walk, window and file transfer in flight ends now
           case "/api/free-download/stop": dlstop.stopAll(); return json({ ok: true });
           // not queued either: a public Drive / Dropbox file or SoundCloud's own download button
-          case "/api/direct-download": return direct(() => directdl.download(data.id, String(data.url || ""),
-            async () => opts.sc ? opts.sc.token() : null));
+          case "/api/direct-download": return direct(async () => {
+            const url = String(data.url || "");
+            const r = await directdl.download(data.id, url, async () => opts.sc ? opts.sc.token() : null);
+            core.noteDownload(data.id, url, r);
+            return r;
+          });
           // the Bandcamp search only reads files' names; it writes its findings to the saved data
           case "/api/bandcamp/start":  return direct(() => bandcamp.start({ force: !!data.force }));
           case "/api/bandcamp/find":   return direct(() => bandcamp.findOne(data.id));

@@ -28,11 +28,12 @@ I18N.add('pl', 'tags', {
   needsTags: 'Wymaga tagów',
   // etykiety problemów: po jednym słowie, zdanie trafia do dymka i na listę pod +N
   issue: {
-    convert: 'Do konwersji', tags: 'Brak tagów', name: 'Sprawdź nazwę', lossless: 'Bezstratny',
+    convert: 'Do konwersji', tags: 'Brak tagów', name: 'Sprawdź nazwę', lossless: 'Bezstratny', match: 'Sprawdź plik',
     wavHeader: 'NAGŁÓWEK WAV',
     notes: { one: '{n} uwaga do tego pliku', few: '{n} uwagi do tego pliku', many: '{n} uwag do tego pliku', other: '{n} uwagi do tego pliku' },
     fix: 'Napraw w: {page}',
   },
+  checkMatchTip: 'Ten plik dopasowano automatycznie i może nie być właściwy. Kliknij, żeby porównać go z pozycją na playliście.',
   needsTagsTip: 'W pliku brakuje wykonawcy / tytułu albo różnią się od nazwy widocznej tutaj',
   convert: 'Do konwersji · {codec}',
   bits: { one: '{n} bit', few: '{n} bity', many: '{n} bitów' },

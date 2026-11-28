@@ -170,6 +170,15 @@ export interface AppState {
   /** track ids whose assigned entry the user picked in the match dialog (the others come from
    *  a download moved in or a found file): only these show "Matched by hand" */
   by_hand: Record<string, true>;
+  /** "Not this file": track id -> the file names the auto-match never gives that track again */
+  rejected: Record<string, string[]>;
+  /** "This is it" on an uncertain auto-match: track id -> the file name the user confirmed.
+   *  It counts only while the auto-match still picks that file. */
+  match_ok: Record<string, string>;
+  /** files a Free DL saved into the downloads folder: absolute path (the file, or the zip) ->
+   *  the track whose link it came from. The inbox gives the file to that track instead of
+   *  guessing by its name, and the move into the collection pins it there. */
+  dl_origin?: Record<string, { track: number; url: string; at: number }>;
   /** SoundCloud track picked for a local file that isn't in the playlist, keyed "x:" + path */
   found: Record<string, Found>;
   /** "not available now": track id -> the links it had when marked; cleared when they change */
@@ -355,6 +364,8 @@ export function withDefaults(st: any): AppState {
   st.edits = st.edits || {};
   st.assigned = st.assigned || {}; // older state files predate manual matching
   st.by_hand = st.by_hand || {};
+  st.rejected = st.rejected || {};
+  st.match_ok = st.match_ok || {};
   st.found = st.found || {};
   st.na = st.na || {};
   st.bandcamp = st.bandcamp || {};
@@ -2539,6 +2550,13 @@ function moveRecords(trackIds: Set<number>, oldKey: string, newKey: string, oldP
   if (oldKey !== newKey)
     for (const [tid, f] of Object.entries(STATE.assigned))
       if (f === oldKey && trackIds.has(Number(tid))) { STATE.assigned[tid] = newKey; changed = true; }
+  if (oldKey !== newKey) {
+    // "Not this file" and "This is it" follow the file too, so a converted WAV is not offered again
+    for (const [tid, fs_] of Object.entries(STATE.rejected))
+      if (trackIds.has(Number(tid)) && fs_.includes(oldKey)) { STATE.rejected[tid] = fs_.map((f) => f === oldKey ? newKey : f); changed = true; }
+    for (const [tid, f] of Object.entries(STATE.match_ok))
+      if (f === oldKey && trackIds.has(Number(tid))) { STATE.match_ok[tid] = newKey; changed = true; }
+  }
   if (oldPath !== newPath) {
     for (const map of [STATE.found, STATE.edits] as Record<string, unknown>[]) {
       const ok = "x:" + oldPath, nk = "x:" + newPath;
@@ -2673,13 +2691,18 @@ export function listAudioKeys(d: string, recursive: boolean, cap = 200000): stri
 
 /** Which file goes with which track: the pins (`manual`: track id -> file key, "" = no file)
  *  first, then every other file to the playlist track its name and length are closest to
- *  (sim). matched: track id -> [file key, score] (score -1: a pin); fileHit: the files that
- *  went to a track (the rest are extras). Pure: the folder change's preview uses it too. */
-function matchFiles(files: LocalFile[], tracks: PlTrack[], manual: Map<number, string>): { matched: Map<number, [string, number]>; fileHit: Set<string> } {
+ *  (sim), never to a track the user said it is not (`rejected`). matched: track id -> [file key,
+ *  score] (score -1: a pin); fileHit: the files that went to a track (the rest are extras);
+ *  doubt: the auto-matched tracks worth a look (see MATCH_DOUBT). Pure: the folder change's
+ *  preview uses it too. */
+function matchFiles(files: LocalFile[], tracks: PlTrack[], manual: Map<number, string>, rejected: Map<number, Set<string>> = new Map()): MatchResult {
   const manualFiles = new Set([...manual.values()].filter(Boolean));
   const fmap = new Set(files.map((f) => f.name));
   const matched = new Map<number, [string, number]>(); // score -1 = manual
   const fileHit = new Set<string>();
+  const close = new Set<number>();      // another file or another track scored nearly as high
+  const fdur = new Map<string, number>();
+  const tById = new Map(tracks.map((t) => [t.id, t]));
   // A file and a track with no normalised word in common can never reach the 0.6 bar
   // (without the Jaccard part the most a pair can score is 0.4 + 0.15), so each file is
   // only scored against the tracks it shares a word with. The collection can hold tens
@@ -2694,34 +2717,54 @@ function matchFiles(files: LocalFile[], tracks: PlTrack[], manual: Map<number, s
     if (manualFiles.has(f.name)) { fileHit.add(f.name); continue; }
     const cand = new Set<number>();
     for (const w of norm(f.base).split(" ")) if (w) for (const i of byToken.get(w) || []) cand.add(i);
-    let best: PlTrack | null = null, bestS = 0;
+    let best: PlTrack | null = null, bestS = 0, second = 0;
     for (const i of cand) {
       const t = tracks[i];
       if (manual.has(t.id)) continue; // manually decided, don't steal / re-fill
+      if (rejected.get(t.id)?.has(f.name)) continue; // "Not this file"
       let s = Math.max(sim(f.base, t.title), sim(f.base, `${t.user} ${t.title}`));
       const dd = Math.abs(f.dur - t.dur);
       s += dd < 3 ? 0.15 : dd < 10 ? 0.07 : 0;
-      if (s > bestS) { best = t; bestS = s; }
+      if (s > bestS) { second = bestS; best = t; bestS = s; } else if (s > second) second = s;
     }
     if (best && bestS >= 0.6) {
       const prev = matched.get(best.id);
-      if (!prev || bestS > prev[1]) matched.set(best.id, [f.name, Math.round(bestS * 100) / 100]);
+      if (!prev || bestS > prev[1]) {
+        // the file this one beats was nearly as good: either may be the right one
+        if (prev && bestS - prev[1] < MATCH_DOUBT.close) close.add(best.id); else if (prev) close.delete(best.id);
+        matched.set(best.id, [f.name, Math.round(bestS * 100) / 100]);
+        // another track fits this file nearly as well
+        if (second >= 0.6 && bestS - second < MATCH_DOUBT.close) close.add(best.id);
+        fdur.set(f.name, f.dur);
+      } else if (prev[1] - bestS < MATCH_DOUBT.close) close.add(best.id);
       fileHit.add(f.name);
     }
   }
   for (const [tid, fname] of manual)
     if (fname && fmap.has(fname)) matched.set(tid, [fname, -1]); // a pin into a folder that's away stays, without a file
-  return { matched, fileHit };
+  const doubt = new Set<number>();
+  for (const [tid, [fname, s]] of matched) {
+    if (s < 0) continue;
+    const t = tById.get(tid), fd = fdur.get(fname) || 0;
+    const dd = t && t.dur && fd ? Math.abs(fd - t.dur) : 0;
+    if (s < MATCH_DOUBT.score || dd > MATCH_DOUBT.dur || close.has(tid)) doubt.add(tid);
+  }
+  return { matched, fileHit, doubt };
 }
+interface MatchResult { matched: Map<number, [string, number]>; fileHit: Set<string>; doubt: Set<number>; }
+/** When an auto-match asks for a look ("Check file"): its score is under `score`, the file is
+ *  more than `dur` seconds off the track, or a second file or track came within `close`. */
+const MATCH_DOUBT = { score: 0.85, dur: 10, close: 0.05 };
 
 /** matchFiles for a library against the collection, memoised: the result holds until the
  *  collection changes (COLL_VERSION), the playlist's tracks change or the pins change. */
-const MATCH_CACHE = new Map<string, { ver: number; sig: string; matched: Map<number, [string, number]>; fileHit: Set<string> }>();
-function matchLib(lib: Library, files: LocalFile[], tracks: PlTrack[], manual: Map<number, string>): { matched: Map<number, [string, number]>; fileHit: Set<string> } {
-  const sig = tracks.map((t) => t.id).join(",") + "|" + [...manual].map(([k, v]) => k + ":" + v).sort().join("|");
+const MATCH_CACHE = new Map<string, { ver: number; sig: string } & MatchResult>();
+function matchLib(lib: Library, files: LocalFile[], tracks: PlTrack[], manual: Map<number, string>, rejected: Map<number, Set<string>>): MatchResult {
+  const sig = tracks.map((t) => t.id).join(",") + "|" + [...manual].map(([k, v]) => k + ":" + v).sort().join("|")
+    + "|" + [...rejected].map(([k, v]) => k + ":" + [...v].join("/")).sort().join("|");
   const hit = MATCH_CACHE.get(lib.id);
   if (hit && hit.ver === COLL_VERSION && hit.sig === sig) return hit;
-  const r = matchFiles(files, tracks, manual);
+  const r = matchFiles(files, tracks, manual, rejected);
   MATCH_CACHE.set(lib.id, { ver: COLL_VERSION, sig, ...r });
   return r;
 }
@@ -2790,6 +2833,16 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
     }
   }
   if (!keep) for (const k of Object.keys(STATE.by_hand)) if (!(k in STATE.assigned)) { delete STATE.by_hand[k]; assignedDirty = true; }
+  // "Not this file" / "This is it" of a track in no playlist any more, or of files that are gone
+  if (!keep) for (const map of [STATE.rejected, STATE.match_ok] as Record<string, string[] | string>[])
+    for (const k of Object.keys(map)) {
+      if (!trackIds.has(Number(k))) { if (!otherIds.has(Number(k))) { delete map[k]; assignedDirty = true; } continue; }
+      const v = map[k];
+      if (Array.isArray(v)) {
+        const kept = v.filter((f) => fmap.has(f));
+        if (kept.length !== v.length) { if (kept.length) map[k] = kept; else delete map[k]; assignedDirty = true; }
+      } else if (!fmap.has(v)) { delete map[k]; assignedDirty = true; }
+    }
   // local files whose SoundCloud match has since been added to the playlist:
   // pin the file to that track (unless the track already has a manual file)
   for (const k of Object.keys(STATE.found)) {
@@ -2814,16 +2867,21 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
     if (!trackIds.has(Number(k))) continue;   // another library's pin: its file name means nothing here
     manual.set(Number(k), fname);
   }
-  const { matched, fileHit } = matchLib(lib, files, pl.tracks, manual);
+  const rejected = new Map<number, Set<string>>();
+  for (const [k, fs_] of Object.entries(STATE.rejected))
+    if (trackIds.has(Number(k)) && fs_.length) rejected.set(Number(k), new Set(fs_));
+  const { matched, fileHit, doubt } = matchLib(lib, files, pl.tracks, manual, rejected);
   // the inbox is part of the index: a fresh download already matches its track and the row
   // says "in inbox" instead of "missing", before anything is moved into the collection
   const inboxMatch = new Map<number, { name: string; zip: string | null; score: number }>();
   try {
     const idir = inboxDir();
     if (fs.existsSync(idir) && !collRoots().some((r) => sameDir(r.path, idir))) {
-      for (const f of (await scanInbox(idir)).files) {
+      const ifiles = (await scanInbox(idir)).files;
+      const trackFor = inboxMatcher(idir, ifiles, pl.tracks);
+      for (const f of ifiles) {
         if (fmap.has(f.path)) continue;   // the inbox lies inside a root: the file is in the collection already
-        const [t, score] = bestTrackNames(f.matchNames, f.dur, pl.tracks);
+        const [t, score] = trackFor(f);
         if (!t || score < 0.6 || matched.has(t.id)) continue;
         const prev = inboxMatch.get(t.id);
         if (!prev || score > prev.score) inboxMatch.set(t.id, { name: f.name, zip: f.zip || null, score });
@@ -2882,7 +2940,11 @@ export async function buildView(libArg?: Library, opts: { plans?: boolean } = {}
              have, na, in_inbox: !have && !na ? inboxMatch.get(t.id) || null : null,
              auto: !!m, file: m ? m[0] : null, file_disp: m ? collDisplay(m[0]) : null, path: m ? fmap.get(m[0])!.path : null,
              score: m && m[1] >= 0 ? Math.min(1, m[1]) : null,
-             pinned: manual.has(t.id), manual_match: manual.has(t.id) && !!STATE.by_hand[t.id], links, bc_at: STATE.bandcamp?.[String(t.id)]?.v === BANDCAMP_RULES ? STATE.bandcamp[String(t.id)].at : 0, lossy, upgrade,
+             pinned: manual.has(t.id), manual_match: manual.has(t.id) && !!STATE.by_hand[t.id],
+             // an uncertain auto-match the user has not confirmed yet ("Check file")
+             check_match: !!m && m[1] >= 0 && doubt.has(t.id) && STATE.match_ok[String(t.id)] !== m[0] && o !== "have",
+             match_ok: !!m && m[1] >= 0 && STATE.match_ok[String(t.id)] === m[0],
+             rejected: (STATE.rejected[String(t.id)] || []).length, links, bc_at: STATE.bandcamp?.[String(t.id)]?.v === BANDCAMP_RULES ? STATE.bandcamp[String(t.id)].at : 0, lossy, upgrade,
              added: t.added || 0, is_new: (t.added || 0) > (lib.seen_mark || 0),
              acquired, is_new_file: acquired > (lib.seen_mark || 0),
              tagged, incompat, key, pn, override: o || null, edited: hand, ...(plan ? { tag_plan: plan } : {}),
@@ -4016,10 +4078,60 @@ export async function setOverride(data: any): Promise<any> {
   return buildView();
 }
 
+/** What a match change touches for one track, so Undo can put it back as it was. */
+interface MatchSnap { assigned: string | null; by_hand: boolean; override: string | null; na: { sig: string; at: number } | null;
+                      rejected: string[] | null; match_ok: string | null; }
+function matchSnap(tid: string): MatchSnap {
+  return { assigned: tid in STATE.assigned ? STATE.assigned[tid] : null, by_hand: !!STATE.by_hand[tid],
+           override: STATE.overrides[tid] || null, na: STATE.na[tid] || null,
+           rejected: STATE.rejected[tid] ? [...STATE.rejected[tid]] : null, match_ok: STATE.match_ok[tid] ?? null };
+}
+function putSnap(tid: string, s: any): void {
+  if (!/^\d+$/.test(tid) || !s || typeof s !== "object") throw appError("bad_request", "bad undo record");
+  const str = (v: any) => typeof v === "string";
+  if (str(s.assigned)) STATE.assigned[tid] = s.assigned; else delete STATE.assigned[tid];
+  if (s.by_hand) STATE.by_hand[tid] = true; else delete STATE.by_hand[tid];
+  if (s.override === "have" || s.override === "missing") STATE.overrides[tid] = s.override; else delete STATE.overrides[tid];
+  if (s.na && str(s.na.sig) && typeof s.na.at === "number") STATE.na[tid] = { sig: s.na.sig, at: s.na.at }; else delete STATE.na[tid];
+  if (Array.isArray(s.rejected) && s.rejected.every(str) && s.rejected.length) STATE.rejected[tid] = [...s.rejected]; else delete STATE.rejected[tid];
+  if (str(s.match_ok)) STATE.match_ok[tid] = s.match_ok; else delete STATE.match_ok[tid];
+}
+
 export async function setAssign(data: any): Promise<any> {
-  // file: name = pin this file to the track, "" = force no file, null = back to auto
+  // restore: { track id: MatchSnap } = Undo of an earlier change (the `undo` it returned)
+  if (data.restore && typeof data.restore === "object") {
+    for (const [k, s] of Object.entries(data.restore)) putSnap(k, s);
+    saveState();
+    return buildView();
+  }
   const tid = String(data.id);
+  // every track this change touches, as it was: the view hands it back as `undo`
+  const undo: Record<string, MatchSnap> = { [tid]: matchSnap(tid) };
+  const touch = (k: string) => { if (!(k in undo)) undo[k] = matchSnap(k); };
+  // confirm: file = "This is it": the uncertain auto-match stops asking for a look
+  if (typeof data.confirm === "string") {
+    STATE.match_ok[tid] = data.confirm;
+    saveState();
+    return { ...(await buildView()), undo };
+  }
+  // reject: file = "Not this file": the auto-match never gives this file to this track again;
+  // a pin of that file to it goes too, and the track looks for another file by itself
+  if (typeof data.reject === "string" && data.reject) {
+    const f = data.reject;
+    STATE.rejected[tid] = [...new Set([...(STATE.rejected[tid] || []), f])];
+    if (STATE.assigned[tid] === f) { delete STATE.assigned[tid]; delete STATE.by_hand[tid]; }
+    if (STATE.match_ok[tid] === f) delete STATE.match_ok[tid];
+    if (STATE.overrides[tid] === "have") delete STATE.overrides[tid];
+    saveState();
+    return { ...(await buildView()), undo };
+  }
+  // file: name = pin this file to the track, "" = force no file, null = back to auto
   const file = data.file;
+  if (file) for (const k of Object.keys(STATE.assigned)) if (k !== tid && STATE.assigned[k] === file) touch(k);
+  const view = await assignFile(tid, file);
+  return { ...view, undo };
+}
+async function assignFile(tid: string, file: any): Promise<any> {
   if (file === null || file === undefined) {
     delete STATE.assigned[tid]; delete STATE.by_hand[tid];
   } else {
@@ -4273,6 +4385,42 @@ async function scanInboxZips(dir: string): Promise<{ files: InboxFile[]; errors:
   return { files, errors, error_items };
 }
 
+/** A Free DL saved `r.file`: remember which track's link it was, when the id and the link
+ *  belong together (the same check a direct download gets) and the file is in the downloads folder. */
+export function noteDownload(trackId: unknown, url: string, r: any): void {
+  const file = r && typeof r.file === "string" ? r.file : "";
+  if (!file || trackId == null || trackId === "") return;
+  const k = knownLink(String(trackId), url);
+  if (!k || !sameDir(path.dirname(file), inboxDir())) return;
+  (STATE.dl_origin || (STATE.dl_origin = {}))[file] = { track: Number(trackId), url, at: Date.now() };
+  saveState();
+}
+/** The inbox's track finder: a file a Free DL brought in goes to its track (score 1); of a zip
+ *  only the entry whose name fits that track best does, the others are matched by name as before.
+ *  Records of files that are gone are dropped. */
+function inboxMatcher(dir: string, files: InboxFile[], tracks: PlTrack[]): (f: InboxFile) => [PlTrack | null, number, boolean] {
+  const orig = STATE.dl_origin || {};
+  let dirty = false;
+  for (const k of Object.keys(orig)) if (sameDir(path.dirname(k), dir) && !fs.existsSync(k)) { delete orig[k]; dirty = true; }
+  if (dirty) saveState();
+  const byId = new Map(tracks.map((t) => [t.id, t]));
+  const zipPick = new Map<string, [string, number]>();   // zip path -> [entry path, score] for its track
+  for (const f of files) {
+    if (!f.zip) continue;
+    const o = orig[path.join(dir, f.zip)], t = o && byId.get(o.track);
+    if (!t) continue;
+    const [, s] = bestTrackNames(f.matchNames, f.dur, [t]);
+    const prev = zipPick.get(f.zip);
+    if (!prev || s > prev[1]) zipPick.set(f.zip, [f.path, s]);
+  }
+  return (f) => {
+    const o = orig[f.zip ? path.join(dir, f.zip) : f.path], t = o && byId.get(o.track);
+    if (t && (!f.zip || zipPick.get(f.zip)?.[0] === f.path)) return [t, f.zip ? Math.max(0.6, zipPick.get(f.zip)![1]) : 1, true];
+    const [bt, s] = bestTrackNames(f.matchNames, f.dur, tracks);
+    return [bt, s, false];
+  };
+}
+
 function bestTrackNames(names: string[], dur: number, tracks: PlTrack[]): [PlTrack | null, number] {
   let best: PlTrack | null = null, bestS = 0;
   for (const t of tracks) {
@@ -4314,10 +4462,11 @@ export async function inboxView(opts: { auto?: boolean } = {}): Promise<any> {
   const scan = await scanInbox(dir);
   base.zip_errors = scan.errors;
   base.zip_error_items = scan.error_items;
+  const trackFor = inboxMatcher(dir, scan.files, lib.playlist.tracks);
   for (const f of scan.files) {
     if (libNames.has(f.name)) { base.already++; continue; } // copied in already
     if (libStems.get(stemKey(f.name)) || (libStems.has(stemKey(f.name)) && LOSSY.test(f.fmt[0]))) { base.already++; continue; } // in another format
-    const [t, score] = bestTrackNames(f.matchNames, f.dur, lib.playlist.tracks);
+    const [t, score, fromDl] = trackFor(f);
     const row = t && rows.get(t.id);
     const lossy = LOSSY.test(f.fmt[0]);
     if (!t || !row || score < 0.6) {   // not in the playlist: can still be moved in, or looked up on SoundCloud first
@@ -4327,11 +4476,13 @@ export async function inboxView(opts: { auto?: boolean } = {}): Promise<any> {
     }
     let action: "move" | "upgrade" | null = null;
     if (!row.have) action = "move";
+    // the track's Free DL brought this file: it is the file for the track, the auto-matched one was a guess
+    else if (fromDl && !row.pinned) action = "move";
     else if (row.lossy && !lossy) action = "upgrade";
     if (!action) { base.already++; continue; } // we already hold an equal or better file
     base.items.push({ name: f.name, zip: f.zip || null, dur: fmtDur(Math.round(f.dur)), dur_diff: Math.round(f.dur - t.dur), lossy,
                       id: t.id, n: row.n, artist: row.artist, title: row.title, score: Math.min(1, score),
-                      action, cur_file: row.file });
+                      action, cur_file: row.file, from_dl: fromDl });
   }
   base.others = base.unmatched.length;
   // auto-move: exact matches (same name, same length) of tracks we don't have yet
@@ -4442,8 +4593,10 @@ export async function inboxMoveOne(data: any): Promise<{ key: string; path: stri
     try { extractEntry(src, entry, staged); } catch (e) { doneTmp(staged); throw e; }
   }
   const row = tid ? (await buildView()).tracks.find((r: any) => String(r.id) === tid) : null;
+  // the track's own Free DL against a file only guessed by name: the guess stays in the collection, unmatched
+  const fromDl = STATE.dl_origin?.[src]?.track === Number(tid);
   let kept: [string, string] | null = null;
-  if (row?.have && row.file) {
+  if (row?.have && row.file && !(fromDl && !row.pinned)) {
     const rdir = path.join(backupDir(lib), "replaced");
     const old = libPath(lib, row.file);
     const base = path.basename(old);
@@ -4456,7 +4609,7 @@ export async function inboxMoveOne(data: any): Promise<{ key: string; path: stri
   }
   try {
     if (staged) fs.renameSync(staged, dst);
-    else { moveFile(src, dst); delete STATE.dur_cache[src]; }
+    else { moveFile(src, dst); delete STATE.dur_cache[src]; if (STATE.dl_origin) delete STATE.dl_origin[src]; }
   } catch (e) {
     if (kept) try { moveFile(kept[1], kept[0]); } catch {}   // put the replaced file back
     if (staged) try { fs.unlinkSync(staged); } catch {}

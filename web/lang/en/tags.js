@@ -30,11 +30,12 @@ I18N.add('en', 'tags', {
   needsTags: 'Needs tags',
   // problem labels: one word each, the sentence goes to the tooltip and the +N list
   issue: {
-    convert: 'Convert', tags: 'Needs tags', name: 'Check name', lossless: 'Lossless',
+    convert: 'Convert', tags: 'Needs tags', name: 'Check name', lossless: 'Lossless', match: 'Check file',
     wavHeader: 'WAV HEADER',
     notes: { one: '{n} note on this file', other: '{n} notes on this file' },
     fix: 'Fix in {page}',
   },
+  checkMatchTip: 'This file was matched automatically and may not be the right one. Click to compare it with the playlist entry.',
   needsTagsTip: 'The artist / title in the file are missing or differ from the name shown here',
   convert: 'Convert · {codec}',
   bits: { one: '{n}-bit', other: '{n}-bit' },

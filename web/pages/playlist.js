@@ -73,7 +73,7 @@ function incompatText(s) {
    at most a short fact in mono ("24-BIT", "FLAC"); the sentence lives in the tooltip and in the
    +N list. Two sizes: full (word and fact, the To do column and Prepare) and compact (icon and
    fact, file lines). A file line shows at most two labels, most important first, then +N. */
-const ISSUE_ICON = { convert: 'sliders', tags: 'tag', name: 'alert', lossless: 'arrowUp' };
+const ISSUE_ICON = { convert: 'sliders', tags: 'tag', name: 'alert', lossless: 'arrowUp', match: 'link' };
 /** the short fact for a file's incompat reason ("24-bit" > 24-BIT, "X unsupported" > X) */
 function incompatFact(s) {
   let m = /^(\d+)-bit$/.exec(s); if (m) return m[1] + '-BIT';
@@ -101,6 +101,8 @@ function issueTag({ kind, label, fact = '', tip = '', size = 'full', click = '' 
  *  Check name, with its onclick) */
 function fileIssues(r, opts = {}) {
   const out = [];
+  // an uncertain auto-match first: everything else on the line is about a file that may be the wrong one
+  if (r.check_match && r.id != null) out.push({ kind: 'match', label: t('tags.issue.match'), tip: t('tags.checkMatchTip'), click: `openCheckMatch(${r.id})` });
   if (opts.convert && r.incompat) out.push({ kind: 'convert', label: t('tags.issue.convert'), fact: incompatFact(r.incompat),
     tip: r.incompat === 'WAV header' ? t('tags.wavHeaderTip') : `${opts.convertTip || t('tags.convertTip')} (${incompatText(r.incompat)})` });
   if (r.tagged === false) out.push({ kind: 'tags', label: t('tags.issue.tags'), tip: t('tags.needsTagsTip') });
@@ -258,6 +260,7 @@ function rowMenu(anchor, id, withStatus) {
   const items = [
     ...(withStatus ? [...statusItems(r), '-'] : []),
     { label: t('playlist.menu.match'), icon: 'link', onclick: () => openAssign(id) },
+    ...(r.file ? [{ label: t('playlist.assign.reject'), icon: 'x', hint: t('playlist.assign.rejectTip'), onclick: () => rejectFile(id, r.file) }] : []),
     { label: t('tags.menu.edit'), icon: 'pencil', onclick: () => { EDIT_ID = id; render(); const a = $('#e-artist'); a && a.focus(); } },
     { label: t('tags.menu.swap'), icon: 'swap', disabled: !r.artist, hint: t('tags.menu.swapHintUpload'), onclick: () => swapName(id) },
     '-',
@@ -307,9 +310,52 @@ async function resetEdit(id) {
 }
 
 /* ---------- match a track to a local file ---------- */
-async function applyAssign(id, file, msg) {
-  try { DATA = await api('/api/assign', { id, file }); render(); toast(msg); inboxChanged(); }
+/** body: { file } | { reject } | { confirm }; the toast offers Undo, which puts every touched track back */
+async function applyAssign(id, body, msg) {
+  try {
+    const v = await api('/api/assign', { id, ...body });
+    const undo = v.undo; delete v.undo;
+    DATA = v; render(); inboxChanged();
+    toast(msg, false, 0, undo ? { label: t('playlist.assign.undo'), onclick: () => undoMatch(undo) } : null);
+  } catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
+}
+async function undoMatch(snap) {
+  try { DATA = await api('/api/assign', { restore: snap }); render(); inboxChanged(); toast(t('playlist.assign.undone')); }
   catch (e) { toast(t('common.error', { msg: errText(e) }), true); }
+}
+const rejectFile = (id, file) => applyAssign(id, { reject: file }, t('playlist.assign.rejectDone'));
+/** "Check file": the playlist entry next to the file the auto-match picked, to say yes or no */
+function openCheckMatch(id) {
+  const tr = DATA.tracks.find(x => x.id === id); if (!tr || !tr.file) return;
+  const f = (DATA.local_files || []).find(x => x.name === tr.file) || { name: tr.file, dur: '' };
+  const name = (tr.artist ? tr.artist + ' - ' : '') + tr.title;
+  const pct = tr.score != null ? Math.round(tr.score * 100) : null;
+  dialog({
+    title: th('playlist.check.title'),
+    sub: th('playlist.check.sub'),
+    body: `<div class="optlist">
+        <div class="opt cur" style="cursor:default">${icon('music', 'lead')}<span class="opt-main"><span class="fn">${esc(name)}</span>
+          <span class="fi">${tag(t('playlist.check.track'), '')}</span></span><span class="dur">${esc(tr.dur)}</span></div>
+        <div class="opt" style="cursor:default">${playBtn(filePath(f, f.name), name, '').replace('play-btn', 'play-btn lead') || icon('music', 'lead')}
+          <span class="opt-main"><span class="fn" title="${esc(f.name)}">${esc(tr.file_disp || f.name)}</span>
+          <span class="fi">${tag(t('playlist.check.file'), '')}${pct != null ? tag(t('tags.pctMatch', { pct }), 'outline') : ''}</span></span>
+          <span class="dur">${esc(f.dur || '')}</span></div>
+      </div>`,
+    foot: `<button class="btn btn-ghost" data-a="other">${icon('link')}${esc(t('playlist.check.other'))}</button>
+           <span class="spacer"></span>
+           <button class="btn" data-a="no">${icon('xCircle')}${esc(t('playlist.check.no'))}</button>
+           <button class="btn btn-primary" data-a="yes">${icon('check')}${esc(t('playlist.check.yes'))}</button>`,
+    open(dlg, done) {
+      dlg.querySelector('[data-a=yes]').onclick = () => done({ yes: true });
+      dlg.querySelector('[data-a=no]').onclick = () => done({ no: true });
+      dlg.querySelector('[data-a=other]').onclick = () => done({ other: true });
+    },
+  }).then(r => {
+    if (!r) return;
+    if (r.yes) return applyAssign(id, { confirm: tr.file }, t('playlist.check.yesDone'));
+    if (r.no) return rejectFile(id, tr.file);
+    openAssign(id);
+  });
 }
 const normName = s => String(s || '').toLowerCase().replace(/\.[a-z0-9]+$/, '').replace(/[^a-z0-9]+/g, ' ').trim();
 function nameScore(a, b) {
@@ -331,6 +377,7 @@ function openAssign(id) {
     body: `<div class="search" style="width:100%"><span>${icon('search')}</span><input id="af-q" type="search" placeholder="${esc(t('playlist.assign.filter'))}" spellcheck="false"></div>
            <div class="optlist" id="af-list" style="margin-top:10px"></div>`,
     foot: `${tr.pinned || tr.manual_match ? `<button class="btn btn-ghost" data-a="auto" title="${esc(t('playlist.assign.autoTip'))}">${icon('wand')}${esc(t('playlist.assign.auto'))}</button>` : ''}
+           ${tr.file ? `<button class="btn btn-ghost" data-a="reject" title="${esc(t('playlist.assign.rejectTip'))}">${icon('x')}${esc(t('playlist.assign.reject'))}</button>` : ''}
            ${tr.file || tr.manual_match ? `<button class="btn btn-ghost" data-a="none" title="${esc(t('playlist.assign.noneTip'))}">${icon('xCircle')}${esc(t('playlist.assign.none'))}</button>` : ''}
            <span class="spacer"></span><button class="btn" data-close>${esc(t('common.cancel'))}</button>`,
     open(dlg, done) {
@@ -350,12 +397,14 @@ function openAssign(id) {
       const q = dlg.querySelector('#af-q'); q.oninput = e => paint(e.target.value); q.focus();
       const auto = dlg.querySelector('[data-a=auto]'); if (auto) auto.onclick = () => done({ auto: true });
       const none = dlg.querySelector('[data-a=none]'); if (none) none.onclick = () => done({ none: true });
+      const rej = dlg.querySelector('[data-a=reject]'); if (rej) rej.onclick = () => done({ reject: true });
     },
   }).then(r => {
     if (!r) return;
-    if (r.auto) return applyAssign(id, null, t('playlist.assign.autoDone'));
-    if (r.none) return applyAssign(id, '', t('playlist.assign.noneDone'));
-    applyAssign(id, r.file, t('playlist.assign.fileDone'));
+    if (r.auto) return applyAssign(id, { file: null }, t('playlist.assign.autoDone'));
+    if (r.none) return applyAssign(id, { file: '' }, t('playlist.assign.noneDone'));
+    if (r.reject) return rejectFile(id, tr.file);
+    applyAssign(id, { file: r.file }, t('playlist.assign.fileDone'));
   });
 }
 
@@ -634,7 +683,7 @@ PAGES.missing = {
 
 /** the Have chips: all · lossless available · needs tags · needs convert · check name ("attention" from older links = tags or convert) */
 const haveFilter = r => HFILTER === 'all' ? true : HFILTER === 'upgrade' ? !!r.upgrade : HFILTER === 'tags' ? r.tagged === false
-  : HFILTER === 'convert' ? !!r.incompat : HFILTER === 'names' ? !!r.check_name : (r.tagged === false || !!r.incompat);
+  : HFILTER === 'convert' ? !!r.incompat : HFILTER === 'names' ? !!r.check_name : HFILTER === 'match' ? !!r.check_match : (r.tagged === false || !!r.incompat);
 
 PAGES.have = {
   title: () => t('app.nav.have'),
@@ -646,7 +695,8 @@ PAGES.have = {
     return chipsHtml('HFILTER', HFILTER, [['all', 'tags.chip.all', rows.length], ['upgrade', 'tags.lossless', rows.filter(r => r.upgrade).length, 'arrowUp'],
       ['tags', 'tags.needsTags', rows.filter(r => r.tagged === false).length, 'tag'],
       ['convert', 'playlist.have.chip.convert', rows.filter(r => !!r.incompat).length, 'sliders'],
-      ['names', 'playlist.missing.chip.names', rows.filter(r => r.check_name).length, 'alert']]);
+      ['names', 'playlist.missing.chip.names', rows.filter(r => r.check_name).length, 'alert'],
+      ...(rows.some(r => r.check_match) || HFILTER === 'match' ? [['match', 'playlist.have.chip.match', rows.filter(r => r.check_match).length, 'link']] : [])]);
   },
   body: q => {
     let rows = DATA.tracks.filter(r => r.have && matchesQ(r, q));

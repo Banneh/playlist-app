@@ -135,6 +135,8 @@ const ibExact = it => Math.round(it.score * 100) >= 100 && ibSameLength(it);
 /** how well a download fits its track, as one label: Exact match, or Close match with what differs (the length, or the
  *  name when the length agrees). Work through shows this same label on the file it finds (pages/workthrough.js) */
 function ibMatchTag(it) {
+  // the track's own Free DL brought it: no guess about the name
+  if (it.from_dl) return tag(t('inbox.fromDl'), 'ok', 'download', t('inbox.fromDlTip'));
   if (ibExact(it)) return tag(t('tags.exactMatch'), 'ok', 'check', t('inbox.exactTip'));
   const pct = Math.round(it.score * 100);
   const diff = ibSameLength(it) ? t('inbox.nameDiffers') : (it.dur_diff > 0 ? '+' : '−') + Math.abs(it.dur_diff) + ' s';

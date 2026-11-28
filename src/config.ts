@@ -699,7 +699,7 @@ export async function apply(data: any, opts: { jobActive: boolean }): Promise<an
     }
   };
   const next: any = {
-    libraries: [], active: null, dur_cache: {}, zip_cache: { ...(S.zip_cache || {}) }, overrides: {}, edits: {}, assigned: {}, by_hand: {},
+    libraries: [], active: null, dur_cache: {}, zip_cache: { ...(S.zip_cache || {}) }, overrides: {}, edits: {}, assigned: {}, by_hand: {}, rejected: {}, match_ok: {},
     found: {}, na: {}, acquired: {}, settings: {}, bandcamp: { ...(S.bandcamp || {}) }, sc_card: { ...(S.sc_card || {}) }, client_id: S.client_id ?? null, device: S.device,
   };
   const report: any = { libraries: [], backups: [], machine_used: false, notes: [...p.notes] };
@@ -870,7 +870,7 @@ async function applyV2(p: Plan, data: any, opts: { jobActive: boolean }): Promis
   };
   const next: any = {
     collection: { roots: [] }, libraries: [], active: null, dur_cache: {}, zip_cache: { ...(S.zip_cache || {}) },
-    overrides: {}, edits: {}, assigned: {}, by_hand: {}, found: {}, na: {}, acquired: {}, settings: {},
+    overrides: {}, edits: {}, assigned: {}, by_hand: {}, rejected: {}, match_ok: {}, found: {}, na: {}, acquired: {}, settings: {},
     bandcamp: { ...(S.bandcamp || {}) }, sc_card: { ...(S.sc_card || {}) }, client_id: S.client_id ?? null, device: S.device,
   };
   let rid = 1;

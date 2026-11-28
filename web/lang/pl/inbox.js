@@ -7,6 +7,8 @@ I18N.add('pl', 'inbox', {
     many: '{n} plików zostało jako WAV',
   },
   exactTip: 'Nazwa i długość pliku pasują do pozycji na playliście',
+  fromDl: 'Z jego Free DL',
+  fromDlTip: 'Ten plik przyszedł z linku Free DL tego utworu, więc trafia do niego bez względu na nazwę',
   fromZip: 'z {zip}',
   fromZipTip: 'W archiwum zip w folderze Pobrane; utwór zostanie rozpakowany do kolekcji, a archiwum zostanie na miejscu',
   replaces: 'Zastępuje {file} · stary plik trafi do kopii',

@@ -7,6 +7,8 @@ I18N.add('en', 'inbox', {
     other: '{n} files were kept as WAV',
   },
   exactTip: 'The file name and length match the playlist entry',
+  fromDl: 'From its Free DL',
+  fromDlTip: 'This file came from this track’s Free DL link, so it goes to this track whatever its name',
   fromZip: 'from {zip}',
   fromZipTip: 'Inside a zip in your Downloads folder; the track is unpacked into your collection and the zip stays where it is',
   replaces: 'Replaces {file} · old file goes to backups',
