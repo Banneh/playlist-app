@@ -5,6 +5,7 @@ import * as path from "path";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import * as core from "../core";
+import { fileUrl } from "../directdl";
 import { trace } from "./trace";
 
 export const UA =
@@ -68,8 +69,17 @@ const safe = (s: string) => s.replace(/[/\\:*?"<>|]+/g, "-").trim() || "download
 export async function saveFile(url: string, headers: Record<string, string>, fallback: string, prefer = false): Promise<{ filePath: string; bytes: number; mime: string }> {
   const dir = core.inboxDir();
   fs.mkdirSync(dir, { recursive: true });
+  // a gate that hands out a Google Drive or Dropbox share link: that is a viewer page, the file
+  // itself comes from the link's download address
+  if (core.directKind(url) === "drive" || core.directKind(url) === "dropbox") url = fileUrl(url);
   const res = await req(url, { headers }, FILE_TIMEOUT_MS);
   if (!res.ok || !res.body) throw new Error("file HTTP " + res.status);
+  // a page (a private file, a download limit, a share page) is never saved as the track
+  const type = res.headers.get("content-type") || "";
+  if (/text\/html|json/i.test(type)) {
+    await res.body.cancel().catch(() => {});
+    throw new Error("the download link gave a page, not a file (" + type + ")");
+  }
   const cd = res.headers.get("content-disposition") || "";
   let named = "";
   try { named = decodeURIComponent((cd.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i) || [])[1] || ""); } catch {}
@@ -82,7 +92,23 @@ export async function saveFile(url: string, headers: Record<string, string>, fal
   await pipeline(Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]), fs.createWriteStream(target));
   const bytes = fs.statSync(target).size;
   if (!bytes) throw new Error("empty file");
+  if (looksLikePage(target)) {
+    try { fs.unlinkSync(target); } catch { /* gone already */ }
+    throw new Error("the download link gave a page, not a file");
+  }
   return { filePath: target, bytes, mime: mimeOf(res.headers.get("content-type"), target) };
+}
+
+/** An HTML or JSON answer sent as a binary type: its first bytes are markup, not audio or a zip. */
+function looksLikePage(file: string): boolean {
+  const fd = fs.openSync(file, "r");
+  try {
+    const head = Buffer.alloc(256);
+    const n = fs.readSync(fd, head, 0, head.length, 0);
+    return /^\s*(<!doctype html|<html|<head|<\?xml|\{\s*")/i.test(head.subarray(0, n).toString("latin1").replace(/^\xEF\xBB\xBF/, ""));
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 const MIME: Record<string, string> = {
